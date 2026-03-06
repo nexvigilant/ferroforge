@@ -228,9 +228,20 @@ impl ConfigRegistry {
                         "required": required,
                     });
 
+                    // Detect stub tools: has stub_response but no proxy at tool or config level
+                    let is_stub = tool.stub_response.is_some()
+                        && tool.proxy.is_none()
+                        && config.proxy.is_none();
+
+                    let description = if is_stub {
+                        format!("[STUB — not yet live] [{}] {}", config.domain, tool.description)
+                    } else {
+                        format!("[{}] {}", config.domain, tool.description)
+                    };
+
                     ToolInfo {
                         name: prefixed_name,
-                        description: format!("[{}] {}", config.domain, tool.description),
+                        description,
                         input_schema,
                         output_schema: tool.output_schema.clone(),
                     }
