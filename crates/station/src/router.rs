@@ -84,12 +84,11 @@ fn extract_status(result: &ToolCallResult) -> (String, bool) {
     let is_error = result.is_error.unwrap_or(false);
 
     // Try to parse the content as JSON and extract "status" field
-    if let Some(ContentBlock::Text { text }) = result.content.first() {
-        if let Ok(json) = serde_json::from_str::<Value>(text) {
-            if let Some(status) = json.get("status").and_then(|s| s.as_str()) {
-                return (status.to_string(), is_error);
-            }
-        }
+    if let Some(ContentBlock::Text { text }) = result.content.first()
+        && let Ok(json) = serde_json::from_str::<Value>(text)
+        && let Some(status) = json.get("status").and_then(|s| s.as_str())
+    {
+        return (status.to_string(), is_error);
     }
 
     if is_error {

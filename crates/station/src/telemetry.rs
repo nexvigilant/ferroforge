@@ -129,16 +129,14 @@ impl StationTelemetry {
     /// Record a completed tool call.
     pub fn record(&self, record: ToolCallRecord) {
         // Append to JSONL file
-        if let Some(ref path) = self.log_path {
-            if let Ok(json) = serde_json::to_string(&record) {
-                if let Ok(mut file) = OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(path)
-                {
-                    let _ = writeln!(file, "{json}");
-                }
-            }
+        if let Some(ref path) = self.log_path
+            && let Ok(json) = serde_json::to_string(&record)
+            && let Ok(mut file) = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+        {
+            let _ = writeln!(file, "{json}");
         }
 
         // Push to ring buffer
@@ -473,13 +471,13 @@ fn parse_iso8601_epoch(ts: &str) -> Option<u64> {
     // Approximate days from epoch (good enough for 60s window comparison)
     let mut days = 0u64;
     for yr in 1970..y {
-        days += if yr % 4 == 0 && (yr % 100 != 0 || yr % 400 == 0) {
+        days += if yr.is_multiple_of(4) && (!yr.is_multiple_of(100) || yr.is_multiple_of(400)) {
             366
         } else {
             365
         };
     }
-    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let leap = y.is_multiple_of(4) && (!y.is_multiple_of(100) || y.is_multiple_of(400));
     let month_days: &[u64] = if leap {
         &[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     } else {
