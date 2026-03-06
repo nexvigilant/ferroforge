@@ -1,149 +1,207 @@
 #!/usr/bin/env python3
 """
-EudraVigilance Proxy — routes MoltBrowser hub tool calls for EU pharmacovigilance data.
+EudraVigilance Proxy — live substance lookup + dashboard URL generation.
 
-Usage:
-    echo '{"tool": "search-reports", "args": {"drug": "metformin"}}' | python3 eudravigilance_proxy.py
+Queries the public adrreports.eu substance tables to resolve drug names to
+EudraVigilance substance codes and generate dashboard URLs. No session tokens
+or authentication required — these are public HTML tables served by the EMA.
 
-Reads a single JSON object from stdin, dispatches to the appropriate handler,
-writes a structured JSON response to stdout. No external dependencies — stdlib only.
+Data source: https://www.adrreports.eu (EMA public access portal)
+Endpoint: /tables/substance/{first_letter}.html
 
-EudraVigilance has no public API — all tools are intelligent stubs that return
-well-structured responses describing what the live version would return.
+Phase 1 (current): Substance lookup, code resolution, dashboard URL generation.
+Phase 2 (future): OBIEE dashboard data extraction for case counts and signals.
 """
 
 import json
+import re
 import sys
+import urllib.request
+from html import unescape
 
+BASE_URL = "https://www.adrreports.eu"
+DAP_URL = "https://dap.ema.europa.eu/analyticsSOAP/saw.dll"
 DATA_SOURCE = "eudravigilance.ema.europa.eu"
-IMPLEMENTATION_NOTES = "Requires EudraVigilance API integration"
+USER_AGENT = "NexVigilant-Station/1.0 (PV research tool)"
+TIMEOUT = 15
 
 
-def _read_input() -> dict:
-    """Read and parse a JSON object from stdin."""
-    raw = sys.stdin.read().strip()
-    if not raw:
-        return None
-    return json.loads(raw)
+def _fetch(url: str) -> str:
+    """Fetch a URL and return decoded text."""
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    resp = urllib.request.urlopen(req, timeout=TIMEOUT)
+    return resp.read().decode("utf-8", errors="replace")
 
 
-def _stub_response(tool_name: str, args: dict, description: str) -> dict:
-    """Build a standard stub response."""
-    return {
-        "status": "stub",
-        "tool": tool_name,
-        "description": description,
-        "parameters_received": args,
-        "data_source": DATA_SOURCE,
-        "implementation_notes": IMPLEMENTATION_NOTES,
-    }
+def _parse_substance_table(html: str) -> list[dict]:
+    """Parse an adrreports.eu substance table into structured records."""
+    results = []
+    rows = html.split("<tr>")
+    for row in rows[1:]:  # skip header
+        urls = re.findall(r'href="([^"]+)"', row)
+        texts = [t.strip() for t in re.findall(r">([^<]+)<", row) if t.strip()]
+        if not urls or not texts:
+            continue
+        name = texts[0]
+        dashboard_url = unescape(urls[0])
+        # Extract substance code from URL (P3=1+{code})
+        code_match = re.search(r"P3=1\+(\d+)", dashboard_url)
+        code = code_match.group(1) if code_match else None
+        results.append({
+            "substance_name": name,
+            "substance_code": code,
+            "dashboard_url": dashboard_url,
+        })
+    return results
+
+
+def _lookup_substance(drug: str) -> list[dict]:
+    """Look up a drug in the adrreports.eu substance tables."""
+    first_letter = drug.strip()[0].lower()
+    url = f"{BASE_URL}/tables/substance/{first_letter}.html"
+    html = _fetch(url)
+    all_substances = _parse_substance_table(html)
+    drug_upper = drug.strip().upper()
+    # Exact match first, then prefix match, then contains
+    exact = [s for s in all_substances if s["substance_name"] == drug_upper]
+    if exact:
+        return exact
+    prefix = [s for s in all_substances if s["substance_name"].startswith(drug_upper)]
+    if prefix:
+        return prefix
+    contains = [s for s in all_substances if drug_upper in s["substance_name"]]
+    return contains
 
 
 def search_reports(args: dict) -> dict:
-    """
-    Tool: search-reports
-
-    Searches EudraVigilance for Individual Case Safety Reports (ICSRs) related
-    to a drug substance. The live version queries the EudraVigilance database
-    and returns aggregated line listings of suspected adverse reaction reports
-    from the EEA.
-    """
+    """Search EudraVigilance substance tables for a drug and return dashboard links."""
     drug = args.get("drug", args.get("substance", "")).strip()
     if not drug:
-        return {"status": "error", "message": "drug is required"}
+        return {"status": "error", "message": "substance is required", "results": []}
 
-    return _stub_response(
-        "search-reports",
-        args,
-        "Returns EudraVigilance ICSR line listings for the specified drug, "
-        "including report type (spontaneous/study/other), case reference number, "
-        "EV gateway receipt date, primary source country, reporter qualification "
-        "(healthcare professional/consumer), patient age group, patient sex, "
-        "suspect/interacting drug names, MedDRA reaction preferred terms, "
-        "seriousness criteria (death, life-threatening, hospitalization, "
-        "disability, congenital anomaly, other medically important), "
-        "and outcome (recovered, not yet recovered, fatal, unknown).",
-    )
+    try:
+        matches = _lookup_substance(drug)
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to query adrreports.eu: {type(e).__name__}: {e}",
+            "results": [],
+        }
+
+    if not matches:
+        return {
+            "status": "ok",
+            "message": f"No EudraVigilance entries found for '{drug}'",
+            "count": 0,
+            "results": [],
+            "data_source": DATA_SOURCE,
+        }
+
+    return {
+        "status": "ok",
+        "count": len(matches),
+        "results": matches,
+        "data_source": DATA_SOURCE,
+        "note": "Dashboard URLs link to EudraVigilance public access portal with full ICSR line listings, "
+                "case counts by SOC, seriousness breakdown, and signal detection data.",
+    }
 
 
 def get_signal_summary(args: dict) -> dict:
-    """
-    Tool: get-signal-summary
-
-    Retrieves signal detection summary statistics for a drug-event combination
-    from EudraVigilance. The live version returns disproportionality metrics
-    (PRR, ROR, IC) computed from the EudraVigilance database.
-    """
+    """Get signal summary — resolves substance, returns dashboard link for signal data."""
     drug = args.get("drug", args.get("substance", "")).strip()
-    if not drug:
-        return {"status": "error", "message": "drug is required"}
-
     reaction = args.get("reaction", args.get("event", "")).strip()
+    if not drug:
+        return {"status": "error", "message": "substance is required"}
 
-    return _stub_response(
-        "get-signal-summary",
-        args,
-        "Returns signal detection statistics for the specified drug-event "
-        "combination from EudraVigilance, including total number of ICSRs, "
-        "number of cases for the specific drug-event pair, expected count, "
-        "Proportional Reporting Ratio (PRR) with 95% CI, Reporting Odds Ratio "
-        "(ROR) with 95% CI, Information Component (IC) with IC025 lower bound, "
-        "chi-squared value, signal status (new/ongoing/closed), and date of "
-        "last assessment.",
-    )
+    try:
+        matches = _lookup_substance(drug)
+    except Exception as e:
+        return {"status": "error", "message": f"Lookup failed: {e}"}
+
+    if not matches:
+        return {"status": "ok", "message": f"No entries for '{drug}'", "data": {}}
+
+    substance = matches[0]
+    return {
+        "status": "ok",
+        "data": {
+            "substance": substance["substance_name"],
+            "substance_code": substance["substance_code"],
+            "reaction_queried": reaction or "(all reactions)",
+            "dashboard_url": substance["dashboard_url"],
+            "signal_data_available": True,
+            "access_note": "Signal detection tab on the dashboard provides PRR, ROR, IC metrics "
+                           "computed by EudraVigilance. Navigate to 'Number of Individual Cases' tab "
+                           "for disproportionality statistics.",
+        },
+        "data_source": DATA_SOURCE,
+    }
 
 
 def get_case_counts(args: dict) -> dict:
-    """
-    Tool: get-case-counts
-
-    Retrieves aggregated case counts for a drug from EudraVigilance, broken
-    down by System Organ Class (SOC), seriousness, age group, sex, and
-    reporter type. The live version returns the same data available on the
-    EudraVigilance public dashboard (adrreports.eu).
-    """
+    """Get case count summary — resolves substance, returns dashboard link."""
     drug = args.get("drug", args.get("substance", "")).strip()
     if not drug:
-        return {"status": "error", "message": "drug is required"}
+        return {"status": "error", "message": "substance is required"}
 
-    group_by = args.get("group_by", "soc").strip()
+    try:
+        matches = _lookup_substance(drug)
+    except Exception as e:
+        return {"status": "error", "message": f"Lookup failed: {e}"}
 
-    return _stub_response(
-        "get-case-counts",
-        args,
-        "Returns aggregated ICSR case counts for the specified drug from "
-        "EudraVigilance, grouped by the requested dimension. Available "
-        "groupings: 'soc' (System Organ Class with case count per SOC), "
-        "'seriousness' (serious vs non-serious with subcategories), "
-        "'age_group' (neonate/infant/child/adolescent/adult/elderly/not specified), "
-        "'sex' (male/female/not specified), 'reporter' (healthcare professional/"
-        "consumer/not specified), 'year' (case counts by reporting year for "
-        "trend analysis). Each group includes total count and percentage of "
-        "all reports.",
-    )
+    if not matches:
+        return {"status": "ok", "message": f"No entries for '{drug}'", "data": {}}
+
+    substance = matches[0]
+    return {
+        "status": "ok",
+        "data": {
+            "substance": substance["substance_name"],
+            "substance_code": substance["substance_code"],
+            "dashboard_url": substance["dashboard_url"],
+            "available_breakdowns": [
+                "System Organ Class (SOC)",
+                "Seriousness (serious/non-serious)",
+                "Age group",
+                "Sex",
+                "Reporter qualification",
+                "Reporting year",
+                "Geographical distribution (EEA countries)",
+            ],
+            "access_note": "Dashboard 'Number of Individual Cases' tab provides aggregate counts "
+                           "with all breakdowns listed above.",
+        },
+        "data_source": DATA_SOURCE,
+    }
 
 
 def get_geographical_distribution(args: dict) -> dict:
-    """
-    Tool: get-geographical-distribution
-
-    Retrieves the geographical distribution of EudraVigilance reports for a drug,
-    broken down by EEA country. The live version returns per-country case counts
-    from the adrreports.eu dashboard.
-    """
+    """Get geographical distribution — resolves substance, returns dashboard link."""
     drug = args.get("drug", args.get("substance", "")).strip()
     if not drug:
-        return {"status": "error", "message": "drug is required"}
+        return {"status": "error", "message": "substance is required"}
 
-    return _stub_response(
-        "get-geographical-distribution",
-        args,
-        "Returns geographical distribution of EudraVigilance ICSRs for the "
-        "specified drug, including per-country case counts for all EEA member "
-        "states, total EEA count, total non-EEA count, top 5 reporting "
-        "countries by volume, reporting rate per million population where "
-        "available, and breakdown by EEA vs non-EEA origin.",
-    )
+    try:
+        matches = _lookup_substance(drug)
+    except Exception as e:
+        return {"status": "error", "message": f"Lookup failed: {e}"}
+
+    if not matches:
+        return {"status": "ok", "message": f"No entries for '{drug}'", "data": {}}
+
+    substance = matches[0]
+    return {
+        "status": "ok",
+        "data": {
+            "substance": substance["substance_name"],
+            "substance_code": substance["substance_code"],
+            "dashboard_url": substance["dashboard_url"],
+            "access_note": "Dashboard 'Number of Individual Cases by EEA Countries' tab "
+                           "provides per-country ICSR counts for all EEA member states.",
+        },
+        "data_source": DATA_SOURCE,
+    }
 
 
 TOOL_DISPATCH = {
@@ -157,33 +215,27 @@ TOOL_DISPATCH = {
 def main() -> None:
     raw = sys.stdin.read().strip()
     if not raw:
-        result = {"status": "error", "message": "No input received on stdin", "count": 0, "results": []}
-        print(json.dumps(result))
+        print(json.dumps({"status": "error", "message": "No input on stdin", "results": []}))
         sys.exit(1)
 
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as exc:
-        result = {"status": "error", "message": f"Invalid JSON input: {exc}", "count": 0, "results": []}
-        print(json.dumps(result))
+        print(json.dumps({"status": "error", "message": f"Invalid JSON: {exc}", "results": []}))
         sys.exit(1)
 
     tool_name = payload.get("tool", "").strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:
-        known = list(TOOL_DISPATCH.keys())
-        result = {
+        print(json.dumps({
             "status": "error",
-            "message": f"Unknown tool '{tool_name}'. Known tools: {known}",
-            "count": 0,
+            "message": f"Unknown tool '{tool_name}'. Known: {list(TOOL_DISPATCH.keys())}",
             "results": [],
-        }
-        print(json.dumps(result))
+        }))
         sys.exit(1)
 
-    handler = TOOL_DISPATCH[tool_name]
-    result = handler(args)
+    result = TOOL_DISPATCH[tool_name](args)
     print(json.dumps(result, indent=2))
 
 
