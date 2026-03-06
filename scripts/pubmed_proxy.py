@@ -1,0 +1,458 @@
+#!/usr/bin/env python3
+"""
+PubMed E-utilities proxy for NexVigilant Station.
+
+Implements the 5 tools defined in configs/pubmed.json:
+  - search-articles
+  - get-abstract
+  - get-citations
+  - search-case-reports
+  - search-signal-literature
+
+Reads a JSON request from stdin, dispatches to the appropriate handler,
+and writes a JSON response to stdout.  All HTTP calls go through urllib
+(stdlib only).  XML is parsed with xml.etree.ElementTree (stdlib only).
+
+PubMed E-utilities courtesy parameters are appended to every request:
+  &tool=nexvigilant&email=dev@nexvigilant.com
+"""
+
+import json
+import sys
+import time
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+from typing import Any
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
+COURTESY = "&tool=nexvigilant&email=dev@nexvigilant.com"
+DEFAULT_LIMIT = 10
+MAX_LIMIT = 50
+# NCBI asks for no more than 3 requests / second without an API key.
+REQUEST_DELAY = 0.35  # seconds between sequential requests
+
+
+# ---------------------------------------------------------------------------
+# HTTP helpers
+# ---------------------------------------------------------------------------
+
+def _get(url: str) -> bytes:
+    """Perform a GET request and return the response body."""
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "NexVigilant-Station/1.0 (dev@nexvigilant.com)"},
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return resp.read()
+
+
+def _get_json(url: str) -> dict:
+    return json.loads(_get(url).decode("utf-8"))
+
+
+def _get_xml(url: str) -> ET.Element:
+    return ET.fromstring(_get(url).decode("utf-8"))
+
+
+# ---------------------------------------------------------------------------
+# XML parsing helpers
+# ---------------------------------------------------------------------------
+
+def _text(element: ET.Element | None, default: str = "") -> str:
+    """Return stripped text content of an element, or default."""
+    if element is None:
+        return default
+    return (element.text or "").strip()
+
+
+def _parse_article(article_el: ET.Element) -> dict:
+    """
+    Extract structured metadata from a PubMed <PubmedArticle> XML element.
+
+    Fields returned:
+      pmid, title, abstract, authors, journal, year, pub_types, doi
+    """
+    medline = article_el.find(".//MedlineCitation")
+    if medline is None:
+        return {}
+
+    pmid = _text(medline.find("PMID"))
+
+    article = medline.find("Article")
+    if article is None:
+        return {"pmid": pmid}
+
+    title = _text(article.find("ArticleTitle"))
+
+    # Abstract — may be structured (multiple AbstractText elements)
+    abstract_parts = []
+    for ab in article.findall(".//AbstractText"):
+        label = ab.get("Label", "")
+        text = (ab.text or "").strip()
+        if label:
+            abstract_parts.append(f"{label}: {text}")
+        elif text:
+            abstract_parts.append(text)
+    abstract = " ".join(abstract_parts)
+
+    # Authors
+    authors = []
+    for author in article.findall(".//Author"):
+        last = _text(author.find("LastName"))
+        fore = _text(author.find("ForeName"))
+        if last:
+            authors.append(f"{last} {fore}".strip())
+        else:
+            collective = _text(author.find("CollectiveName"))
+            if collective:
+                authors.append(collective)
+
+    # Journal
+    journal_el = article.find("Journal")
+    journal = ""
+    year = ""
+    if journal_el is not None:
+        journal = _text(journal_el.find("Title")) or _text(
+            journal_el.find("ISOAbbreviation")
+        )
+        pub_date = journal_el.find(".//PubDate")
+        if pub_date is not None:
+            year = _text(pub_date.find("Year")) or _text(pub_date.find("MedlineDate"))
+
+    # Publication types
+    pub_types = [
+        _text(pt)
+        for pt in article.findall(".//PublicationType")
+        if _text(pt)
+    ]
+
+    # DOI
+    doi = ""
+    for loc_id in article.findall(".//ELocationID"):
+        if loc_id.get("EIdType") == "doi":
+            doi = _text(loc_id)
+            break
+
+    return {
+        "pmid": pmid,
+        "title": title,
+        "abstract": abstract,
+        "authors": authors,
+        "journal": journal,
+        "year": year,
+        "pub_types": pub_types,
+        "doi": doi,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tool handlers
+# ---------------------------------------------------------------------------
+
+def search_articles(params: dict) -> dict:
+    """
+    Two-phase search: esearch to get PMIDs, then efetch for full metadata.
+    """
+    query = params.get("query", "").strip()
+    if not query:
+        return {"error": "query parameter is required"}
+
+    mesh_terms = params.get("mesh_terms", "").strip()
+    date_range = params.get("date_range", "").strip()
+    article_type = params.get("article_type", "").strip()
+    limit = min(int(params.get("limit", DEFAULT_LIMIT)), MAX_LIMIT)
+
+    # Build query string
+    full_query = query
+    if mesh_terms:
+        full_query += f" AND {mesh_terms}[MeSH Terms]"
+    if article_type:
+        full_query += f" AND {article_type}[Publication Type]"
+
+    # Phase 1 — esearch
+    esearch_url = (
+        f"{BASE}/esearch.fcgi"
+        f"?db=pubmed"
+        f"&term={urllib.parse.quote(full_query)}"
+        f"&retmax={limit}"
+        f"&retmode=json"
+        f"{COURTESY}"
+    )
+    if date_range:
+        parts = date_range.split(":")
+        if len(parts) == 2:
+            esearch_url += f"&mindate={parts[0].strip()}&maxdate={parts[1].strip()}&datetype=pdat"
+
+    esearch_data = _get_json(esearch_url)
+    result_info = esearch_data.get("esearchresult", {})
+    id_list = result_info.get("idlist", [])
+    total = int(result_info.get("count", 0))
+
+    if not id_list:
+        return {
+            "query": full_query,
+            "total_found": total,
+            "returned": 0,
+            "articles": [],
+        }
+
+    # Phase 2 — efetch
+    time.sleep(REQUEST_DELAY)
+    ids_csv = ",".join(id_list)
+    efetch_url = (
+        f"{BASE}/efetch.fcgi"
+        f"?db=pubmed"
+        f"&id={ids_csv}"
+        f"&retmode=xml"
+        f"{COURTESY}"
+    )
+    root = _get_xml(efetch_url)
+    articles = [_parse_article(el) for el in root.findall(".//PubmedArticle")]
+
+    return {
+        "query": full_query,
+        "total_found": total,
+        "returned": len(articles),
+        "articles": articles,
+    }
+
+
+def get_abstract(params: dict) -> dict:
+    """
+    Fetch structured metadata and abstract for a single PMID.
+    """
+    pmid = str(params.get("pmid", "")).strip()
+    if not pmid:
+        return {"error": "pmid parameter is required"}
+
+    efetch_url = (
+        f"{BASE}/efetch.fcgi"
+        f"?db=pubmed"
+        f"&id={urllib.parse.quote(pmid)}"
+        f"&retmode=xml"
+        f"{COURTESY}"
+    )
+    root = _get_xml(efetch_url)
+    article_el = root.find(".//PubmedArticle")
+    if article_el is None:
+        return {"error": f"PMID {pmid} not found", "pmid": pmid}
+
+    result = _parse_article(article_el)
+
+    # Include full MeSH headings for downstream microgram use
+    mesh_headings = []
+    for mh in root.findall(".//MeshHeading"):
+        descriptor = _text(mh.find("DescriptorName"))
+        if descriptor:
+            mesh_headings.append(descriptor)
+    result["mesh_headings"] = mesh_headings
+
+    return result
+
+
+def get_citations(params: dict) -> dict:
+    """
+    Use elink to find articles that cite the given PMID.
+    Returns citing PMIDs plus brief metadata for each.
+    """
+    pmid = str(params.get("pmid", "")).strip()
+    if not pmid:
+        return {"error": "pmid parameter is required"}
+
+    elink_url = (
+        f"{BASE}/elink.fcgi"
+        f"?dbfrom=pubmed"
+        f"&db=pubmed"
+        f"&id={urllib.parse.quote(pmid)}"
+        f"&cmd=neighbor"
+        f"&retmode=json"
+        f"{COURTESY}"
+    )
+    elink_data = _get_json(elink_url)
+
+    # Extract linked IDs from the elink response
+    citing_ids: list[str] = []
+    link_sets = elink_data.get("linksets", [])
+    for ls in link_sets:
+        for link_set_db in ls.get("linksetdbs", []):
+            # "pubmed_pubmed_citedin" contains articles that cite the query PMID
+            if "citedin" in link_set_db.get("linkname", ""):
+                citing_ids.extend(str(i) for i in link_set_db.get("links", []))
+
+    if not citing_ids:
+        return {
+            "pmid": pmid,
+            "citing_count": 0,
+            "citing_articles": [],
+            "note": "No citing articles found via elink (citedin linkname). "
+                    "elink citation data is limited to PubMed Central full-text.",
+        }
+
+    # Fetch metadata for up to DEFAULT_LIMIT citing articles
+    fetch_ids = citing_ids[:DEFAULT_LIMIT]
+    time.sleep(REQUEST_DELAY)
+    ids_csv = ",".join(fetch_ids)
+    efetch_url = (
+        f"{BASE}/efetch.fcgi"
+        f"?db=pubmed"
+        f"&id={ids_csv}"
+        f"&retmode=xml"
+        f"{COURTESY}"
+    )
+    root = _get_xml(efetch_url)
+    articles = [_parse_article(el) for el in root.findall(".//PubmedArticle")]
+
+    return {
+        "pmid": pmid,
+        "citing_count": len(citing_ids),
+        "returned": len(articles),
+        "citing_articles": articles,
+    }
+
+
+def search_case_reports(params: dict) -> dict:
+    """
+    Search PubMed for adverse event case reports for a specific drug.
+    Optional: narrow by adverse_event term.
+    """
+    drug_name = params.get("drug_name", "").strip()
+    if not drug_name:
+        return {"error": "drug_name parameter is required"}
+
+    adverse_event = params.get("adverse_event", "").strip()
+
+    # Build structured PubMed query
+    drug_clause = f"{drug_name}[Title/Abstract]"
+    pub_type_clause = "case report[Publication Type]"
+    ae_clause = "adverse*[Title/Abstract] OR toxicity[Title/Abstract] OR adverse event*[Title/Abstract]"
+
+    if adverse_event:
+        query = (
+            f"{drug_clause} AND {pub_type_clause} "
+            f"AND ({adverse_event}[Title/Abstract]) "
+            f"AND ({ae_clause})"
+        )
+    else:
+        query = f"{drug_clause} AND {pub_type_clause} AND ({ae_clause})"
+
+    return search_articles({"query": query, "limit": DEFAULT_LIMIT})
+
+
+def search_signal_literature(params: dict) -> dict:
+    """
+    Find pharmacovigilance signal detection papers for a drug.
+    Targets papers using standard PV methodology terms.
+    """
+    drug_name = params.get("drug_name", "").strip()
+    if not drug_name:
+        return {"error": "drug_name parameter is required"}
+
+    pv_terms = (
+        "pharmacovigilance[Title/Abstract] OR "
+        "signal detection[Title/Abstract] OR "
+        "disproportionality[Title/Abstract] OR "
+        "PRR[Title/Abstract] OR "
+        "ROR[Title/Abstract] OR "
+        "reporting odds ratio[Title/Abstract] OR "
+        "proportional reporting ratio[Title/Abstract] OR "
+        "information component[Title/Abstract] OR "
+        "EBGM[Title/Abstract] OR "
+        "spontaneous report*[Title/Abstract]"
+    )
+    query = f"{drug_name}[Title/Abstract] AND ({pv_terms})"
+
+    return search_articles({"query": query, "limit": DEFAULT_LIMIT})
+
+
+# ---------------------------------------------------------------------------
+# Dispatch table
+# ---------------------------------------------------------------------------
+
+HANDLERS: dict[str, Any] = {
+    "search-articles": search_articles,
+    "get-abstract": get_abstract,
+    "get-citations": get_citations,
+    "search-case-reports": search_case_reports,
+    "search-signal-literature": search_signal_literature,
+}
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    """
+    Read a JSON request from stdin and write a JSON response to stdout.
+
+    Request schema:
+      { "tool": "<tool-name>", "params": { ... } }
+
+    Response schema (success):
+      { "tool": "<tool-name>", "result": { ... } }
+
+    Response schema (error):
+      { "tool": "<tool-name>", "error": "<message>" }
+    """
+    raw = sys.stdin.read().strip()
+    if not raw:
+        json.dump({"error": "empty request"}, sys.stdout)
+        sys.stdout.write("\n")
+        return
+
+    try:
+        request = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        json.dump({"error": f"invalid JSON: {exc}"}, sys.stdout)
+        sys.stdout.write("\n")
+        return
+
+    tool_name = request.get("tool", "")
+    params = request.get("arguments", request.get("params", {}))
+
+    handler = HANDLERS.get(tool_name)
+    if handler is None:
+        json.dump(
+            {
+                "error": f"unknown tool: {tool_name!r}",
+                "available_tools": list(HANDLERS.keys()),
+            },
+            sys.stdout,
+        )
+        sys.stdout.write("\n")
+        return
+
+    try:
+        result = handler(params)
+        json.dump({"tool": tool_name, "result": result}, sys.stdout, indent=2)
+    except urllib.error.HTTPError as exc:
+        json.dump(
+            {"tool": tool_name, "error": f"HTTP {exc.code}: {exc.reason}"},
+            sys.stdout,
+        )
+    except urllib.error.URLError as exc:
+        json.dump(
+            {"tool": tool_name, "error": f"Network error: {exc.reason}"},
+            sys.stdout,
+        )
+    except ET.ParseError as exc:
+        json.dump(
+            {"tool": tool_name, "error": f"XML parse error: {exc}"},
+            sys.stdout,
+        )
+    except Exception as exc:  # noqa: BLE001
+        json.dump(
+            {"tool": tool_name, "error": f"Unexpected error: {type(exc).__name__}: {exc}"},
+            sys.stdout,
+        )
+
+    sys.stdout.write("\n")
+
+
+if __name__ == "__main__":
+    main()
