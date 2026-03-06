@@ -23,6 +23,10 @@ pub struct HubConfig {
     #[serde(default)]
     pub description: Option<String>,
 
+    /// Python proxy script for all tools in this config (relative to station root)
+    #[serde(default)]
+    pub proxy: Option<String>,
+
     /// Tools exposed by this config
     pub tools: Vec<ToolDef>,
 }
@@ -43,6 +47,10 @@ pub struct ToolDef {
     /// Static response for stub tools (development/testing)
     #[serde(default)]
     pub stub_response: Option<String>,
+
+    /// Per-tool proxy script override (relative to station root)
+    #[serde(default)]
+    pub proxy: Option<String>,
 }
 
 /// A parameter for a tool.
@@ -65,6 +73,8 @@ fn default_string_type() -> String {
 #[derive(Debug)]
 pub struct ConfigRegistry {
     pub configs: Vec<HubConfig>,
+    /// Root directory of the station (for resolving relative proxy paths)
+    pub station_root: String,
 }
 
 impl ConfigRegistry {
@@ -74,7 +84,10 @@ impl ConfigRegistry {
 
         if !dir.exists() {
             info!(path = %dir.display(), "Config directory does not exist, starting empty");
-            return Ok(Self { configs });
+            return Ok(Self {
+                configs,
+                station_root: dir.parent().unwrap_or(dir).to_string_lossy().into(),
+            });
         }
 
         for entry in std::fs::read_dir(dir).context("reading config directory")? {
@@ -117,12 +130,48 @@ impl ConfigRegistry {
             "Config registry loaded"
         );
 
-        Ok(Self { configs })
+        Ok(Self {
+            configs,
+            station_root: dir.canonicalize()
+                .unwrap_or_else(|_| dir.to_path_buf())
+                .parent()
+                .unwrap_or(dir)
+                .to_string_lossy()
+                .into(),
+        })
     }
 
-    /// Convert all tools to MCP ToolInfo for tools/list.
+    /// Convert all tools to MCP ToolInfo for tools/list, including meta-tools.
     pub fn tool_infos(&self) -> Vec<ToolInfo> {
-        self.configs
+        let mut tools: Vec<ToolInfo> = vec![
+            ToolInfo {
+                name: "nexvigilant_directory".into(),
+                description: "[NexVigilant Station] Complete directory of all pharmacovigilance tools, domains, and capabilities. Lists every available tool with parameters and handler status.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                }),
+            },
+            ToolInfo {
+                name: "nexvigilant_capabilities".into(),
+                description: "[NexVigilant Station] Search NexVigilant capabilities by keyword or domain. Find tools for adverse events, drug interactions, signal detection, labeling, and more.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search keyword (e.g., 'adverse events', 'signal', 'interaction')"
+                        },
+                        "domain": {
+                            "type": "string",
+                            "description": "Filter by domain (e.g., 'fda', 'dailymed', 'clinicaltrials')"
+                        }
+                    },
+                }),
+            },
+        ];
+
+        tools.extend(self.configs
             .iter()
             .flat_map(|config| {
                 config.tools.iter().map(move |tool| {
@@ -157,7 +206,9 @@ impl ConfigRegistry {
                     }
                 })
             })
-            .collect()
+            .collect::<Vec<_>>());
+
+        tools
     }
 
     /// Find a tool definition by its prefixed MCP name.
