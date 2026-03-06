@@ -1,0 +1,129 @@
+use std::sync::Arc;
+
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::routing::{get, post};
+use axum::Json;
+use serde_json::Value;
+use tracing::{debug, info};
+
+use crate::config::ConfigRegistry;
+use crate::protocol::JsonRpcRequest;
+use crate::server::handle_request;
+use crate::telemetry::StationTelemetry;
+
+struct AppState {
+    registry: ConfigRegistry,
+    telemetry: StationTelemetry,
+}
+
+/// Run the MCP server over HTTP REST transport (Skyway).
+///
+/// Any agent framework (LangChain, CrewAI, AutoGen, raw HTTP) can call tools via:
+///   POST /rpc              → JSON-RPC 2.0 (full MCP protocol)
+///   POST /tools/{name}     → simplified REST: body is arguments, response is result
+///   GET  /tools            → list all available tools
+///   GET  /health           → liveness check
+pub async fn run_http(
+    registry: ConfigRegistry,
+    telemetry: StationTelemetry,
+    host: &str,
+    port: u16,
+) -> anyhow::Result<()> {
+    let state = Arc::new(AppState {
+        registry,
+        telemetry,
+    });
+
+    let app = axum::Router::new()
+        .route("/rpc", post(handle_rpc))
+        .route("/tools", get(handle_list_tools))
+        .route("/tools/{name}", post(handle_tool_call))
+        .route("/health", get(handle_health))
+        .with_state(state);
+
+    let addr = format!("{host}:{port}");
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    info!(addr = %addr, "Station HTTP transport listening");
+    axum::serve(listener, app).await?;
+    Ok(())
+}
+
+// Full JSON-RPC 2.0 endpoint — speaks native MCP protocol
+async fn handle_rpc(
+    State(state): State<Arc<AppState>>,
+    Json(request): Json<JsonRpcRequest>,
+) -> impl IntoResponse {
+    debug!(method = %request.method, "HTTP RPC request");
+    let response = handle_request(&state.registry, &state.telemetry, &request);
+    match response {
+        Some(resp) => (StatusCode::OK, Json(resp)).into_response(),
+        None => StatusCode::ACCEPTED.into_response(),
+    }
+}
+
+// Simplified REST: GET /tools → tool list as JSON array
+async fn handle_list_tools(
+    State(state): State<Arc<AppState>>,
+) -> Json<Value> {
+    let tools = state.registry.tool_infos();
+    info!(count = tools.len(), "HTTP tools list");
+    Json(serde_json::to_value(tools).unwrap_or_default())
+}
+
+// Simplified REST: POST /tools/{name} → call a tool, body = arguments
+async fn handle_tool_call(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(name): axum::extract::Path<String>,
+    Json(arguments): Json<Value>,
+) -> impl IntoResponse {
+    info!(tool = %name, "HTTP tool call");
+
+    // Synthesize a JSON-RPC request from the REST call
+    let request = JsonRpcRequest {
+        jsonrpc: "2.0".into(),
+        id: Some(Value::String("http-1".into())),
+        method: "tools/call".into(),
+        params: Some(serde_json::json!({
+            "name": name,
+            "arguments": arguments,
+        })),
+    };
+
+    let response = handle_request(&state.registry, &state.telemetry, &request);
+    match response {
+        Some(resp) => {
+            // Unwrap the JSON-RPC envelope for REST clients
+            if let Some(result) = resp.result {
+                (StatusCode::OK, Json(result)).into_response()
+            } else if let Some(err) = resp.error {
+                let status = match err.code {
+                    -32602 => StatusCode::BAD_REQUEST,
+                    -32601 => StatusCode::NOT_FOUND,
+                    _ => StatusCode::INTERNAL_SERVER_ERROR,
+                };
+                (status, Json(serde_json::json!({
+                    "error": err.message,
+                    "code": err.code,
+                }))).into_response()
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        }
+        None => StatusCode::NO_CONTENT.into_response(),
+    }
+}
+
+async fn handle_health(
+    State(state): State<Arc<AppState>>,
+) -> Json<Value> {
+    Json(serde_json::json!({
+        "status": "ok",
+        "transport": "http",
+        "configs": state.registry.configs.len(),
+        "tools": state.registry.tool_count(),
+        "server": "nexvigilant-station",
+        "version": env!("CARGO_PKG_VERSION"),
+    }))
+}

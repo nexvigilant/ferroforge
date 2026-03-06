@@ -172,7 +172,7 @@ fn experimental_protocols(args: &Value) -> Value {
     } else {
         let q = assay.to_lowercase();
         all.into_iter()
-            .filter(|p| p["name"].as_str().map_or(false, |n| n.to_lowercase().contains(&q)))
+            .filter(|p| p["name"].as_str().is_some_and(|n| n.to_lowercase().contains(&q)))
             .collect()
     };
 
@@ -198,7 +198,7 @@ fn bet_inhibitors(args: &Value) -> Value {
         all
     } else {
         all.into_iter()
-            .filter(|b| b["name"].as_str().map_or(false, |n| n.to_lowercase().contains(&compound)))
+            .filter(|b| b["name"].as_str().is_some_and(|n| n.to_lowercase().contains(&compound)))
             .collect()
     };
 
@@ -226,7 +226,7 @@ fn hdac_inhibitors(args: &Value) -> Value {
         all
     } else {
         all.into_iter()
-            .filter(|h| h["name"].as_str().map_or(false, |n| n.to_lowercase().contains(&compound)))
+            .filter(|h| h["name"].as_str().is_some_and(|n| n.to_lowercase().contains(&compound)))
             .collect()
     };
 

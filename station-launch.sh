@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # NexVigilant Station Launch Script
-# Starts supergateway (StreamableHTTP on :8808) wrapping the station binary
+# Native axum HTTP transport on :8808 — no supergateway wrapper
 
 STATION_BIN="$HOME/ferroforge/target/release/nexvigilant-station"
 CONFIG_DIR="$HOME/ferroforge/configs"
@@ -14,7 +14,8 @@ if ! [ -f "$STATION_BIN" ]; then
     exit 1
 fi
 
-exec supergateway \
-    --stdio "$STATION_BIN --config-dir $CONFIG_DIR --telemetry-log $TELEMETRY_LOG" \
-    --outputTransport streamableHttp \
+exec "$STATION_BIN" \
+    --config-dir "$CONFIG_DIR" \
+    --telemetry-log "$TELEMETRY_LOG" \
+    --transport http \
     --port "$PORT"

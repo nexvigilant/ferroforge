@@ -436,25 +436,29 @@ def main() -> None:
 
     try:
         result = handler(params)
-        json.dump({"tool": tool_name, "result": result}, sys.stdout, indent=2)
+        if isinstance(result, dict) and "error" in result:
+            result["status"] = "error"
+        elif isinstance(result, dict) and "status" not in result:
+            result["status"] = "ok"
+        json.dump(result, sys.stdout, indent=2)
     except urllib.error.HTTPError as exc:
         json.dump(
-            {"tool": tool_name, "error": f"HTTP {exc.code}: {exc.reason}"},
+            {"status": "error", "error": f"HTTP {exc.code}: {exc.reason}"},
             sys.stdout,
         )
     except urllib.error.URLError as exc:
         json.dump(
-            {"tool": tool_name, "error": f"Network error: {exc.reason}"},
+            {"status": "error", "error": f"Network error: {exc.reason}"},
             sys.stdout,
         )
     except ET.ParseError as exc:
         json.dump(
-            {"tool": tool_name, "error": f"XML parse error: {exc}"},
+            {"status": "error", "error": f"XML parse error: {exc}"},
             sys.stdout,
         )
     except Exception as exc:  # noqa: BLE001
         json.dump(
-            {"tool": tool_name, "error": f"Unexpected error: {type(exc).__name__}: {exc}"},
+            {"status": "error", "error": f"Unexpected error: {type(exc).__name__}: {exc}"},
             sys.stdout,
         )
 

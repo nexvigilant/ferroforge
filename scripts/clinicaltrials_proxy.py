@@ -173,7 +173,7 @@ def search_trials(args: dict) -> dict:
         "total_count": total,
         "returned": len(results),
         "next_page_token": next_token,
-        "studies": results,
+        "trials": results,
     }
 
 
@@ -207,8 +207,8 @@ def get_trial(args: dict) -> dict:
         "title": id_mod.get("briefTitle"),
         "official_title": id_mod.get("officialTitle"),
         "status": status_mod.get("overallStatus"),
-        "phase": design_mod.get("phases"),
-        "study_type": design_mod.get("studyType"),
+        "phase": ", ".join(design_mod.get("phases", [])) if design_mod.get("phases") else "",
+        "study_type": design_mod.get("studyType", ""),
         "allocation": design_mod.get("designInfo", {}).get("allocation"),
         "masking": design_mod.get("designInfo", {}).get("maskingInfo", {}).get(
             "masking"
@@ -587,12 +587,17 @@ def main() -> None:
     try:
         result = handler(arguments)
     except RuntimeError as exc:
-        result = {"error": True, "message": str(exc)}
+        result = {"status": "error", "error": True, "message": str(exc)}
     except Exception as exc:  # noqa: BLE001
         result = {
+            "status": "error",
             "error": True,
             "message": f"Unexpected error in '{tool_name}': {type(exc).__name__}: {exc}",
         }
+
+    # Ensure all successful responses have a "status" field
+    if "status" not in result and not result.get("error"):
+        result["status"] = "ok"
 
     print(json.dumps(result, indent=2, default=str), flush=True)
 

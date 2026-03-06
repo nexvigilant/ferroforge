@@ -144,7 +144,7 @@ def search_drugs(args: dict) -> dict:
 
     return {
         "status": "ok",
-        "query": {"query": query, "max_entries": max_entries},
+        "query": query,
         "count": len(results),
         "results": results,
     }

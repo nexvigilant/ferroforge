@@ -421,14 +421,25 @@ def route(tool_name: str, args: dict) -> dict:
         return {"status": "error", "message": "Provide uniprot_id or gene parameter"}
 
     if tool_name == "get-crystal-structures":
-        query = args.get("query", args.get("target", args.get("gene", "")))
+        query = args.get("query", args.get("target", args.get("gene", ""))).strip()
+        if not query:
+            return {"status": "error", "message": "Provide query, target, or gene parameter"}
         return search_pdb(query)
 
     if tool_name == "search-clinical-candidates":
-        target = args.get("target", args.get("target_chembl_id", ""))
-        if not target:
-            return {"status": "error", "message": "Provide target or target_chembl_id parameter"}
-        return search_chembl_compounds(target, limit=args.get("limit", 10))
+        target = args.get("target_chembl_id", "").strip()
+        gene = args.get("target", args.get("gene", "")).strip()
+        if not target and not gene:
+            return {"status": "error", "message": "Provide target (gene name) or target_chembl_id parameter"}
+        # If we have a gene name but no ChEMBL ID, resolve via target search first
+        if not target and gene:
+            target_result = search_chembl_target(gene)
+            targets = target_result.get("targets", [])
+            if targets:
+                target = targets[0].get("chembl_id", "")
+            if not target:
+                return {"status": "ok", "message": f"No ChEMBL target found for '{gene}'", "activities": []}
+        return search_chembl_compounds(target, limit=int(args.get("limit", 10)))
 
     if tool_name == "get-target-safety":
         gene = args.get("gene", args.get("target", ""))
