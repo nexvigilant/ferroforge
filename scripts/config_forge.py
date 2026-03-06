@@ -149,7 +149,7 @@ def generate_hub_payload(config: dict) -> dict:
 
 
 def deploy_to_hub(config_path: str, api_key: str = None) -> dict:
-    """Deploy a local config file to the WebMCP Hub."""
+    """Deploy a local config file to the WebMCP Hub. Creates or updates."""
     if not api_key:
         api_key = os.environ.get("HUB_API_KEY", "")
     if not api_key:
@@ -163,6 +163,8 @@ def deploy_to_hub(config_path: str, api_key: str = None) -> dict:
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
+
+    # Try POST (create) first
     req = urllib.request.Request(
         "https://www.webmcp-hub.com/api/configs",
         data=json.dumps(payload).encode(),
@@ -172,9 +174,33 @@ def deploy_to_hub(config_path: str, api_key: str = None) -> dict:
     try:
         resp = urllib.request.urlopen(req)
         result = json.loads(resp.read())
-        return {"status": "ok", "config_id": result["id"], "tools": len(payload["tools"])}
+        return {"status": "created", "config_id": result["id"], "tools": len(payload["tools"])}
     except urllib.error.HTTPError as e:
-        return {"status": "error", "code": e.code, "message": e.read().decode()[:200]}
+        if e.code != 409:
+            return {"status": "error", "code": e.code, "message": e.read().decode()[:200]}
+
+        # 409 Conflict — config exists. Extract existing ID and PUT to update.
+        try:
+            conflict = json.loads(e.read().decode())
+            existing_id = conflict.get("existingId", "")
+        except (json.JSONDecodeError, ValueError):
+            return {"status": "error", "code": 409, "message": "Config exists but could not parse existingId"}
+
+        if not existing_id:
+            return {"status": "error", "code": 409, "message": "Config exists but no existingId returned"}
+
+        update_req = urllib.request.Request(
+            f"https://www.webmcp-hub.com/api/configs/{existing_id}",
+            data=json.dumps(payload).encode(),
+            headers=headers,
+            method="PATCH",
+        )
+        try:
+            update_resp = urllib.request.urlopen(update_req)
+            update_result = json.loads(update_resp.read())
+            return {"status": "updated", "config_id": existing_id, "tools": len(payload["tools"])}
+        except urllib.error.HTTPError as ue:
+            return {"status": "error", "code": ue.code, "message": ue.read().decode()[:200]}
 
 
 def from_spec_file(spec_path: str) -> list:

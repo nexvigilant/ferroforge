@@ -206,7 +206,7 @@ def get_trial(args: dict) -> dict:
         "nct_id": id_mod.get("nctId"),
         "title": id_mod.get("briefTitle"),
         "official_title": id_mod.get("officialTitle"),
-        "status": status_mod.get("overallStatus"),
+        "overall_status": status_mod.get("overallStatus"),
         "phase": ", ".join(design_mod.get("phases", [])) if design_mod.get("phases") else "",
         "study_type": design_mod.get("studyType", ""),
         "allocation": design_mod.get("designInfo", {}).get("allocation"),
