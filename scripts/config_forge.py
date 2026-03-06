@@ -122,10 +122,24 @@ def generate_hub_payload(config: dict) -> dict:
     hub_tools = []
     for t in config["tools"]:
         station_prefix = "[NexVigilant Science Station]" if "science" in domain else "[NexVigilant Station]"
+        # Build inputSchema from local parameter definitions
+        input_props = {}
+        input_required = []
+        for param in t.get("parameters", []):
+            input_props[param["name"]] = {
+                "type": param.get("type", "string"),
+                "description": param.get("description", ""),
+            }
+            if param.get("required"):
+                input_required.append(param["name"])
+        input_schema: dict = {"type": "object", "properties": input_props}
+        if input_required:
+            input_schema["required"] = input_required
+
         hub_tools.append({
             "name": t["name"],
             "description": f"{station_prefix} {t['description']}",
-            "inputSchema": {"type": "object", "properties": {}},
+            "inputSchema": input_schema,
             "execution": {
                 "selector": "body",
                 "autosubmit": False,
