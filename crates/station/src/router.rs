@@ -84,12 +84,11 @@ fn extract_status(result: &ToolCallResult) -> (String, bool) {
     let is_error = result.is_error.unwrap_or(false);
 
     // Try to parse the content as JSON and extract "status" field
-    if let Some(ContentBlock::Text { text }) = result.content.first() {
-        if let Ok(json) = serde_json::from_str::<Value>(text) {
-            if let Some(status) = json.get("status").and_then(|s| s.as_str()) {
-                return (status.to_string(), is_error);
-            }
-        }
+    if let Some(ContentBlock::Text { text }) = result.content.first()
+        && let Ok(json) = serde_json::from_str::<Value>(text)
+        && let Some(status) = json.get("status").and_then(|s| s.as_str())
+    {
+        return (status.to_string(), is_error);
     }
 
     if is_error {
@@ -188,35 +187,60 @@ fn execute_tool(
     }
 }
 
-/// Execute a tool via the unified dispatch.py script (or direct proxy fallback).
+/// Execute a tool via its proxy script.
 ///
-/// The dispatcher reads a JSON envelope from stdin:
-///   {"tool": "api_fda_gov_search_adverse_events", "arguments": {...}}
-///
-/// It routes by domain prefix to the correct proxy script, which hits the live API.
+/// Two modes:
+/// 1. **Direct proxy** — if proxy_path points to a specific per-tool script
+///    (not dispatch.py), run it directly with the unprefixed tool name.
+/// 2. **Unified dispatch** — otherwise route through dispatch.py which
+///    parses the domain prefix and delegates to the correct proxy.
 fn execute_proxy(
-    _proxy_path: &str,
+    proxy_path: &str,
     tool_name: &str,
     arguments: &Value,
     station_root: &str,
 ) -> ToolCallResult {
-    let dispatch_path = format!("{}/scripts/dispatch.py", station_root);
+    let resolved_path = if proxy_path.ends_with("dispatch.py") {
+        format!("{}/scripts/dispatch.py", station_root)
+    } else {
+        // Per-tool proxy: resolve relative to station_root
+        if proxy_path.starts_with('/') {
+            proxy_path.to_string()
+        } else {
+            format!("{}/{}", station_root, proxy_path)
+        }
+    };
+
+    let is_dispatch = resolved_path.ends_with("dispatch.py");
 
     info!(
         tool = %tool_name,
-        "Dispatching via unified dispatcher"
+        proxy = %resolved_path,
+        direct = !is_dispatch,
+        "Executing proxy"
     );
 
-    // The tool_name coming in is already the full MCP-prefixed name
-    // (e.g., "api_fda_gov_search_adverse_events") from config.rs prefixing
-    let envelope = serde_json::json!({
-        "tool": tool_name,
-        "arguments": arguments,
-    });
+    // For direct proxy: strip domain prefix to get bare tool name.
+    // For dispatch: send the full MCP-prefixed name (dispatch parses it).
+    let envelope = if is_dispatch {
+        serde_json::json!({
+            "tool": tool_name,
+            "arguments": arguments,
+        })
+    } else {
+        // Extract bare tool name: strip everything up to and including the
+        // last domain-separator pattern. The config tool name is already
+        // bare (kebab-case), but MCP names arrive prefixed.
+        let bare = strip_domain_prefix(tool_name);
+        serde_json::json!({
+            "tool": bare,
+            "arguments": arguments,
+        })
+    };
     let envelope_str = serde_json::to_string(&envelope).unwrap_or_else(|_| "{}".into());
 
     let output = Command::new("python3")
-        .arg(&dispatch_path)
+        .arg(&resolved_path)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -238,7 +262,7 @@ fn execute_proxy(
 
             if !result.status.success() {
                 warn!(
-                    proxy = %dispatch_path,
+                    proxy = %resolved_path,
                     tool = %tool_name,
                     stderr = %stderr,
                     "Proxy returned non-zero exit"
@@ -271,18 +295,41 @@ fn execute_proxy(
         }
         Err(e) => {
             warn!(
-                proxy = %dispatch_path,
+                proxy = %resolved_path,
                 error = %e,
                 "Failed to spawn proxy"
             );
             ToolCallResult {
                 content: vec![ContentBlock::Text {
-                    text: format!("Failed to execute proxy {dispatch_path}: {e}"),
+                    text: format!("Failed to execute proxy {resolved_path}: {e}"),
                 }],
                 is_error: Some(true),
             }
         }
     }
+}
+
+/// Strip domain prefix from an MCP tool name.
+///
+/// Input:  `"api_fda_gov_search_adverse_events"`
+/// Output: `"search-adverse-events"`
+///
+/// Heuristic: domain prefixes end with a known TLD segment followed by `_`.
+/// We find the last TLD-like segment (`_gov_`, `_com_`, `_org_`, `_eu_`, `_fr_`,
+/// `_ch_`, `_int_`) and strip everything up to and including it.
+/// Remaining underscores become hyphens (kebab-case).
+fn strip_domain_prefix(mcp_name: &str) -> String {
+    let tld_markers = ["_gov_", "_com_", "_org_", "_eu_", "_fr_", "_ch_", "_int_"];
+
+    for marker in &tld_markers {
+        if let Some(pos) = mcp_name.rfind(marker) {
+            let bare = &mcp_name[pos + marker.len()..];
+            return bare.replace('_', "-");
+        }
+    }
+
+    // No TLD found — return as-is with underscore→hyphen conversion
+    mcp_name.replace('_', "-")
 }
 
 /// Meta-tool: List all NexVigilant capabilities as a structured directory.

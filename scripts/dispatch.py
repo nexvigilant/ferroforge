@@ -5,6 +5,10 @@ NexVigilant Station — Unified MCP Tool Dispatcher
 Reads a JSON envelope from stdin, parses the domain prefix from the tool name,
 and routes to the correct proxy script. Returns the proxy's JSON output on stdout.
 
+Routes are auto-discovered from configs/*.json — no manual wiring needed.
+Each config's "domain" field becomes an underscore prefix, and its "proxy"
+field (config-level or first tool-level) determines the target script.
+
 Input envelope (stdin):
     {"tool": "api_fda_gov_search_adverse_events", "arguments": {"drug_name": "aspirin"}}
 
@@ -21,39 +25,68 @@ import subprocess
 import sys
 from pathlib import Path
 
+SCRIPTS_DIR = Path(__file__).parent.resolve()
+CONFIGS_DIR = SCRIPTS_DIR.parent / "configs"
+
+
 # ---------------------------------------------------------------------------
-# Domain routing map
-# Key   : prefix that appears at the start of the tool name (trailing _ included)
-# Value : proxy script filename (relative to this script's directory)
+# SmartDispatch: Auto-discover domain routes from config files
 # ---------------------------------------------------------------------------
-DOMAIN_ROUTES: dict[str, str] = {
-    # ── Live API proxies (7) ──
-    "api_fda_gov_":                "openfda_proxy.py",
-    "clinicaltrials_gov_":         "clinicaltrials_proxy.py",
-    "dailymed_nlm_nih_gov_":       "dailymed_proxy.py",
-    "rxnav_nlm_nih_gov_":          "rxnav_proxy.py",
-    "pubmed_ncbi_nlm_nih_gov_":    "pubmed_proxy.py",
-    "open-vigil_fr_":              "openvigil_proxy.py",
-    "accessdata_fda_gov_":             "accessdata_proxy.py",
-    # ── Routed stubs (9) — proxy scripts return stub envelopes ──
-    "www_ema_europa_eu_":              "ema_proxy.py",
-    "eudravigilance_ema_europa_eu_":   "eudravigilance_proxy.py",
-    "vigiaccess_org_":                 "vigiaccess_proxy.py",
-    "go_drugbank_com_":                "drugbank_proxy.py",
-    "meddra_org_":                     "meddra_proxy.py",
-    "ich_org_":                        "ich_proxy.py",
-    "cioms_ch_":                       "cioms_proxy.py",
-    "who-umc_org_":                    "who_umc_proxy.py",
-    "www_fda_gov_":                    "fda_safety_proxy.py",
-}
+
+def _discover_routes() -> dict[str, str]:
+    """
+    Scan configs/*.json and build domain prefix → proxy script mapping.
+
+    Each config has:
+      - "domain": "api.fda.gov"  →  prefix "api_fda_gov_"
+      - "proxy": "scripts/openfda_proxy.py"  (config-level or first tool-level)
+
+    Returns dict mapping prefix strings to proxy script filenames.
+    """
+    routes: dict[str, str] = {}
+
+    if not CONFIGS_DIR.is_dir():
+        return routes
+
+    for config_path in sorted(CONFIGS_DIR.glob("*.json")):
+        try:
+            with open(config_path) as f:
+                config = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        domain = config.get("domain", "")
+        if not domain:
+            continue
+
+        # Build prefix: "api.fda.gov" → "api_fda_gov_"
+        prefix = domain.replace(".", "_").replace("-", "-") + "_"
+
+        # Find proxy: config-level first, then first tool-level
+        proxy = config.get("proxy")
+        if not proxy:
+            for tool in config.get("tools", []):
+                proxy = tool.get("proxy")
+                if proxy:
+                    break
+
+        if not proxy:
+            continue
+
+        # Normalize: "scripts/openfda_proxy.py" → "openfda_proxy.py"
+        script_name = Path(proxy).name
+        routes[prefix] = script_name
+
+    return routes
+
+
+DOMAIN_ROUTES: dict[str, str] = _discover_routes()
 
 # Ordered by prefix length (longest first) so that more-specific prefixes win
 # when two prefixes share a common stem (e.g. future sub-domain variants).
 _SORTED_ROUTES: list[tuple[str, str]] = sorted(
     DOMAIN_ROUTES.items(), key=lambda kv: len(kv[0]), reverse=True
 )
-
-SCRIPTS_DIR = Path(__file__).parent.resolve()
 
 
 # ---------------------------------------------------------------------------
@@ -243,29 +276,29 @@ SMOKE_TEST_CASES: list[dict] = [
         "expect_domain": "open-vigil_fr_",
     },
     {
-        "label": "VigiAccess — routed stub (no proxy script yet)",
-        "envelope": {"tool": "vigiaccess_org_search_reports", "arguments": {"drug_name": "warfarin"}},
-        "expect_domain": "vigiaccess_org_",
-    },
-    {
-        "label": "EMA — routed stub",
-        "envelope": {"tool": "www_ema_europa_eu_search_medicines", "arguments": {"query": "metformin"}},
-        "expect_domain": "www_ema_europa_eu_",
-    },
-    {
-        "label": "DrugBank — routed stub",
-        "envelope": {"tool": "go_drugbank_com_get_drug_info", "arguments": {"drug_name": "metformin"}},
-        "expect_domain": "go_drugbank_com_",
-    },
-    {
-        "label": "MedDRA — routed stub",
-        "envelope": {"tool": "meddra_org_search_terms", "arguments": {"query": "lactic acidosis"}},
-        "expect_domain": "meddra_org_",
-    },
-    {
-        "label": "WHO-UMC — routed stub",
+        "label": "WHO-UMC — config-discovered proxy",
         "envelope": {"tool": "who-umc_org_search_vigibase", "arguments": {"drug": "metformin"}},
         "expect_domain": "who-umc_org_",
+    },
+    {
+        "label": "FDA Safety — config-discovered proxy",
+        "envelope": {"tool": "www_fda_gov_search_safety_communications", "arguments": {"drug": "metformin"}},
+        "expect_domain": "www_fda_gov_",
+    },
+    {
+        "label": "VigiAccess — no proxy in config, falls to stub",
+        "envelope": {"tool": "vigiaccess_org_search_reports", "arguments": {"drug_name": "warfarin"}},
+        "expect_domain": None,
+    },
+    {
+        "label": "EMA — no proxy in config, falls to stub",
+        "envelope": {"tool": "www_ema_europa_eu_search_medicines", "arguments": {"query": "metformin"}},
+        "expect_domain": None,
+    },
+    {
+        "label": "DrugBank — no proxy in config, falls to stub",
+        "envelope": {"tool": "go_drugbank_com_get_drug_info", "arguments": {"drug_name": "metformin"}},
+        "expect_domain": None,
     },
     {
         "label": "Unknown domain — should return stub",
