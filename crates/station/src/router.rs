@@ -147,17 +147,7 @@ fn execute_tool(
         "Executing tool"
     );
 
-    // If the tool has a stub response, return it directly
-    if let Some(stub) = &tool.stub_response {
-        return ToolCallResult {
-            content: vec![ContentBlock::Text {
-                text: stub.clone(),
-            }],
-            is_error: None,
-        };
-    }
-
-    // Try proxy execution: config-level proxy or tool-level proxy
+    // Try proxy execution first: config-level proxy or tool-level proxy
     let proxy_path = tool
         .proxy
         .as_ref()
@@ -165,6 +155,16 @@ fn execute_tool(
 
     if let Some(proxy) = proxy_path {
         return execute_proxy(proxy, mcp_name, arguments, station_root);
+    }
+
+    // Fall back to stub response if no proxy is available
+    if let Some(stub) = &tool.stub_response {
+        return ToolCallResult {
+            content: vec![ContentBlock::Text {
+                text: stub.clone(),
+            }],
+            is_error: None,
+        };
     }
 
     // No proxy, no stub — return structured info
