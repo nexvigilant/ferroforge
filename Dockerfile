@@ -2,7 +2,7 @@
 # Supports: stdio (local), sse (mcp-remote), http (REST API)
 
 # Stage 1: Build the Rust binary
-FROM rust:1.85-slim AS builder
+FROM rust:1.93-slim AS builder
 
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
@@ -27,11 +27,9 @@ WORKDIR /app
 ENV PORT=8080
 ENV RUST_LOG=nexvigilant_station=info
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-  CMD curl -f http://localhost:${PORT}/health || exit 1
+# Cloud Run uses its own startup probe at /health — Docker HEALTHCHECK not needed
 
-# Default: HTTP transport on Cloud Run's port
+# Default: HTTP transport on Cloud Run's $PORT
 # Override with --transport sse for Highway mode
 ENTRYPOINT ["nexvigilant-station"]
-CMD ["--config-dir", "/app/configs", "--transport", "http", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["--config-dir", "/app/configs", "--telemetry-log", "/tmp/station-telemetry.jsonl", "--transport", "http", "--host", "0.0.0.0", "--port", "8080"]

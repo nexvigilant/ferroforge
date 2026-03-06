@@ -60,8 +60,10 @@ gcloud run deploy "$SERVICE" \
     --min-instances=0 \
     --max-instances=3 \
     --timeout=300s \
-    --set-env-vars="RUST_LOG=nexvigilant_station=info,PORT=$PORT" \
-    --args="--config-dir,/app/configs,--transport,$TRANSPORT,--host,0.0.0.0,--port,$PORT"
+    --cpu-boost \
+    --set-env-vars="RUST_LOG=nexvigilant_station=info" \
+    --args="--config-dir,/app/configs,--telemetry-log,/tmp/station-telemetry.jsonl,--transport,$TRANSPORT,--host,0.0.0.0,--port,$PORT" \
+    --description="NexVigilant Station — PV agent traffic routing (${TRANSPORT} transport)"
 
 # Get the service URL
 URL=$(gcloud run services describe "$SERVICE" \
