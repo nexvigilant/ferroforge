@@ -5,6 +5,7 @@ use tracing::info;
 
 use nexvigilant_station::config::ConfigRegistry;
 use nexvigilant_station::server;
+use nexvigilant_station::telemetry::StationTelemetry;
 
 #[derive(Parser)]
 #[command(name = "nexvigilant-station")]
@@ -13,6 +14,10 @@ struct Cli {
     /// Path to configs directory
     #[arg(short, long, default_value = "configs")]
     config_dir: PathBuf,
+
+    /// Path to telemetry JSONL log file
+    #[arg(long, default_value = "station-telemetry.jsonl")]
+    telemetry_log: PathBuf,
 }
 
 fn main() -> Result<()> {
@@ -28,6 +33,7 @@ fn main() -> Result<()> {
     );
 
     let registry = ConfigRegistry::load_from_dir(&cli.config_dir)?;
+    let telemetry = StationTelemetry::new(Some(cli.telemetry_log));
 
     info!(
         configs = registry.configs.len(),
@@ -35,5 +41,5 @@ fn main() -> Result<()> {
         "Station ready — entering MCP stdio loop"
     );
 
-    server::run_stdio(registry)
+    server::run_stdio(registry, &telemetry)
 }

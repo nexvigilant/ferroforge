@@ -33,7 +33,62 @@
           "required": false
         }
       ],
-      "proxy": "scripts/openfda_proxy.py"
+      "proxy": "scripts/openfda_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error | stub"
+          },
+          "query": {
+            "type": "object"
+          },
+          "total_matching": {
+            "type": "integer",
+            "description": "Total FAERS reports matching query"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "safetyreportid": {
+                  "type": "string"
+                },
+                "receivedate": {
+                  "type": "string"
+                },
+                "serious": {
+                  "type": "string"
+                },
+                "drugs": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "reactions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "country": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "status",
+          "results"
+        ]
+      }
     },
     {
       "name": "get-drug-counts",
@@ -52,7 +107,212 @@
           "required": false
         }
       ],
-      "proxy": "scripts/openfda_proxy.py"
+      "proxy": "scripts/openfda_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error | stub"
+          },
+          "query": {
+            "type": "object"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "term": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "status",
+          "results"
+        ]
+      }
+    },
+    {
+      "name": "get-event-outcomes",
+      "description": "Get outcome breakdown (death, hospitalization, disability) for a drug's FAERS reports with seriousness percentages",
+      "parameters": [
+        {
+          "name": "drug_name",
+          "type": "string",
+          "description": "Drug name (generic)",
+          "required": true
+        }
+      ],
+      "proxy": "scripts/openfda_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "query": { "type": "object" },
+          "serious_count": { "type": "integer" },
+          "non_serious_count": { "type": "integer" },
+          "total": { "type": "integer" },
+          "serious_pct": { "type": "number" },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "outcome": { "type": "string" },
+                "count": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "get-event-timeline",
+      "description": "Get FAERS report counts by date for trend detection — enables signal velocity analysis",
+      "parameters": [
+        {
+          "name": "drug_name",
+          "type": "string",
+          "description": "Drug name (generic)",
+          "required": true
+        }
+      ],
+      "proxy": "scripts/openfda_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "query": { "type": "object" },
+          "count": { "type": "integer" },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": { "type": "string" },
+                "count": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "required": ["status", "results"]
+      }
+    },
+    {
+      "name": "get-reporter-breakdown",
+      "description": "Get reporter qualification breakdown (physician, pharmacist, consumer, etc.) for signal quality weighting",
+      "parameters": [
+        {
+          "name": "drug_name",
+          "type": "string",
+          "description": "Drug name (generic)",
+          "required": true
+        }
+      ],
+      "proxy": "scripts/openfda_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "query": { "type": "object" },
+          "total_reports": { "type": "integer" },
+          "hcp_count": { "type": "integer" },
+          "hcp_pct": { "type": "number" },
+          "count": { "type": "integer" },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "reporter_type": { "type": "string" },
+                "code": { "type": "integer" },
+                "count": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "required": ["status", "results"]
+      }
+    },
+    {
+      "name": "get-drug-characterization",
+      "description": "Get how often a drug is suspect vs concomitant vs interacting in FAERS — feeds causality weighting",
+      "parameters": [
+        {
+          "name": "drug_name",
+          "type": "string",
+          "description": "Drug name (generic)",
+          "required": true
+        }
+      ],
+      "proxy": "scripts/openfda_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "query": { "type": "object" },
+          "total_mentions": { "type": "integer" },
+          "suspect_count": { "type": "integer" },
+          "suspect_pct": { "type": "number" },
+          "count": { "type": "integer" },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "characterization": { "type": "string" },
+                "code": { "type": "integer" },
+                "count": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "required": ["status", "results"]
+      }
+    },
+    {
+      "name": "get-indication-counts",
+      "description": "Get top indications (reasons for use) from FAERS — detects off-label use patterns",
+      "parameters": [
+        {
+          "name": "drug_name",
+          "type": "string",
+          "description": "Drug name (generic)",
+          "required": true
+        }
+      ],
+      "proxy": "scripts/openfda_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "query": { "type": "object" },
+          "count": { "type": "integer" },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "term": { "type": "string" },
+                "count": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "required": ["status", "results"]
+      }
     }
-  ]
+  ],
+  "proxy": "scripts/openfda_proxy.py"
 }

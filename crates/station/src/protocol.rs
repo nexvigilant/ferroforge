@@ -90,6 +90,8 @@ pub struct ToolInfo {
     pub description: String,
     #[serde(rename = "inputSchema")]
     pub input_schema: Value,
+    #[serde(rename = "outputSchema", skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<Value>,
 }
 
 #[derive(Debug, Serialize)]

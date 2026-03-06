@@ -4,10 +4,61 @@ use tracing::{info, warn};
 
 use crate::config::{ConfigRegistry, HubConfig, ToolDef};
 use crate::protocol::{ContentBlock, ToolCallResult};
+use crate::telemetry::{
+    elapsed_ms, extract_domain, now_iso8601, start_timer, StationTelemetry, ToolCallRecord,
+};
 
-/// Route a tool call to the appropriate handler.
+/// Route a tool call to the appropriate handler, with telemetry.
 pub fn route_tool_call(
     registry: &ConfigRegistry,
+    telemetry: &StationTelemetry,
+    tool_name: &str,
+    arguments: &Value,
+) -> ToolCallResult {
+    let timer = start_timer();
+    let result = route_tool_call_inner(registry, telemetry, tool_name, arguments);
+    let duration_ms = elapsed_ms(timer);
+
+    // Extract status from the result content
+    let (status, is_error) = extract_status(&result);
+    let domain = extract_domain(tool_name);
+
+    telemetry.record(ToolCallRecord {
+        timestamp: now_iso8601(),
+        tool_name: tool_name.to_string(),
+        domain,
+        duration_ms,
+        status,
+        is_error,
+    });
+
+    result
+}
+
+/// Extract status string from a tool call result.
+fn extract_status(result: &ToolCallResult) -> (String, bool) {
+    let is_error = result.is_error.unwrap_or(false);
+
+    // Try to parse the content as JSON and extract "status" field
+    if let Some(ContentBlock::Text { text }) = result.content.first() {
+        if let Ok(json) = serde_json::from_str::<Value>(text) {
+            if let Some(status) = json.get("status").and_then(|s| s.as_str()) {
+                return (status.to_string(), is_error);
+            }
+        }
+    }
+
+    if is_error {
+        ("error".to_string(), true)
+    } else {
+        ("ok".to_string(), false)
+    }
+}
+
+/// Inner routing logic (no telemetry wrapping).
+fn route_tool_call_inner(
+    registry: &ConfigRegistry,
+    telemetry: &StationTelemetry,
     tool_name: &str,
     arguments: &Value,
 ) -> ToolCallResult {
@@ -17,6 +68,14 @@ pub fn route_tool_call(
     }
     if tool_name == "nexvigilant_capabilities" {
         return handle_capabilities(registry, arguments);
+    }
+    if tool_name == "nexvigilant_station_health" {
+        return handle_station_health(telemetry);
+    }
+
+    // Rust-native science handlers — no Python proxy needed
+    if let Some(result) = crate::science::try_handle(tool_name, arguments, registry) {
+        return result;
     }
 
     match registry.find_tool(tool_name) {
@@ -234,6 +293,18 @@ fn handle_directory(registry: &ConfigRegistry) -> ToolCallResult {
     ToolCallResult {
         content: vec![ContentBlock::Text {
             text: serde_json::to_string_pretty(&directory).unwrap_or_default(),
+        }],
+        is_error: None,
+    }
+}
+
+/// Meta-tool: Station health — telemetry dashboard for the owner.
+fn handle_station_health(telemetry: &StationTelemetry) -> ToolCallResult {
+    let health = telemetry.health();
+
+    ToolCallResult {
+        content: vec![ContentBlock::Text {
+            text: serde_json::to_string_pretty(&health).unwrap_or_default(),
         }],
         is_error: None,
     }

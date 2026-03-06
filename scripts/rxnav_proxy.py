@@ -163,14 +163,26 @@ def get_interactions(args: dict) -> dict:
     if not rxcuis_raw:
         return {"status": "error", "message": "rxcuis is required (plus-separated or comma-separated RxCUI list)"}
 
-    # Normalize to plus-separated for the API
+    # Normalize separators and determine endpoint
     rxcuis_normalized = rxcuis_raw.replace(",", "+").replace(" ", "")
-    url = f"{BASE_URL}/interaction/list.json?rxcuis={rxcuis_normalized}"
+    rxcui_list = [r for r in rxcuis_normalized.split("+") if r]
+
+    if len(rxcui_list) == 1:
+        url = f"{BASE_URL}/interaction/interaction.json?rxcui={rxcui_list[0]}"
+    else:
+        url = f"{BASE_URL}/interaction/list.json?rxcuis={rxcuis_normalized}"
 
     try:
         data = _fetch(url)
     except RuntimeError as exc:
-        return {"status": "error", "message": str(exc), "rxcuis": rxcuis_raw}
+        error_msg = str(exc)
+        if "404" in error_msg:
+            return {
+                "status": "unavailable",
+                "message": "RxNav interaction API endpoints (/interaction/) are no longer available as of API v3.1.345 (March 2026). Use DrugBank or openFDA for drug-drug interaction data.",
+                "rxcuis": rxcuis_raw,
+            }
+        return {"status": "error", "message": error_msg, "rxcuis": rxcuis_raw}
 
     full_interaction_type_group = data.get("fullInteractionTypeGroup", [])
 
@@ -321,22 +333,31 @@ def get_drug_classes(args: dict) -> dict:
             "drug_name": drug_name,
         }
 
-    # Group by classification type for readability
+    # Group by classification type, dedup by (class_id, class_name, relation)
     classes_by_type: dict[str, list[dict]] = {}
+    seen: set[tuple[str, str, str, str]] = set()
     for member in members:
         rx_class_info = member.get("rxclassMinConceptItem", {})
         class_type = rx_class_info.get("classType", "UNKNOWN")
+        class_id = rx_class_info.get("classId", "")
+        class_name = rx_class_info.get("className", "")
+        relation = member.get("rela", "")
+        key = (class_type, class_id, class_name, relation)
+        if key in seen:
+            continue
+        seen.add(key)
         entry = {
-            "class_id": rx_class_info.get("classId"),
-            "class_name": rx_class_info.get("className"),
-            "relation": member.get("rela"),
+            "class_id": class_id,
+            "class_name": class_name,
+            "relation": relation,
         }
         classes_by_type.setdefault(class_type, []).append(entry)
 
+    unique_count = sum(len(v) for v in classes_by_type.values())
     return {
         "status": "ok",
         "drug_name": drug_name,
-        "total_classifications": len(members),
+        "total_classifications": unique_count,
         "classes_by_type": classes_by_type,
     }
 

@@ -2,20 +2,27 @@ use nexvigilant_station::config::{ConfigRegistry, HubConfig, ParamDef, ToolDef};
 use nexvigilant_station::protocol::{JsonRpcRequest, INVALID_PARAMS, METHOD_NOT_FOUND};
 use nexvigilant_station::router;
 use nexvigilant_station::server;
+use nexvigilant_station::telemetry::StationTelemetry;
 use serde_json::{json, Value};
 use std::io::Write;
 use tempfile::TempDir;
+
+fn test_telemetry() -> StationTelemetry {
+    StationTelemetry::new(None)
+}
 
 // --- Helper: build a test registry from inline configs ---
 
 fn test_registry() -> ConfigRegistry {
     ConfigRegistry {
+        station_root: "/tmp".into(),
         configs: vec![
             HubConfig {
                 domain: "api.fda.gov".into(),
                 url_pattern: Some("/drug/event*".into()),
                 title: "openFDA FAERS".into(),
                 description: Some("Test config".into()),
+                proxy: None,
                 tools: vec![
                     ToolDef {
                         name: "search-adverse-events".into(),
@@ -27,12 +34,16 @@ fn test_registry() -> ConfigRegistry {
                             required: true,
                         }],
                         stub_response: Some(r#"{"status":"ok","events":42}"#.into()),
+                        proxy: None,
+                        output_schema: None,
                     },
                     ToolDef {
                         name: "get-drug-counts".into(),
                         description: "Get counts".into(),
                         parameters: vec![],
                         stub_response: None,
+                        proxy: None,
+                        output_schema: None,
                     },
                 ],
             },
@@ -41,11 +52,14 @@ fn test_registry() -> ConfigRegistry {
                 url_pattern: None,
                 title: "DailyMed".into(),
                 description: None,
+                proxy: None,
                 tools: vec![ToolDef {
                     name: "get-drug-label".into(),
                     description: "Get label".into(),
                     parameters: vec![],
                     stub_response: Some(r#"{"label":"test"}"#.into()),
+                    proxy: None,
+                    output_schema: None,
                 }],
             },
         ],
@@ -99,10 +113,14 @@ fn test_registry_tool_count() {
 }
 
 #[test]
-fn test_registry_tool_infos_count() {
+fn test_registry_tool_infos_includes_meta_tools() {
     let reg = test_registry();
     let infos = reg.tool_infos();
-    assert_eq!(infos.len(), 3);
+    // 3 config tools + 4 meta tools (directory + capabilities + station_health + chart_course)
+    assert_eq!(infos.len(), 7);
+    assert!(infos.iter().any(|t| t.name == "nexvigilant_directory"));
+    assert!(infos.iter().any(|t| t.name == "nexvigilant_capabilities"));
+    assert!(infos.iter().any(|t| t.name == "nexvigilant_station_health"));
 }
 
 #[test]
@@ -120,7 +138,11 @@ fn test_registry_tool_description_has_domain() {
     let reg = test_registry();
     let infos = reg.tool_infos();
     for info in &infos {
-        assert!(info.description.starts_with('['), "description should start with [domain]: {}", info.description);
+        assert!(
+            info.description.starts_with('['),
+            "description should start with [domain] or [NexVigilant]: {}",
+            info.description
+        );
     }
 }
 
@@ -209,7 +231,7 @@ fn test_load_ignores_non_config_files() {
 #[test]
 fn test_route_known_tool_with_stub() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, "api_fda_gov_search_adverse_events", &json!({"drug_name": "aspirin"}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), "api_fda_gov_search_adverse_events", &json!({"drug_name": "aspirin"}));
     assert!(result.is_error.is_none());
     assert_eq!(result.content.len(), 1);
 }
@@ -217,19 +239,57 @@ fn test_route_known_tool_with_stub() {
 #[test]
 fn test_route_known_tool_without_stub() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, "api_fda_gov_get_drug_counts", &json!({"drug_name": "metformin"}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), "api_fda_gov_get_drug_counts", &json!({"drug_name": "metformin"}));
     assert!(result.is_error.is_none());
     let text = match &result.content[0] {
         nexvigilant_station::protocol::ContentBlock::Text { text } => text,
     };
-    assert!(text.contains("registered but has no implementation"));
+    assert!(text.contains("no proxy or stub") || text.contains("no_handler"));
 }
 
 #[test]
 fn test_route_unknown_tool() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, "nonexistent_tool", &json!({}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), "nonexistent_tool", &json!({}));
     assert_eq!(result.is_error, Some(true));
+}
+
+#[test]
+fn test_route_directory_meta_tool() {
+    let reg = test_registry();
+    let result = router::route_tool_call(&reg, &test_telemetry(), "nexvigilant_directory", &json!({}));
+    assert!(result.is_error.is_none());
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("should be JSON");
+    assert_eq!(parsed["station"], "NexVigilant Station");
+    assert_eq!(parsed["total_domains"], 2);
+    assert_eq!(parsed["total_tools"], 3);
+}
+
+#[test]
+fn test_route_capabilities_search() {
+    let reg = test_registry();
+    let result = router::route_tool_call(&reg, &test_telemetry(), "nexvigilant_capabilities", &json!({"query": "adverse"}));
+    assert!(result.is_error.is_none());
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("should be JSON");
+    assert!(parsed["matches"].as_u64().expect("count") >= 1);
+}
+
+#[test]
+fn test_route_capabilities_domain_filter() {
+    let reg = test_registry();
+    let result = router::route_tool_call(&reg, &test_telemetry(), "nexvigilant_capabilities", &json!({"domain": "dailymed"}));
+    assert!(result.is_error.is_none());
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("should be JSON");
+    assert_eq!(parsed["matches"], 1);
 }
 
 // =============================================
@@ -240,7 +300,7 @@ fn test_route_unknown_tool() {
 fn test_handle_initialize() {
     let reg = test_registry();
     let req = make_request(Some(json!(1)), "initialize", Some(json!({})));
-    let resp = server::handle_request(&reg, &req).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &req).expect("should respond");
     let result = resp.result.expect("should have result");
     assert_eq!(result["protocolVersion"], "2024-11-05");
     assert_eq!(result["serverInfo"]["name"], "nexvigilant-station");
@@ -251,10 +311,11 @@ fn test_handle_initialize() {
 fn test_handle_tools_list() {
     let reg = test_registry();
     let req = make_request(Some(json!(2)), "tools/list", None);
-    let resp = server::handle_request(&reg, &req).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &req).expect("should respond");
     let result = resp.result.expect("should have result");
     let tools = result["tools"].as_array().expect("tools array");
-    assert_eq!(tools.len(), 3);
+    // 3 config tools + 4 meta tools
+    assert_eq!(tools.len(), 7);
 }
 
 #[test]
@@ -268,7 +329,7 @@ fn test_handle_tools_call_with_stub() {
             "arguments": {"drug_name": "aspirin"}
         })),
     );
-    let resp = server::handle_request(&reg, &req).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &req).expect("should respond");
     let result = resp.result.expect("should have result");
     let content = result["content"].as_array().expect("content");
     assert_eq!(content.len(), 1);
@@ -279,7 +340,7 @@ fn test_handle_tools_call_with_stub() {
 fn test_handle_tools_call_missing_name() {
     let reg = test_registry();
     let req = make_request(Some(json!(4)), "tools/call", Some(json!({"arguments": {}})));
-    let resp = server::handle_request(&reg, &req).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &req).expect("should respond");
     let err = resp.error.expect("should have error");
     assert_eq!(err.code, INVALID_PARAMS);
 }
@@ -288,7 +349,7 @@ fn test_handle_tools_call_missing_name() {
 fn test_handle_ping() {
     let reg = test_registry();
     let req = make_request(Some(json!(5)), "ping", None);
-    let resp = server::handle_request(&reg, &req).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &req).expect("should respond");
     assert!(resp.result.is_some());
     assert!(resp.error.is_none());
 }
@@ -297,7 +358,7 @@ fn test_handle_ping() {
 fn test_handle_unknown_method() {
     let reg = test_registry();
     let req = make_request(Some(json!(6)), "bogus/method", None);
-    let resp = server::handle_request(&reg, &req).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &req).expect("should respond");
     let err = resp.error.expect("should have error");
     assert_eq!(err.code, METHOD_NOT_FOUND);
 }
@@ -306,7 +367,7 @@ fn test_handle_unknown_method() {
 fn test_handle_notification_returns_none() {
     let reg = test_registry();
     let req = make_request(None, "notifications/initialized", None);
-    let resp = server::handle_request(&reg, &req);
+    let resp = server::handle_request(&reg, &test_telemetry(), &req);
     assert!(resp.is_none(), "notifications should return None");
 }
 
@@ -319,7 +380,7 @@ fn test_e2e_json_roundtrip_initialize() {
     let raw = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}"#;
     let req: JsonRpcRequest = serde_json::from_str(raw).expect("parse");
     let reg = test_registry();
-    let resp = server::handle_request(&reg, &req).expect("respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &req).expect("respond");
     let json_str = serde_json::to_string(&resp).expect("serialize");
     let reparsed: Value = serde_json::from_str(&json_str).expect("reparse");
     assert_eq!(reparsed["jsonrpc"], "2.0");
@@ -332,7 +393,7 @@ fn test_e2e_json_roundtrip_tools_call() {
     let raw = r#"{"jsonrpc":"2.0","id":99,"method":"tools/call","params":{"name":"dailymed_nlm_nih_gov_get_drug_label","arguments":{"drug_name":"metformin"}}}"#;
     let req: JsonRpcRequest = serde_json::from_str(raw).expect("parse");
     let reg = test_registry();
-    let resp = server::handle_request(&reg, &req).expect("respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &req).expect("respond");
     let json_str = serde_json::to_string(&resp).expect("serialize");
     let reparsed: Value = serde_json::from_str(&json_str).expect("reparse");
     assert_eq!(reparsed["id"], 99);
@@ -385,6 +446,10 @@ fn test_real_configs_all_tools_routable() {
     let infos = reg.tool_infos();
 
     for info in &infos {
+        // Skip meta-tools — they're handled directly, not via find_tool
+        if info.name.starts_with("nexvigilant_") {
+            continue;
+        }
         let found = reg.find_tool(&info.name);
         assert!(
             found.is_some(),

@@ -264,25 +264,34 @@ def get_citations(params: dict) -> dict:
     if not pmid:
         return {"error": "pmid parameter is required"}
 
+    # Use XML mode — elink JSON from NCBI can contain control characters
     elink_url = (
         f"{BASE}/elink.fcgi"
         f"?dbfrom=pubmed"
-        f"&db=pubmed"
+        f"&db=pmc"
         f"&id={urllib.parse.quote(pmid)}"
-        f"&cmd=neighbor"
-        f"&retmode=json"
+        f"&linkname=pubmed_pmc_refs"
         f"{COURTESY}"
     )
-    elink_data = _get_json(elink_url)
+    try:
+        root = _get_xml(elink_url)
+    except ET.ParseError:
+        return {
+            "pmid": pmid,
+            "citing_count": 0,
+            "citing_articles": [],
+            "note": "Failed to parse elink XML response.",
+        }
 
-    # Extract linked IDs from the elink response
+    # Extract linked PMC IDs, then resolve back to PMIDs
     citing_ids: list[str] = []
-    link_sets = elink_data.get("linksets", [])
-    for ls in link_sets:
-        for link_set_db in ls.get("linksetdbs", []):
-            # "pubmed_pubmed_citedin" contains articles that cite the query PMID
-            if "citedin" in link_set_db.get("linkname", ""):
-                citing_ids.extend(str(i) for i in link_set_db.get("links", []))
+    for link_set in root.findall(".//LinkSetDb"):
+        link_name = _text(link_set.find("LinkName"))
+        if "refs" in link_name or "citedin" in link_name:
+            for link in link_set.findall("Link"):
+                link_id = _text(link.find("Id"))
+                if link_id:
+                    citing_ids.append(link_id)
 
     if not citing_ids:
         return {
@@ -326,19 +335,17 @@ def search_case_reports(params: dict) -> dict:
 
     adverse_event = params.get("adverse_event", "").strip()
 
-    # Build structured PubMed query
+    # Build structured PubMed query — case report pub type is sufficient filter
     drug_clause = f"{drug_name}[Title/Abstract]"
-    pub_type_clause = "case report[Publication Type]"
-    ae_clause = "adverse*[Title/Abstract] OR toxicity[Title/Abstract] OR adverse event*[Title/Abstract]"
+    pub_type_clause = "Case Reports[Publication Type]"
 
     if adverse_event:
         query = (
             f"{drug_clause} AND {pub_type_clause} "
-            f"AND ({adverse_event}[Title/Abstract]) "
-            f"AND ({ae_clause})"
+            f"AND ({adverse_event}[Title/Abstract])"
         )
     else:
-        query = f"{drug_clause} AND {pub_type_clause} AND ({ae_clause})"
+        query = f"{drug_clause} AND {pub_type_clause}"
 
     return search_articles({"query": query, "limit": DEFAULT_LIMIT})
 

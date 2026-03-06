@@ -51,6 +51,10 @@ pub struct ToolDef {
     /// Per-tool proxy script override (relative to station root)
     #[serde(default)]
     pub proxy: Option<String>,
+
+    /// JSON Schema describing the tool's output structure (MCP spec 2025-06-18)
+    #[serde(default, rename = "outputSchema")]
+    pub output_schema: Option<Value>,
 }
 
 /// A parameter for a tool.
@@ -151,6 +155,7 @@ impl ConfigRegistry {
                     "type": "object",
                     "properties": {},
                 }),
+                output_schema: None,
             },
             ToolInfo {
                 name: "nexvigilant_capabilities".into(),
@@ -168,6 +173,30 @@ impl ConfigRegistry {
                         }
                     },
                 }),
+                output_schema: None,
+            },
+            ToolInfo {
+                name: "nexvigilant_station_health".into(),
+                description: "[NexVigilant Station] Station telemetry dashboard — total calls, error rates, per-domain stats, top tools, recent activity. Owner visibility into the open house.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                }),
+                output_schema: None,
+            },
+            ToolInfo {
+                name: "nexvigilant_chart_course".into(),
+                description: "[NexVigilant Station] Chart a research course — predefined multi-tool workflows for drug safety profiling, signal investigation, target analysis, and HEXIM1 research. Call with no args to list courses, or provide 'course' to get the step-by-step plan.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "course": {
+                            "type": "string",
+                            "description": "Course name (e.g., 'drug-safety-profile', 'signal-investigation', 'hexim1-landscape'). Omit to list all available courses."
+                        }
+                    },
+                }),
+                output_schema: None,
             },
         ];
 
@@ -203,6 +232,7 @@ impl ConfigRegistry {
                         name: prefixed_name,
                         description: format!("[{}] {}", config.domain, tool.description),
                         input_schema,
+                        output_schema: tool.output_schema.clone(),
                     }
                 })
             })

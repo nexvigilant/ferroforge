@@ -6,9 +6,10 @@ use tracing::{debug, error, info};
 use crate::config::ConfigRegistry;
 use crate::protocol::*;
 use crate::router;
+use crate::telemetry::StationTelemetry;
 
 /// Run the MCP server over stdio (JSON-RPC 2.0).
-pub fn run_stdio(registry: ConfigRegistry) -> Result<()> {
+pub fn run_stdio(registry: ConfigRegistry, telemetry: &StationTelemetry) -> Result<()> {
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
@@ -44,7 +45,7 @@ pub fn run_stdio(registry: ConfigRegistry) -> Result<()> {
             }
         };
 
-        let response = handle_request(&registry, &request);
+        let response = handle_request(&registry, telemetry, &request);
 
         // Notifications (no id) get no response
         if request.id.is_none() {
@@ -61,7 +62,7 @@ pub fn run_stdio(registry: ConfigRegistry) -> Result<()> {
     Ok(())
 }
 
-pub fn handle_request(registry: &ConfigRegistry, req: &JsonRpcRequest) -> Option<JsonRpcResponse> {
+pub fn handle_request(registry: &ConfigRegistry, telemetry: &StationTelemetry, req: &JsonRpcRequest) -> Option<JsonRpcResponse> {
     let id = req.id.clone();
 
     match req.method.as_str() {
@@ -124,7 +125,7 @@ pub fn handle_request(registry: &ConfigRegistry, req: &JsonRpcRequest) -> Option
             }
 
             info!(tool = %tool_name, "Tool call");
-            let result = router::route_tool_call(registry, tool_name, &arguments);
+            let result = router::route_tool_call(registry, telemetry, tool_name, &arguments);
             Some(JsonRpcResponse::success(
                 id,
                 serde_json::to_value(result).unwrap_or_default(),

@@ -128,6 +128,211 @@ def search_adverse_events(args: dict) -> dict:
     }
 
 
+def get_event_outcomes(args: dict) -> dict:
+    """
+    Tool: get-event-outcomes
+
+    Returns outcome breakdown (death, hospitalization, disability, etc.) for a drug.
+    Maps to ICH E2A seriousness criteria via outcome-severity-classifier microgram.
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+
+    search_expr = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"'
+    url = f"{BASE_URL}?search={search_expr}&count=serious"
+
+    try:
+        data = _fetch(url)
+    except RuntimeError as exc:
+        return {"status": "error", "message": str(exc), "count": 0, "results": []}
+
+    serious_results = data.get("results", [])
+
+    # Also fetch outcome breakdown
+    url_outcomes = f"{BASE_URL}?search={search_expr}&count=patient.reaction.reactionoutcome"
+    try:
+        outcome_data = _fetch(url_outcomes)
+    except RuntimeError:
+        outcome_data = {"results": []}
+
+    outcome_map = {1: "recovered", 2: "recovering", 3: "not_recovered", 4: "recovered_with_sequelae", 5: "fatal", 6: "unknown"}
+    outcomes = []
+    for item in outcome_data.get("results", []):
+        term_code = item.get("term")
+        outcomes.append({
+            "outcome": outcome_map.get(term_code, f"code_{term_code}"),
+            "count": item.get("count", 0),
+        })
+
+    serious_count = 0
+    non_serious_count = 0
+    for item in serious_results:
+        if item.get("term") == 1:
+            serious_count = item.get("count", 0)
+        elif item.get("term") == 2:
+            non_serious_count = item.get("count", 0)
+
+    return {
+        "status": "ok",
+        "query": {"drug_name": drug_name},
+        "serious_count": serious_count,
+        "non_serious_count": non_serious_count,
+        "total": serious_count + non_serious_count,
+        "serious_pct": round(serious_count / max(serious_count + non_serious_count, 1) * 100, 1),
+        "outcomes": outcomes,
+    }
+
+
+def get_event_timeline(args: dict) -> dict:
+    """
+    Tool: get-event-timeline
+
+    Returns FAERS report counts by receive date for a drug, enabling trend detection
+    via signal-trend-detector microgram.
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+
+    search_expr = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"'
+    url = f"{BASE_URL}?search={search_expr}&count=receivedate"
+
+    try:
+        data = _fetch(url)
+    except RuntimeError as exc:
+        return {"status": "error", "message": str(exc), "count": 0, "results": []}
+
+    raw = data.get("results", [])
+
+    # Return the most recent 24 quarters (6 years) for trend analysis
+    results = [{"date": item.get("time", ""), "count": item.get("count", 0)} for item in raw]
+
+    return {
+        "status": "ok",
+        "query": {"drug_name": drug_name},
+        "count": len(results),
+        "results": results[-96:],  # last 96 months if available
+    }
+
+
+def get_reporter_breakdown(args: dict) -> dict:
+    """
+    Tool: get-reporter-breakdown
+
+    Returns reporter qualification breakdown for a drug's FAERS reports.
+    Feeds into reporter-quality-classifier microgram for signal weighting.
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+
+    search_expr = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"'
+    url = f"{BASE_URL}?search={search_expr}&count=primarysource.qualification"
+
+    try:
+        data = _fetch(url)
+    except RuntimeError as exc:
+        return {"status": "error", "message": str(exc), "count": 0, "results": []}
+
+    qual_map = {1: "physician", 2: "pharmacist", 3: "other_hcp", 4: "lawyer", 5: "consumer"}
+    raw = data.get("results", [])
+
+    total = sum(item.get("count", 0) for item in raw)
+    hcp_count = 0
+    results = []
+    for item in raw:
+        code = item.get("term")
+        label = qual_map.get(code, f"code_{code}")
+        count = item.get("count", 0)
+        if code in (1, 2, 3):
+            hcp_count += count
+        results.append({"reporter_type": label, "code": code, "count": count})
+
+    return {
+        "status": "ok",
+        "query": {"drug_name": drug_name},
+        "total_reports": total,
+        "hcp_count": hcp_count,
+        "hcp_pct": round(hcp_count / max(total, 1) * 100, 1),
+        "count": len(results),
+        "results": results,
+    }
+
+
+def get_drug_characterization(args: dict) -> dict:
+    """
+    Tool: get-drug-characterization
+
+    Returns how often a drug is listed as suspect vs concomitant vs interacting
+    in FAERS reports. Feeds into suspect-drug-classifier microgram.
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+
+    search_expr = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"'
+    url = f"{BASE_URL}?search={search_expr}&count=patient.drug.drugcharacterization"
+
+    try:
+        data = _fetch(url)
+    except RuntimeError as exc:
+        return {"status": "error", "message": str(exc), "count": 0, "results": []}
+
+    char_map = {1: "suspect", 2: "concomitant", 3: "interacting"}
+    raw = data.get("results", [])
+
+    total = sum(item.get("count", 0) for item in raw)
+    suspect_count = 0
+    results = []
+    for item in raw:
+        code = item.get("term")
+        label = char_map.get(code, f"code_{code}")
+        count = item.get("count", 0)
+        if code == 1:
+            suspect_count = count
+        results.append({"characterization": label, "code": code, "count": count})
+
+    return {
+        "status": "ok",
+        "query": {"drug_name": drug_name},
+        "total_mentions": total,
+        "suspect_count": suspect_count,
+        "suspect_pct": round(suspect_count / max(total, 1) * 100, 1),
+        "count": len(results),
+        "results": results,
+    }
+
+
+def get_indication_counts(args: dict) -> dict:
+    """
+    Tool: get-indication-counts
+
+    Returns top indications (reasons for use) for a drug from FAERS reports.
+    Useful for detecting off-label use patterns.
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+
+    search_expr = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"'
+    url = f"{BASE_URL}?search={search_expr}&count=patient.drug.drugindication.exact"
+
+    try:
+        data = _fetch(url)
+    except RuntimeError as exc:
+        return {"status": "error", "message": str(exc), "count": 0, "results": []}
+
+    raw = data.get("results", [])
+
+    return {
+        "status": "ok",
+        "query": {"drug_name": drug_name},
+        "count": len(raw),
+        "results": raw,  # already [{term, count}] from openFDA
+    }
+
+
 def get_drug_counts(args: dict) -> dict:
     """
     Tool: get-drug-counts
@@ -168,6 +373,11 @@ def get_drug_counts(args: dict) -> dict:
 TOOL_DISPATCH = {
     "search-adverse-events": search_adverse_events,
     "get-drug-counts": get_drug_counts,
+    "get-event-outcomes": get_event_outcomes,
+    "get-event-timeline": get_event_timeline,
+    "get-reporter-breakdown": get_reporter_breakdown,
+    "get-drug-characterization": get_drug_characterization,
+    "get-indication-counts": get_indication_counts,
 }
 
 

@@ -2,41 +2,283 @@
   "domain": "open-vigil.fr",
   "url_pattern": "/*",
   "title": "OpenVigil France",
-  "description": "Open pharmacovigilance analytics — disproportionality analysis on FAERS and French PV data",
+  "description": "Open pharmacovigilance analytics \u2014 disproportionality analysis on FAERS data with PRR, ROR, and IC computation",
   "tools": [
     {
       "name": "compute-disproportionality",
       "description": "Compute PRR, ROR, and IC for a drug-event combination using FAERS data",
       "parameters": [
-        {"name": "drug", "type": "string", "description": "Drug name (generic)", "required": true},
-        {"name": "event", "type": "string", "description": "MedDRA preferred term", "required": true}
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Drug name (generic)",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "MedDRA preferred term",
+          "required": true
+        }
       ],
-      "stub_response": "{\"status\": \"stub\", \"message\": \"Will query OpenVigil API for 2x2 contingency table and compute PRR/ROR/IC with confidence intervals.\"}"
+      "proxy": "scripts/openvigil_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error | stub"
+          },
+          "drug": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
+          "contingency_table": {
+            "type": "object",
+            "properties": {
+              "a_drug_event": {
+                "type": "integer"
+              },
+              "b_drug_noevent": {
+                "type": "integer"
+              },
+              "c_nodrug_event": {
+                "type": "integer"
+              },
+              "d_nodrug_noevent": {
+                "type": "integer"
+              },
+              "total_reports": {
+                "type": "integer"
+              }
+            }
+          },
+          "scores": {
+            "type": "object",
+            "properties": {
+              "PRR": {
+                "type": "number"
+              },
+              "PRR_CI_lower": {
+                "type": "number"
+              },
+              "PRR_CI_upper": {
+                "type": "number"
+              },
+              "ROR": {
+                "type": "number"
+              },
+              "ROR_CI_lower": {
+                "type": "number"
+              },
+              "ROR_CI_upper": {
+                "type": "number"
+              },
+              "IC": {
+                "type": "number"
+              },
+              "IC025": {
+                "type": "number"
+              },
+              "IC975": {
+                "type": "number"
+              },
+              "chi_squared": {
+                "type": "number"
+              }
+            }
+          },
+          "signal_assessment": {
+            "type": "string",
+            "description": "none | possible_signal | signal_detected"
+          },
+          "criteria": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "scores",
+          "signal_assessment"
+        ]
+      }
     },
     {
       "name": "get-top-reactions",
       "description": "Get top adverse reactions for a drug ranked by disproportionality score",
       "parameters": [
-        {"name": "drug", "type": "string", "description": "Drug name", "required": true},
-        {"name": "limit", "type": "integer", "description": "Number of top reactions", "required": false}
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Drug name",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "description": "Number of top reactions",
+          "required": false
+        }
       ],
-      "stub_response": "{\"status\": \"stub\", \"message\": \"Will return ranked reaction list with PRR, ROR, case count for each.\"}"
+      "proxy": "scripts/openvigil_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error | stub"
+          },
+          "drug": {
+            "type": "string"
+          },
+          "drug_total_reports": {
+            "type": "integer"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "reaction": {
+                  "type": "string"
+                },
+                "case_count": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "status",
+          "reactions"
+        ]
+      }
     },
     {
       "name": "get-top-drugs",
       "description": "Get top drugs associated with a specific adverse event",
       "parameters": [
-        {"name": "event", "type": "string", "description": "MedDRA preferred term", "required": true},
-        {"name": "limit", "type": "integer", "description": "Number of top drugs", "required": false}
-      ]
+        {
+          "name": "event",
+          "type": "string",
+          "description": "MedDRA preferred term",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "description": "Number of top drugs",
+          "required": false
+        }
+      ],
+      "proxy": "scripts/openvigil_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error | stub"
+          },
+          "event": {
+            "type": "string"
+          },
+          "event_total_reports": {
+            "type": "integer"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "drugs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "drug": {
+                  "type": "string"
+                },
+                "case_count": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "status",
+          "drugs"
+        ]
+      }
     },
     {
       "name": "get-case-demographics",
       "description": "Get demographic breakdown of cases for a drug-event pair",
       "parameters": [
-        {"name": "drug", "type": "string", "description": "Drug name", "required": true},
-        {"name": "event", "type": "string", "description": "MedDRA PT", "required": false}
-      ]
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Drug name",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "MedDRA PT",
+          "required": false
+        }
+      ],
+      "proxy": "scripts/openvigil_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error | stub"
+          },
+          "drug": {
+            "type": "string"
+          },
+          "event": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "demographics": {
+            "type": "object",
+            "properties": {
+              "sex": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "age_groups": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "countries": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "status",
+          "demographics"
+        ]
+      }
     }
-  ]
+  ],
+  "proxy": "scripts/openvigil_proxy.py"
 }

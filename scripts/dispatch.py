@@ -19,7 +19,6 @@ Usage:
 import json
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -28,11 +27,24 @@ from pathlib import Path
 # Value : proxy script filename (relative to this script's directory)
 # ---------------------------------------------------------------------------
 DOMAIN_ROUTES: dict[str, str] = {
+    # ── Live API proxies (7) ──
     "api_fda_gov_":                "openfda_proxy.py",
     "clinicaltrials_gov_":         "clinicaltrials_proxy.py",
     "dailymed_nlm_nih_gov_":       "dailymed_proxy.py",
     "rxnav_nlm_nih_gov_":          "rxnav_proxy.py",
     "pubmed_ncbi_nlm_nih_gov_":    "pubmed_proxy.py",
+    "open-vigil_fr_":              "openvigil_proxy.py",
+    "accessdata_fda_gov_":             "accessdata_proxy.py",
+    # ── Routed stubs (9) — proxy scripts return stub envelopes ──
+    "www_ema_europa_eu_":              "ema_proxy.py",
+    "eudravigilance_ema_europa_eu_":   "eudravigilance_proxy.py",
+    "vigiaccess_org_":                 "vigiaccess_proxy.py",
+    "go_drugbank_com_":                "drugbank_proxy.py",
+    "meddra_org_":                     "meddra_proxy.py",
+    "ich_org_":                        "ich_proxy.py",
+    "cioms_ch_":                       "cioms_proxy.py",
+    "who-umc_org_":                    "who_umc_proxy.py",
+    "www_fda_gov_":                    "fda_safety_proxy.py",
 }
 
 # Ordered by prefix length (longest first) so that more-specific prefixes win
@@ -226,8 +238,38 @@ SMOKE_TEST_CASES: list[dict] = [
         "expect_domain": "pubmed_ncbi_nlm_nih_gov_",
     },
     {
-        "label": "Unknown domain — should return stub",
+        "label": "OpenVigil — registered proxy",
+        "envelope": {"tool": "open-vigil_fr_compute_disproportionality", "arguments": {"drug": "metformin", "event": "lactic acidosis"}},
+        "expect_domain": "open-vigil_fr_",
+    },
+    {
+        "label": "VigiAccess — routed stub (no proxy script yet)",
         "envelope": {"tool": "vigiaccess_org_search_reports", "arguments": {"drug_name": "warfarin"}},
+        "expect_domain": "vigiaccess_org_",
+    },
+    {
+        "label": "EMA — routed stub",
+        "envelope": {"tool": "www_ema_europa_eu_search_medicines", "arguments": {"query": "metformin"}},
+        "expect_domain": "www_ema_europa_eu_",
+    },
+    {
+        "label": "DrugBank — routed stub",
+        "envelope": {"tool": "go_drugbank_com_get_drug_info", "arguments": {"drug_name": "metformin"}},
+        "expect_domain": "go_drugbank_com_",
+    },
+    {
+        "label": "MedDRA — routed stub",
+        "envelope": {"tool": "meddra_org_search_terms", "arguments": {"query": "lactic acidosis"}},
+        "expect_domain": "meddra_org_",
+    },
+    {
+        "label": "WHO-UMC — routed stub",
+        "envelope": {"tool": "who-umc_org_search_vigibase", "arguments": {"drug": "metformin"}},
+        "expect_domain": "who-umc_org_",
+    },
+    {
+        "label": "Unknown domain — should return stub",
+        "envelope": {"tool": "unknown_domain_search", "arguments": {"query": "test"}},
         "expect_domain": None,
     },
     {
@@ -264,7 +306,8 @@ def run_smoke_tests() -> None:
             ok = proxy_path is None
             outcome = f"proxy={'none (correct)' if ok else proxy_path}"
         else:
-            ok = proxy_path is not None and DOMAIN_ROUTES.get(expect_domain) in (proxy_path or "")
+            expected_script = DOMAIN_ROUTES.get(expect_domain, "")
+            ok = proxy_path is not None and expected_script in proxy_path
             outcome = f"proxy={Path(proxy_path).name if proxy_path else 'none'}"
 
         # Exercise the full dispatch path to verify no exceptions
