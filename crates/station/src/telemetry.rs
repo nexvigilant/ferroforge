@@ -22,6 +22,33 @@ use tracing::{info, warn};
 /// Maximum entries in the in-memory ring buffer.
 const MAX_RING_ENTRIES: usize = 10_000;
 
+/// Rate limit window in seconds (sliding window).
+const RATE_LIMIT_WINDOW_SECS: u64 = 60;
+
+/// Per-domain rate limits (calls per minute).
+/// Conservative: stay well under upstream API limits to leave headroom.
+/// Meta tools (nexvigilant.*) and science tools are unlimited (local computation).
+const DOMAIN_RATE_LIMITS: &[(&str, u64)] = &[
+    // Live API proxies — respect upstream limits
+    ("api.fda.gov", 30),             // upstream: 40/min without key
+    ("open-vigil.fr", 30),           // inherits openFDA (builds 2x2 from FAERS)
+    ("pubmed.ncbi.nlm.nih.gov", 120),// upstream: 3/sec = 180/min, keep headroom
+    ("clinicaltrials.gov", 60),      // undocumented, be respectful
+    ("dailymed.nlm.nih.gov", 60),    // undocumented, be respectful
+    ("rxnav.nlm.nih.gov", 300),      // upstream: 20/sec, very generous
+    ("accessdata.fda.gov", 30),      // same org as openFDA
+    // Stub domains — no real API calls, but limit anyway to prevent abuse
+    ("www.ema.europa.eu", 30),
+    ("eudravigilance.ema.europa.eu", 30),
+    ("vigiaccess.org", 30),
+    ("go.drugbank.com", 30),
+    ("meddra.org", 30),
+    ("ich.org", 30),
+    ("cioms.ch", 30),
+    ("who-umc.org", 30),
+    ("www.fda.gov", 30),
+];
+
 /// A single tool call record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolCallRecord {
@@ -62,6 +89,21 @@ pub struct StationHealth {
     pub domains: Vec<DomainStats>,
     pub top_tools: Vec<(String, u64)>,
     pub recent_calls: Vec<ToolCallRecord>,
+}
+
+/// Result of a rate limit check.
+#[derive(Debug, Clone, Serialize)]
+pub struct RateLimitCheck {
+    /// Whether the call is allowed.
+    pub allowed: bool,
+    /// Domain that was checked.
+    pub domain: String,
+    /// Calls in the current window.
+    pub current_count: u64,
+    /// Maximum calls allowed per window.
+    pub limit: u64,
+    /// Seconds until the oldest call in the window expires.
+    pub retry_after_secs: u64,
 }
 
 /// Core telemetry engine.
@@ -218,6 +260,81 @@ impl StationTelemetry {
         }
     }
 
+    /// Check if a domain has exceeded its rate limit.
+    ///
+    /// Uses the ring buffer timestamps to count calls in the sliding window.
+    /// Meta tools (nexvigilant.meta) and science tools are never rate-limited.
+    pub fn check_rate_limit(&self, domain: &str) -> RateLimitCheck {
+        // Never rate-limit local computation
+        if domain == "nexvigilant.meta" || domain == "science.nexvigilant.com" || domain == "unknown" {
+            return RateLimitCheck {
+                allowed: true,
+                domain: domain.to_string(),
+                current_count: 0,
+                limit: 0, // 0 = unlimited
+                retry_after_secs: 0,
+            };
+        }
+
+        // Find the limit for this domain
+        let limit = DOMAIN_RATE_LIMITS
+            .iter()
+            .find(|(d, _)| *d == domain)
+            .map(|(_, l)| *l)
+            .unwrap_or(30); // default: 30/min for unknown domains
+
+        let ring = match self.ring.lock() {
+            Ok(r) => r,
+            Err(_) => {
+                // If lock poisoned, allow the call (fail open)
+                return RateLimitCheck {
+                    allowed: true,
+                    domain: domain.to_string(),
+                    current_count: 0,
+                    limit,
+                    retry_after_secs: 0,
+                };
+            }
+        };
+
+        // Count calls for this domain in the sliding window
+        let now = epoch_secs();
+        let window_start = now.saturating_sub(RATE_LIMIT_WINDOW_SECS);
+
+        let mut count = 0u64;
+        let mut oldest_in_window = now;
+
+        for record in ring.iter().rev() {
+            if record.domain != domain {
+                continue;
+            }
+            let record_epoch = parse_iso8601_epoch(&record.timestamp).unwrap_or(0);
+            if record_epoch < window_start {
+                break; // Ring is chronological, so we can stop
+            }
+            count += 1;
+            if record_epoch < oldest_in_window {
+                oldest_in_window = record_epoch;
+            }
+        }
+
+        let allowed = count < limit;
+        let retry_after_secs = if allowed {
+            0
+        } else {
+            // Time until the oldest call in the window expires
+            (oldest_in_window + RATE_LIMIT_WINDOW_SECS).saturating_sub(now)
+        };
+
+        RateLimitCheck {
+            allowed,
+            domain: domain.to_string(),
+            current_count: count,
+            limit,
+            retry_after_secs,
+        }
+    }
+
     /// Get uptime in seconds.
     pub fn uptime_secs(&self) -> u64 {
         self.start_time.elapsed().as_secs()
@@ -320,6 +437,60 @@ pub fn now_iso8601() -> String {
         minutes,
         seconds,
     )
+}
+
+/// Current epoch seconds (UTC).
+fn epoch_secs() -> u64 {
+    use std::time::SystemTime;
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+/// Parse an ISO 8601 timestamp back to epoch seconds.
+/// Handles our format: "YYYY-MM-DDThh:mm:ssZ"
+fn parse_iso8601_epoch(ts: &str) -> Option<u64> {
+    // Quick parse: "2026-03-06T20:19:56Z"
+    let ts = ts.trim_end_matches('Z');
+    let (date, time) = ts.split_once('T')?;
+    let parts: Vec<&str> = date.split('-').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let y: u64 = parts[0].parse().ok()?;
+    let m: u64 = parts[1].parse().ok()?;
+    let d: u64 = parts[2].parse().ok()?;
+
+    let time_parts: Vec<&str> = time.split(':').collect();
+    if time_parts.len() != 3 {
+        return None;
+    }
+    let h: u64 = time_parts[0].parse().ok()?;
+    let min: u64 = time_parts[1].parse().ok()?;
+    let sec: u64 = time_parts[2].parse().ok()?;
+
+    // Approximate days from epoch (good enough for 60s window comparison)
+    let mut days = 0u64;
+    for yr in 1970..y {
+        days += if yr % 4 == 0 && (yr % 100 != 0 || yr % 400 == 0) {
+            366
+        } else {
+            365
+        };
+    }
+    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let month_days: &[u64] = if leap {
+        &[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    } else {
+        &[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    };
+    for i in 0..(m.saturating_sub(1) as usize) {
+        days += month_days.get(i).copied().unwrap_or(30);
+    }
+    days += d.saturating_sub(1);
+
+    Some(days * 86400 + h * 3600 + min * 60 + sec)
 }
 
 /// Start a timing measurement. Returns an Instant.

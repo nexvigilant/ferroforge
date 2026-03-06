@@ -458,3 +458,86 @@ fn test_real_configs_all_tools_routable() {
         );
     }
 }
+
+// =============================================
+// Phase 3: Rate Limiting
+// =============================================
+
+#[test]
+fn test_rate_limit_meta_tools_never_limited() {
+    let telemetry = test_telemetry();
+    let check = telemetry.check_rate_limit("nexvigilant.meta");
+    assert!(check.allowed);
+    assert_eq!(check.limit, 0); // 0 = unlimited
+}
+
+#[test]
+fn test_rate_limit_science_never_limited() {
+    let telemetry = test_telemetry();
+    let check = telemetry.check_rate_limit("science.nexvigilant.com");
+    assert!(check.allowed);
+}
+
+#[test]
+fn test_rate_limit_allows_under_threshold() {
+    let telemetry = test_telemetry();
+    // Record a few calls for api.fda.gov (limit: 30/min)
+    for _ in 0..5 {
+        telemetry.record(nexvigilant_station::telemetry::ToolCallRecord {
+            timestamp: nexvigilant_station::telemetry::now_iso8601(),
+            tool_name: "api_fda_gov_search_adverse_events".into(),
+            domain: "api.fda.gov".into(),
+            duration_ms: 100,
+            status: "ok".into(),
+            is_error: false,
+        });
+    }
+    let check = telemetry.check_rate_limit("api.fda.gov");
+    assert!(check.allowed);
+    assert_eq!(check.current_count, 5);
+    assert_eq!(check.limit, 30);
+}
+
+#[test]
+fn test_rate_limit_blocks_over_threshold() {
+    let telemetry = test_telemetry();
+    // Flood api.fda.gov past its 30/min limit
+    for _ in 0..31 {
+        telemetry.record(nexvigilant_station::telemetry::ToolCallRecord {
+            timestamp: nexvigilant_station::telemetry::now_iso8601(),
+            tool_name: "api_fda_gov_search_adverse_events".into(),
+            domain: "api.fda.gov".into(),
+            duration_ms: 10,
+            status: "ok".into(),
+            is_error: false,
+        });
+    }
+    let check = telemetry.check_rate_limit("api.fda.gov");
+    assert!(!check.allowed, "should be rate limited after 31 calls");
+    assert_eq!(check.current_count, 31);
+    assert!(check.retry_after_secs > 0);
+}
+
+#[test]
+fn test_rate_limit_response_in_router() {
+    let reg = test_registry();
+    let telemetry = test_telemetry();
+    // Flood past limit
+    for _ in 0..31 {
+        telemetry.record(nexvigilant_station::telemetry::ToolCallRecord {
+            timestamp: nexvigilant_station::telemetry::now_iso8601(),
+            tool_name: "api_fda_gov_search_adverse_events".into(),
+            domain: "api.fda.gov".into(),
+            duration_ms: 10,
+            status: "ok".into(),
+            is_error: false,
+        });
+    }
+    // This call should be rate-limited
+    let result = router::route_tool_call(&reg, &telemetry, "api_fda_gov_search_adverse_events", &json!({"drug_name": "test"}));
+    assert_eq!(result.is_error, Some(true));
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    assert!(text.contains("rate_limited"));
+}

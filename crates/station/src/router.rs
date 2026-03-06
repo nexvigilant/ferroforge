@@ -8,20 +8,64 @@ use crate::telemetry::{
     elapsed_ms, extract_domain, now_iso8601, start_timer, StationTelemetry, ToolCallRecord,
 };
 
-/// Route a tool call to the appropriate handler, with telemetry.
+/// Route a tool call to the appropriate handler, with telemetry and rate limiting.
 pub fn route_tool_call(
     registry: &ConfigRegistry,
     telemetry: &StationTelemetry,
     tool_name: &str,
     arguments: &Value,
 ) -> ToolCallResult {
+    let domain = extract_domain(tool_name);
+
+    // Rate limit check BEFORE executing
+    let rate_check = telemetry.check_rate_limit(&domain);
+    if !rate_check.allowed {
+        warn!(
+            domain = %domain,
+            tool = %tool_name,
+            count = rate_check.current_count,
+            limit = rate_check.limit,
+            retry_after = rate_check.retry_after_secs,
+            "Rate limit exceeded"
+        );
+
+        // Record the rate-limited attempt in telemetry
+        telemetry.record(ToolCallRecord {
+            timestamp: now_iso8601(),
+            tool_name: tool_name.to_string(),
+            domain: domain.clone(),
+            duration_ms: 0,
+            status: "rate_limited".to_string(),
+            is_error: true,
+        });
+
+        let response = serde_json::json!({
+            "status": "rate_limited",
+            "domain": domain,
+            "tool": tool_name,
+            "message": format!(
+                "Rate limit exceeded for domain '{}': {}/{} calls in the last 60 seconds. Retry after {} seconds.",
+                domain, rate_check.current_count, rate_check.limit, rate_check.retry_after_secs
+            ),
+            "current_count": rate_check.current_count,
+            "limit": rate_check.limit,
+            "retry_after_secs": rate_check.retry_after_secs,
+        });
+
+        return ToolCallResult {
+            content: vec![ContentBlock::Text {
+                text: serde_json::to_string_pretty(&response).unwrap_or_default(),
+            }],
+            is_error: Some(true),
+        };
+    }
+
     let timer = start_timer();
     let result = route_tool_call_inner(registry, telemetry, tool_name, arguments);
     let duration_ms = elapsed_ms(timer);
 
     // Extract status from the result content
     let (status, is_error) = extract_status(&result);
-    let domain = extract_domain(tool_name);
 
     telemetry.record(ToolCallRecord {
         timestamp: now_iso8601(),
