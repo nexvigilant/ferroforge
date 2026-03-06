@@ -7,13 +7,13 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::Json;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{broadcast, mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::config::ConfigRegistry;
-use crate::protocol::JsonRpcRequest;
+use crate::protocol::{JsonRpcRequest, StationEvent, StationEventNotification};
 use crate::server::handle_request;
 use crate::telemetry::StationTelemetry;
 
@@ -22,6 +22,7 @@ type SseChannel = mpsc::Sender<Result<Event, axum::Error>>;
 struct AppState {
     registry: ConfigRegistry,
     telemetry: StationTelemetry,
+    event_tx: broadcast::Sender<StationEvent>,
     sessions: Mutex<HashMap<String, SseChannel>>,
 }
 
@@ -34,12 +35,14 @@ struct AppState {
 pub async fn run_sse(
     registry: ConfigRegistry,
     telemetry: StationTelemetry,
+    event_tx: broadcast::Sender<StationEvent>,
     host: &str,
     port: u16,
 ) -> anyhow::Result<()> {
     let state = Arc::new(AppState {
         registry,
         telemetry,
+        event_tx,
         sessions: Mutex::new(HashMap::new()),
     });
 
@@ -73,7 +76,25 @@ async fn handle_sse(
     }
 
     info!(session_id = %session_id, "SSE session opened");
-    state.sessions.lock().await.insert(session_id, tx);
+    state.sessions.lock().await.insert(session_id.clone(), tx.clone());
+
+    // Subscribe this SSE session to station events
+    let mut event_rx = state.event_tx.subscribe();
+    let event_session_id = session_id;
+    tokio::spawn(async move {
+        while let Ok(station_event) = event_rx.recv().await {
+            let notification = StationEventNotification::new(station_event);
+            let json = match serde_json::to_string(&notification) {
+                Ok(j) => j,
+                Err(_) => continue,
+            };
+            let sse_event = Event::default().event("station_event").data(json);
+            if tx.send(Ok(sse_event)).await.is_err() {
+                debug!(session_id = %event_session_id, "SSE session closed, stopping event forward");
+                break;
+            }
+        }
+    });
 
     Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default())
 }
@@ -103,7 +124,7 @@ async fn handle_message(
         "SSE message received"
     );
 
-    let response = handle_request(&state.registry, &state.telemetry, &request);
+    let response = handle_request(&state.registry, &state.telemetry, &request, Some(&state.event_tx));
 
     if let Some(resp) = response {
         let json = match serde_json::to_string(&resp) {

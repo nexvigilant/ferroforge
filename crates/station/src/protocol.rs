@@ -117,3 +117,39 @@ pub enum ContentBlock {
 pub const PARSE_ERROR: i64 = -32700;
 pub const METHOD_NOT_FOUND: i64 = -32601;
 pub const INVALID_PARAMS: i64 = -32602;
+
+// --- Station Event Bus Types ---
+
+/// A station event emitted after every tool call.
+/// Delivered via broadcast channel to all subscribed transports.
+#[derive(Debug, Clone, Serialize)]
+pub struct StationEvent {
+    /// Domain that handled the call (e.g., "api.fda.gov")
+    pub domain: String,
+    /// MCP tool name (e.g., "api_fda_gov_search_adverse_events")
+    pub tool: String,
+    /// Outcome: "ok", "error", "stub", "no_handler"
+    pub status: String,
+    /// Wall-clock duration in milliseconds
+    pub duration_ms: u64,
+    /// ISO 8601 timestamp
+    pub timestamp: String,
+}
+
+/// JSON-RPC notification wrapper for station events.
+#[derive(Debug, Clone, Serialize)]
+pub struct StationEventNotification {
+    pub jsonrpc: String,
+    pub method: String,
+    pub params: StationEvent,
+}
+
+impl StationEventNotification {
+    pub fn new(event: StationEvent) -> Self {
+        Self {
+            jsonrpc: "2.0".into(),
+            method: "notifications/station_event".into(),
+            params: event,
+        }
+    }
+}

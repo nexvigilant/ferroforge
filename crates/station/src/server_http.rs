@@ -6,16 +6,18 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::Json;
 use serde_json::Value;
+use tokio::sync::broadcast;
 use tracing::{debug, info};
 
 use crate::config::ConfigRegistry;
-use crate::protocol::JsonRpcRequest;
+use crate::protocol::{JsonRpcRequest, StationEvent};
 use crate::server::handle_request;
 use crate::telemetry::StationTelemetry;
 
 struct AppState {
     registry: ConfigRegistry,
     telemetry: StationTelemetry,
+    event_tx: broadcast::Sender<StationEvent>,
 }
 
 /// Run the MCP server over HTTP REST transport (Skyway).
@@ -28,12 +30,14 @@ struct AppState {
 pub async fn run_http(
     registry: ConfigRegistry,
     telemetry: StationTelemetry,
+    event_tx: broadcast::Sender<StationEvent>,
     host: &str,
     port: u16,
 ) -> anyhow::Result<()> {
     let state = Arc::new(AppState {
         registry,
         telemetry,
+        event_tx,
     });
 
     let app = axum::Router::new()
@@ -56,7 +60,7 @@ async fn handle_rpc(
     Json(request): Json<JsonRpcRequest>,
 ) -> impl IntoResponse {
     debug!(method = %request.method, "HTTP RPC request");
-    let response = handle_request(&state.registry, &state.telemetry, &request);
+    let response = handle_request(&state.registry, &state.telemetry, &request, Some(&state.event_tx));
     match response {
         Some(resp) => (StatusCode::OK, Json(resp)).into_response(),
         None => StatusCode::ACCEPTED.into_response(),
@@ -91,7 +95,7 @@ async fn handle_tool_call(
         })),
     };
 
-    let response = handle_request(&state.registry, &state.telemetry, &request);
+    let response = handle_request(&state.registry, &state.telemetry, &request, Some(&state.event_tx));
     match response {
         Some(resp) => {
             // Unwrap the JSON-RPC envelope for REST clients

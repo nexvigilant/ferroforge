@@ -1,12 +1,13 @@
 use anyhow::Result;
 use serde_json::Value;
 use std::io::{self, BufRead, Write};
+use tokio::sync::broadcast;
 use tracing::{debug, error, info};
 
 use crate::config::ConfigRegistry;
 use crate::protocol::*;
 use crate::router;
-use crate::telemetry::StationTelemetry;
+use crate::telemetry::{self, StationTelemetry};
 
 /// Run the MCP server over stdio (JSON-RPC 2.0).
 pub fn run_stdio(registry: ConfigRegistry, telemetry: &StationTelemetry) -> Result<()> {
@@ -45,7 +46,7 @@ pub fn run_stdio(registry: ConfigRegistry, telemetry: &StationTelemetry) -> Resu
             }
         };
 
-        let response = handle_request(&registry, telemetry, &request);
+        let response = handle_request(&registry, telemetry, &request, None);
 
         // Notifications (no id) get no response
         if request.id.is_none() {
@@ -62,7 +63,12 @@ pub fn run_stdio(registry: ConfigRegistry, telemetry: &StationTelemetry) -> Resu
     Ok(())
 }
 
-pub fn handle_request(registry: &ConfigRegistry, telemetry: &StationTelemetry, req: &JsonRpcRequest) -> Option<JsonRpcResponse> {
+pub fn handle_request(
+    registry: &ConfigRegistry,
+    telemetry: &StationTelemetry,
+    req: &JsonRpcRequest,
+    event_tx: Option<&broadcast::Sender<StationEvent>>,
+) -> Option<JsonRpcResponse> {
     let id = req.id.clone();
 
     match req.method.as_str() {
@@ -125,7 +131,25 @@ pub fn handle_request(registry: &ConfigRegistry, telemetry: &StationTelemetry, r
             }
 
             info!(tool = %tool_name, "Tool call");
+            let timer = telemetry::start_timer();
             let result = router::route_tool_call(registry, telemetry, tool_name, &arguments);
+            let duration_ms = telemetry::elapsed_ms(timer);
+
+            // Emit station event to broadcast channel
+            if let Some(tx) = event_tx {
+                let event = StationEvent {
+                    domain: telemetry::extract_domain(tool_name),
+                    tool: tool_name.to_string(),
+                    status: if result.is_error.unwrap_or(false) { "error" } else { "ok" }.into(),
+                    duration_ms,
+                    timestamp: telemetry::now_iso8601(),
+                };
+                match tx.send(event) {
+                    Ok(n) => debug!(receivers = n, tool = %tool_name, "Station event emitted"),
+                    Err(_) => debug!(tool = %tool_name, "Station event emitted (no subscribers)"),
+                }
+            }
+
             Some(JsonRpcResponse::success(
                 id,
                 serde_json::to_value(result).unwrap_or_default(),

@@ -1,9 +1,11 @@
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
+use tokio::sync::broadcast;
 use tracing::info;
 
 use nexvigilant_station::config::ConfigRegistry;
+use nexvigilant_station::protocol::StationEvent;
 use nexvigilant_station::{server, server_http, server_sse};
 use nexvigilant_station::telemetry::StationTelemetry;
 
@@ -63,6 +65,9 @@ fn main() -> Result<()> {
         "Station ready"
     );
 
+    // Event broadcast channel — capacity 256, best-effort delivery
+    let (event_tx, _) = broadcast::channel::<StationEvent>(256);
+
     match cli.transport {
         Transport::Stdio => {
             info!("Transport: stdio (Station)");
@@ -71,12 +76,12 @@ fn main() -> Result<()> {
         Transport::Sse => {
             info!(host = %cli.host, port = cli.port, "Transport: SSE (Highway)");
             let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(server_sse::run_sse(registry, telemetry, &cli.host, cli.port))
+            rt.block_on(server_sse::run_sse(registry, telemetry, event_tx, &cli.host, cli.port))
         }
         Transport::Http => {
             info!(host = %cli.host, port = cli.port, "Transport: HTTP (Skyway)");
             let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(server_http::run_http(registry, telemetry, &cli.host, cli.port))
+            rt.block_on(server_http::run_http(registry, telemetry, event_tx, &cli.host, cli.port))
         }
     }
 }
