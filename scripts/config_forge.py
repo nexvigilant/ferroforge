@@ -19,7 +19,9 @@ Usage:
     --tools "search-modifications:Search post-translational modifications"
 
   python3 config_forge.py --from-spec spec.json   # Batch from spec file
-  python3 config_forge.py --hub-deploy configs/my-config.json  # Deploy to hub
+  python3 config_forge.py deploy configs/my-config.json                    # Deploy (POST or 409->PATCH)
+  python3 config_forge.py deploy configs/my-config.json --hub-id UUID      # Direct PATCH (at cap)
+  python3 config_forge.py batch-deploy hub-mapping.json                    # Batch PATCH all configs
 """
 
 import argparse
@@ -162,8 +164,15 @@ def generate_hub_payload(config: dict) -> dict:
     }
 
 
-def deploy_to_hub(config_path: str, api_key: str = None) -> dict:
-    """Deploy a local config file to the WebMCP Hub. Creates or updates."""
+def deploy_to_hub(config_path: str, api_key: str = None, hub_id: str = None) -> dict:
+    """Deploy a local config file to the WebMCP Hub. Creates or updates.
+
+    Args:
+        config_path: Path to local config JSON file.
+        api_key: Hub API key (falls back to HUB_API_KEY env var).
+        hub_id: If provided, PATCH directly to this Hub config ID (skips POST).
+                Required when at the 50-config cap since POST returns 403.
+    """
     if not api_key:
         api_key = os.environ.get("HUB_API_KEY", "")
     if not api_key:
@@ -178,6 +187,10 @@ def deploy_to_hub(config_path: str, api_key: str = None) -> dict:
         "Content-Type": "application/json",
     }
 
+    # Direct PATCH when hub_id is known (works at cap, skips POST)
+    if hub_id:
+        return _patch_config(hub_id, payload, headers)
+
     # Try POST (create) first
     req = urllib.request.Request(
         "https://www.webmcp-hub.com/api/configs",
@@ -190,31 +203,34 @@ def deploy_to_hub(config_path: str, api_key: str = None) -> dict:
         result = json.loads(resp.read())
         return {"status": "created", "config_id": result["id"], "tools": len(payload["tools"])}
     except urllib.error.HTTPError as e:
-        if e.code != 409:
-            return {"status": "error", "code": e.code, "message": e.read().decode()[:200]}
+        body = e.read().decode()
+        if e.code == 409:
+            # 409 Conflict — config exists. Extract existing ID and PATCH.
+            try:
+                conflict = json.loads(body)
+                existing_id = conflict.get("existingId", "")
+            except (json.JSONDecodeError, ValueError):
+                return {"status": "error", "code": 409, "message": "Config exists but could not parse existingId"}
+            if not existing_id:
+                return {"status": "error", "code": 409, "message": "Config exists but no existingId returned"}
+            return _patch_config(existing_id, payload, headers)
+        return {"status": "error", "code": e.code, "message": body[:200]}
 
-        # 409 Conflict — config exists. Extract existing ID and PUT to update.
-        try:
-            conflict = json.loads(e.read().decode())
-            existing_id = conflict.get("existingId", "")
-        except (json.JSONDecodeError, ValueError):
-            return {"status": "error", "code": 409, "message": "Config exists but could not parse existingId"}
 
-        if not existing_id:
-            return {"status": "error", "code": 409, "message": "Config exists but no existingId returned"}
-
-        update_req = urllib.request.Request(
-            f"https://www.webmcp-hub.com/api/configs/{existing_id}",
-            data=json.dumps(payload).encode(),
-            headers=headers,
-            method="PATCH",
-        )
-        try:
-            update_resp = urllib.request.urlopen(update_req)
-            update_result = json.loads(update_resp.read())
-            return {"status": "updated", "config_id": existing_id, "tools": len(payload["tools"])}
-        except urllib.error.HTTPError as ue:
-            return {"status": "error", "code": ue.code, "message": ue.read().decode()[:200]}
+def _patch_config(hub_id: str, payload: dict, headers: dict) -> dict:
+    """PATCH an existing Hub config by ID."""
+    req = urllib.request.Request(
+        f"https://www.webmcp-hub.com/api/configs/{hub_id}",
+        data=json.dumps(payload).encode(),
+        headers=headers,
+        method="PATCH",
+    )
+    try:
+        resp = urllib.request.urlopen(req)
+        json.loads(resp.read())
+        return {"status": "updated", "config_id": hub_id, "tools": len(payload["tools"])}
+    except urllib.error.HTTPError as e:
+        return {"status": "error", "code": e.code, "message": e.read().decode()[:200]}
 
 
 def from_spec_file(spec_path: str) -> list:
@@ -244,6 +260,52 @@ def from_spec_file(spec_path: str) -> list:
     return results
 
 
+def discover_hub_mapping(api_key: str = None) -> dict:
+    """Fetch all Hub configs and build a local-filename → hub-id mapping."""
+    if not api_key:
+        api_key = os.environ.get("HUB_API_KEY", "")
+    if not api_key:
+        return {}
+
+    headers = {"Authorization": f"Bearer {api_key}"}
+    all_configs = []
+    for page in range(1, 10):
+        url = f"https://www.webmcp-hub.com/api/configs?page={page}&limit=50"
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            resp = urllib.request.urlopen(req, timeout=15)
+            data = json.loads(resp.read())
+            configs = data if isinstance(data, list) else data.get("configs", data.get("data", []))
+            if not configs:
+                break
+            all_configs.extend(configs)
+            if len(configs) < 50:
+                break
+        except urllib.error.HTTPError:
+            break
+
+    # Match hub configs to local config files by title
+    config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "configs")
+    mapping = {}
+    for hub_config in all_configs:
+        if not isinstance(hub_config, dict):
+            continue
+        hub_title = hub_config.get("title", "")
+        hub_id = hub_config.get("id", "")
+        # Try matching by generating hub payload for each local config
+        for fname in os.listdir(config_dir):
+            if not fname.endswith(".json") or fname in mapping:
+                continue
+            with open(os.path.join(config_dir, fname)) as f:
+                local_config = json.load(f)
+            payload = generate_hub_payload(local_config)
+            if payload["title"] == hub_title:
+                mapping[fname] = hub_id
+                break
+
+    return mapping
+
+
 def main():
     parser = argparse.ArgumentParser(description="Config Forge — generate NexVigilant Station configs")
     sub = parser.add_subparsers(dest="command")
@@ -265,6 +327,14 @@ def main():
     # Deploy
     deploy = sub.add_parser("deploy", help="Deploy config to WebMCP Hub")
     deploy.add_argument("config_file")
+    deploy.add_argument("--hub-id", default=None, help="PATCH directly to this Hub config ID (required at cap)")
+
+    # Batch deploy with mapping
+    batch_deploy = sub.add_parser("batch-deploy", help="Deploy all configs using a JSON mapping file")
+    batch_deploy.add_argument("mapping_file", help="JSON file: {\"config_name.json\": \"hub-uuid\", ...}")
+
+    # Discover mapping
+    sub.add_parser("discover", help="Fetch Hub configs and generate hub-mapping.json")
 
     # Hub payload preview
     preview = sub.add_parser("preview", help="Preview hub payload without deploying")
@@ -291,8 +361,42 @@ def main():
             print(f"Generated: {r['path']} ({r['tools']} tools)")
 
     elif args.command == "deploy":
-        result = deploy_to_hub(args.config_file)
+        result = deploy_to_hub(args.config_file, hub_id=args.hub_id)
         print(json.dumps(result, indent=2))
+
+    elif args.command == "batch-deploy":
+        with open(args.mapping_file) as f:
+            mapping = json.load(f)
+        config_dir = os.path.join(os.path.dirname(args.mapping_file) or ".", "configs")
+        if not os.path.isdir(config_dir):
+            config_dir = os.path.join(os.path.dirname(os.path.abspath(args.mapping_file)), "..", "configs")
+        success, failed = 0, 0
+        for config_name, hub_id in mapping.items():
+            config_path = os.path.join(config_dir, config_name)
+            if not os.path.exists(config_path):
+                config_path = os.path.join("configs", config_name)
+            result = deploy_to_hub(config_path, hub_id=hub_id)
+            status = result.get("status", "error")
+            if status in ("updated", "created"):
+                print(f"  OK  {config_name:30s} -> {result.get('tools', '?')} tools")
+                success += 1
+            else:
+                print(f"  ERR {config_name:30s} -> {result.get('message', '')[:80]}")
+                failed += 1
+        print(f"\nBatch: {success} ok, {failed} failed, {success + failed} total")
+
+    elif args.command == "discover":
+        mapping = discover_hub_mapping()
+        if mapping:
+            out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hub-mapping.json")
+            with open(out_path, "w") as f:
+                json.dump(mapping, f, indent=2)
+                f.write("\n")
+            print(f"Discovered {len(mapping)} config mappings -> {out_path}")
+            for fname, hub_id in sorted(mapping.items()):
+                print(f"  {fname:30s} -> {hub_id[:12]}...")
+        else:
+            print("No mappings discovered (check HUB_API_KEY)")
 
     elif args.command == "preview":
         with open(args.config_file) as f:
