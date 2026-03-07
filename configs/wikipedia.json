@@ -1,0 +1,219 @@
+{
+  "domain": "en.wikipedia.org",
+  "url_pattern": "/wiki/*",
+  "title": "Wikipedia",
+  "description": "Wikipedia article search, summaries, content extraction, references, and categories via the MediaWiki and REST APIs",
+  "tools": [
+    {
+      "name": "search-articles",
+      "description": "Search Wikipedia articles by keyword query. Returns titles, snippets, and page IDs for matching articles.",
+      "parameters": [
+        {
+          "name": "query",
+          "type": "string",
+          "description": "Search query string",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "description": "Maximum results (default 10, max 50)",
+          "required": false
+        }
+      ],
+      "proxy": "scripts/wikipedia_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "query": { "type": "object" },
+          "total_hits": { "type": "integer", "description": "Total matching articles" },
+          "count": { "type": "integer" },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string" },
+                "pageid": { "type": "integer" },
+                "snippet": { "type": "string" },
+                "wordcount": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "required": ["status", "results"]
+      }
+    },
+    {
+      "name": "get-article-summary",
+      "description": "Get a concise summary of a Wikipedia article including description, thumbnail, and extract text. Uses the REST API for structured output.",
+      "parameters": [
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Article title (e.g., 'Metformin', 'Pharmacovigilance')",
+          "required": true
+        }
+      ],
+      "proxy": "scripts/wikipedia_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "extract": { "type": "string", "description": "Plain-text summary extract" },
+          "thumbnail": {
+            "type": "object",
+            "properties": {
+              "source": { "type": "string" },
+              "width": { "type": "integer" },
+              "height": { "type": "integer" }
+            }
+          },
+          "content_urls": {
+            "type": "object",
+            "properties": {
+              "desktop": { "type": "string" },
+              "mobile": { "type": "string" }
+            }
+          },
+          "timestamp": { "type": "string" }
+        },
+        "required": ["status", "title"]
+      }
+    },
+    {
+      "name": "get-article-sections",
+      "description": "Get the section structure and content of a Wikipedia article. Returns section titles, levels, and wikitext or parsed HTML for each section.",
+      "parameters": [
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Article title",
+          "required": true
+        },
+        {
+          "name": "section",
+          "type": "integer",
+          "description": "Specific section index to retrieve (omit for all sections)",
+          "required": false
+        }
+      ],
+      "proxy": "scripts/wikipedia_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "title": { "type": "string" },
+          "count": { "type": "integer" },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": { "type": "integer" },
+                "title": { "type": "string" },
+                "level": { "type": "integer" },
+                "text": { "type": "string" }
+              }
+            }
+          }
+        },
+        "required": ["status", "sections"]
+      }
+    },
+    {
+      "name": "get-references",
+      "description": "Extract external references and citations from a Wikipedia article. Returns URLs, titles, and reference text.",
+      "parameters": [
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Article title",
+          "required": true
+        }
+      ],
+      "proxy": "scripts/wikipedia_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "title": { "type": "string" },
+          "count": { "type": "integer" },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": { "type": "string" },
+                "text": { "type": "string" }
+              }
+            }
+          }
+        },
+        "required": ["status", "references"]
+      }
+    },
+    {
+      "name": "get-categories",
+      "description": "Get all categories an article belongs to. Useful for classifying articles by topic domain.",
+      "parameters": [
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Article title",
+          "required": true
+        }
+      ],
+      "proxy": "scripts/wikipedia_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "title": { "type": "string" },
+          "count": { "type": "integer" },
+          "categories": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["status", "categories"]
+      }
+    },
+    {
+      "name": "get-links",
+      "description": "Get internal Wikipedia links from an article. Returns titles of linked articles, useful for knowledge graph traversal.",
+      "parameters": [
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Article title",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "description": "Maximum links to return (default 50, max 500)",
+          "required": false
+        }
+      ],
+      "proxy": "scripts/wikipedia_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "title": { "type": "string" },
+          "count": { "type": "integer" },
+          "links": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["status", "links"]
+      }
+    }
+  ],
+  "proxy": "scripts/wikipedia_proxy.py"
+}
