@@ -30,7 +30,7 @@ N (Quantity)     Case counts, event frequencies, confidence intervals
 
 ## Domain Coverage Map
 
-23 configs, 174 tools (17 public / 6 private). 129 public tools served (125 from configs + 4 Rust meta-tools). Verified by `cargo test -p nexvigilant-station` (44 tests, source: `crates/station/tests/integration.rs`).
+23 configs, 174 tools (17 public / 6 private). 129 public tools served (125 from configs + 4 Rust meta-tools). Verified by `cargo test -p nexvigilant-station` (53 tests, source: `crates/station/tests/integration.rs`).
 
 ```
                     ┌─────────────────────────┐

@@ -126,7 +126,7 @@ configs/*.json  →  ConfigRegistry  →  MCP tools/list  →  Agent discovery
 
 ### Validation
 
-44 integration tests covering protocol, config loading, routing, auth, and real config verification.
+53 integration tests covering protocol, config loading, routing, auth, and real config verification.
 
 ```bash
 cargo test -p nexvigilant-station
@@ -186,7 +186,7 @@ ferroforge/
     │   │   ├── router.rs   # Tool dispatch
     │   │   └── server.rs   # Stdio MCP server loop
     │   └── tests/
-    │       └── integration.rs  # 44 tests
+    │       └── integration.rs  # 53 tests
     └── borrow_miner/       # Educational Rust game
 ```
 
