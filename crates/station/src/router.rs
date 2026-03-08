@@ -2,19 +2,37 @@ use serde_json::Value;
 use std::process::Command;
 use tracing::{info, warn};
 
+use crate::auth::{ApiKeyGate, AuthResult, auth_error_json};
 use crate::config::{ConfigRegistry, HubConfig, ToolDef};
 use crate::protocol::{ContentBlock, ToolCallResult};
 use crate::telemetry::{
     elapsed_ms, extract_domain, now_iso8601, start_timer, StationTelemetry, ToolCallRecord,
 };
 
-/// Route a tool call to the appropriate handler, with telemetry and rate limiting.
+/// Route a tool call to the appropriate handler, with auth, telemetry, and rate limiting.
+///
+/// Auth enforcement lives here — the single chokepoint for all transports.
+/// Pass `None` for `auth_header` in stdio/dev mode (auth gate handles it).
 pub fn route_tool_call(
     registry: &ConfigRegistry,
     telemetry: &StationTelemetry,
+    auth_gate: &ApiKeyGate,
+    auth_header: Option<&str>,
     tool_name: &str,
     arguments: &Value,
 ) -> ToolCallResult {
+    // Auth check FIRST — before rate limiting or execution
+    let auth_result = auth_gate.check(auth_header, tool_name);
+    if !matches!(auth_result, AuthResult::Allowed) {
+        let error_json = auth_error_json(&auth_result);
+        return ToolCallResult {
+            content: vec![ContentBlock::Text {
+                text: serde_json::to_string_pretty(&error_json).unwrap_or_default(),
+            }],
+            is_error: Some(true),
+        };
+    }
+
     let domain = extract_domain(tool_name);
 
     // Rate limit check BEFORE executing
@@ -37,6 +55,12 @@ pub fn route_tool_call(
             duration_ms: 0,
             status: "rate_limited".to_string(),
             is_error: true,
+            error_message: Some(format!(
+                "Rate limit exceeded: {}/{} calls in 60s",
+                rate_check.current_count, rate_check.limit
+            )),
+            client_id: None,
+            request_id: None,
         });
 
         let response = serde_json::json!({
@@ -64,8 +88,8 @@ pub fn route_tool_call(
     let result = route_tool_call_inner(registry, telemetry, tool_name, arguments);
     let duration_ms = elapsed_ms(timer);
 
-    // Extract status from the result content
-    let (status, is_error) = extract_status(&result);
+    // Extract status and error detail from the result content
+    let (status, is_error, error_message) = extract_status(&result);
 
     telemetry.record(ToolCallRecord {
         timestamp: now_iso8601(),
@@ -74,27 +98,52 @@ pub fn route_tool_call(
         duration_ms,
         status,
         is_error,
+        error_message,
+        client_id: None,
+        request_id: None,
     });
 
     result
 }
 
-/// Extract status string from a tool call result.
-fn extract_status(result: &ToolCallResult) -> (String, bool) {
-    let is_error = result.is_error.unwrap_or(false);
+/// Extract status, error flag, and error message from a tool call result.
+///
+/// Ensures consistency: if either the MCP `is_error` flag or the JSON `status`
+/// field indicates an error, both the returned status and is_error agree.
+/// Also extracts error messages for the "why it failed" telemetry field.
+fn extract_status(result: &ToolCallResult) -> (String, bool, Option<String>) {
+    let mcp_error = result.is_error.unwrap_or(false);
 
     // Try to parse the content as JSON and extract "status" field
     if let Some(ContentBlock::Text { text }) = result.content.first()
         && let Ok(json) = serde_json::from_str::<Value>(text)
         && let Some(status) = json.get("status").and_then(|s| s.as_str())
     {
-        return (status.to_string(), is_error);
+        // Reconcile: if EITHER signal says error, mark as error
+        let status_signals_error = matches!(status, "error" | "no_handler");
+        let is_error = mcp_error || status_signals_error;
+
+        // Extract error message from common fields
+        let error_message = if is_error {
+            json.get("message")
+                .or_else(|| json.get("error"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.chars().take(256).collect())
+        } else {
+            None
+        };
+
+        return (status.to_string(), is_error, error_message);
     }
 
-    if is_error {
-        ("error".to_string(), true)
+    if mcp_error {
+        // Extract error message from raw text content
+        let error_message = result.content.first().map(|c| match c {
+            ContentBlock::Text { text } => text.chars().take(256).collect(),
+        });
+        ("error".to_string(), true, error_message)
     } else {
-        ("ok".to_string(), false)
+        ("ok".to_string(), false, None)
     }
 }
 
@@ -113,7 +162,7 @@ fn route_tool_call_inner(
         return handle_capabilities(registry, arguments);
     }
     if tool_name == "nexvigilant_station_health" {
-        return handle_station_health(telemetry);
+        return handle_station_health(telemetry, registry);
     }
 
     // Rust-native science handlers — no Python proxy needed
@@ -239,6 +288,10 @@ fn execute_proxy(
     };
     let envelope_str = serde_json::to_string(&envelope).unwrap_or_else(|_| "{}".into());
 
+    // Proxy timeout: 30 seconds. Upstream APIs should respond in <15s;
+    // 30s gives headroom for slow networks without hanging indefinitely.
+    let proxy_timeout = std::time::Duration::from_secs(30);
+
     let output = Command::new("python3")
         .arg(&resolved_path)
         .stdin(std::process::Stdio::piped())
@@ -252,7 +305,28 @@ fn execute_proxy(
                 let _ = stdin.write_all(envelope_str.as_bytes());
             }
             drop(child.stdin.take());
-            child.wait_with_output()
+
+            // Wait with timeout using a channel — no external crate needed.
+            // Spawn a thread to call wait_with_output (blocking), then recv
+            // with a deadline on the main thread.
+            let (tx, rx) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                let result = child.wait_with_output();
+                let _ = tx.send(result);
+            });
+
+            match rx.recv_timeout(proxy_timeout) {
+                Ok(result) => result,
+                Err(_) => {
+                    // Timeout — the spawned thread still owns child, which
+                    // will be dropped (and the process killed) when the
+                    // thread completes. We return a timeout error immediately.
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "proxy timed out after 30s",
+                    ))
+                }
+            }
         });
 
     match output {
@@ -389,8 +463,9 @@ fn handle_directory(registry: &ConfigRegistry) -> ToolCallResult {
 }
 
 /// Meta-tool: Station health — summary telemetry (recent_calls redacted for public surface).
-fn handle_station_health(telemetry: &StationTelemetry) -> ToolCallResult {
-    let health = telemetry.health();
+fn handle_station_health(telemetry: &StationTelemetry, registry: &ConfigRegistry) -> ToolCallResult {
+    let mut health = telemetry.health();
+    health.config_hash = Some(registry.config_hash());
 
     // Serialize then redact recent_calls — operational intelligence not for public
     let mut health_json = serde_json::to_value(&health).unwrap_or_default();

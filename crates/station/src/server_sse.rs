@@ -20,11 +20,29 @@ use crate::telemetry::StationTelemetry;
 
 type SseChannel = mpsc::Sender<Result<Event, axum::Error>>;
 
+/// Maximum concurrent SSE sessions before rejecting new connections.
+const MAX_SESSIONS: usize = 1000;
+
+/// Sessions idle longer than this are reaped (seconds).
+const SESSION_IDLE_TIMEOUT_SECS: u64 = 300;
+
+/// How often the reaper runs (seconds).
+const REAPER_INTERVAL_SECS: u64 = 60;
+
+/// Session metadata — tracks lifecycle beyond just the channel sender.
+struct SessionInfo {
+    tx: SseChannel,
+    #[allow(dead_code)] // Available for diagnostics and future health reporting
+    created_at: tokio::time::Instant,
+    last_activity: tokio::time::Instant,
+    request_count: u64,
+}
+
 struct AppState {
     registry: ConfigRegistry,
     telemetry: StationTelemetry,
     event_tx: broadcast::Sender<StationEvent>,
-    sessions: Mutex<HashMap<String, SseChannel>>,
+    sessions: Mutex<HashMap<String, SessionInfo>>,
     auth_gate: ApiKeyGate,
 }
 
@@ -48,6 +66,32 @@ pub async fn run_sse(
         event_tx,
         sessions: Mutex::new(HashMap::new()),
         auth_gate,
+    });
+
+    // Spawn session reaper — prunes zombie sessions every REAPER_INTERVAL_SECS
+    let reaper_state = Arc::clone(&state);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(
+            std::time::Duration::from_secs(REAPER_INTERVAL_SECS),
+        );
+        loop {
+            interval.tick().await;
+            let mut sessions = reaper_state.sessions.lock().await;
+            let before = sessions.len();
+            let cutoff = tokio::time::Instant::now()
+                - std::time::Duration::from_secs(SESSION_IDLE_TIMEOUT_SECS);
+            sessions.retain(|id, info| {
+                let alive = !info.tx.is_closed() && info.last_activity > cutoff;
+                if !alive {
+                    debug!(session_id = %id, "Reaping idle/closed session");
+                }
+                alive
+            });
+            let reaped = before - sessions.len();
+            if reaped > 0 {
+                info!(reaped = reaped, remaining = sessions.len(), "Session reaper cycle");
+            }
+        }
     });
 
     let app = axum::Router::new()
@@ -79,8 +123,25 @@ async fn handle_sse(
         error!(error = %e, "Failed to send endpoint event");
     }
 
+    // Enforce session cap
+    {
+        let sessions = state.sessions.lock().await;
+        if sessions.len() >= MAX_SESSIONS {
+            warn!(count = sessions.len(), max = MAX_SESSIONS, "Session cap reached, rejecting");
+            // Still return an SSE stream — but it will just have the endpoint event
+            // and no session registered, so /message will 404
+            return Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default());
+        }
+    }
+
+    let now = tokio::time::Instant::now();
     info!(session_id = %session_id, "SSE session opened");
-    state.sessions.lock().await.insert(session_id.clone(), tx.clone());
+    state.sessions.lock().await.insert(session_id.clone(), SessionInfo {
+        tx: tx.clone(),
+        created_at: now,
+        last_activity: now,
+        request_count: 0,
+    });
 
     // Subscribe this SSE session to station events
     let mut event_rx = state.event_tx.subscribe();
@@ -117,13 +178,7 @@ async fn handle_message(
 ) -> impl IntoResponse {
     let session_id = &query.session_id;
 
-    let sessions = state.sessions.lock().await;
-    let Some(tx) = sessions.get(session_id) else {
-        warn!(session_id = %session_id, "Unknown session");
-        return StatusCode::NOT_FOUND;
-    };
-
-    // Auth gate: check tools/call requests
+    // Auth gate: check tools/call requests (before locking sessions)
     if request.method == "tools/call" {
         let auth_header = headers
             .get(axum::http::header::AUTHORIZATION)
@@ -135,13 +190,24 @@ async fn handle_message(
         }
     }
 
+    let mut sessions = state.sessions.lock().await;
+    let Some(info) = sessions.get_mut(session_id) else {
+        warn!(session_id = %session_id, "Unknown session");
+        return StatusCode::NOT_FOUND;
+    };
+
+    // Update session activity
+    info.last_activity = tokio::time::Instant::now();
+    info.request_count += 1;
+
     debug!(
         session_id = %session_id,
         method = %request.method,
+        requests = info.request_count,
         "SSE message received"
     );
 
-    let response = handle_request(&state.registry, &state.telemetry, &request, Some(&state.event_tx));
+    let response = handle_request(&state.registry, &state.telemetry, &state.auth_gate, &request, Some(&state.event_tx));
 
     if let Some(resp) = response {
         let json = match serde_json::to_string(&resp) {
@@ -153,7 +219,7 @@ async fn handle_message(
         };
 
         let event = Event::default().event("message").data(json);
-        if let Err(e) = tx.send(Ok(event)).await {
+        if let Err(e) = info.tx.send(Ok(event)).await {
             error!(error = %e, "Failed to send SSE event");
             return StatusCode::INTERNAL_SERVER_ERROR;
         }

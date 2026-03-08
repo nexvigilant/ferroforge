@@ -311,4 +311,23 @@ impl ConfigRegistry {
     pub fn tool_count(&self) -> usize {
         self.configs.iter().map(|c| c.tools.len()).sum()
     }
+
+    /// SHA-256 hash of the config set for drift detection.
+    ///
+    /// Hashes the sorted domain names + tool counts. If this value changes
+    /// between deploys, the config set has drifted.
+    pub fn config_hash(&self) -> String {
+        use sha2::{Sha256, Digest};
+        let mut hasher = Sha256::new();
+        let mut domains: Vec<String> = self
+            .configs
+            .iter()
+            .map(|c| format!("{}:{}", c.domain, c.tools.len()))
+            .collect();
+        domains.sort();
+        for d in &domains {
+            hasher.update(d.as_bytes());
+        }
+        format!("{:x}", hasher.finalize())
+    }
 }

@@ -18,15 +18,34 @@ use crate::auth::{self, ApiKeyGate, AuthResult};
 use crate::config::ConfigRegistry;
 use crate::protocol::{JsonRpcRequest, StationEvent, StationEventNotification};
 use crate::server::handle_request;
+use crate::server_streamable::StreamableState;
 use crate::telemetry::StationTelemetry;
 
 type SseChannel = mpsc::Sender<Result<Event, axum::Error>>;
 
+/// Maximum concurrent SSE sessions before rejecting new connections.
+const MAX_SESSIONS: usize = 1000;
+
+/// Sessions idle longer than this are reaped (seconds).
+const SESSION_IDLE_TIMEOUT_SECS: u64 = 300;
+
+/// How often the reaper runs (seconds).
+const REAPER_INTERVAL_SECS: u64 = 60;
+
+/// Session metadata — tracks lifecycle beyond just the channel sender.
+struct SessionInfo {
+    tx: SseChannel,
+    #[allow(dead_code)] // Available for diagnostics and future health reporting
+    created_at: tokio::time::Instant,
+    last_activity: tokio::time::Instant,
+    request_count: u64,
+}
+
 struct AppState {
-    registry: ConfigRegistry,
-    telemetry: StationTelemetry,
+    registry: Arc<ConfigRegistry>,
+    telemetry: Arc<StationTelemetry>,
     event_tx: broadcast::Sender<StationEvent>,
-    sessions: Mutex<HashMap<String, SseChannel>>,
+    sessions: Mutex<HashMap<String, SessionInfo>>,
     auth_gate: ApiKeyGate,
 }
 
@@ -47,23 +66,76 @@ pub async fn run_combined(
     port: u16,
 ) -> anyhow::Result<()> {
     let auth_gate = ApiKeyGate::from_env();
+
+    // Wrap registry and telemetry in Arc for sharing with streamable transport
+    let registry_arc = Arc::new(registry);
+    let telemetry_arc = Arc::new(telemetry);
+
     let state = Arc::new(AppState {
-        registry,
-        telemetry,
-        event_tx,
+        registry: Arc::clone(&registry_arc),
+        telemetry: Arc::clone(&telemetry_arc),
+        event_tx: event_tx.clone(),
         sessions: Mutex::new(HashMap::new()),
-        auth_gate,
+        auth_gate: auth_gate.clone(),
     });
+
+    // Spawn session reaper — prunes zombie sessions every REAPER_INTERVAL_SECS
+    let reaper_state = Arc::clone(&state);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(
+            std::time::Duration::from_secs(REAPER_INTERVAL_SECS),
+        );
+        loop {
+            interval.tick().await;
+            let mut sessions = reaper_state.sessions.lock().await;
+            let before = sessions.len();
+            let cutoff = tokio::time::Instant::now()
+                - std::time::Duration::from_secs(SESSION_IDLE_TIMEOUT_SECS);
+            sessions.retain(|id, info| {
+                let alive = !info.tx.is_closed() && info.last_activity > cutoff;
+                if !alive {
+                    debug!(session_id = %id, "Reaping idle/closed session");
+                }
+                alive
+            });
+            let reaped = before - sessions.len();
+            if reaped > 0 {
+                info!(reaped = reaped, remaining = sessions.len(), "Session reaper cycle");
+            }
+        }
+    });
+
+    // Streamable HTTP state (shares registry, telemetry via Arc)
+    let streamable_state = Arc::new(StreamableState::new(
+        Arc::clone(&registry_arc),
+        Arc::clone(&telemetry_arc),
+        event_tx.clone(),
+        auth_gate.clone(),
+    ));
+    StreamableState::spawn_reaper(Arc::clone(&streamable_state));
 
     let cors = CorsLayer::new()
         .allow_origin("*".parse::<HeaderValue>().expect("valid header"))
-        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
         .allow_headers([
             axum::http::header::CONTENT_TYPE,
             axum::http::header::AUTHORIZATION,
+            "mcp-session-id".parse().expect("valid header name"),
+        ])
+        .expose_headers([
+            "mcp-session-id".parse::<axum::http::HeaderName>().expect("valid header name"),
         ]);
 
+    // Streamable HTTP routes (Claude.ai Connectors)
+    let mcp_routes = axum::Router::new()
+        .route("/mcp", post(crate::server_streamable::handle_mcp_post))
+        .route("/mcp", get(crate::server_streamable::handle_mcp_get))
+        .route("/mcp", axum::routing::delete(crate::server_streamable::handle_mcp_delete))
+        .with_state(streamable_state);
+
     let app = axum::Router::new()
+        // Streamable HTTP transport (Claude.ai Connectors — MCP 2025-03-26)
+        .merge(mcp_routes)
         // SSE transport (MCP protocol — mcp-remote, Claude Code)
         .route("/sse", get(handle_sse))
         .route("/message", post(handle_message))
@@ -102,8 +174,23 @@ async fn handle_sse(
         error!(error = %e, "Failed to send endpoint event");
     }
 
+    // Enforce session cap
+    {
+        let sessions = state.sessions.lock().await;
+        if sessions.len() >= MAX_SESSIONS {
+            warn!(count = sessions.len(), max = MAX_SESSIONS, "Session cap reached, rejecting");
+            return Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default());
+        }
+    }
+
+    let now = tokio::time::Instant::now();
     info!(session_id = %session_id, "SSE session opened");
-    state.sessions.lock().await.insert(session_id.clone(), tx.clone());
+    state.sessions.lock().await.insert(session_id.clone(), SessionInfo {
+        tx: tx.clone(),
+        created_at: now,
+        last_activity: now,
+        request_count: 0,
+    });
 
     let mut event_rx = state.event_tx.subscribe();
     let event_session_id = session_id;
@@ -139,13 +226,7 @@ async fn handle_message(
 ) -> impl IntoResponse {
     let session_id = &query.session_id;
 
-    let sessions = state.sessions.lock().await;
-    let Some(tx) = sessions.get(session_id) else {
-        warn!(session_id = %session_id, "Unknown session");
-        return StatusCode::NOT_FOUND;
-    };
-
-    // Auth gate: check tools/call requests
+    // Auth gate: check tools/call requests (before locking sessions)
     if request.method == "tools/call" {
         let auth_header = headers
             .get(axum::http::header::AUTHORIZATION)
@@ -157,13 +238,24 @@ async fn handle_message(
         }
     }
 
+    let mut sessions = state.sessions.lock().await;
+    let Some(info) = sessions.get_mut(session_id) else {
+        warn!(session_id = %session_id, "Unknown session");
+        return StatusCode::NOT_FOUND;
+    };
+
+    // Update session activity
+    info.last_activity = tokio::time::Instant::now();
+    info.request_count += 1;
+
     debug!(
         session_id = %session_id,
         method = %request.method,
+        requests = info.request_count,
         "SSE message received"
     );
 
-    let response = handle_request(&state.registry, &state.telemetry, &request, Some(&state.event_tx));
+    let response = handle_request(&state.registry, &state.telemetry, &state.auth_gate, &request, Some(&state.event_tx));
 
     if let Some(resp) = response {
         let json = match serde_json::to_string(&resp) {
@@ -175,7 +267,7 @@ async fn handle_message(
         };
 
         let event = Event::default().event("message").data(json);
-        if let Err(e) = tx.send(Ok(event)).await {
+        if let Err(e) = info.tx.send(Ok(event)).await {
             error!(error = %e, "Failed to send SSE event");
             return StatusCode::INTERNAL_SERVER_ERROR;
         }
@@ -206,7 +298,7 @@ async fn handle_rpc(
         }
     }
 
-    let response = handle_request(&state.registry, &state.telemetry, &request, Some(&state.event_tx));
+    let response = handle_request(&state.registry, &state.telemetry, &state.auth_gate, &request, Some(&state.event_tx));
     match response {
         Some(resp) => (StatusCode::OK, Json(resp)).into_response(),
         None => StatusCode::ACCEPTED.into_response(),
@@ -248,7 +340,7 @@ async fn handle_tool_call(
         })),
     };
 
-    let response = handle_request(&state.registry, &state.telemetry, &request, Some(&state.event_tx));
+    let response = handle_request(&state.registry, &state.telemetry, &state.auth_gate, &request, Some(&state.event_tx));
     match response {
         Some(resp) => {
             if let Some(result) = resp.result {
@@ -283,6 +375,7 @@ async fn handle_health(
         "status": "ok",
         "transport": "combined",
         "surfaces": {
+            "streamable_http": "/mcp",
             "sse": "/sse",
             "rpc": "/rpc",
             "rest": "/tools",

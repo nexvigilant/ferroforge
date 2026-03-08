@@ -63,7 +63,11 @@ fn main() -> Result<()> {
     );
 
     let registry = ConfigRegistry::load_from_dir_filtered(&cli.config_dir, cli.exclude_private)?;
-    let telemetry = StationTelemetry::new(Some(cli.telemetry_log));
+    let telemetry = if matches!(cli.transport, Transport::Stdio) {
+        StationTelemetry::new_local(Some(cli.telemetry_log))
+    } else {
+        StationTelemetry::new(Some(cli.telemetry_log))
+    };
 
     info!(
         configs = registry.configs.len(),

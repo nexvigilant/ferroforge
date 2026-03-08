@@ -4,13 +4,19 @@ use std::io::{self, BufRead, Write};
 use tokio::sync::broadcast;
 use tracing::{debug, error, info};
 
+use crate::auth::ApiKeyGate;
 use crate::config::ConfigRegistry;
 use crate::protocol::*;
 use crate::router;
 use crate::telemetry::{self, StationTelemetry};
 
 /// Run the MCP server over stdio (JSON-RPC 2.0).
+///
+/// Stdio transport uses a dev-mode auth gate (no keys required).
+/// Auth enforcement for remote transports happens through the same
+/// `route_tool_call` path with a real `ApiKeyGate`.
 pub fn run_stdio(registry: ConfigRegistry, telemetry: &StationTelemetry) -> Result<()> {
+    let auth_gate = ApiKeyGate::from_env();
     let stdin = io::stdin();
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
@@ -46,7 +52,7 @@ pub fn run_stdio(registry: ConfigRegistry, telemetry: &StationTelemetry) -> Resu
             }
         };
 
-        let response = handle_request(&registry, telemetry, &request, None);
+        let response = handle_request(&registry, telemetry, &auth_gate, &request, None);
 
         // Notifications (no id) get no response
         if request.id.is_none() {
@@ -66,6 +72,7 @@ pub fn run_stdio(registry: ConfigRegistry, telemetry: &StationTelemetry) -> Resu
 pub fn handle_request(
     registry: &ConfigRegistry,
     telemetry: &StationTelemetry,
+    auth_gate: &ApiKeyGate,
     req: &JsonRpcRequest,
     event_tx: Option<&broadcast::Sender<StationEvent>>,
 ) -> Option<JsonRpcResponse> {
@@ -74,7 +81,7 @@ pub fn handle_request(
     match req.method.as_str() {
         "initialize" => {
             let result = InitializeResult {
-                protocol_version: "2024-11-05".into(),
+                protocol_version: "2025-03-26".into(),
                 capabilities: ServerCapabilities {
                     tools: ToolCapability {
                         list_changed: false,
@@ -132,7 +139,7 @@ pub fn handle_request(
 
             info!(tool = %tool_name, "Tool call");
             let timer = telemetry::start_timer();
-            let result = router::route_tool_call(registry, telemetry, tool_name, &arguments);
+            let result = router::route_tool_call(registry, telemetry, auth_gate, None, tool_name, &arguments);
             let duration_ms = telemetry::elapsed_ms(timer);
 
             // Emit station event to broadcast channel

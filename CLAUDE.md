@@ -83,6 +83,20 @@ curl https://mcp.nexvigilant.com/sse
 
 **DO NOT deploy to webmcp-hub.com.** The third-party hub has a 50-config cap and is no longer the primary deployment target. All agent traffic routes through `mcp.nexvigilant.com`.
 
+**Deployment:** Use `scripts/deploy-cloud-run.sh` (canary by default: 10% → health check → 100%). Pass `--no-canary` for immediate full deploy.
+
+### Service Level Objectives
+
+| Metric | Target | Measurement |
+|--------|--------|-------------|
+| Availability | 99.5% monthly | Cloud Run uptime (allows ~3.6h downtime/month) |
+| Latency P99 | <5s per tool call | Telemetry ring buffer `duration_ms` P99 |
+| Error rate | <5% of tool calls | `StationHealth.error_rate_pct` |
+| Proxy timeout | 30s hard kill | `router.rs` timeout on subprocess spawn |
+| Rate limit response | <1ms | In-memory ring buffer scan |
+
+**Error budget:** At 99.5%, the monthly budget is ~3.6 hours. Cloud Run cold starts (~2-5s) do NOT count against availability — only failed health checks do.
+
 ## Local Hub (`hub/`)
 
 Self-hosted config registry for local development and seeding. Not the production deployment target.

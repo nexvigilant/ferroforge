@@ -8,6 +8,8 @@
 //!
 //! Key format: `nv_` prefix + 32 hex chars (e.g., `nv_a1b2c3d4e5f6...`).
 
+use sha2::{Digest, Sha256};
+use subtle::ConstantTimeEq;
 use tracing::info;
 
 /// Tools that are always free — education/discovery surface.
@@ -15,13 +17,16 @@ const FREE_TOOLS: &[&str] = &[
     "nexvigilant_directory",
     "nexvigilant_capabilities",
     "nexvigilant_chart_course",
+    "nexvigilant_station_health",
 ];
 
 /// API key gate for station access control.
 #[derive(Debug, Clone)]
 pub struct ApiKeyGate {
-    /// Valid API keys. `None` = auth disabled (dev mode).
-    valid_keys: Option<Vec<String>>,
+    /// SHA-256 hashes of valid API keys. Hashing normalizes length for
+    /// constant-time comparison and avoids keeping plaintext keys in memory.
+    /// `None` = auth disabled (dev mode).
+    key_hashes: Option<Vec<[u8; 32]>>,
 }
 
 /// Result of an auth check.
@@ -35,11 +40,20 @@ pub enum AuthResult {
     InvalidKey,
 }
 
+/// Hash a key with SHA-256 to normalize length for constant-time comparison.
+fn hash_key(key: &str) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(key.as_bytes());
+    hasher.finalize().into()
+}
+
 impl ApiKeyGate {
     /// Create an auth gate with explicit keys (for testing).
     /// Pass `None` for dev mode (all allowed), `Some(vec)` for enforced mode.
     pub fn new(valid_keys: Option<Vec<String>>) -> Self {
-        Self { valid_keys }
+        Self {
+            key_hashes: valid_keys.map(|keys| keys.iter().map(|k| hash_key(k)).collect()),
+        }
     }
 
     /// Load API keys from `NEXVIGILANT_API_KEYS` env var.
@@ -53,13 +67,14 @@ impl ApiKeyGate {
                     .filter(|s| !s.is_empty())
                     .collect();
                 info!(key_count = keys.len(), "API key gate enabled");
+                let hashes = keys.iter().map(|k| hash_key(k)).collect();
                 Self {
-                    valid_keys: Some(keys),
+                    key_hashes: Some(hashes),
                 }
             }
             _ => {
                 info!("API key gate disabled (NEXVIGILANT_API_KEYS not set — dev mode)");
-                Self { valid_keys: None }
+                Self { key_hashes: None }
             }
         }
     }
@@ -69,6 +84,10 @@ impl ApiKeyGate {
     /// - Free tools (meta-tools) always pass.
     /// - If no keys configured → always pass (dev mode).
     /// - Otherwise, requires valid `Authorization: Bearer nv_...` header.
+    ///
+    /// Key comparison is constant-time: both the candidate and stored keys
+    /// are SHA-256 hashed, then compared with `subtle::ConstantTimeEq` to
+    /// prevent timing side-channel attacks.
     pub fn check(&self, auth_header: Option<&str>, tool_name: &str) -> AuthResult {
         // Meta-tools are always free — education surface
         if FREE_TOOLS.contains(&tool_name) {
@@ -76,7 +95,7 @@ impl ApiKeyGate {
         }
 
         // Dev mode — no keys configured
-        let Some(valid_keys) = &self.valid_keys else {
+        let Some(key_hashes) = &self.key_hashes else {
             return AuthResult::Allowed;
         };
 
@@ -95,8 +114,15 @@ impl ApiKeyGate {
             return AuthResult::KeyRequired;
         }
 
-        // Constant-time comparison would be ideal, but for MVP:
-        if valid_keys.iter().any(|k| k == token) {
+        // Constant-time comparison via SHA-256 hash + subtle::ConstantTimeEq.
+        // Hashing normalizes key length (prevents length-leak timing).
+        // ConstantTimeEq prevents byte-position timing leaks.
+        let candidate_hash = hash_key(token);
+        let matched = key_hashes
+            .iter()
+            .any(|stored| candidate_hash.ct_eq(stored).into());
+
+        if matched {
             AuthResult::Allowed
         } else {
             AuthResult::InvalidKey
@@ -105,7 +131,7 @@ impl ApiKeyGate {
 
     /// Check if auth is enabled (keys are configured).
     pub fn is_enabled(&self) -> bool {
-        self.valid_keys.is_some()
+        self.key_hashes.is_some()
     }
 
     /// Check a tools/list request — always allowed, but annotates which tools need auth.

@@ -3,7 +3,7 @@ use nexvigilant_station::config::{ConfigRegistry, HubConfig, ParamDef, ToolDef};
 use nexvigilant_station::protocol::{JsonRpcRequest, INVALID_PARAMS, METHOD_NOT_FOUND};
 use nexvigilant_station::router;
 use nexvigilant_station::server;
-use nexvigilant_station::telemetry::StationTelemetry;
+use nexvigilant_station::telemetry::{self, StationTelemetry};
 use serde_json::{json, Value};
 use std::io::Write;
 use tempfile::TempDir;
@@ -239,7 +239,7 @@ fn test_load_ignores_non_config_files() {
 #[test]
 fn test_route_known_tool_with_stub() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), "api_fda_gov_search_adverse_events", &json!({"drug_name": "aspirin"}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "api_fda_gov_search_adverse_events", &json!({"drug_name": "aspirin"}));
     assert!(result.is_error.is_none());
     assert_eq!(result.content.len(), 1);
 }
@@ -247,7 +247,7 @@ fn test_route_known_tool_with_stub() {
 #[test]
 fn test_route_known_tool_without_stub() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), "api_fda_gov_get_drug_counts", &json!({"drug_name": "metformin"}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "api_fda_gov_get_drug_counts", &json!({"drug_name": "metformin"}));
     assert!(result.is_error.is_none());
     let text = match &result.content[0] {
         nexvigilant_station::protocol::ContentBlock::Text { text } => text,
@@ -258,14 +258,14 @@ fn test_route_known_tool_without_stub() {
 #[test]
 fn test_route_unknown_tool() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), "nonexistent_tool", &json!({}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "nonexistent_tool", &json!({}));
     assert_eq!(result.is_error, Some(true));
 }
 
 #[test]
 fn test_route_directory_meta_tool() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), "nexvigilant_directory", &json!({}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "nexvigilant_directory", &json!({}));
     assert!(result.is_error.is_none());
     let text = match &result.content[0] {
         nexvigilant_station::protocol::ContentBlock::Text { text } => text,
@@ -279,7 +279,7 @@ fn test_route_directory_meta_tool() {
 #[test]
 fn test_route_capabilities_search() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), "nexvigilant_capabilities", &json!({"query": "adverse"}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "nexvigilant_capabilities", &json!({"query": "adverse"}));
     assert!(result.is_error.is_none());
     let text = match &result.content[0] {
         nexvigilant_station::protocol::ContentBlock::Text { text } => text,
@@ -291,7 +291,7 @@ fn test_route_capabilities_search() {
 #[test]
 fn test_route_capabilities_domain_filter() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), "nexvigilant_capabilities", &json!({"domain": "dailymed"}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "nexvigilant_capabilities", &json!({"domain": "dailymed"}));
     assert!(result.is_error.is_none());
     let text = match &result.content[0] {
         nexvigilant_station::protocol::ContentBlock::Text { text } => text,
@@ -308,9 +308,9 @@ fn test_route_capabilities_domain_filter() {
 fn test_handle_initialize() {
     let reg = test_registry();
     let req = make_request(Some(json!(1)), "initialize", Some(json!({})));
-    let resp = server::handle_request(&reg, &test_telemetry(), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
     let result = resp.result.expect("should have result");
-    assert_eq!(result["protocolVersion"], "2024-11-05");
+    assert_eq!(result["protocolVersion"], "2025-03-26");
     assert_eq!(result["serverInfo"]["name"], "nexvigilant-station");
     assert!(resp.error.is_none());
 }
@@ -319,7 +319,7 @@ fn test_handle_initialize() {
 fn test_handle_tools_list() {
     let reg = test_registry();
     let req = make_request(Some(json!(2)), "tools/list", None);
-    let resp = server::handle_request(&reg, &test_telemetry(), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
     let result = resp.result.expect("should have result");
     let tools = result["tools"].as_array().expect("tools array");
     // 3 config tools + 4 meta tools
@@ -337,7 +337,7 @@ fn test_handle_tools_call_with_stub() {
             "arguments": {"drug_name": "aspirin"}
         })),
     );
-    let resp = server::handle_request(&reg, &test_telemetry(), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
     let result = resp.result.expect("should have result");
     let content = result["content"].as_array().expect("content");
     assert_eq!(content.len(), 1);
@@ -348,7 +348,7 @@ fn test_handle_tools_call_with_stub() {
 fn test_handle_tools_call_missing_name() {
     let reg = test_registry();
     let req = make_request(Some(json!(4)), "tools/call", Some(json!({"arguments": {}})));
-    let resp = server::handle_request(&reg, &test_telemetry(), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
     let err = resp.error.expect("should have error");
     assert_eq!(err.code, INVALID_PARAMS);
 }
@@ -357,7 +357,7 @@ fn test_handle_tools_call_missing_name() {
 fn test_handle_ping() {
     let reg = test_registry();
     let req = make_request(Some(json!(5)), "ping", None);
-    let resp = server::handle_request(&reg, &test_telemetry(), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
     assert!(resp.result.is_some());
     assert!(resp.error.is_none());
 }
@@ -366,7 +366,7 @@ fn test_handle_ping() {
 fn test_handle_unknown_method() {
     let reg = test_registry();
     let req = make_request(Some(json!(6)), "bogus/method", None);
-    let resp = server::handle_request(&reg, &test_telemetry(), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
     let err = resp.error.expect("should have error");
     assert_eq!(err.code, METHOD_NOT_FOUND);
 }
@@ -375,7 +375,7 @@ fn test_handle_unknown_method() {
 fn test_handle_notification_returns_none() {
     let reg = test_registry();
     let req = make_request(None, "notifications/initialized", None);
-    let resp = server::handle_request(&reg, &test_telemetry(), &req, None);
+    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None);
     assert!(resp.is_none(), "notifications should return None");
 }
 
@@ -388,7 +388,7 @@ fn test_e2e_json_roundtrip_initialize() {
     let raw = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}"#;
     let req: JsonRpcRequest = serde_json::from_str(raw).expect("parse");
     let reg = test_registry();
-    let resp = server::handle_request(&reg, &test_telemetry(), &req, None).expect("respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("respond");
     let json_str = serde_json::to_string(&resp).expect("serialize");
     let reparsed: Value = serde_json::from_str(&json_str).expect("reparse");
     assert_eq!(reparsed["jsonrpc"], "2.0");
@@ -401,7 +401,7 @@ fn test_e2e_json_roundtrip_tools_call() {
     let raw = r#"{"jsonrpc":"2.0","id":99,"method":"tools/call","params":{"name":"dailymed_nlm_nih_gov_get_drug_label","arguments":{"drug_name":"metformin"}}}"#;
     let req: JsonRpcRequest = serde_json::from_str(raw).expect("parse");
     let reg = test_registry();
-    let resp = server::handle_request(&reg, &test_telemetry(), &req, None).expect("respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("respond");
     let json_str = serde_json::to_string(&resp).expect("serialize");
     let reparsed: Value = serde_json::from_str(&json_str).expect("reparse");
     assert_eq!(reparsed["id"], 99);
@@ -560,6 +560,9 @@ fn test_rate_limit_allows_under_threshold() {
             duration_ms: 100,
             status: "ok".into(),
             is_error: false,
+            error_message: None,
+            client_id: None,
+            request_id: None,
         });
     }
     let check = telemetry.check_rate_limit("api.fda.gov");
@@ -580,6 +583,9 @@ fn test_rate_limit_blocks_over_threshold() {
             duration_ms: 10,
             status: "ok".into(),
             is_error: false,
+            error_message: None,
+            client_id: None,
+            request_id: None,
         });
     }
     let check = telemetry.check_rate_limit("api.fda.gov");
@@ -601,13 +607,45 @@ fn test_rate_limit_response_in_router() {
             duration_ms: 10,
             status: "ok".into(),
             is_error: false,
+            error_message: None,
+            client_id: None,
+            request_id: None,
         });
     }
     // This call should be rate-limited
-    let result = router::route_tool_call(&reg, &telemetry, "api_fda_gov_search_adverse_events", &json!({"drug_name": "test"}));
+    let result = router::route_tool_call(&reg, &telemetry, &ApiKeyGate::new(None), None, "api_fda_gov_search_adverse_events", &json!({"drug_name": "test"}));
     assert_eq!(result.is_error, Some(true));
     let text = match &result.content[0] {
         nexvigilant_station::protocol::ContentBlock::Text { text } => text,
     };
     assert!(text.contains("rate_limited"));
+}
+
+// =============================================
+// Telemetry date formatting validation
+// =============================================
+
+#[test]
+fn test_now_iso8601_format() {
+    let ts = telemetry::now_iso8601();
+    // Should match YYYY-MM-DDTHH:MM:SSZ
+    assert_eq!(ts.len(), 20, "ISO 8601 timestamp should be 20 chars: {ts}");
+    assert!(ts.ends_with('Z'), "Should end with Z: {ts}");
+    assert_eq!(&ts[4..5], "-");
+    assert_eq!(&ts[7..8], "-");
+    assert_eq!(&ts[10..11], "T");
+    assert_eq!(&ts[13..14], ":");
+    assert_eq!(&ts[16..17], ":");
+
+    // Year should be reasonable (2020-2099)
+    let year: u32 = ts[0..4].parse().expect("year should parse");
+    assert!(year >= 2020 && year <= 2099, "Year out of range: {year}");
+
+    // Month 01-12
+    let month: u32 = ts[5..7].parse().expect("month should parse");
+    assert!((1..=12).contains(&month), "Month out of range: {month}");
+
+    // Day 01-31
+    let day: u32 = ts[8..10].parse().expect("day should parse");
+    assert!((1..=31).contains(&day), "Day out of range: {day}");
 }

@@ -11,7 +11,7 @@
 //!   3. stderr tracing (existing log infrastructure)
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
@@ -64,6 +64,15 @@ pub struct ToolCallRecord {
     pub status: String,
     /// Whether the MCP response flagged isError
     pub is_error: bool,
+    /// Error message when is_error is true (why it failed, not just that it failed)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    /// Caller identity extracted from API key prefix or auth header (who called)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    /// Unique request ID for cross-call correlation (links related calls in a workflow)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request_id: Option<String>,
 }
 
 /// Aggregate statistics for a domain.
@@ -75,6 +84,18 @@ pub struct DomainStats {
     pub avg_duration_ms: f64,
     pub top_tools: Vec<(String, u64)>,
 }
+
+/// SLO thresholds — aligned with CLAUDE.md Service Level Objectives.
+///
+/// | Metric          | Target   | Constant                  |
+/// |-----------------|----------|---------------------------|
+/// | Error rate warn | <5%      | ERROR_RATE_WARN_PCT       |
+/// | Error rate crit | <10%     | ERROR_RATE_CRITICAL_PCT   |
+/// | Latency P99     | <5000ms  | LATENCY_P99_TARGET_MS     |
+/// | Proxy timeout   | 30s      | router.rs proxy_timeout   |
+const ERROR_RATE_WARN_PCT: f64 = 5.0;
+const ERROR_RATE_CRITICAL_PCT: f64 = 10.0;
+const LATENCY_P99_TARGET_MS: u64 = 5_000;
 
 /// Station-wide health summary.
 #[derive(Debug, Clone, Serialize)]
@@ -89,6 +110,19 @@ pub struct StationHealth {
     pub domains: Vec<DomainStats>,
     pub top_tools: Vec<(String, u64)>,
     pub recent_calls: Vec<ToolCallRecord>,
+    /// P99 latency in milliseconds (99th percentile of call durations).
+    pub latency_p99_ms: u64,
+    /// Whether P99 latency exceeds the 5000ms SLO target.
+    pub latency_slo_ok: bool,
+    /// SLO alert: "ok", "warn" (>5% errors), or "critical" (>10% errors or P99 > 5s).
+    pub slo_status: String,
+    /// Domains with error rates above the warning threshold.
+    pub degraded_domains: Vec<String>,
+    /// Health trend: "improving", "stable", or "degrading" based on recent error rate direction.
+    pub trend: String,
+    /// SHA-256 hash of the loaded config set (detects config drift between deploys).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config_hash: Option<String>,
 }
 
 /// Result of a rate limit check.
@@ -108,9 +142,11 @@ pub struct RateLimitCheck {
 
 /// Core telemetry engine.
 pub struct StationTelemetry {
-    ring: Mutex<Vec<ToolCallRecord>>,
+    ring: Mutex<VecDeque<ToolCallRecord>>,
     log_path: Option<PathBuf>,
     start_time: Instant,
+    /// When true, rate limiting is disabled (stdio/local transport).
+    local_mode: bool,
 }
 
 impl StationTelemetry {
@@ -120,10 +156,19 @@ impl StationTelemetry {
             info!(path = %path.display(), "Telemetry JSONL log enabled");
         }
         Self {
-            ring: Mutex::new(Vec::with_capacity(MAX_RING_ENTRIES)),
+            ring: Mutex::new(VecDeque::with_capacity(MAX_RING_ENTRIES)),
             log_path,
             start_time: Instant::now(),
+            local_mode: false,
         }
+    }
+
+    /// Create a telemetry instance with local mode (rate limiting disabled).
+    /// Use for stdio transport where the single local user should never be throttled.
+    pub fn new_local(log_path: Option<PathBuf>) -> Self {
+        let mut t = Self::new(log_path);
+        t.local_mode = true;
+        t
     }
 
     /// Record a completed tool call.
@@ -149,9 +194,9 @@ impl StationTelemetry {
         };
 
         if ring.len() >= MAX_RING_ENTRIES {
-            ring.remove(0);
+            ring.pop_front();
         }
-        ring.push(record);
+        ring.push_back(record);
     }
 
     /// Generate a health summary from the ring buffer.
@@ -170,6 +215,12 @@ impl StationTelemetry {
                     domains: vec![],
                     top_tools: vec![],
                     recent_calls: vec![],
+                    latency_p99_ms: 0,
+                    latency_slo_ok: true,
+                    slo_status: "ok".into(),
+                    degraded_domains: vec![],
+                    trend: "stable".into(),
+                    config_hash: None,
                 };
             }
         };
@@ -236,16 +287,71 @@ impl StationTelemetry {
             .cloned()
             .collect();
 
+        let error_rate_pct = if total_calls > 0 {
+            (total_errors as f64 / total_calls as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // P99 latency — sort durations, pick 99th percentile
+        let latency_p99_ms = if total_calls > 0 {
+            let mut durations: Vec<u64> = ring.iter().map(|r| r.duration_ms).collect();
+            durations.sort_unstable();
+            let p99_idx = ((durations.len() as f64) * 0.99).ceil() as usize;
+            durations[p99_idx.min(durations.len()) - 1]
+        } else {
+            0
+        };
+        let latency_slo_ok = latency_p99_ms <= LATENCY_P99_TARGET_MS;
+
+        // SLO status — composite of error rate AND latency
+        let slo_status = if error_rate_pct >= ERROR_RATE_CRITICAL_PCT || !latency_slo_ok {
+            "critical".to_string()
+        } else if error_rate_pct >= ERROR_RATE_WARN_PCT {
+            "warn".to_string()
+        } else {
+            "ok".to_string()
+        };
+
+        // Find per-domain degradation
+        let degraded_domains: Vec<String> = domains
+            .iter()
+            .filter(|d| d.call_count >= 5) // only flag domains with meaningful sample size
+            .filter(|d| {
+                let rate = (d.error_count as f64 / d.call_count as f64) * 100.0;
+                rate >= ERROR_RATE_WARN_PCT
+            })
+            .map(|d| d.domain.clone())
+            .collect();
+
+        // Trend detection: compare error rate of first half vs second half of ring buffer.
+        // "improving" = second half has lower error rate, "degrading" = higher, "stable" = same.
+        let trend = if total_calls >= 10 {
+            let mid = ring.len() / 2;
+            let first_half_errors =
+                ring.iter().take(mid).filter(|r| r.is_error).count() as f64;
+            let second_half_errors =
+                ring.iter().skip(mid).filter(|r| r.is_error).count() as f64;
+            let first_rate = first_half_errors / mid as f64;
+            let second_rate = second_half_errors / (ring.len() - mid) as f64;
+            let delta = second_rate - first_rate;
+            if delta < -0.02 {
+                "improving"
+            } else if delta > 0.02 {
+                "degrading"
+            } else {
+                "stable"
+            }
+        } else {
+            "stable" // Not enough data to detect trend
+        };
+
         StationHealth {
             station: "NexVigilant Station".into(),
             uptime_seconds: uptime_secs,
             total_calls,
             total_errors,
-            error_rate_pct: if total_calls > 0 {
-                (total_errors as f64 / total_calls as f64) * 100.0
-            } else {
-                0.0
-            },
+            error_rate_pct,
             avg_duration_ms: if total_calls > 0 {
                 total_duration_ms as f64 / total_calls as f64
             } else {
@@ -255,6 +361,12 @@ impl StationTelemetry {
             domains,
             top_tools,
             recent_calls,
+            latency_p99_ms,
+            latency_slo_ok,
+            slo_status,
+            degraded_domains,
+            trend: trend.into(),
+            config_hash: None, // Set by caller via set_config_hash()
         }
     }
 
@@ -263,6 +375,17 @@ impl StationTelemetry {
     /// Uses the ring buffer timestamps to count calls in the sliding window.
     /// Meta tools (nexvigilant.meta) and science tools are never rate-limited.
     pub fn check_rate_limit(&self, domain: &str) -> RateLimitCheck {
+        // Stdio/local transport — never rate-limit the single local user
+        if self.local_mode {
+            return RateLimitCheck {
+                allowed: true,
+                domain: domain.to_string(),
+                current_count: 0,
+                limit: 0,
+                retry_after_secs: 0,
+            };
+        }
+
         // Never rate-limit local computation
         if domain == "nexvigilant.meta" || domain == "science.nexvigilant.com" || domain == "unknown" {
             return RateLimitCheck {

@@ -7,4 +7,5 @@ pub mod server;
 pub mod server_combined;
 pub mod server_http;
 pub mod server_sse;
+pub mod server_streamable;
 pub mod telemetry;
