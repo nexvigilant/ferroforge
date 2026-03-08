@@ -9,3 +9,32 @@ pub mod server_http;
 pub mod server_sse;
 pub mod server_streamable;
 pub mod telemetry;
+
+/// Shutdown signal — resolves on SIGTERM (Cloud Run) or CTRL+C (local dev).
+///
+/// Cloud Run sends SIGTERM with a 10s grace period. This handler lets axum
+/// finish in-flight requests before the process exits, instead of force-killing.
+pub async fn shutdown_signal() {
+    use tracing::info;
+
+    let ctrl_c = tokio::signal::ctrl_c();
+
+    #[cfg(unix)]
+    {
+        let mut sigterm = tokio::signal::unix::signal(
+            tokio::signal::unix::SignalKind::terminate(),
+        )
+        .expect("failed to install SIGTERM handler");
+
+        tokio::select! {
+            _ = ctrl_c => info!("CTRL+C received, shutting down"),
+            _ = sigterm.recv() => info!("SIGTERM received, shutting down"),
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        ctrl_c.await.expect("failed to listen for CTRL+C");
+        info!("CTRL+C received, shutting down");
+    }
+}

@@ -103,7 +103,10 @@ pub async fn run_sse(
     let addr = format!("{host}:{port}");
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     info!(addr = %addr, "Station SSE transport listening");
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(crate::shutdown_signal())
+        .await?;
+    info!("Station SSE transport shut down gracefully");
     Ok(())
 }
 

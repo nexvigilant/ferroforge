@@ -151,7 +151,15 @@ pub async fn run_combined(
     let addr = format!("{host}:{port}");
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     info!(addr = %addr, "Station combined transport listening (SSE + HTTP)");
-    axum::serve(listener, app).await?;
+
+    // Graceful shutdown — listen for SIGTERM (Cloud Run) and CTRL+C (local dev).
+    // Without this, Cloud Run sends SIGTERM, Station ignores it, Cloud Run
+    // force-kills after 10s, and in-flight requests get broken pipes.
+    axum::serve(listener, app)
+        .with_graceful_shutdown(crate::shutdown_signal())
+        .await?;
+
+    info!("Station shut down gracefully");
     Ok(())
 }
 
@@ -387,3 +395,4 @@ async fn handle_health(
         "version": env!("CARGO_PKG_VERSION"),
     }))
 }
+

@@ -51,6 +51,24 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
+    // Panic handler — convert panics from silent crashes to diagnosable log entries.
+    // Without this, a panic in any handler kills the process and Cloud Run sees
+    // only "connection reset". With it, the panic location is logged before exit.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let location = info.location().map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()));
+        let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "unknown panic payload".to_string()
+        };
+        // Use eprintln directly — tracing may not be initialized or may be poisoned
+        eprintln!("STATION PANIC at {}: {}", location.as_deref().unwrap_or("unknown"), payload);
+        default_hook(info);
+    }));
+
     tracing_subscriber::fmt()
         .with_writer(std::io::stderr)
         .init();
