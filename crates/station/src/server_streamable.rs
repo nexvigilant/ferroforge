@@ -158,41 +158,17 @@ pub async fn handle_mcp_post(
         return StatusCode::ACCEPTED.into_response();
     }
 
-    // For all other methods, require a valid session ID
-    let session_id = match get_session_id(&headers) {
-        Some(id) => id,
-        None => {
-            // No session ID and not an initialize request
-            let resp = JsonRpcResponse::error(
-                request.id,
-                -32600,
-                "Missing Mcp-Session-Id header. Send an initialize request first.",
-            );
-            return (
-                StatusCode::BAD_REQUEST,
-                [("content-type", "application/json")],
-                serde_json::to_string(&resp).unwrap_or_default(),
-            ).into_response();
-        }
-    };
+    // Session tracking is optional — Claude.ai connectors may not forward
+    // the Mcp-Session-Id header. Process requests statelessly if absent.
+    let session_id = get_session_id(&headers);
 
-    // Verify session exists and update activity
-    {
+    // Update session activity if session exists
+    if let Some(ref sid) = session_id {
         let mut sessions = state.sessions.lock().await;
-        let Some(info) = sessions.get_mut(&session_id) else {
-            let resp = JsonRpcResponse::error(
-                request.id,
-                -32600,
-                "Unknown session. Session may have expired.",
-            );
-            return (
-                StatusCode::NOT_FOUND,
-                [("content-type", "application/json")],
-                serde_json::to_string(&resp).unwrap_or_default(),
-            ).into_response();
-        };
-        info.last_activity = tokio::time::Instant::now();
-        info.request_count += 1;
+        if let Some(info) = sessions.get_mut(sid) {
+            info.last_activity = tokio::time::Instant::now();
+            info.request_count += 1;
+        }
     }
 
     // Auth gate for tools/call
@@ -202,7 +178,7 @@ pub async fn handle_mcp_post(
             .and_then(|v| v.to_str().ok());
         let result = state.auth_gate.check_rpc(auth_header, request.params.as_ref());
         if !matches!(result, AuthResult::Allowed) {
-            warn!(session_id = %session_id, "Unauthorized streamable tool call");
+            warn!(session_id = ?session_id, "Unauthorized streamable tool call");
             let resp = JsonRpcResponse::error(
                 request.id,
                 -32600,
@@ -217,7 +193,7 @@ pub async fn handle_mcp_post(
     }
 
     debug!(
-        session_id = %session_id,
+        session_id = ?session_id,
         method = %request.method,
         "Streamable HTTP request"
     );
@@ -239,11 +215,12 @@ pub async fn handle_mcp_post(
     match response {
         Some(resp) => {
             let json = serde_json::to_string(&resp).unwrap_or_default();
+            let sid = session_id.as_deref().unwrap_or("");
             (
                 StatusCode::OK,
                 [
                     ("content-type", "application/json"),
-                    ("mcp-session-id", session_id.as_str()),
+                    ("mcp-session-id", sid),
                 ],
                 json,
             ).into_response()
@@ -308,13 +285,13 @@ async fn handle_streamable_initialize(
         Some(resp) => {
             // Patch protocol version to 2025-03-26 for Streamable HTTP transport
             let mut json_val = serde_json::to_value(&resp).unwrap_or_default();
-            if let Some(result) = json_val.get_mut("result") {
-                if let Some(obj) = result.as_object_mut() {
-                    obj.insert(
-                        "protocolVersion".to_string(),
-                        serde_json::Value::String("2025-03-26".to_string()),
-                    );
-                }
+            if let Some(result) = json_val.get_mut("result")
+                && let Some(obj) = result.as_object_mut()
+            {
+                obj.insert(
+                    "protocolVersion".to_string(),
+                    serde_json::Value::String("2025-03-26".to_string()),
+                );
             }
             let json = serde_json::to_string(&json_val).unwrap_or_default();
             (
