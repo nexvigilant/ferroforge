@@ -376,6 +376,133 @@ def search_signal_literature(params: dict) -> dict:
     return search_articles({"query": query, "limit": DEFAULT_LIMIT})
 
 
+def get_mesh_terms(params: dict) -> dict:
+    """
+    Extract MeSH (Medical Subject Headings) terms assigned to a PubMed article.
+    Returns descriptor names with qualifier names and major topic flags.
+    Useful for MedDRA concept mapping in PV signal detection workflows.
+    """
+    pmid = str(params.get("pmid", "")).strip()
+    if not pmid:
+        return {"error": "pmid parameter is required"}
+
+    efetch_url = (
+        f"{BASE}/efetch.fcgi"
+        f"?db=pubmed"
+        f"&id={urllib.parse.quote(pmid)}"
+        f"&retmode=xml"
+        f"{COURTESY}"
+    )
+    root = _get_xml(efetch_url)
+    article_el = root.find(".//PubmedArticle")
+    if article_el is None:
+        return {"error": f"PMID {pmid} not found", "pmid": pmid}
+
+    title = _text(article_el.find(".//ArticleTitle"))
+
+    mesh_headings = []
+    for mh in article_el.findall(".//MeshHeading"):
+        descriptor_el = mh.find("DescriptorName")
+        if descriptor_el is None:
+            continue
+        descriptor = _text(descriptor_el)
+        major = descriptor_el.get("MajorTopicYN", "N") == "Y"
+
+        qualifiers = []
+        for qual in mh.findall("QualifierName"):
+            qualifiers.append({
+                "name": _text(qual),
+                "major_topic": qual.get("MajorTopicYN", "N") == "Y",
+            })
+
+        mesh_headings.append({
+            "descriptor": descriptor,
+            "major_topic": major,
+            "qualifiers": qualifiers,
+        })
+
+    # Also extract chemical/substance list
+    chemicals = []
+    for chem in article_el.findall(".//Chemical/NameOfSubstance"):
+        chemicals.append(_text(chem))
+
+    return {
+        "pmid": pmid,
+        "title": title,
+        "mesh_heading_count": len(mesh_headings),
+        "mesh_headings": mesh_headings,
+        "chemicals": chemicals,
+    }
+
+
+def get_related_articles(params: dict) -> dict:
+    """
+    Find articles related to a given PMID using PubMed's elink similarity algorithm.
+    Returns the top related articles with metadata.
+    """
+    pmid = str(params.get("pmid", "")).strip()
+    if not pmid:
+        return {"error": "pmid parameter is required"}
+
+    limit = min(int(params.get("limit", DEFAULT_LIMIT)), MAX_LIMIT)
+
+    # elink with linkname=pubmed_pubmed to get related articles
+    elink_url = (
+        f"{BASE}/elink.fcgi"
+        f"?dbfrom=pubmed"
+        f"&db=pubmed"
+        f"&id={urllib.parse.quote(pmid)}"
+        f"&linkname=pubmed_pubmed"
+        f"&retmode=xml"
+        f"{COURTESY}"
+    )
+    try:
+        root = _get_xml(elink_url)
+    except ET.ParseError:
+        return {
+            "pmid": pmid,
+            "related_count": 0,
+            "related_articles": [],
+            "note": "Failed to parse elink XML response.",
+        }
+
+    # Extract linked PMIDs
+    related_ids: list[str] = []
+    for link_set in root.findall(".//LinkSetDb"):
+        for link in link_set.findall("Link"):
+            link_id = _text(link.find("Id"))
+            if link_id and link_id != pmid:
+                related_ids.append(link_id)
+
+    if not related_ids:
+        return {
+            "pmid": pmid,
+            "related_count": 0,
+            "related_articles": [],
+        }
+
+    # Fetch metadata for top related articles
+    fetch_ids = related_ids[:limit]
+    time.sleep(REQUEST_DELAY)
+    ids_csv = ",".join(fetch_ids)
+    efetch_url = (
+        f"{BASE}/efetch.fcgi"
+        f"?db=pubmed"
+        f"&id={ids_csv}"
+        f"&retmode=xml"
+        f"{COURTESY}"
+    )
+    root = _get_xml(efetch_url)
+    articles = [_parse_article(el) for el in root.findall(".//PubmedArticle")]
+
+    return {
+        "pmid": pmid,
+        "related_count": len(related_ids),
+        "returned": len(articles),
+        "related_articles": articles,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Dispatch table
 # ---------------------------------------------------------------------------
@@ -386,6 +513,8 @@ HANDLERS: dict[str, Any] = {
     "get-citations": get_citations,
     "search-case-reports": search_case_reports,
     "search-signal-literature": search_signal_literature,
+    "get-mesh-terms": get_mesh_terms,
+    "get-related-articles": get_related_articles,
 }
 
 

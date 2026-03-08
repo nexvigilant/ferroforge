@@ -1,0 +1,246 @@
+{
+  "domain": "calculate.nexvigilant.com",
+  "url_pattern": "/calculate/*",
+  "title": "PV Calculation Engine",
+  "description": "Pharmacovigilance computation tools: signal detection (PRR/ROR/IC/EBGM), causality assessment (Naranjo, WHO-UMC), seriousness classification (ICH E2A), benefit-risk analysis, and reporting rate calculations. All computations follow published methodologies from WHO, FDA, and ICH guidelines.",
+  "tools": [
+    {
+      "name": "compute-prr",
+      "description": "Compute Proportional Reporting Ratio (PRR) for a drug-event pair from a 2x2 contingency table. PRR > 2 with chi-squared > 4 and N >= 3 indicates a signal.",
+      "parameters": [
+        { "name": "a", "type": "integer", "description": "Reports of target drug WITH target event", "required": true },
+        { "name": "b", "type": "integer", "description": "Reports of target drug WITHOUT target event", "required": true },
+        { "name": "c", "type": "integer", "description": "Reports of other drugs WITH target event", "required": true },
+        { "name": "d", "type": "integer", "description": "Reports of other drugs WITHOUT target event", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "PRR value, chi-squared, 95% CI, signal determination" },
+          "method": { "type": "string", "description": "Evans 2001 PRR criteria" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "compute-ror",
+      "description": "Compute Reporting Odds Ratio (ROR) for a drug-event pair from a 2x2 contingency table. ROR > 1 with lower 95% CI > 1 indicates a signal.",
+      "parameters": [
+        { "name": "a", "type": "integer", "description": "Reports of target drug WITH target event", "required": true },
+        { "name": "b", "type": "integer", "description": "Reports of target drug WITHOUT target event", "required": true },
+        { "name": "c", "type": "integer", "description": "Reports of other drugs WITH target event", "required": true },
+        { "name": "d", "type": "integer", "description": "Reports of other drugs WITHOUT target event", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "ROR value, 95% CI bounds, signal determination" },
+          "method": { "type": "string", "description": "Reporting Odds Ratio with log-normal CI" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "compute-ic",
+      "description": "Compute Information Component (IC/BCPNN) for a drug-event pair. IC > 0 with IC025 (lower credibility interval) > 0 indicates a signal. Bayesian method used by WHO-UMC.",
+      "parameters": [
+        { "name": "a", "type": "integer", "description": "Reports of target drug WITH target event", "required": true },
+        { "name": "b", "type": "integer", "description": "Reports of target drug WITHOUT target event", "required": true },
+        { "name": "c", "type": "integer", "description": "Reports of other drugs WITH target event", "required": true },
+        { "name": "d", "type": "integer", "description": "Reports of other drugs WITHOUT target event", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "IC value, IC025/IC975 credibility interval, signal determination" },
+          "method": { "type": "string", "description": "BCPNN (Bayesian Confidence Propagation Neural Network)" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "compute-ebgm",
+      "description": "Compute Empirical Bayesian Geometric Mean (EBGM/GPS) for a drug-event pair. EBGM > 2 with EB05 (lower bound) > 1 indicates a signal. FDA method.",
+      "parameters": [
+        { "name": "a", "type": "integer", "description": "Reports of target drug WITH target event", "required": true },
+        { "name": "b", "type": "integer", "description": "Reports of target drug WITHOUT target event", "required": true },
+        { "name": "c", "type": "integer", "description": "Reports of other drugs WITH target event", "required": true },
+        { "name": "d", "type": "integer", "description": "Reports of other drugs WITHOUT target event", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "EBGM value, EB05/EB95 bounds, signal determination" },
+          "method": { "type": "string", "description": "GPS (Gamma Poisson Shrinker) simplified" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "assess-naranjo-causality",
+      "description": "Compute Naranjo adverse drug reaction probability score (0-13). Categories: Definite (>=9), Probable (5-8), Possible (1-4), Doubtful (<=0).",
+      "parameters": [
+        { "name": "previous_reports", "type": "boolean", "description": "Are there previous conclusive reports on this reaction?", "required": true },
+        { "name": "after_drug", "type": "boolean", "description": "Did the adverse event appear after the suspected drug was administered?", "required": true },
+        { "name": "improved_on_withdrawal", "type": "string", "description": "Did the reaction improve when the drug was discontinued? (yes/no/not_withdrawn)", "required": true },
+        { "name": "reappeared_on_rechallenge", "type": "string", "description": "Did the reaction reappear on rechallenge? (yes/no/not_done)", "required": true },
+        { "name": "alternative_causes", "type": "boolean", "description": "Are there alternative causes that could have caused the reaction?", "required": true },
+        { "name": "placebo_reaction", "type": "string", "description": "Did the reaction appear when placebo was given? (yes/no/not_done)", "required": true },
+        { "name": "drug_detected", "type": "string", "description": "Was the drug detected in blood/fluids in toxic concentrations? (yes/no/not_done)", "required": true },
+        { "name": "dose_related", "type": "string", "description": "Was the reaction more severe with higher dose or less severe with lower dose? (yes/no/not_done)", "required": true },
+        { "name": "previous_exposure", "type": "boolean", "description": "Did the patient have a similar reaction to the same or similar drugs previously?", "required": true },
+        { "name": "objective_evidence", "type": "boolean", "description": "Was the adverse event confirmed by objective evidence?", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "Total score, category, per-question breakdown" },
+          "method": { "type": "string", "description": "Naranjo ADR Probability Scale" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "classify-seriousness",
+      "description": "Classify adverse event seriousness per ICH E2A criteria. An event is serious if it meets ANY criterion: death, life-threatening, hospitalization, disability, congenital anomaly, or medically important.",
+      "parameters": [
+        { "name": "resulted_in_death", "type": "boolean", "description": "Did the event result in death?", "required": true },
+        { "name": "life_threatening", "type": "boolean", "description": "Was the event life-threatening at the time of occurrence?", "required": true },
+        { "name": "required_hospitalization", "type": "boolean", "description": "Did the event require or prolong hospitalization?", "required": true },
+        { "name": "resulted_in_disability", "type": "boolean", "description": "Did the event result in persistent or significant disability?", "required": true },
+        { "name": "congenital_anomaly", "type": "boolean", "description": "Did the event result in a congenital anomaly/birth defect?", "required": true },
+        { "name": "medically_important", "type": "boolean", "description": "Is the event medically important based on clinical judgment?", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "Classification (serious/non-serious), criteria met, severity rank, reporting timeline" },
+          "method": { "type": "string", "description": "ICH E2A Clinical Safety Data Management" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "compute-benefit-risk",
+      "description": "Compute a quantitative benefit-risk ratio using the NexVigilant QBR framework. Scores benefit (efficacy \u00d7 population impact) against risk (severity \u00d7 frequency \u00d7 detectability).",
+      "parameters": [
+        { "name": "efficacy_score", "type": "number", "description": "Drug efficacy score (0.0-1.0)", "required": true },
+        { "name": "population_impact", "type": "number", "description": "Fraction of population that benefits (0.0-1.0)", "required": true },
+        { "name": "risk_severity", "type": "number", "description": "Severity of the primary risk (0.0-1.0, where 1.0 = fatal)", "required": true },
+        { "name": "risk_frequency", "type": "number", "description": "Frequency of the primary risk (0.0-1.0)", "required": true },
+        { "name": "risk_detectability", "type": "number", "description": "How detectable is the risk before harm (0.0-1.0, where 1.0 = easily detected)", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "Benefit score, risk score, B/R ratio, classification (favorable/unfavorable/marginal)" },
+          "method": { "type": "string", "description": "NexVigilant QBR Framework" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "compute-disproportionality-table",
+      "description": "Compute ALL four disproportionality measures (PRR, ROR, IC, EBGM) simultaneously from a single 2x2 contingency table. Returns all scores with signal thresholds.",
+      "parameters": [
+        { "name": "a", "type": "integer", "description": "Reports of target drug WITH target event", "required": true },
+        { "name": "b", "type": "integer", "description": "Reports of target drug WITHOUT target event", "required": true },
+        { "name": "c", "type": "integer", "description": "Reports of other drugs WITH target event", "required": true },
+        { "name": "d", "type": "integer", "description": "Reports of other drugs WITHOUT target event", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "All four scores (PRR, ROR, IC, EBGM) with CIs and consensus signal" },
+          "method": { "type": "string", "description": "Combined disproportionality analysis" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "assess-who-umc-causality",
+      "description": "Assess drug-event causality using the WHO-UMC system. Categories: Certain, Probable/Likely, Possible, Unlikely, Conditional/Unclassified, Unassessable/Unclassifiable.",
+      "parameters": [
+        { "name": "temporal_relationship", "type": "boolean", "description": "Is there a reasonable temporal relationship between drug and event?", "required": true },
+        { "name": "known_response", "type": "boolean", "description": "Is this a known response pattern to the drug?", "required": true },
+        { "name": "dechallenge_positive", "type": "string", "description": "Did the event improve on drug withdrawal? (yes/no/not_done)", "required": true },
+        { "name": "rechallenge_positive", "type": "string", "description": "Did the event recur on re-exposure? (yes/no/not_done)", "required": true },
+        { "name": "alternative_explanation", "type": "boolean", "description": "Could the event be explained by disease or other drugs?", "required": true },
+        { "name": "sufficient_information", "type": "boolean", "description": "Is there sufficient information to assess?", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "Causality category, reasoning, criteria met" },
+          "method": { "type": "string", "description": "WHO-UMC Causality Assessment System" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "compute-reporting-rate",
+      "description": "Compute adverse event reporting rate per unit exposure. Normalizes raw case counts by exposure denominator (prescriptions, patient-years, or doses sold).",
+      "parameters": [
+        { "name": "case_count", "type": "integer", "description": "Number of adverse event reports", "required": true },
+        { "name": "exposure_denominator", "type": "number", "description": "Total exposure (prescriptions, patient-years, or doses)", "required": true },
+        { "name": "denominator_unit", "type": "string", "description": "Unit of denominator: prescriptions, patient_years, or doses", "required": true },
+        { "name": "time_period_months", "type": "integer", "description": "Time period in months over which cases were collected", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "Reporting rate, annualized rate, 95% Poisson CI" },
+          "method": { "type": "string", "description": "Poisson-based reporting rate calculation" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "compute-signal-half-life",
+      "description": "Compute signal persistence using exponential decay model. Estimates how long a safety signal remains actionable based on initial strength and decay rate.",
+      "parameters": [
+        { "name": "initial_signal_strength", "type": "number", "description": "Initial signal score (PRR, ROR, or EBGM value)", "required": true },
+        { "name": "decay_rate", "type": "number", "description": "Monthly decay rate (0.0-1.0, typical: 0.05-0.15)", "required": true },
+        { "name": "detection_threshold", "type": "number", "description": "Minimum signal value considered actionable (default: 2.0)", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "Half-life in months, months to threshold, 6/12/24 month projections" },
+          "method": { "type": "string", "description": "Exponential decay model" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "compute-expectedness",
+      "description": "Assess whether an adverse event is expected (listed) or unexpected (unlisted) based on reference safety information. Unexpected serious events require expedited reporting.",
+      "parameters": [
+        { "name": "event_term", "type": "string", "description": "MedDRA preferred term for the adverse event", "required": true },
+        { "name": "drug_name", "type": "string", "description": "Drug name to check against", "required": true },
+        { "name": "reference_source", "type": "string", "description": "Reference: SmPC, USPI, IB, or CCDS", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "result": { "type": "object", "description": "Expectedness classification, reference source, reporting implications" },
+          "method": { "type": "string", "description": "Reference Safety Information comparison" }
+        },
+        "required": ["status"]
+      }
+    }
+  ],
+  "proxy": "scripts/calculation_proxy.py"
+}

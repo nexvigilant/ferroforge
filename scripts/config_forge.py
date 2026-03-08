@@ -178,6 +178,8 @@ def deploy_to_hub(config_path: str, api_key: str = None, hub_id: str = None) -> 
     if not api_key:
         return {"status": "error", "message": "HUB_API_KEY not set"}
 
+    hub_url = os.environ.get("HUB_URL", "https://www.webmcp-hub.com")
+
     with open(config_path) as f:
         config = json.load(f)
 
@@ -189,11 +191,11 @@ def deploy_to_hub(config_path: str, api_key: str = None, hub_id: str = None) -> 
 
     # Direct PATCH when hub_id is known (works at cap, skips POST)
     if hub_id:
-        return _patch_config(hub_id, payload, headers)
+        return _patch_config(hub_id, payload, headers, hub_url)
 
     # Try POST (create) first
     req = urllib.request.Request(
-        "https://www.webmcp-hub.com/api/configs",
+        f"{hub_url}/api/configs",
         data=json.dumps(payload).encode(),
         headers=headers,
         method="POST",
@@ -213,14 +215,14 @@ def deploy_to_hub(config_path: str, api_key: str = None, hub_id: str = None) -> 
                 return {"status": "error", "code": 409, "message": "Config exists but could not parse existingId"}
             if not existing_id:
                 return {"status": "error", "code": 409, "message": "Config exists but no existingId returned"}
-            return _patch_config(existing_id, payload, headers)
+            return _patch_config(existing_id, payload, headers, hub_url)
         return {"status": "error", "code": e.code, "message": body[:200]}
 
 
-def _patch_config(hub_id: str, payload: dict, headers: dict) -> dict:
+def _patch_config(hub_id: str, payload: dict, headers: dict, hub_url: str = "https://www.webmcp-hub.com") -> dict:
     """PATCH an existing Hub config by ID."""
     req = urllib.request.Request(
-        f"https://www.webmcp-hub.com/api/configs/{hub_id}",
+        f"{hub_url}/api/configs/{hub_id}",
         data=json.dumps(payload).encode(),
         headers=headers,
         method="PATCH",
@@ -267,10 +269,11 @@ def discover_hub_mapping(api_key: str = None) -> dict:
     if not api_key:
         return {}
 
+    hub_url = os.environ.get("HUB_URL", "https://www.webmcp-hub.com")
     headers = {"Authorization": f"Bearer {api_key}"}
     all_configs = []
     for page in range(1, 10):
-        url = f"https://www.webmcp-hub.com/api/configs?page={page}&limit=50"
+        url = f"{hub_url}/api/configs?page={page}&limit=50"
         req = urllib.request.Request(url, headers=headers)
         try:
             resp = urllib.request.urlopen(req, timeout=15)

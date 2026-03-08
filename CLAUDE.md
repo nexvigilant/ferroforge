@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## FerroForge — NexVigilant Station
 
-Rust MCP server + 20 PV domain configs (112 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio (source: `ls configs/*.json | wc -l` = 20, tool count from JSON parsing = 112, measured 2026-03-06).
+Rust MCP server + 23 PV domain configs (175 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio (source: `ls configs/*.json | wc -l` = 23, tool count from JSON parsing = 175, measured 2026-03-08).
 
 ## Build & Test
 
 ```bash
 cargo build -p nexvigilant-station --release    # Build station binary
-cargo test -p nexvigilant-station               # 29 integration tests
+cargo test -p nexvigilant-station               # 37 integration tests
 cargo clippy -p nexvigilant-station -- -D warnings
 
 # MCP protocol test
@@ -38,9 +38,11 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 | `scripts/*_proxy.py` | Per-domain API proxy scripts (17 files: 6 clean live, ~6 partial, ~5 new/untested — source: Matthew's 3-tier classification, 2026-03-06) |
 | `scripts/config_forge.py` | Config generator + WebMCP Hub deployer |
 
-## Config Inventory (20 configs, 112 tools — source: measured 2026-03-06)
+## Config Inventory (23 configs, 175 tools — source: measured 2026-03-08)
 
 **Proxy scripts with HTTP calls (10):** openfda, clinicaltrials, pubmed, dailymed, rxnav, openvigilfrance, fda-accessdata, eudravigilance, fda-safety, science
+
+**Pure computation proxy (1):** calculation (12 tools — PRR/ROR/IC/EBGM, Naranjo, WHO-UMC, ICH E2A, QBR, reporting rate, signal half-life, expectedness)
 
 **Stub configs without proxies (3):** cioms, who-umc, science-hexim1
 
@@ -70,13 +72,40 @@ HUB_API_KEY=<key> python3 scripts/config_forge.py deploy configs/openfda.json --
 HUB_API_KEY=<key> python3 scripts/config_forge.py batch-deploy hub-mapping.json
 ```
 
-**Hub state (2026-03-07):** 20/20 configs deployed, 98 tools, 100% NexVigilant branded. At 50-config account cap — use `--hub-id` or `batch-deploy` with `hub-mapping.json` for updates. `wikipedia.json` is the only local config not on Hub (1 short of cap).
+**Hub state (2026-03-08):** 20/22 configs deployed, 149 hub tools, 100% NexVigilant branded. 50-config cap, 30 remaining. 2 not deployed: linkedin, wikipedia. Use `--hub-id` or `batch-deploy` with `hub-mapping.json` for updates.
+
+## Self-Hosted Hub (`hub/`)
+
+NexVigilant Hub — self-hosted WebMCP config registry. Eliminates the 50-config cap.
+
+```bash
+# Start the hub (requires HUB_TOKEN)
+HUB_TOKEN=<secret> python3 hub/app.py                      # Port 8787
+HUB_TOKEN=<secret> python3 hub/app.py --port 9090          # Custom port
+
+# Seed from local configs (no server needed)
+python3 hub/seed.py --direct
+
+# Seed via API (server must be running)
+HUB_TOKEN=<token> python3 hub/seed.py
+
+# Deploy via config_forge.py pointed at self-hosted hub
+HUB_URL=http://127.0.0.1:8787 HUB_API_KEY=<token> python3 scripts/config_forge.py deploy configs/openfda.json
+```
+
+| File | Role |
+|------|------|
+| `hub/app.py` | FastAPI server — API-compatible with webmcp-hub.com |
+| `hub/seed.py` | Seeds hub.db from `configs/` directory |
+| `hub/hub.db` | SQLite database (23 configs, 175 tools) |
+
+**Key endpoints:** POST/PATCH/GET/DELETE `/api/configs`, GET `/api/tools` (agent discovery), GET `/mcp/tools/list` (MCP-compatible), POST `/api/import` (bulk), GET `/api/stats`, GET `/health`.
 
 ## Key Gotchas
 
 - **MCP client caching:** After rebuilding the binary, must `/mcp` restart in Claude Code or stale process returns old tools
 - **Tool naming:** `{domain_underscored}_{tool_name_underscored}` (e.g., `api_fda_gov_search_adverse_events`)
-- **outputSchema:** All 112 tools have outputSchema defined — required for MCP spec compliance
+- **outputSchema:** All 175 tools have outputSchema defined — required for MCP spec compliance
 - **dispatch.py routes by domain prefix** — 8/8 domain prefixes smoke-tested
 - **Science configs** route via `science_proxy.py`, not individual proxy files
 - **Telemetry JSONL** at `~/ferroforge/station-telemetry.jsonl` — owner dashboard via `nexvigilant_station_health` meta-tool

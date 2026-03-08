@@ -22,7 +22,9 @@ CONFIGS_DIR = SCRIPTS_DIR.parent / "configs"
 DISPATCH = str(SCRIPTS_DIR / "dispatch.py")
 
 # Default test arguments per parameter name (for generating test inputs)
-DEFAULT_TEST_ARGS: dict[str, str] = {
+# Values are typed: str for strings, int/float/bool match config param types
+DEFAULT_TEST_ARGS: dict[str, object] = {
+    # String defaults (API proxies)
     "drug_name": "metformin",
     "drug": "metformin",
     "query": "metformin safety",
@@ -44,6 +46,60 @@ DEFAULT_TEST_ARGS: dict[str, str] = {
     "identifier": "metformin",
     "application_number": "NDA020357",
     "uniprot_id": "O94992",
+    # Integer defaults (2x2 contingency table — signal detection)
+    "a": 15,
+    "b": 100,
+    "c": 200,
+    "d": 10000,
+    # Integer defaults (reporting, counts)
+    "case_count": 50,
+    "time_period_months": 12,
+    # Float defaults (benefit-risk, signal decay)
+    "efficacy_score": 0.75,
+    "population_impact": 0.6,
+    "risk_severity": 0.3,
+    "risk_frequency": 0.05,
+    "risk_detectability": 0.8,
+    "initial_signal_strength": 4.5,
+    "decay_rate": 0.1,
+    "detection_threshold": 2.0,
+    "exposure_denominator": 100000.0,
+    # Boolean defaults (causality assessment, seriousness)
+    "previous_reports": True,
+    "after_drug": True,
+    "alternative_causes": False,
+    "previous_exposure": True,
+    "objective_evidence": True,
+    "temporal_relationship": True,
+    "known_response": True,
+    "alternative_explanation": False,
+    "sufficient_information": True,
+    "resulted_in_death": False,
+    "life_threatening": False,
+    "required_hospitalization": True,
+    "resulted_in_disability": False,
+    "congenital_anomaly": False,
+    "medically_important": True,
+    # String enum defaults (causality questions with yes/no/not_done)
+    "improved_on_withdrawal": "yes",
+    "reappeared_on_rechallenge": "not_done",
+    "placebo_reaction": "not_done",
+    "drug_detected": "not_done",
+    "dose_related": "yes",
+    "dechallenge_positive": "yes",
+    "rechallenge_positive": "not_done",
+    "reference_source": "SmPC",
+    "denominator_unit": "prescriptions",
+    # String defaults (expectedness)
+    "event_term": "hepatotoxicity",
+}
+
+# Type-based fallback defaults when a param name isn't in DEFAULT_TEST_ARGS
+TYPE_DEFAULTS: dict[str, object] = {
+    "string": "test",
+    "integer": 10,
+    "number": 1.0,
+    "boolean": True,
 }
 
 
@@ -83,7 +139,10 @@ TOOL_ARG_OVERRIDES: dict[str, dict[str, str]] = {
 
 
 def generate_test_args(tool: dict) -> dict:
-    """Generate test arguments from tool parameter definitions."""
+    """Generate test arguments from tool parameter definitions.
+
+    Priority: tool-specific overrides > named defaults > type-based fallback.
+    """
     tool_name = tool.get("name", "")
     overrides = TOOL_ARG_OVERRIDES.get(tool_name, {})
     args = {}
@@ -94,7 +153,8 @@ def generate_test_args(tool: dict) -> dict:
         elif name in DEFAULT_TEST_ARGS:
             args[name] = DEFAULT_TEST_ARGS[name]
         elif param.get("required", False):
-            args[name] = "test"
+            param_type = param.get("type", "string")
+            args[name] = TYPE_DEFAULTS.get(param_type, "test")
     return args
 
 

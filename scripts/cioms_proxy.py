@@ -219,10 +219,269 @@ def search_publications(args: dict) -> dict:
     }
 
 
+def get_seriousness_criteria(args: dict) -> dict:
+    """
+    Tool: get-seriousness-criteria
+
+    Returns the ICH E2A seriousness criteria used internationally to classify
+    adverse events as serious. These criteria determine expedited reporting
+    obligations.
+    SEMI-LIVE: hardcoded from ICH E2A guideline (1994, current).
+    """
+    criteria = [
+        {
+            "criterion": "Death",
+            "code": "DEATH",
+            "description": "The adverse event resulted in the patient's death.",
+            "reporting_implication": "Expedited report required within 7 calendar days (initial) "
+                                     "and 15 calendar days (follow-up).",
+        },
+        {
+            "criterion": "Life-threatening",
+            "code": "LIFE_THREATENING",
+            "description": "The patient was at substantial risk of dying at the time of "
+                           "the adverse event. It does NOT refer to an event that hypothetically "
+                           "might have caused death if it were more severe.",
+            "reporting_implication": "Expedited report required within 15 calendar days.",
+        },
+        {
+            "criterion": "Hospitalization (initial or prolonged)",
+            "code": "HOSPITALIZATION",
+            "description": "The adverse event required inpatient hospitalization or prolonged "
+                           "an existing hospitalization. Emergency room visits that do not "
+                           "result in admission are generally NOT considered hospitalization.",
+            "reporting_implication": "Expedited report required within 15 calendar days.",
+        },
+        {
+            "criterion": "Disability/Incapacity",
+            "code": "DISABILITY",
+            "description": "The adverse event resulted in a substantial disruption of a person's "
+                           "ability to conduct normal life functions.",
+            "reporting_implication": "Expedited report required within 15 calendar days.",
+        },
+        {
+            "criterion": "Congenital anomaly/Birth defect",
+            "code": "CONGENITAL_ANOMALY",
+            "description": "The adverse event resulted in a congenital anomaly or birth defect "
+                           "in the offspring of a patient who received the drug.",
+            "reporting_implication": "Expedited report required within 15 calendar days.",
+        },
+        {
+            "criterion": "Other medically important condition",
+            "code": "MEDICALLY_IMPORTANT",
+            "description": "The event may not be immediately life-threatening or result in death "
+                           "or hospitalization, but may jeopardize the patient and may require "
+                           "intervention to prevent one of the other outcomes. Examples: allergic "
+                           "bronchospasm requiring intensive treatment in ER, blood dyscrasias, "
+                           "convulsions, drug dependence, drug abuse.",
+            "reporting_implication": "Expedited report required within 15 calendar days.",
+        },
+    ]
+
+    return {
+        "status": "ok",
+        "source": "ICH E2A (Clinical Safety Data Management: Definitions and Standards "
+                  "for Expedited Reporting, 1994) — semi-live hardcoded reference",
+        "guideline": "ICH E2A",
+        "criteria_count": len(criteria),
+        "criteria": criteria,
+        "note": "An event is classified as 'serious' if it meets ANY ONE of these criteria. "
+                "A single event can meet multiple criteria simultaneously.",
+    }
+
+
+def get_causality_categories(args: dict) -> dict:
+    """
+    Tool: get-causality-categories
+
+    Returns the WHO-UMC causality assessment categories used internationally
+    to evaluate the likelihood that a drug caused an adverse event.
+    SEMI-LIVE: hardcoded from WHO-UMC system (current standard).
+    """
+    categories = [
+        {
+            "category": "Certain",
+            "criteria": [
+                "Event or laboratory test abnormality with plausible time relationship to drug intake",
+                "Cannot be explained by disease or other drugs",
+                "Response to withdrawal plausible (pharmacologically, pathologically)",
+                "Event definitive pharmacologically or phenomenologically (i.e., an objective and "
+                "specific medical disorder or a recognized pharmacological phenomenon)",
+                "Rechallenge satisfactory, if necessary",
+            ],
+        },
+        {
+            "category": "Probable/Likely",
+            "criteria": [
+                "Event or laboratory test abnormality with reasonable time relationship to drug intake",
+                "Unlikely to be attributed to disease or other drugs",
+                "Response to withdrawal clinically reasonable",
+                "Rechallenge not required",
+            ],
+        },
+        {
+            "category": "Possible",
+            "criteria": [
+                "Event or laboratory test abnormality with reasonable time relationship to drug intake",
+                "Could also be explained by disease or other drugs",
+                "Information on drug withdrawal may be lacking or unclear",
+            ],
+        },
+        {
+            "category": "Unlikely",
+            "criteria": [
+                "Event or laboratory test abnormality with a time to drug intake that makes a "
+                "relationship improbable (but not impossible)",
+                "Disease or other drugs provide plausible explanations",
+            ],
+        },
+        {
+            "category": "Conditional/Unclassified",
+            "criteria": [
+                "Event or laboratory test abnormality",
+                "More data for proper assessment needed",
+                "OR additional data under examination",
+            ],
+        },
+        {
+            "category": "Unassessable/Unclassifiable",
+            "criteria": [
+                "Report suggesting an adverse reaction",
+                "Cannot be judged because information is insufficient or contradictory",
+                "Data cannot be supplemented or verified",
+            ],
+        },
+    ]
+
+    return {
+        "status": "ok",
+        "source": "WHO-UMC causality assessment system — semi-live hardcoded reference",
+        "system": "WHO-UMC",
+        "category_count": len(categories),
+        "categories": categories,
+        "note": "The WHO-UMC system is one of the most widely used causality assessment "
+                "methods globally. It is a clinical judgment-based approach, distinct from "
+                "the Naranjo algorithm (which uses a scored questionnaire).",
+    }
+
+
+def get_reporting_timelines(args: dict) -> dict:
+    """
+    Tool: get-reporting-timelines
+
+    Returns expedited and periodic safety reporting timelines by region
+    (US FDA, EU EMA, Japan PMDA, ICH harmonized). Covers ICSRs, PSURs/PBRERs,
+    and DSURs.
+    SEMI-LIVE: hardcoded from ICH E2A/E2B/E2C/E2D/E2F and regional regulations.
+    """
+    timelines = {
+        "expedited_reports": {
+            "description": "Individual Case Safety Reports (ICSRs) requiring expedited submission",
+            "by_region": {
+                "ICH_harmonized": {
+                    "fatal_or_life_threatening_unexpected": "7 calendar days (initial), 15 days (follow-up)",
+                    "serious_unexpected": "15 calendar days",
+                    "source": "ICH E2A",
+                },
+                "US_FDA": {
+                    "fatal_or_life_threatening_unexpected": "7 calendar days (IND safety report), "
+                                                            "15 calendar days (MedWatch 3500A)",
+                    "serious_unexpected": "15 calendar days",
+                    "field_alert_report": "3 working days (product quality defect posing safety risk)",
+                    "source": "21 CFR 312.32 (IND), 21 CFR 314.80 (NDA), FDA Safety Reporting Portal",
+                },
+                "EU_EMA": {
+                    "fatal_or_life_threatening_unexpected": "7 calendar days (initial), "
+                                                            "8 additional days (follow-up = 15 total)",
+                    "serious_unexpected": "15 calendar days",
+                    "submission_system": "EudraVigilance (electronic only since 2017)",
+                    "source": "Regulation (EU) No 726/2004, Directive 2001/83/EC",
+                },
+                "Japan_PMDA": {
+                    "fatal_or_life_threatening_known": "15 days",
+                    "fatal_or_life_threatening_unknown": "7 days (initial), 15 days (follow-up)",
+                    "serious_unknown": "15 days",
+                    "source": "PMDA Pharmaceutical Affairs Law, Article 77-4-2",
+                },
+            },
+        },
+        "periodic_reports": {
+            "PSUR_PBRER": {
+                "full_name": "Periodic Safety Update Report / Periodic Benefit-Risk Evaluation Report",
+                "frequency": "Every 6 months (first 2 years post-approval), annually (next 2 years), "
+                             "then every 3 years (or per EURD list in EU)",
+                "guideline": "ICH E2C(R2)",
+                "scope": "Cumulative review of global safety data with benefit-risk evaluation",
+            },
+            "DSUR": {
+                "full_name": "Development Safety Update Report",
+                "frequency": "Annually during clinical development (within 60 days of DIBD anniversary)",
+                "guideline": "ICH E2F",
+                "scope": "Review of safety information collected during reporting period for "
+                         "investigational drugs",
+            },
+        },
+    }
+
+    return {
+        "status": "ok",
+        "source": "ICH E2A/E2B/E2C(R2)/E2D/E2F and regional regulations — "
+                  "semi-live hardcoded reference",
+        "timelines": timelines,
+    }
+
+
+def get_cioms_form_ii(args: dict) -> dict:
+    """
+    Tool: get-cioms-form-ii
+
+    Returns the CIOMS II form structure — the standardized format for
+    line listings used in Periodic Safety Update Reports (PSURs). CIOMS II
+    defines the minimum data elements for tabulating individual cases.
+    SEMI-LIVE: hardcoded schema based on CIOMS II Working Group recommendations.
+    """
+    form_structure = {
+        "form_name": "CIOMS II Line Listing",
+        "full_title": "CIOMS Working Group II — International Reporting of Periodic "
+                      "Drug-Safety Update Summaries (Line Listing Format)",
+        "purpose": "Standardized tabular format for presenting individual case "
+                   "summaries in Periodic Safety Update Reports (PSURs). Enables "
+                   "regulators to review individual cases within the context of "
+                   "cumulative safety data.",
+        "columns": [
+            {"column": 1, "field": "case_number", "description": "Company case reference number"},
+            {"column": 2, "field": "country", "description": "Country where the event was reported"},
+            {"column": 3, "field": "source", "description": "Source type: spontaneous, clinical trial, literature, regulatory authority"},
+            {"column": 4, "field": "age_sex", "description": "Patient age and sex"},
+            {"column": 5, "field": "daily_dose_route", "description": "Daily dose and route of administration"},
+            {"column": 6, "field": "date_of_onset", "description": "Date of onset of the reaction"},
+            {"column": 7, "field": "reaction_terms", "description": "Adverse reaction terms (preferably coded to MedDRA Preferred Terms)"},
+            {"column": 8, "field": "outcome", "description": "Outcome: recovered, not recovered, fatal, unknown"},
+            {"column": 9, "field": "comments", "description": "Brief comments on causality assessment, concomitant drugs, relevant history"},
+        ],
+        "usage_context": {
+            "psur_section": "Line listings appear in PSUR/PBRER Section 7 (Patient Listings)",
+            "grouping": "Cases are typically grouped by SOC or by seriousness",
+            "reference_period": "Covers the reporting interval of the PSUR",
+        },
+    }
+
+    return {
+        "status": "ok",
+        "source": "CIOMS II Working Group — International Reporting of Periodic "
+                  "Drug-Safety Update Summaries (1992) — semi-live hardcoded reference schema",
+        "form": form_structure,
+    }
+
+
 TOOL_DISPATCH = {
     "get-working-groups": get_working_groups,
     "get-cioms-form": get_cioms_form,
     "search-publications": search_publications,
+    "get-seriousness-criteria": get_seriousness_criteria,
+    "get-causality-categories": get_causality_categories,
+    "get-reporting-timelines": get_reporting_timelines,
+    "get-cioms-form-ii": get_cioms_form_ii,
 }
 
 

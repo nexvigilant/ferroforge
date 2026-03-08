@@ -475,12 +475,138 @@ def get_adverse_effects(args: dict) -> dict:
     }
 
 
+def get_classification(args: dict) -> dict:
+    """
+    Tool: get-classification
+
+    Retrieves drug classification from openFDA pharmacological classes and
+    PubChem compound classification (ATC codes, pharmacologic class, MeSH).
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required"}
+
+    classification = {}
+
+    # Source 1: openFDA pharmacological class annotations
+    label = _get_openfda_label(drug_name)
+    if label:
+        ofd = label.get("openfda", {})
+        classification["established_pharmacologic_class"] = ofd.get("pharm_class_epc", [])
+        classification["mechanism_of_action"] = ofd.get("pharm_class_moa", [])
+        classification["physiologic_effect"] = ofd.get("pharm_class_pe", [])
+        classification["chemical_structure"] = ofd.get("pharm_class_cs", [])
+        classification["product_type"] = ofd.get("product_type", [])
+        classification["route"] = ofd.get("route", [])
+        classification["dosage_form"] = ofd.get("dosage_form", [])
+        # Filter empty lists
+        classification = {k: v for k, v in classification.items() if v}
+
+    # Source 2: PubChem classification
+    cid = _get_pubchem_cid(drug_name)
+    pubchem_class = {}
+    if cid:
+        url = f"{PUBCHEM_BASE}/compound/cid/{cid}/classification/JSON"
+        try:
+            data = _fetch(url)
+            hierarchies = data.get("Hierarchies", {}).get("Hierarchy", [])
+            for h in hierarchies[:10]:
+                source = h.get("SourceName", "Unknown")
+                nodes = h.get("Node", [])
+                if nodes:
+                    path = []
+                    for n in nodes:
+                        info = n.get("Information", {})
+                        name = info.get("Name", "")
+                        # Handle StringWithMarkup nested format
+                        if isinstance(name, dict):
+                            name = name.get("StringWithMarkup", {}).get("String", "")
+                        if name:
+                            path.append(name)
+                    if path:
+                        pubchem_class[source] = path[:5]
+        except RuntimeError:
+            pass
+
+    if not classification and not pubchem_class:
+        return {
+            "status": "not_found",
+            "message": f"No classification data found for '{drug_name}'",
+            "drug_name": drug_name,
+        }
+
+    return {
+        "status": "ok",
+        "drug_name": drug_name,
+        "pubchem_cid": cid,
+        "openfda_classification": classification,
+        "pubchem_classification": pubchem_class,
+        "sources": [s for s in [
+            "openFDA" if classification else None,
+            "PubChem" if pubchem_class else None,
+        ] if s],
+    }
+
+
+def get_contraindications(args: dict) -> dict:
+    """
+    Tool: get-contraindications
+
+    Retrieves contraindications, warnings, and precautions from the openFDA
+    drug label. Includes boxed warnings (black box), contraindications section,
+    warnings and precautions, and pregnancy/lactation information.
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required"}
+
+    label = _get_openfda_label(drug_name)
+    if not label:
+        return {
+            "status": "not_found",
+            "message": f"No label found for '{drug_name}'",
+            "drug_name": drug_name,
+        }
+
+    def _section(field: str, max_len: int = 2000) -> str | None:
+        val = _first_label_section(label, field)
+        if val:
+            return val[:max_len] + "..." if len(val) > max_len else val
+        return None
+
+    sections = {
+        "boxed_warning": _section("boxed_warning"),
+        "contraindications": _section("contraindications"),
+        "warnings_and_precautions": _section("warnings_and_precautions"),
+        "warnings": _section("warnings"),
+        "precautions": _section("precautions"),
+        "pregnancy": _section("pregnancy"),
+        "nursing_mothers": _section("nursing_mothers"),
+        "pediatric_use": _section("pediatric_use"),
+        "geriatric_use": _section("geriatric_use"),
+    }
+
+    # Filter None sections
+    sections = {k: v for k, v in sections.items() if v is not None}
+
+    return {
+        "status": "ok",
+        "drug_name": drug_name,
+        "sections_found": len(sections),
+        "has_boxed_warning": "boxed_warning" in sections,
+        "contraindications": sections,
+        "sources": ["openFDA label"],
+    }
+
+
 TOOL_DISPATCH = {
     "get-drug-info": get_drug_info,
     "get-interactions": get_interactions,
     "get-pharmacology": get_pharmacology,
     "get-targets": get_targets,
     "get-adverse-effects": get_adverse_effects,
+    "get-classification": get_classification,
+    "get-contraindications": get_contraindications,
 }
 
 

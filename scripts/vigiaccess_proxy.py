@@ -143,12 +143,60 @@ def get_region_distribution(args: dict) -> dict:
     )
 
 
+def get_sex_distribution(args: dict) -> dict:
+    """
+    Tool: get-sex-distribution
+
+    Returns the distribution of reports by patient sex (male, female, unknown)
+    for a drug's VigiAccess reports.
+    """
+    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name or medicine is required"}
+
+    return _stub_response(
+        "get-sex-distribution",
+        (
+            "Returns patient sex distribution: male, female, and unknown/not "
+            "specified. Includes report counts and percentages per category. "
+            "Useful for identifying sex-specific adverse reaction patterns."
+        ),
+        args,
+    )
+
+
+def get_year_distribution(args: dict) -> dict:
+    """
+    Tool: get-year-distribution
+
+    Returns the distribution of reports by reporting year for a drug's
+    VigiAccess entries. Useful for temporal trend analysis — identifying
+    signal emergence, reporting rate changes, and post-marketing surveillance
+    patterns.
+    """
+    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name or medicine is required"}
+
+    return _stub_response(
+        "get-year-distribution",
+        (
+            "Returns report counts by year from VigiBase. Enables temporal "
+            "trend analysis: signal emergence detection, reporting rate changes "
+            "after regulatory actions, and post-marketing surveillance patterns."
+        ),
+        args,
+    )
+
+
 TOOL_DISPATCH = {
     "search-reports": search_reports,
     "get-adverse-reactions": get_adverse_reactions,
     "get-reporter-distribution": get_reporter_distribution,
     "get-age-distribution": get_age_distribution,
     "get-region-distribution": get_region_distribution,
+    "get-sex-distribution": get_sex_distribution,
+    "get-year-distribution": get_year_distribution,
 }
 
 
