@@ -542,12 +542,122 @@ def _error(message: str) -> dict:
 # Dispatch table
 # ---------------------------------------------------------------------------
 
+def get_eligibility_criteria(args: dict) -> dict:
+    """
+    Extract eligibility criteria (inclusion/exclusion) from a trial record.
+
+    Maps to: GET /studies/{nctId} -> eligibilityModule
+    """
+    nct_id = args.get("nct_id", "").strip().upper()
+    if not nct_id:
+        return _error("nct_id is required")
+
+    try:
+        study = _fetch_study(nct_id)
+    except RuntimeError as exc:
+        return _error(str(exc))
+
+    protocol = study.get("protocolSection", {})
+    elig = protocol.get("eligibilityModule", {})
+
+    if not elig:
+        return {"status": "ok", "nct_id": nct_id, "message": "No eligibility module found", "criteria": {}}
+
+    criteria_text = elig.get("eligibilityCriteria", "")
+    # Parse into inclusion/exclusion if structured
+    inclusion = []
+    exclusion = []
+    current = None
+    for line in criteria_text.split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        lower = stripped.lower()
+        if "inclusion" in lower and "criteria" in lower:
+            current = "inclusion"
+            continue
+        if "exclusion" in lower and "criteria" in lower:
+            current = "exclusion"
+            continue
+        if current == "inclusion":
+            inclusion.append(stripped.lstrip("•-* "))
+        elif current == "exclusion":
+            exclusion.append(stripped.lstrip("•-* "))
+
+    return {
+        "status": "ok",
+        "nct_id": nct_id,
+        "criteria": {
+            "sex": elig.get("sex", "ALL"),
+            "minimum_age": elig.get("minimumAge", "N/A"),
+            "maximum_age": elig.get("maximumAge", "N/A"),
+            "healthy_volunteers": elig.get("healthyVolunteers", False),
+            "inclusion_criteria": inclusion if inclusion else ["(See raw text)"],
+            "exclusion_criteria": exclusion if exclusion else ["(See raw text)"],
+            "raw_text": criteria_text[:3000] if not (inclusion or exclusion) else None,
+        },
+        "data_source": "clinicaltrials.gov",
+    }
+
+
+def get_study_design(args: dict) -> dict:
+    """
+    Extract study design details — randomization, blinding, masking, allocation.
+
+    Maps to: GET /studies/{nctId} -> designModule
+    """
+    nct_id = args.get("nct_id", "").strip().upper()
+    if not nct_id:
+        return _error("nct_id is required")
+
+    try:
+        study = _fetch_study(nct_id)
+    except RuntimeError as exc:
+        return _error(str(exc))
+
+    protocol = study.get("protocolSection", {})
+    design = protocol.get("designModule", {})
+    ident = protocol.get("identificationModule", {})
+
+    if not design:
+        return {"status": "ok", "nct_id": nct_id, "message": "No design module found", "design": {}}
+
+    design_info = design.get("designInfo", {})
+    masking = design_info.get("maskingInfo", {})
+    enrollment = design.get("enrollmentInfo", {})
+
+    return {
+        "status": "ok",
+        "nct_id": nct_id,
+        "title": ident.get("briefTitle", ""),
+        "design": {
+            "study_type": design.get("studyType", "N/A"),
+            "phases": design.get("phases", []),
+            "allocation": design_info.get("allocation", "N/A"),
+            "intervention_model": design_info.get("interventionModel", "N/A"),
+            "primary_purpose": design_info.get("primaryPurpose", "N/A"),
+            "masking": {
+                "type": masking.get("masking", "NONE"),
+                "who_masked": masking.get("whoMasked", []),
+            },
+            "enrollment": {
+                "count": enrollment.get("count", "N/A"),
+                "type": enrollment.get("type", "N/A"),
+            },
+            "number_of_arms": design_info.get("numberOfArms", "N/A"),
+        },
+        "data_source": "clinicaltrials.gov",
+    }
+
+
 TOOLS: dict[str, Any] = {
     "search-trials": search_trials,
     "get-trial": get_trial,
     "get-safety-endpoints": get_safety_endpoints,
     "get-serious-adverse-events": get_serious_adverse_events,
     "compare-trial-arms": compare_trial_arms,
+    "get-eligibility-criteria": get_eligibility_criteria,
+    "get-study-design": get_study_design,
 }
 
 
