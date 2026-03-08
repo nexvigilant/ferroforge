@@ -10,6 +10,7 @@ env:
   PROJECT_ID: nexvigilant-digital-clubhouse
   REGION: us-central1
   SERVICE: nexvigilant-station
+  REGISTRY: us-central1-docker.pkg.dev/nexvigilant-digital-clubhouse/station
 
 jobs:
   deploy:
@@ -33,16 +34,45 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Deploy new revision (no traffic)
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+
+      - name: Create Artifact Registry repo (if needed)
+        run: |
+          gcloud artifacts repositories describe station \
+            --project="$PROJECT_ID" \
+            --location="$REGION" 2>/dev/null \
+          || gcloud artifacts repositories create station \
+            --project="$PROJECT_ID" \
+            --location="$REGION" \
+            --repository-format=docker \
+            --description="NexVigilant Station images"
+
+      - name: Build and push Docker image
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          IMAGE="${REGISTRY}/${SERVICE}:${SHORT_SHA}"
+          LATEST="${REGISTRY}/${SERVICE}:latest"
+          # Pull latest for layer cache (best-effort — first build won't have it)
+          docker pull "$LATEST" 2>/dev/null || true
+          docker build \
+            --build-arg "GIT_SHA=${SHORT_SHA}" \
+            --cache-from "$LATEST" \
+            -t "$IMAGE" \
+            -t "$LATEST" \
+            .
+          docker push "$IMAGE"
+          docker push "$LATEST"
+          echo "IMAGE=${IMAGE}" >> "$GITHUB_ENV"
+
+      - name: Deploy new revision (no traffic)
+        run: |
           gcloud run deploy "$SERVICE" \
-            --source . \
+            --image "$IMAGE" \
             --region "$REGION" \
             --project "$PROJECT_ID" \
             --allow-unauthenticated \
             --no-traffic \
-            --set-build-env-vars="GIT_SHA=${SHORT_SHA}" \
             --quiet
 
       - name: Get new revision name
@@ -69,7 +99,6 @@ jobs:
         run: |
           SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           sleep 15
-          # Hit the canary repeatedly — at 10% traffic, need multiple attempts
           for i in 1 2 3 4 5; do
             HEALTH=$(curl -sf -m 15 https://mcp.nexvigilant.com/health)
             STATUS=$(echo "$HEALTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
