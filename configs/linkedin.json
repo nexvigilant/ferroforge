@@ -1,0 +1,394 @@
+{
+  "domain": "www.linkedin.com",
+  "url_pattern": "/*",
+  "title": "LinkedIn Professional Network",
+  "description": "Read posts, publish rich content, manage engagement, and track analytics on LinkedIn — personal and professional PV knowledge sharing",
+  "tools": [
+    {
+      "name": "get-profile",
+      "description": "Get your LinkedIn profile information (name, headline, email, picture)",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "name": { "type": "string" },
+          "given_name": { "type": "string" },
+          "family_name": { "type": "string" },
+          "headline": { "type": "string" },
+          "email": { "type": "string" },
+          "picture": { "type": "string" },
+          "locale": { "type": "string" },
+          "profile_url": { "type": "string" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "get-my-posts",
+      "description": "List your recent LinkedIn posts with text preview and engagement counts (requires Community Management API)",
+      "parameters": [
+        {
+          "name": "limit",
+          "type": "integer",
+          "description": "Maximum posts to return (default 10, max 50)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error | pending_approval" },
+          "count": { "type": "integer" },
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "post_urn": { "type": "string" },
+                "text": { "type": "string" },
+                "created_at": { "type": "string" },
+                "visibility": { "type": "string" }
+              }
+            }
+          }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "get-post",
+      "description": "Get full text and metadata of a specific LinkedIn post by URN or URL (requires Community Management API)",
+      "parameters": [
+        {
+          "name": "post_id",
+          "type": "string",
+          "description": "Post URN (urn:li:share:..., urn:li:activity:...) or LinkedIn post URL",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "post_urn": { "type": "string" },
+          "author": { "type": "string" },
+          "text": { "type": "string" },
+          "created_at": { "type": "string" },
+          "visibility": { "type": "string" },
+          "media": { "type": "array", "items": { "type": "object" } }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "get-post-analytics",
+      "description": "Get engagement metrics (likes, comments, shares) for a post (impressions require Marketing API)",
+      "parameters": [
+        {
+          "name": "post_id",
+          "type": "string",
+          "description": "Post URN or LinkedIn post URL",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "post_urn": { "type": "string" },
+          "impressions": { "type": "integer" },
+          "likes": { "type": "integer" },
+          "comments": { "type": "integer" },
+          "shares": { "type": "integer" },
+          "clicks": { "type": "integer" },
+          "engagement_rate": { "type": "number", "description": "Engagement % (interactions / impressions * 100)" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "get-comments",
+      "description": "Get comments on a specific LinkedIn post (requires Community Management API)",
+      "parameters": [
+        {
+          "name": "post_id",
+          "type": "string",
+          "description": "Post URN or LinkedIn post URL",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "description": "Maximum comments to return (default 20, max 100)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "post_urn": { "type": "string" },
+          "count": { "type": "integer" },
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "comment_urn": { "type": "string" },
+                "author_name": { "type": "string" },
+                "text": { "type": "string" },
+                "created_at": { "type": "string" },
+                "likes": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "create-post",
+      "description": "Publish a text post to your LinkedIn feed",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "string",
+          "description": "Post content (supports LinkedIn markdown: bold, lists, mentions, hashtags)",
+          "required": true
+        },
+        {
+          "name": "visibility",
+          "type": "string",
+          "description": "Post visibility: 'PUBLIC' or 'CONNECTIONS' (default PUBLIC)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "post_urn": { "type": "string" },
+          "post_url": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "create-image-post",
+      "description": "Publish a post with an image attachment to your LinkedIn feed",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "string",
+          "description": "Post content text",
+          "required": true
+        },
+        {
+          "name": "image_path",
+          "type": "string",
+          "description": "Local file path to image (PNG, JPG, GIF — max 10MB)",
+          "required": true
+        },
+        {
+          "name": "alt_text",
+          "type": "string",
+          "description": "Alt text for accessibility",
+          "required": false
+        },
+        {
+          "name": "visibility",
+          "type": "string",
+          "description": "Post visibility: 'PUBLIC' or 'CONNECTIONS' (default PUBLIC)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "post_urn": { "type": "string" },
+          "post_url": { "type": "string" },
+          "image_urn": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "create-document-post",
+      "description": "Publish a post with a document (PDF, PPTX) carousel attachment",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "string",
+          "description": "Post content text",
+          "required": true
+        },
+        {
+          "name": "document_path",
+          "type": "string",
+          "description": "Local file path to document (PDF, PPTX — max 100MB)",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Document title shown in the carousel",
+          "required": false
+        },
+        {
+          "name": "visibility",
+          "type": "string",
+          "description": "Post visibility: 'PUBLIC' or 'CONNECTIONS' (default PUBLIC)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "post_urn": { "type": "string" },
+          "post_url": { "type": "string" },
+          "document_urn": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "create-video-post",
+      "description": "Publish a post with a video attachment",
+      "parameters": [
+        {
+          "name": "text",
+          "type": "string",
+          "description": "Post content text",
+          "required": true
+        },
+        {
+          "name": "video_path",
+          "type": "string",
+          "description": "Local file path to video (MP4 — max 200MB, 10min)",
+          "required": true
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "description": "Video title",
+          "required": false
+        },
+        {
+          "name": "visibility",
+          "type": "string",
+          "description": "Post visibility: 'PUBLIC' or 'CONNECTIONS' (default PUBLIC)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "post_urn": { "type": "string" },
+          "post_url": { "type": "string" },
+          "video_urn": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "reply-to-comment",
+      "description": "Reply to a comment on one of your LinkedIn posts",
+      "parameters": [
+        {
+          "name": "post_id",
+          "type": "string",
+          "description": "Post URN or LinkedIn post URL",
+          "required": true
+        },
+        {
+          "name": "comment_urn",
+          "type": "string",
+          "description": "URN of the comment to reply to",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "description": "Reply text",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "comment_urn": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "delete-post",
+      "description": "Delete one of your LinkedIn posts by URN",
+      "parameters": [
+        {
+          "name": "post_id",
+          "type": "string",
+          "description": "Post URN or LinkedIn post URL",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "message": { "type": "string" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "search-posts",
+      "description": "Search LinkedIn posts by keyword (stub — requires Content Search API or browser fallback)",
+      "parameters": [
+        {
+          "name": "query",
+          "type": "string",
+          "description": "Search keywords",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "description": "Maximum results (default 10, max 25)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error | stub" },
+          "total_found": { "type": "integer" },
+          "posts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "post_urn": { "type": "string" },
+                "author_name": { "type": "string" },
+                "text": { "type": "string" },
+                "created_at": { "type": "string" }
+              }
+            }
+          }
+        },
+        "required": ["status"]
+      }
+    }
+  ],
+  "proxy": "scripts/linkedin_proxy.py"
+}
