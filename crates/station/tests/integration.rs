@@ -774,3 +774,87 @@ fn test_chart_course_all_tool_names_exist_in_registry() {
         }
     }
 }
+
+#[test]
+fn test_station_health_includes_courses() {
+    let registry = real_registry();
+    let telemetry = StationTelemetry::new_local(None);
+    let result = router::route_tool_call(
+        &registry,
+        &telemetry,
+        &ApiKeyGate::new(None),
+        None,
+        "nexvigilant_station_health",
+        &json!({}),
+    );
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("valid JSON");
+    assert_eq!(
+        parsed["courses"].as_u64(),
+        Some(6),
+        "station_health should report 6 courses"
+    );
+}
+
+#[test]
+fn test_directory_includes_courses() {
+    let registry = real_registry();
+    let telemetry = StationTelemetry::new_local(None);
+    let result = router::route_tool_call(
+        &registry,
+        &telemetry,
+        &ApiKeyGate::new(None),
+        None,
+        "nexvigilant_directory",
+        &json!({}),
+    );
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("valid JSON");
+    assert_eq!(parsed["total_courses"].as_u64(), Some(6));
+    let courses = parsed["courses"].as_array().expect("courses array");
+    assert_eq!(courses.len(), 6, "directory should list all 6 courses");
+}
+
+#[test]
+fn test_course_count_matches_summaries() {
+    let count = nexvigilant_station::science::course_count();
+    let summaries = nexvigilant_station::science::course_summaries();
+    assert_eq!(count, summaries.len(), "course_count() and course_summaries() must agree");
+    assert!(count >= 6, "should have at least 6 courses, got {count}");
+}
+
+#[test]
+fn test_capabilities_returns_matching_courses() {
+    let registry = real_registry();
+    let telemetry = StationTelemetry::new_local(None);
+    let result = router::route_tool_call(
+        &registry,
+        &telemetry,
+        &ApiKeyGate::new(None),
+        None,
+        "nexvigilant_capabilities",
+        &json!({"query": "causality"}),
+    );
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("valid JSON");
+    let courses = parsed["matching_courses"].as_array().expect("matching_courses array");
+    assert!(
+        courses.iter().any(|c| c["course"].as_str() == Some("causality-assessment")),
+        "searching 'causality' should match the causality-assessment course"
+    );
+}
+
+#[test]
+fn test_course_summaries_have_valid_data() {
+    for (name, desc, steps) in nexvigilant_station::science::course_summaries() {
+        assert!(!name.is_empty(), "course name must not be empty");
+        assert!(!desc.is_empty(), "course description must not be empty");
+        assert!(steps > 0, "course '{name}' must have at least 1 step");
+    }
+}
