@@ -27,6 +27,21 @@ DEFAULT_TEST_ARGS: dict[str, object] = {
     # String defaults (API proxies)
     "drug_name": "metformin",
     "drug": "metformin",
+    "medicine": "metformin",
+    "preferred_term": "nausea",
+    "soc": "Gastrointestinal disorders",
+    "smq_name": "Hepatic disorders",
+    "scope": "narrow",
+    "level": "PT",
+    "post_id": "test-post-123",
+    "comment_urn": "urn:li:comment:test",
+    "text": "Test post content",
+    "visibility": "PUBLIC",
+    "image_path": "/tmp/test.png",
+    "document_path": "/tmp/test.pdf",
+    "video_path": "/tmp/test.mp4",
+    "alt_text": "Test image",
+    "title": "Metformin",
     "query": "metformin safety",
     "nct_id": "NCT02793479",
     "event": "lactic acidosis",
@@ -115,6 +130,13 @@ DEFAULT_TEST_ARGS: dict[str, object] = {
     "adverse_event": "lactic acidosis",
     "patient_age": "65",
     "patient_sex": "male",
+    # String defaults (T1 Lex Primitiva concept analysis)
+    "system": "adverse event reporting",
+    "subject": "drug safety signal",
+    "structure": "ICSR workflow",
+    "observation": "elevated reporting rate",
+    "context": "pharmacovigilance",
+    "variants": "serious, non-serious, expected, unexpected",
 }
 
 # Type-based fallback defaults when a param name isn't in DEFAULT_TEST_ARGS
@@ -158,6 +180,12 @@ TOOL_ARG_OVERRIDES: dict[str, dict[str, str]] = {
     "search-clinical-candidates": {"target": "EGFR"},
     "get-expression-profile": {"query": "BRCA1 expression"},
     "search-geo-datasets": {"query": "cancer gene expression"},
+    # accessdata recall search uses drug name as query
+    "search-recalls": {"query": "metformin"},
+    # fda-safety uses drug name as query
+    "search-safety-communications": {"query": "metformin"},
+    # T1 Lex Primitiva tools (string params that collide with integer defaults)
+    "analyze-comparison": {"a": "signal detection", "b": "causality assessment"},
 }
 
 

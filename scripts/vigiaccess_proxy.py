@@ -36,11 +36,11 @@ def search_reports(args: dict) -> dict:
     the given drug name. Returns report counts and summary statistics from
     the WHO global pharmacovigilance database (VigiBase).
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required"}
+        return {"status": "error", "message": "drug_name or medicine is required"}
 
-    return _stub_response(
+    resp = _stub_response(
         "search-reports",
         (
             "Returns total ICSR count, year-over-year trend, and geographic "
@@ -49,6 +49,9 @@ def search_reports(args: dict) -> dict:
         ),
         args,
     )
+    resp["results"] = []
+    resp["count"] = 0
+    return resp
 
 
 def get_adverse_reactions(args: dict) -> dict:
@@ -59,9 +62,9 @@ def get_adverse_reactions(args: dict) -> dict:
     by MedDRA System Organ Class (SOC). Returns reaction counts by SOC
     with drill-down to Preferred Term level.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required"}
+        return {"status": "error", "message": "drug_name or medicine is required"}
 
     return _stub_response(
         "get-adverse-reactions",
@@ -81,9 +84,9 @@ def get_reporter_distribution(args: dict) -> dict:
     Returns the distribution of reporter types (healthcare professional,
     consumer, pharmaceutical company, other) for a drug's VigiAccess reports.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required"}
+        return {"status": "error", "message": "drug_name or medicine is required"}
 
     return _stub_response(
         "get-reporter-distribution",
@@ -104,9 +107,9 @@ def get_age_distribution(args: dict) -> dict:
     reports. Age groups follow WHO standard bands (0-27 days, 28 days-23 months,
     2-11 years, 12-17 years, 18-44, 45-64, 65-74, 75+, unknown).
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required"}
+        return {"status": "error", "message": "drug_name or medicine is required"}
 
     return _stub_response(
         "get-age-distribution",
@@ -128,9 +131,9 @@ def get_region_distribution(args: dict) -> dict:
     WHO region (Africa, Americas, Eastern Mediterranean, Europe, South-East
     Asia, Western Pacific).
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required"}
+        return {"status": "error", "message": "drug_name or medicine is required"}
 
     return _stub_response(
         "get-region-distribution",

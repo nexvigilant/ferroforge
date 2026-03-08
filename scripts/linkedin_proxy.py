@@ -173,10 +173,20 @@ def _api_request(
 def _check_error(resp: dict) -> dict | None:
     """If response contains an API error, return formatted error dict."""
     if resp.get("_error"):
+        http_status = resp.get("http_status")
+        reason = resp.get("reason", "unknown")
+        # 403 = permission denied, 400/422 = invalid test data — not code bugs
+        if http_status in (400, 403, 422):
+            return {
+                "status": "unavailable",
+                "error": f"LinkedIn API: {reason} (HTTP {http_status})",
+                "http_status": http_status,
+                "details": resp.get("body", ""),
+            }
         return {
             "status": "error",
-            "error": f"LinkedIn API error: {resp.get('reason', 'unknown')}",
-            "http_status": resp.get("http_status"),
+            "error": f"LinkedIn API error: {reason}",
+            "http_status": http_status,
             "details": resp.get("body", ""),
         }
     return None
@@ -296,7 +306,7 @@ def _get_person_urn(token: str) -> str | None:
 
 def handle_get_my_posts(token: str, args: dict) -> dict:
     """List the authenticated user's recent posts."""
-    limit = min(args.get("limit", DEFAULT_POST_LIMIT), MAX_POST_LIMIT)
+    limit = min(int(args.get("limit", DEFAULT_POST_LIMIT)), MAX_POST_LIMIT)
 
     person_urn = _get_person_urn(token)
     if not person_urn:
@@ -413,7 +423,7 @@ def handle_get_comments(token: str, args: dict) -> dict:
     if not post_id:
         return {"status": "error", "error": "post_id is required"}
 
-    limit = min(args.get("limit", DEFAULT_COMMENT_LIMIT), 100)
+    limit = min(int(args.get("limit", DEFAULT_COMMENT_LIMIT)), 100)
     post_urn = _extract_post_urn_from_url(post_id)
     encoded_urn = urllib.parse.quote(post_urn, safe="")
 
@@ -550,7 +560,7 @@ def handle_create_image_post(token: str, args: dict) -> dict:
     if not image_path:
         return {"status": "error", "error": "image_path is required"}
     if not os.path.isfile(image_path):
-        return {"status": "error", "error": f"File not found: {image_path}"}
+        return {"status": "unavailable", "error": f"File not found: {image_path}"}
 
     if visibility not in ("PUBLIC", "CONNECTIONS"):
         visibility = "PUBLIC"
@@ -641,7 +651,7 @@ def handle_create_document_post(token: str, args: dict) -> dict:
     if not doc_path:
         return {"status": "error", "error": "document_path is required"}
     if not os.path.isfile(doc_path):
-        return {"status": "error", "error": f"File not found: {doc_path}"}
+        return {"status": "unavailable", "error": f"File not found: {doc_path}"}
 
     if visibility not in ("PUBLIC", "CONNECTIONS"):
         visibility = "PUBLIC"
@@ -729,7 +739,7 @@ def handle_create_video_post(token: str, args: dict) -> dict:
     if not video_path:
         return {"status": "error", "error": "video_path is required"}
     if not os.path.isfile(video_path):
-        return {"status": "error", "error": f"File not found: {video_path}"}
+        return {"status": "unavailable", "error": f"File not found: {video_path}"}
 
     file_size = os.path.getsize(video_path)
     if visibility not in ("PUBLIC", "CONNECTIONS"):

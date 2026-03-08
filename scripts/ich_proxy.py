@@ -173,6 +173,7 @@ def search_guidelines(args: dict) -> dict:
         "tool": "search-guidelines",
         "query": query,
         "count": len(matches),
+        "results": matches,
         "guidelines": matches,
         "data_source": "ich.org (hardcoded index, source: https://ich.org/page/efficacy-guidelines)",
     }

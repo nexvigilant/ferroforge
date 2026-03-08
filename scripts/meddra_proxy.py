@@ -59,6 +59,7 @@ def search_terms(args: dict) -> dict:
             + HIERARCHY_NOTE
         ),
         "parameters_received": {"query": query},
+        "results": [],
         "data_source": "meddra.org",
         "implementation_notes": "Requires MedDRA MSSO subscription license (source: https://www.meddra.org/how-to-use/support-documentation/english)",
     }
@@ -71,7 +72,7 @@ def get_term_hierarchy(args: dict) -> dict:
     Stub for MedDRA hierarchy lookup. When live, returns the full hierarchy
     for a given MedDRA term or code.
     """
-    term = args.get("term", "").strip()
+    term = args.get("term", args.get("preferred_term", "")).strip()
     code = args.get("code", "")
     if not term and not code:
         return {"status": "error", "message": "term or code is required"}
