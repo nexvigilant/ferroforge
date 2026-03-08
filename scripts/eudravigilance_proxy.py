@@ -204,11 +204,129 @@ def get_geographical_distribution(args: dict) -> dict:
     }
 
 
+def get_soc_breakdown(args: dict) -> dict:
+    """Get System Organ Class breakdown for a substance."""
+    drug = args.get("drug", args.get("substance", "")).strip()
+    if not drug:
+        return {"status": "error", "message": "substance is required"}
+
+    try:
+        matches = _lookup_substance(drug)
+    except Exception as e:
+        return {"status": "error", "message": f"Lookup failed: {e}"}
+
+    if not matches:
+        return {"status": "ok", "message": f"No entries for '{drug}'", "data": {}}
+
+    substance = matches[0]
+    return {
+        "status": "ok",
+        "data": {
+            "substance": substance["substance_name"],
+            "substance_code": substance["substance_code"],
+            "dashboard_url": substance["dashboard_url"],
+            "available_soc_categories": [
+                "Blood and lymphatic system disorders",
+                "Cardiac disorders",
+                "Gastrointestinal disorders",
+                "General disorders and administration site conditions",
+                "Hepatobiliary disorders",
+                "Immune system disorders",
+                "Infections and infestations",
+                "Investigations",
+                "Metabolism and nutrition disorders",
+                "Musculoskeletal and connective tissue disorders",
+                "Nervous system disorders",
+                "Psychiatric disorders",
+                "Renal and urinary disorders",
+                "Respiratory, thoracic and mediastinal disorders",
+                "Skin and subcutaneous tissue disorders",
+                "Vascular disorders",
+            ],
+            "access_note": "Dashboard 'Number of Individual Cases for a selected Reaction Group' tab "
+                           "provides per-SOC case counts with serious/non-serious split.",
+        },
+        "data_source": DATA_SOURCE,
+    }
+
+
+def get_reporter_breakdown(args: dict) -> dict:
+    """Get reporter qualification breakdown for a substance."""
+    drug = args.get("drug", args.get("substance", "")).strip()
+    if not drug:
+        return {"status": "error", "message": "substance is required"}
+
+    try:
+        matches = _lookup_substance(drug)
+    except Exception as e:
+        return {"status": "error", "message": f"Lookup failed: {e}"}
+
+    if not matches:
+        return {"status": "ok", "message": f"No entries for '{drug}'", "data": {}}
+
+    substance = matches[0]
+    return {
+        "status": "ok",
+        "data": {
+            "substance": substance["substance_name"],
+            "substance_code": substance["substance_code"],
+            "dashboard_url": substance["dashboard_url"],
+            "reporter_categories": [
+                "Healthcare Professional",
+                "Non-Healthcare Professional (Consumer/Patient)",
+                "Not Specified",
+            ],
+            "access_note": "Dashboard 'Number of Individual Cases by Healthcare Professional / "
+                           "Non-Healthcare Professional' tab provides reporter qualification "
+                           "breakdown. HCP reports carry higher evidentiary weight in signal evaluation.",
+        },
+        "data_source": DATA_SOURCE,
+    }
+
+
+def get_age_sex_distribution(args: dict) -> dict:
+    """Get age group and sex distribution for a substance."""
+    drug = args.get("drug", args.get("substance", "")).strip()
+    if not drug:
+        return {"status": "error", "message": "substance is required"}
+
+    try:
+        matches = _lookup_substance(drug)
+    except Exception as e:
+        return {"status": "error", "message": f"Lookup failed: {e}"}
+
+    if not matches:
+        return {"status": "ok", "message": f"No entries for '{drug}'", "data": {}}
+
+    substance = matches[0]
+    return {
+        "status": "ok",
+        "data": {
+            "substance": substance["substance_name"],
+            "substance_code": substance["substance_code"],
+            "dashboard_url": substance["dashboard_url"],
+            "age_groups": [
+                "0-1 Month", "2 Months - 2 Years", "3-11 Years",
+                "12-17 Years", "18-64 Years", "65-85 Years",
+                "More than 85 Years", "Not Specified",
+            ],
+            "sex_categories": ["Female", "Male", "Not Specified"],
+            "access_note": "Dashboard 'Number of Individual Cases by Age Group' and "
+                           "'Number of Individual Cases by Sex' tabs provide demographic "
+                           "breakdowns for risk characterization.",
+        },
+        "data_source": DATA_SOURCE,
+    }
+
+
 TOOL_DISPATCH = {
     "search-reports": search_reports,
     "get-signal-summary": get_signal_summary,
     "get-case-counts": get_case_counts,
     "get-geographical-distribution": get_geographical_distribution,
+    "get-soc-breakdown": get_soc_breakdown,
+    "get-reporter-breakdown": get_reporter_breakdown,
+    "get-age-sex-distribution": get_age_sex_distribution,
 }
 
 

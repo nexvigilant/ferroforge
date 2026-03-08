@@ -242,11 +242,199 @@ def get_country_programs(args: dict) -> dict:
     }
 
 
+def get_naranjo_algorithm(args: dict) -> dict:
+    """
+    Tool: get-naranjo-algorithm
+
+    Returns the Naranjo Adverse Drug Reaction Probability Scale — a structured
+    questionnaire for causality assessment. SEMI-LIVE: hardcoded from the original
+    1981 Naranjo et al. publication.
+    """
+    questions = [
+        {
+            "number": 1,
+            "question": "Are there previous conclusive reports on this reaction?",
+            "scores": {"yes": 1, "no": 0, "unknown": 0},
+        },
+        {
+            "number": 2,
+            "question": "Did the adverse event appear after the suspected drug was administered?",
+            "scores": {"yes": 2, "no": -1, "unknown": 0},
+        },
+        {
+            "number": 3,
+            "question": "Did the adverse reaction improve when the drug was discontinued or a specific antagonist was administered?",
+            "scores": {"yes": 1, "no": 0, "unknown": 0},
+        },
+        {
+            "number": 4,
+            "question": "Did the adverse reaction reappear when the drug was readministered?",
+            "scores": {"yes": 2, "no": -1, "unknown": 0},
+        },
+        {
+            "number": 5,
+            "question": "Are there alternative causes (other than the drug) that could have on their own caused the reaction?",
+            "scores": {"yes": -1, "no": 2, "unknown": 0},
+        },
+        {
+            "number": 6,
+            "question": "Did the reaction reappear when a placebo was given?",
+            "scores": {"yes": -1, "no": 1, "unknown": 0},
+        },
+        {
+            "number": 7,
+            "question": "Was the drug detected in the blood (or other fluids) in concentrations known to be toxic?",
+            "scores": {"yes": 1, "no": 0, "unknown": 0},
+        },
+        {
+            "number": 8,
+            "question": "Was the reaction more severe when the dose was increased, or less severe when the dose was decreased?",
+            "scores": {"yes": 1, "no": 0, "unknown": 0},
+        },
+        {
+            "number": 9,
+            "question": "Did the patient have a similar reaction to the same or similar drugs in any previous exposure?",
+            "scores": {"yes": 1, "no": 0, "unknown": 0},
+        },
+        {
+            "number": 10,
+            "question": "Was the adverse event confirmed by any objective evidence?",
+            "scores": {"yes": 1, "no": 0, "unknown": 0},
+        },
+    ]
+
+    interpretation = {
+        "definite": {"range": "9+", "description": "Definite adverse drug reaction"},
+        "probable": {"range": "5-8", "description": "Probable adverse drug reaction"},
+        "possible": {"range": "1-4", "description": "Possible adverse drug reaction"},
+        "doubtful": {"range": "0 or less", "description": "Doubtful adverse drug reaction"},
+    }
+
+    return {
+        "status": "ok",
+        "source": "Naranjo CA, et al. A method for estimating the probability of adverse drug "
+                  "reactions. Clin Pharmacol Ther. 1981;30(2):239-45.",
+        "algorithm_name": "Naranjo Adverse Drug Reaction Probability Scale",
+        "score_range": {"min": -4, "max": 13},
+        "questions": questions,
+        "interpretation": interpretation,
+        "note": "The Naranjo scale is the most widely used causality assessment tool globally. "
+                "It complements the WHO-UMC system — Naranjo is algorithmic/scored while WHO-UMC "
+                "is expert-judgment/categorical.",
+    }
+
+
+def get_ic_computation(args: dict) -> dict:
+    """
+    Tool: get-ic-computation
+
+    Returns the Information Component (IC) computation methodology with
+    a worked example. SEMI-LIVE: reference from WHO-UMC published methodology.
+    """
+    return {
+        "status": "ok",
+        "source": "WHO-UMC — Bayesian Confidence Propagation Neural Network methodology",
+        "measure_name": "Information Component (IC)",
+        "formula": {
+            "ic": "IC = log2(observed / expected)",
+            "observed": "P(drug AND event) = n_drug_event / N_total",
+            "expected": "P(drug) × P(event) = (n_drug / N_total) × (n_event / N_total)",
+            "simplified": "IC = log2((n_drug_event × N_total) / (n_drug × n_event))",
+        },
+        "credibility_interval": {
+            "ic025": "Lower bound of 95% credibility interval — primary signal criterion",
+            "ic975": "Upper bound of 95% credibility interval",
+            "signal_threshold": "IC025 > 0 indicates a statistically robust signal",
+        },
+        "worked_example": {
+            "description": "Drug X with Event Y in a database of 1,000,000 reports",
+            "inputs": {
+                "n_drug_event": 50,
+                "n_drug": 5000,
+                "n_event": 10000,
+                "N_total": 1000000,
+            },
+            "computation": {
+                "observed": "50 / 1,000,000 = 0.00005",
+                "expected": "(5,000 / 1,000,000) × (10,000 / 1,000,000) = 0.00005 × 0.00001 = 0.00000005",
+                "but_simplified": "(50 × 1,000,000) / (5,000 × 10,000) = 50,000,000 / 50,000,000 = 1.0",
+                "ic_value": "IC = log2(1.0) = 0.0",
+            },
+            "interpretation": "IC = 0.0 means the drug-event combination is reported exactly at the "
+                              "expected rate. No signal. If n_drug_event were 100, IC = log2(2.0) = 1.0, "
+                              "indicating twice the expected reporting rate.",
+        },
+        "comparison_with_other_measures": {
+            "PRR": "Proportional Reporting Ratio — frequentist, no shrinkage",
+            "ROR": "Reporting Odds Ratio — frequentist, odds-based",
+            "EBGM": "Empirical Bayes Geometric Mean — Bayesian with Gamma-Poisson, used by FDA",
+            "IC": "Information Component — Bayesian with BCPNN, used by WHO-UMC",
+        },
+    }
+
+
+def get_adverse_reaction_terminology(args: dict) -> dict:
+    """
+    Tool: get-adverse-reaction-terminology
+
+    Returns WHO-ART (Adverse Reaction Terminology) hierarchy description.
+    SEMI-LIVE: reference from WHO-UMC published documentation.
+    """
+    return {
+        "status": "ok",
+        "source": "WHO-UMC — WHO Adverse Reaction Terminology (WHO-ART)",
+        "terminology_name": "WHO-ART (WHO Adverse Reaction Terminology)",
+        "current_status": "Legacy — largely superseded by MedDRA for regulatory reporting, "
+                          "but still used in VigiBase historical data and some national PV centres.",
+        "hierarchy": {
+            "levels": [
+                {
+                    "level": 1,
+                    "name": "System Organ Class (SOC)",
+                    "description": "Highest level — body system affected",
+                    "example": "Gastrointestinal disorders",
+                    "count": "32 SOCs",
+                },
+                {
+                    "level": 2,
+                    "name": "High Level Term (HLT)",
+                    "description": "Grouped related preferred terms",
+                    "example": "Nausea and vomiting symptoms",
+                },
+                {
+                    "level": 3,
+                    "name": "Preferred Term (PT)",
+                    "description": "Standard term for individual ADR",
+                    "example": "Nausea",
+                    "count": "~2,000 PTs",
+                },
+                {
+                    "level": 4,
+                    "name": "Included Term (IT)",
+                    "description": "Synonyms and verbatim terms mapped to PT",
+                    "example": "Feeling sick, queasy",
+                },
+            ],
+        },
+        "meddra_comparison": {
+            "who_art_levels": 4,
+            "meddra_levels": 5,
+            "key_difference": "MedDRA adds High Level Group Term (HLGT) between HLT and SOC, "
+                              "and has ~80,000+ terms vs WHO-ART's ~2,000 PTs",
+            "migration_note": "ICH E2B(R3) mandates MedDRA for regulatory reporting. "
+                              "WHO-ART remains in historical VigiBase data.",
+        },
+    }
+
+
 TOOL_DISPATCH = {
     "get-signal-methodology": get_signal_methodology,
     "get-causality-assessment": get_causality_assessment,
     "search-vigibase": search_vigibase,
     "get-country-programs": get_country_programs,
+    "get-naranjo-algorithm": get_naranjo_algorithm,
+    "get-ic-computation": get_ic_computation,
+    "get-adverse-reaction-terminology": get_adverse_reaction_terminology,
 }
 
 

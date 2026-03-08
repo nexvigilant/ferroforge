@@ -371,11 +371,175 @@ def get_case_demographics(args: dict) -> dict:
     }
 
 
+def compare_drugs(args: dict) -> dict:
+    """
+    Tool: compare-drugs
+
+    Compare disproportionality scores between two drugs for the same adverse event.
+    Useful for benefit-risk assessment and competitive safety profiling.
+    """
+    drug_a = args.get("drug_a", "").strip()
+    drug_b = args.get("drug_b", "").strip()
+    event = args.get("event", "").strip()
+
+    if not drug_a or not drug_b or not event:
+        return {"status": "error", "message": "'drug_a', 'drug_b', and 'event' are all required"}
+
+    results = {}
+    for drug_name in [drug_a, drug_b]:
+        table = _build_2x2(drug_name, event)
+        if "error" in table:
+            results[drug_name] = {"error": table["error"], "counts": table}
+        else:
+            scores = _compute_scores(table)
+            results[drug_name] = {
+                "case_count": table["a"],
+                "drug_total": table["a_plus_b"],
+                "scores": scores,
+            }
+
+    # Determine which drug has higher signal
+    prr_a = results.get(drug_a, {}).get("scores", {}).get("PRR")
+    prr_b = results.get(drug_b, {}).get("scores", {}).get("PRR")
+    comparison = "inconclusive"
+    if prr_a is not None and prr_b is not None:
+        if prr_a > prr_b * 1.5:
+            comparison = f"{drug_a} has stronger signal"
+        elif prr_b > prr_a * 1.5:
+            comparison = f"{drug_b} has stronger signal"
+        else:
+            comparison = "similar signal strength"
+
+    return {
+        "status": "ok",
+        "event": event,
+        "drug_a": {"name": drug_a, **results.get(drug_a, {})},
+        "drug_b": {"name": drug_b, **results.get(drug_b, {})},
+        "comparison": comparison,
+    }
+
+
+def get_reporting_trends(args: dict) -> dict:
+    """
+    Tool: get-reporting-trends
+
+    Get annual reporting trends for a drug-event combination over time.
+    Shows how reporting frequency has changed, useful for detecting emerging signals.
+    """
+    drug = args.get("drug", "").strip()
+    event = args.get("event", "").strip()
+
+    if not drug:
+        return {"status": "error", "message": "'drug' is required"}
+
+    drug_q = f'patient.drug.openfda.generic_name:"{_quote(drug)}"'
+    search_expr = drug_q
+    if event:
+        search_expr = f'{drug_q}+AND+patient.reaction.reactionmeddrapt:"{_quote(event)}"'
+
+    url = f"{BASE_URL}?search={search_expr}&count=receivedate"
+    try:
+        data = _fetch(url)
+    except RuntimeError as exc:
+        return {"status": "error", "message": str(exc)}
+
+    raw = data.get("results", [])
+
+    # Aggregate by year
+    year_counts = {}
+    for item in raw:
+        date_str = str(item.get("time", ""))
+        if len(date_str) >= 4:
+            year = date_str[:4]
+            year_counts[year] = year_counts.get(year, 0) + item.get("count", 0)
+
+    trends = [{"year": y, "count": c} for y, c in sorted(year_counts.items())]
+
+    # Compute trend direction from last 3 years
+    trend_direction = "stable"
+    if len(trends) >= 3:
+        recent = [t["count"] for t in trends[-3:]]
+        if recent[-1] > recent[0] * 1.5:
+            trend_direction = "increasing"
+        elif recent[-1] < recent[0] * 0.5:
+            trend_direction = "decreasing"
+
+    return {
+        "status": "ok",
+        "drug": drug,
+        "event": event or None,
+        "total_years": len(trends),
+        "trend_direction": trend_direction,
+        "annual_counts": trends,
+    }
+
+
+def get_outcome_distribution(args: dict) -> dict:
+    """
+    Tool: get-outcome-distribution
+
+    Get patient outcome distribution for a drug — death, hospitalization,
+    life-threatening, disability, etc. Critical for seriousness assessment.
+    """
+    drug = args.get("drug", "").strip()
+    event = args.get("event", "").strip()
+
+    if not drug:
+        return {"status": "error", "message": "'drug' is required"}
+
+    drug_q = f'patient.drug.openfda.generic_name:"{_quote(drug)}"'
+    search_expr = drug_q
+    if event:
+        search_expr = f'{drug_q}+AND+patient.reaction.reactionmeddrapt:"{_quote(event)}"'
+
+    url = f"{BASE_URL}?search={search_expr}&count=serious"
+    try:
+        data = _fetch(url)
+    except RuntimeError as exc:
+        return {"status": "error", "message": str(exc)}
+
+    serious_counts = {}
+    serious_map = {"1": "serious", "2": "non_serious"}
+    for item in data.get("results", []):
+        key = serious_map.get(str(item.get("term", "")), str(item.get("term", "")))
+        serious_counts[key] = item.get("count", 0)
+
+    # Get outcome breakdown for serious cases
+    outcomes = {}
+    outcome_fields = [
+        ("seriousnessdeath", "death"),
+        ("seriousnesshospitalization", "hospitalization"),
+        ("seriousnesslifethreatening", "life_threatening"),
+        ("seriousnessdisabling", "disability"),
+        ("seriousnesscongenitalanomali", "congenital_anomaly"),
+        ("seriousnessother", "other_serious"),
+    ]
+
+    for field, label in outcome_fields:
+        count_url = f"{BASE_URL}?search={search_expr}+AND+{field}:1&limit=1"
+        try:
+            count_data = _fetch(count_url)
+            outcomes[label] = count_data.get("meta", {}).get("results", {}).get("total", 0)
+        except RuntimeError:
+            outcomes[label] = 0
+
+    return {
+        "status": "ok",
+        "drug": drug,
+        "event": event or None,
+        "seriousness": serious_counts,
+        "outcome_breakdown": outcomes,
+    }
+
+
 TOOL_DISPATCH = {
     "compute-disproportionality": compute_disproportionality,
     "get-top-reactions": get_top_reactions,
     "get-top-drugs": get_top_drugs,
     "get-case-demographics": get_case_demographics,
+    "compare-drugs": compare_drugs,
+    "get-reporting-trends": get_reporting_trends,
+    "get-outcome-distribution": get_outcome_distribution,
 }
 
 

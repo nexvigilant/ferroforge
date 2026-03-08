@@ -315,11 +315,212 @@ def get_safety_labeling_changes(args: dict) -> dict:
     }
 
 
+def get_recall_classification(args: dict) -> dict:
+    """
+    Tool: get-recall-classification
+
+    Get recall classification breakdown for a drug. FDA classifies recalls:
+    Class I (serious health consequences/death), Class II (temporary/reversible),
+    Class III (unlikely adverse health consequences).
+    """
+    drug_name = args.get("drug_name", args.get("query", "")).strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required", "data": {}}
+
+    limit = int(args.get("limit", 25))
+    limit = max(1, min(limit, 100))
+
+    search_expr = f'openfda.generic_name:"{_quote(drug_name)}"+openfda.brand_name:"{_quote(drug_name)}"'
+
+    # Count by classification
+    count_url = f"{ENFORCEMENT_URL}?search={search_expr}&count=classification.exact"
+    try:
+        count_data = _fetch(count_url)
+    except RuntimeError as exc:
+        return {"status": "error", "message": str(exc), "data": {}}
+
+    classification_counts = {}
+    for item in count_data.get("results", []):
+        classification_counts[item.get("term", "Unknown")] = item.get("count", 0)
+
+    # Count by status (Ongoing, Completed, Terminated)
+    status_url = f"{ENFORCEMENT_URL}?search={search_expr}&count=status.exact"
+    status_counts = {}
+    try:
+        status_data = _fetch(status_url)
+        for item in status_data.get("results", []):
+            status_counts[item.get("term", "Unknown")] = item.get("count", 0)
+    except RuntimeError:
+        pass
+
+    # Count by voluntary_mandated
+    vol_url = f"{ENFORCEMENT_URL}?search={search_expr}&count=voluntary_mandated.exact"
+    voluntary_counts = {}
+    try:
+        vol_data = _fetch(vol_url)
+        for item in vol_data.get("results", []):
+            voluntary_counts[item.get("term", "Unknown")] = item.get("count", 0)
+    except RuntimeError:
+        pass
+
+    total = sum(classification_counts.values())
+
+    return {
+        "status": "ok",
+        "query": {"drug_name": drug_name},
+        "data": {
+            "total_recalls": total,
+            "by_classification": classification_counts,
+            "by_status": status_counts,
+            "by_voluntary_mandated": voluntary_counts,
+            "classification_definitions": {
+                "Class I": "Dangerous or defective — reasonable probability of serious adverse health consequences or death",
+                "Class II": "May cause temporary or medically reversible adverse health consequences",
+                "Class III": "Not likely to cause adverse health consequences",
+            },
+        },
+    }
+
+
+def get_serious_outcomes(args: dict) -> dict:
+    """
+    Tool: get-serious-outcomes
+
+    Get serious outcome distribution from FAERS for a drug — death,
+    hospitalization, life-threatening, disability, congenital anomaly.
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required", "data": {}}
+
+    base_search = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"'
+
+    # Total reports
+    total_url = f"{EVENT_URL}?search={base_search}&limit=1"
+    total_reports = 0
+    try:
+        total_data = _fetch(total_url)
+        total_reports = total_data.get("meta", {}).get("results", {}).get("total", 0)
+    except RuntimeError:
+        pass
+
+    # Serious reports
+    serious_url = f"{EVENT_URL}?search={base_search}+AND+serious:1&limit=1"
+    serious_count = 0
+    try:
+        serious_data = _fetch(serious_url)
+        serious_count = serious_data.get("meta", {}).get("results", {}).get("total", 0)
+    except RuntimeError:
+        pass
+
+    # Individual outcome fields
+    outcomes = {}
+    outcome_fields = {
+        "death": "seriousnessdeath",
+        "hospitalization": "seriousnesshospitalization",
+        "life_threatening": "seriousnesslifethreatening",
+        "disability": "seriousnessdisabling",
+        "congenital_anomaly": "seriousnesscongenitalanomali",
+        "other_serious": "seriousnessother",
+    }
+
+    for label, field in outcome_fields.items():
+        url = f"{EVENT_URL}?search={base_search}+AND+{field}:1&limit=1"
+        try:
+            data = _fetch(url)
+            outcomes[label] = data.get("meta", {}).get("results", {}).get("total", 0)
+        except RuntimeError:
+            outcomes[label] = 0
+
+    return {
+        "status": "ok",
+        "query": {"drug_name": drug_name},
+        "data": {
+            "total_reports": total_reports,
+            "serious_reports": serious_count,
+            "non_serious_reports": total_reports - serious_count,
+            "serious_percentage": round(serious_count / total_reports * 100, 1) if total_reports else 0,
+            "outcome_breakdown": outcomes,
+        },
+    }
+
+
+def get_rems_info(args: dict) -> dict:
+    """
+    Tool: get-rems-info
+
+    Get REMS (Risk Evaluation and Mitigation Strategy) information for a drug
+    from FDA-approved labeling. Checks for REMS-related content in drug labels.
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required", "data": {}}
+
+    search_expr = f'openfda.generic_name:"{_quote(drug_name)}"+openfda.brand_name:"{_quote(drug_name)}"'
+    url = f"{LABEL_URL}?search={search_expr}&limit=5"
+
+    try:
+        data = _fetch(url)
+    except RuntimeError as exc:
+        return {"status": "error", "message": str(exc), "data": {}}
+
+    raw_results = data.get("results", [])
+    if not raw_results:
+        return {"status": "ok", "message": "No label records found", "data": {"has_rems": False}}
+
+    rems_found = []
+    for label in raw_results:
+        openfda = label.get("openfda", {})
+
+        # REMS-related sections
+        rems_text = label.get("risk_evaluation_and_mitigation_strategy", [])
+        medication_guide = label.get("medication_guide", [])
+        patient_package = label.get("patient_medication_information", [])
+
+        if not rems_text and not medication_guide:
+            continue
+
+        entry = {
+            "brand_name": openfda.get("brand_name", [None])[0] if openfda.get("brand_name") else None,
+            "generic_name": openfda.get("generic_name", [None])[0] if openfda.get("generic_name") else None,
+            "set_id": label.get("set_id"),
+            "has_rems": bool(rems_text),
+            "has_medication_guide": bool(medication_guide),
+            "has_patient_info": bool(patient_package),
+        }
+
+        if rems_text:
+            text = " ".join(rems_text) if isinstance(rems_text, list) else str(rems_text)
+            entry["rems_text"] = text[:3000]
+
+        if medication_guide:
+            text = " ".join(medication_guide) if isinstance(medication_guide, list) else str(medication_guide)
+            entry["medication_guide_excerpt"] = text[:2000]
+
+        rems_found.append(entry)
+
+    return {
+        "status": "ok",
+        "query": {"drug_name": drug_name},
+        "data": {
+            "has_rems": len(rems_found) > 0,
+            "labels_with_rems": len(rems_found),
+            "results": rems_found,
+            "note": "REMS are FDA-required risk management programs for drugs with serious "
+                    "safety concerns. Components may include: Medication Guide, Communication Plan, "
+                    "Elements to Assure Safe Use (ETASU), Implementation System.",
+        },
+    }
+
+
 TOOL_DISPATCH = {
     "search-safety-communications": search_safety_communications,
     "get-medwatch-alerts": get_medwatch_alerts,
     "get-boxed-warning": get_boxed_warning,
     "get-safety-labeling-changes": get_safety_labeling_changes,
+    "get-recall-classification": get_recall_classification,
+    "get-serious-outcomes": get_serious_outcomes,
+    "get-rems-info": get_rems_info,
 }
 
 

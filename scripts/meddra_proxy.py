@@ -150,11 +150,206 @@ def get_smq(args: dict) -> dict:
     }
 
 
+def get_hierarchy_overview(args: dict) -> dict:
+    """
+    Tool: get-hierarchy-overview
+
+    Semi-live — returns the complete MedDRA hierarchy structure description
+    with level counts and relationships. Essential reference for understanding
+    MedDRA coding in pharmacovigilance.
+    """
+    return {
+        "status": "ok",
+        "tool": "get-hierarchy-overview",
+        "hierarchy": {
+            "levels": [
+                {
+                    "level": 1,
+                    "name": "System Organ Class (SOC)",
+                    "abbreviation": "SOC",
+                    "count": 27,
+                    "description": (
+                        "Highest level — groupings by body system, aetiology, "
+                        "or purpose (e.g., Cardiac disorders, Infections and "
+                        "infestations, Surgical and medical procedures)."
+                    ),
+                },
+                {
+                    "level": 2,
+                    "name": "High Level Group Term (HLGT)",
+                    "abbreviation": "HLGT",
+                    "count_approximate": 337,
+                    "description": (
+                        "Superordinate descriptor linking one or more HLTs. "
+                        "Example: 'Coronary artery disorders' under Cardiac disorders SOC."
+                    ),
+                },
+                {
+                    "level": 3,
+                    "name": "High Level Term (HLT)",
+                    "abbreviation": "HLT",
+                    "count_approximate": 1737,
+                    "description": (
+                        "Superordinate descriptor for a group of related PTs. "
+                        "Example: 'Myocardial infarction' HLT groups several "
+                        "MI-related PTs."
+                    ),
+                },
+                {
+                    "level": 4,
+                    "name": "Preferred Term (PT)",
+                    "abbreviation": "PT",
+                    "count_approximate": 27000,
+                    "description": (
+                        "Standard term representing a single medical concept. "
+                        "The primary coding level for adverse event reporting. "
+                        "Example: 'Acute myocardial infarction'."
+                    ),
+                },
+                {
+                    "level": 5,
+                    "name": "Lowest Level Term (LLT)",
+                    "abbreviation": "LLT",
+                    "count_approximate": 83000,
+                    "description": (
+                        "Most granular level — synonyms, spelling variations, "
+                        "and sub-types linked to a parent PT. Each LLT maps "
+                        "to exactly one PT. Example: 'Heart attack' -> PT 'Myocardial infarction'."
+                    ),
+                },
+            ],
+            "relationships": {
+                "direction": "LLT -> PT -> HLT -> HLGT -> SOC (bottom to top)",
+                "multi_axiality": (
+                    "A PT may be linked to more than one SOC. One SOC is designated "
+                    "'primary' for tabulation; others are 'secondary' for retrieval."
+                ),
+                "coding_convention": (
+                    "Adverse events should be coded to the most specific LLT, which "
+                    "auto-maps to the correct PT. Signal detection and regulatory "
+                    "reporting primarily use the PT level."
+                ),
+            },
+        },
+        "data_source": "meddra.org (source: https://www.meddra.org/how-to-use/basics/hierarchy)",
+    }
+
+
+def get_version_info(args: dict) -> dict:
+    """
+    Tool: get-version-info
+
+    Semi-live — returns MedDRA version information, update cycle, and
+    maintenance organization details.
+    """
+    return {
+        "status": "ok",
+        "tool": "get-version-info",
+        "current_version": {
+            "version": "27.1",
+            "release_date": "September 2024",
+            "note": "Version numbers may have been updated since this reference was compiled.",
+        },
+        "update_cycle": {
+            "frequency": "Biannual — two releases per year (March and September)",
+            "versioning": "Major.Minor (e.g., 27.0 in March, 27.1 in September)",
+            "process": (
+                "Change requests submitted by member organizations, reviewed by "
+                "MedDRA Maintenance and Support Services Organization (MSSO), "
+                "approved by ICH MedDRA Management Committee."
+            ),
+        },
+        "maintenance_organization": {
+            "name": "MedDRA MSSO (Maintenance and Support Services Organization)",
+            "operator": "Operated under contract to ICH",
+            "url": "https://www.meddra.org",
+            "services": [
+                "Term distribution (annual subscription)",
+                "Browser and search tools",
+                "Change request processing",
+                "Documentation and training",
+                "SMQ development and maintenance",
+            ],
+        },
+        "regulatory_requirement": (
+            "MedDRA is the required terminology for ICSR coding in ICH regions "
+            "(US FDA, EMA, PMDA) per E2B(R3) implementation guides."
+        ),
+        "data_source": "meddra.org (source: https://www.meddra.org/about-meddra/organisation)",
+    }
+
+
+def get_multiaxiality_guide(args: dict) -> dict:
+    """
+    Tool: get-multiaxiality-guide
+
+    Semi-live — returns guidance on MedDRA multi-axiality, where a Preferred
+    Term can be classified under more than one System Organ Class.
+    """
+    return {
+        "status": "ok",
+        "tool": "get-multiaxiality-guide",
+        "concept": (
+            "Multi-axiality means a single PT can be linked to multiple SOCs. "
+            "One SOC is designated 'primary' for statistical tabulation; additional "
+            "SOCs are 'secondary' to allow retrieval from multiple perspectives."
+        ),
+        "examples": [
+            {
+                "pt": "Pneumonia",
+                "primary_soc": "Infections and infestations",
+                "secondary_socs": ["Respiratory, thoracic and mediastinal disorders"],
+                "rationale": (
+                    "Pneumonia is primarily an infection but also manifests as a "
+                    "respiratory disorder. Multi-axiality ensures retrieval under both."
+                ),
+            },
+            {
+                "pt": "Drug-induced liver injury",
+                "primary_soc": "Hepatobiliary disorders",
+                "secondary_socs": ["Injury, poisoning and procedural complications"],
+                "rationale": (
+                    "DILI is a hepatic condition but also classified as an injury "
+                    "when drug-induced."
+                ),
+            },
+            {
+                "pt": "Suicidal ideation",
+                "primary_soc": "Psychiatric disorders",
+                "secondary_socs": ["Social circumstances"],
+                "rationale": (
+                    "Primarily psychiatric, but social context classification "
+                    "enables broader retrieval in post-marketing surveillance."
+                ),
+            },
+        ],
+        "impact_on_signal_detection": {
+            "primary_soc_rule": (
+                "When computing disproportionality signals (PRR, ROR, IC), use "
+                "the PRIMARY SOC assignment to avoid double-counting events."
+            ),
+            "retrieval_rule": (
+                "When searching for all cases related to a body system, include "
+                "BOTH primary and secondary SOC assignments for completeness."
+            ),
+            "regulatory_guidance": (
+                "ICH E2B(R3) requires coding to the LLT level. The PT and SOC "
+                "assignments are automatic via the MedDRA hierarchy. Primary SOC "
+                "designation follows MedDRA's published primary SOC algorithm."
+            ),
+        },
+        "data_source": "meddra.org (source: https://www.meddra.org/how-to-use/basics/hierarchy)",
+    }
+
+
 TOOL_DISPATCH = {
     "search-terms": search_terms,
     "get-term-hierarchy": get_term_hierarchy,
     "get-soc-terms": get_soc_terms,
     "get-smq": get_smq,
+    "get-hierarchy-overview": get_hierarchy_overview,
+    "get-version-info": get_version_info,
+    "get-multiaxiality-guide": get_multiaxiality_guide,
 }
 
 

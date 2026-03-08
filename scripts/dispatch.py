@@ -30,6 +30,54 @@ CONFIGS_DIR = SCRIPTS_DIR.parent / "configs"
 
 
 # ---------------------------------------------------------------------------
+# Ontology Alignment: Normalize parameter names across proxy boundaries
+# ---------------------------------------------------------------------------
+# Each proxy was developed independently against a different upstream API,
+# producing a terminological gap (Schadd & Roos, SEMAPRO 2015): the same
+# concept — "the drug being queried" — is named drug_name, drug, substance,
+# or product depending on which proxy handles the call.
+#
+# This alignment map normalizes arguments at the dispatch boundary so that
+# agents can use ANY of the aliases and every proxy receives its expected key.
+# The canonical form is "drug_name" (most common: 7/17 proxies).
+
+PARAMETER_ALIGNMENT: dict[str, dict[str, str]] = {
+    # Canonical "drug_name" aliases — each proxy's expected key
+    "openfda_proxy.py":          {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
+    "dailymed_proxy.py":         {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
+    "accessdata_proxy.py":       {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
+    "fda_safety_proxy.py":       {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
+    "rxnav_proxy.py":            {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
+    "vigiaccess_proxy.py":       {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
+    "drugbank_proxy.py":         {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
+    # Canonical "drug" aliases — proxies that expect "drug"
+    "openvigil_proxy.py":        {"drug_name": "drug", "substance": "drug", "product": "drug"},
+    "eudravigilance_proxy.py":   {"drug_name": "drug", "substance": "drug", "product": "drug"},
+    "who_umc_proxy.py":          {"drug_name": "drug", "substance": "drug", "product": "drug"},
+    # Canonical "product" aliases — proxies that expect "product"
+    "ema_proxy.py":              {"drug_name": "product", "drug": "product", "substance": "product"},
+}
+
+
+def align_parameters(proxy_script: str, arguments: dict) -> dict:
+    """
+    Apply ontology alignment: if the caller used an alias (e.g. "drug" when
+    the proxy expects "drug_name"), remap it. Never overwrites a key the
+    caller explicitly provided that matches the proxy's expected name.
+    """
+    script_name = Path(proxy_script).name
+    alias_map = PARAMETER_ALIGNMENT.get(script_name)
+    if not alias_map:
+        return arguments
+
+    aligned = dict(arguments)
+    for alias, canonical in alias_map.items():
+        if alias in aligned and canonical not in aligned:
+            aligned[canonical] = aligned.pop(alias)
+    return aligned
+
+
+# ---------------------------------------------------------------------------
 # SmartDispatch: Auto-discover domain routes from config files
 # ---------------------------------------------------------------------------
 
@@ -222,7 +270,8 @@ def dispatch(envelope: dict) -> dict:
             "arguments": arguments,
         }
 
-    return call_proxy(proxy_path, unprefixed, arguments)
+    aligned_args = align_parameters(proxy_path, arguments)
+    return call_proxy(proxy_path, unprefixed, aligned_args)
 
 
 def main_stdin() -> None:
@@ -291,9 +340,9 @@ SMOKE_TEST_CASES: list[dict] = [
         "expect_domain": None,
     },
     {
-        "label": "EMA — no proxy in config, falls to stub",
+        "label": "EMA — config-discovered proxy",
         "envelope": {"tool": "www_ema_europa_eu_search_medicines", "arguments": {"query": "metformin"}},
-        "expect_domain": None,
+        "expect_domain": "www_ema_europa_eu_",
     },
     {
         "label": "DrugBank — no proxy in config, falls to stub",
@@ -304,6 +353,25 @@ SMOKE_TEST_CASES: list[dict] = [
         "label": "Unknown domain — should return stub",
         "envelope": {"tool": "unknown_domain_search", "arguments": {"query": "test"}},
         "expect_domain": None,
+    },
+    # --- Ontology alignment tests ---
+    {
+        "label": "Alignment — 'drug' alias resolves to 'drug_name' for openFDA",
+        "envelope": {"tool": "api_fda_gov_search_adverse_events", "arguments": {"drug": "metformin"}},
+        "expect_domain": "api_fda_gov_",
+        "expect_aligned_key": "drug_name",
+    },
+    {
+        "label": "Alignment — 'drug_name' alias resolves to 'drug' for OpenVigil",
+        "envelope": {"tool": "open-vigil_fr_compute_disproportionality", "arguments": {"drug_name": "metformin", "event": "nausea"}},
+        "expect_domain": "open-vigil_fr_",
+        "expect_aligned_key": "drug",
+    },
+    {
+        "label": "Alignment — no overwrite when canonical key already present",
+        "envelope": {"tool": "api_fda_gov_search_adverse_events", "arguments": {"drug_name": "aspirin", "drug": "ignored"}},
+        "expect_domain": "api_fda_gov_",
+        "expect_aligned_key": "drug_name",
     },
     {
         "label": "Missing tool field — should return error",
@@ -329,19 +397,29 @@ def run_smoke_tests() -> None:
         tool_name = envelope.get("tool", "")
         proxy_path, unprefixed = resolve_route(tool_name)
 
+        # Check alignment if test expects it
+        expect_aligned_key = case.get("expect_aligned_key")
+        if expect_aligned_key and proxy_path:
+            aligned = align_parameters(proxy_path, envelope.get("arguments", {}))
+            has_key = expect_aligned_key in aligned
+        else:
+            has_key = True  # no alignment check needed
+
         # Determine expected outcome
         if expect_domain == "error":
             result = dispatch(envelope)
-            ok = result.get("status") == "error"
+            ok = result.get("status") == "error" and has_key
             outcome = f"status={result.get('status')} (expected error)"
         elif expect_domain is None:
             # Expect stub (no registered proxy)
-            ok = proxy_path is None
+            ok = proxy_path is None and has_key
             outcome = f"proxy={'none (correct)' if ok else proxy_path}"
         else:
             expected_script = DOMAIN_ROUTES.get(expect_domain, "")
-            ok = proxy_path is not None and expected_script in proxy_path
+            ok = proxy_path is not None and expected_script in proxy_path and has_key
             outcome = f"proxy={Path(proxy_path).name if proxy_path else 'none'}"
+            if expect_aligned_key:
+                outcome += f"  |  aligned: {expect_aligned_key}={'present' if has_key else 'MISSING'}"
 
         # Exercise the full dispatch path to verify no exceptions
         try:

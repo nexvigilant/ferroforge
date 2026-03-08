@@ -278,6 +278,150 @@
           "demographics"
         ]
       }
+    },
+    {
+      "name": "compare-drugs",
+      "description": "Compare disproportionality scores between two drugs for the same adverse event",
+      "parameters": [
+        {
+          "name": "drug_a",
+          "type": "string",
+          "description": "First drug name (generic)",
+          "required": true
+        },
+        {
+          "name": "drug_b",
+          "type": "string",
+          "description": "Second drug name (generic)",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "MedDRA preferred term to compare against",
+          "required": true
+        }
+      ],
+      "proxy": "scripts/openvigil_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error"
+          },
+          "event": {
+            "type": "string"
+          },
+          "drug_a": {
+            "type": "object"
+          },
+          "drug_b": {
+            "type": "object"
+          },
+          "comparison": {
+            "type": "string",
+            "description": "Which drug has stronger signal or similar"
+          }
+        },
+        "required": ["status", "comparison"]
+      }
+    },
+    {
+      "name": "get-reporting-trends",
+      "description": "Get annual reporting trends for a drug-event combination — detect emerging signals",
+      "parameters": [
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Drug name (generic)",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "MedDRA preferred term (optional — omit for all events)",
+          "required": false
+        }
+      ],
+      "proxy": "scripts/openvigil_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error"
+          },
+          "drug": {
+            "type": "string"
+          },
+          "trend_direction": {
+            "type": "string",
+            "description": "increasing | decreasing | stable"
+          },
+          "annual_counts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "year": { "type": "string" },
+                "count": { "type": "integer" }
+              }
+            }
+          }
+        },
+        "required": ["status", "trend_direction", "annual_counts"]
+      }
+    },
+    {
+      "name": "get-outcome-distribution",
+      "description": "Get patient outcome distribution — death, hospitalization, life-threatening for seriousness assessment",
+      "parameters": [
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Drug name (generic)",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "MedDRA preferred term (optional)",
+          "required": false
+        }
+      ],
+      "proxy": "scripts/openvigil_proxy.py",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error"
+          },
+          "drug": {
+            "type": "string"
+          },
+          "seriousness": {
+            "type": "object",
+            "properties": {
+              "serious": { "type": "integer" },
+              "non_serious": { "type": "integer" }
+            }
+          },
+          "outcome_breakdown": {
+            "type": "object",
+            "properties": {
+              "death": { "type": "integer" },
+              "hospitalization": { "type": "integer" },
+              "life_threatening": { "type": "integer" },
+              "disability": { "type": "integer" },
+              "congenital_anomaly": { "type": "integer" },
+              "other_serious": { "type": "integer" }
+            }
+          }
+        },
+        "required": ["status", "seriousness", "outcome_breakdown"]
+      }
     }
   ],
   "proxy": "scripts/openvigil_proxy.py"

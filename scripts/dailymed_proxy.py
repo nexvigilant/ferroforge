@@ -295,10 +295,154 @@ def get_adverse_reactions(args: dict) -> dict:
     }
 
 
+def get_drug_interactions(args: dict) -> dict:
+    """
+    Tool: get-drug-interactions
+
+    Extracts the Drug Interactions section from a drug SPL using the openFDA
+    drug label API. Returns known drug-drug interactions, clinical significance,
+    and management recommendations.
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required"}
+
+    setid = _search_for_setid(drug_name)
+    encoded = urllib.parse.quote(drug_name, safe="")
+    url = f"{OPENFDA_LABEL_URL}?search=openfda.generic_name:{encoded}&limit=1"
+    try:
+        data = _fetch(url)
+    except RuntimeError:
+        url_brand = f"{OPENFDA_LABEL_URL}?search=openfda.brand_name:{encoded}&limit=1"
+        try:
+            data = _fetch(url_brand)
+        except RuntimeError as exc2:
+            return {"status": "error", "message": str(exc2), "drug_name": drug_name}
+
+    results = data.get("results", [])
+    if not results:
+        return {"status": "not_found", "message": f"No label found for '{drug_name}'", "drug_name": drug_name}
+
+    label = results[0]
+    interactions = label.get("drug_interactions")
+    if isinstance(interactions, list) and interactions:
+        interactions = interactions[0]
+
+    if not interactions:
+        return {"status": "not_found", "message": f"No Drug Interactions section for '{drug_name}'", "drug_name": drug_name, "setid": setid}
+
+    openfda = label.get("openfda", {})
+    return {
+        "status": "ok",
+        "drug_name": drug_name,
+        "setid": setid,
+        "brand_name": openfda.get("brand_name", [None])[0] if openfda.get("brand_name") else None,
+        "generic_name": openfda.get("generic_name", [None])[0] if openfda.get("generic_name") else None,
+        "drug_interactions": interactions,
+        "source": "openFDA drug label API",
+    }
+
+
+def get_contraindications(args: dict) -> dict:
+    """
+    Tool: get-contraindications
+
+    Extracts the Contraindications section from a drug SPL. Returns conditions
+    and situations where the drug should NOT be used.
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required"}
+
+    setid = _search_for_setid(drug_name)
+    encoded = urllib.parse.quote(drug_name, safe="")
+    url = f"{OPENFDA_LABEL_URL}?search=openfda.generic_name:{encoded}&limit=1"
+    try:
+        data = _fetch(url)
+    except RuntimeError:
+        url_brand = f"{OPENFDA_LABEL_URL}?search=openfda.brand_name:{encoded}&limit=1"
+        try:
+            data = _fetch(url_brand)
+        except RuntimeError as exc2:
+            return {"status": "error", "message": str(exc2), "drug_name": drug_name}
+
+    results = data.get("results", [])
+    if not results:
+        return {"status": "not_found", "message": f"No label found for '{drug_name}'", "drug_name": drug_name}
+
+    label = results[0]
+    contraindications = label.get("contraindications")
+    if isinstance(contraindications, list) and contraindications:
+        contraindications = contraindications[0]
+
+    if not contraindications:
+        return {"status": "not_found", "message": f"No Contraindications section for '{drug_name}'", "drug_name": drug_name, "setid": setid}
+
+    openfda = label.get("openfda", {})
+    return {
+        "status": "ok",
+        "drug_name": drug_name,
+        "setid": setid,
+        "brand_name": openfda.get("brand_name", [None])[0] if openfda.get("brand_name") else None,
+        "generic_name": openfda.get("generic_name", [None])[0] if openfda.get("generic_name") else None,
+        "contraindications": contraindications,
+        "source": "openFDA drug label API",
+    }
+
+
+def get_boxed_warning(args: dict) -> dict:
+    """
+    Tool: get-boxed-warning
+
+    Extracts the Boxed Warning (Black Box Warning) from a drug SPL — the most
+    serious FDA safety communication on a drug label. Returns the warning text
+    and whether one exists.
+    """
+    drug_name = args.get("drug_name", "").strip()
+    if not drug_name:
+        return {"status": "error", "message": "drug_name is required"}
+
+    setid = _search_for_setid(drug_name)
+    encoded = urllib.parse.quote(drug_name, safe="")
+    url = f"{OPENFDA_LABEL_URL}?search=openfda.generic_name:{encoded}&limit=1"
+    try:
+        data = _fetch(url)
+    except RuntimeError:
+        url_brand = f"{OPENFDA_LABEL_URL}?search=openfda.brand_name:{encoded}&limit=1"
+        try:
+            data = _fetch(url_brand)
+        except RuntimeError as exc2:
+            return {"status": "error", "message": str(exc2), "drug_name": drug_name}
+
+    results = data.get("results", [])
+    if not results:
+        return {"status": "not_found", "message": f"No label found for '{drug_name}'", "drug_name": drug_name}
+
+    label = results[0]
+    boxed = label.get("boxed_warning")
+    if isinstance(boxed, list) and boxed:
+        boxed = boxed[0]
+
+    openfda = label.get("openfda", {})
+    return {
+        "status": "ok",
+        "drug_name": drug_name,
+        "setid": setid,
+        "brand_name": openfda.get("brand_name", [None])[0] if openfda.get("brand_name") else None,
+        "generic_name": openfda.get("generic_name", [None])[0] if openfda.get("generic_name") else None,
+        "has_boxed_warning": boxed is not None and len(str(boxed).strip()) > 0,
+        "boxed_warning": boxed,
+        "source": "openFDA drug label API",
+    }
+
+
 TOOL_DISPATCH = {
     "search-drugs": search_drugs,
     "get-drug-label": get_drug_label,
     "get-adverse-reactions": get_adverse_reactions,
+    "get-drug-interactions": get_drug_interactions,
+    "get-contraindications": get_contraindications,
+    "get-boxed-warning": get_boxed_warning,
 }
 
 
