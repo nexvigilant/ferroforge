@@ -44,28 +44,8 @@ const COURSES: &[(&str, &str, &[&str])] = &[
             "www_ema_europa_eu_get_safety_signals",
         ],
     ),
-    (
-        "target-investigation",
-        "Drug target deep-dive: ChEMBL target → UniProt profile → PDB structures → clinical candidates → safety liabilities",
-        &[
-            "science_nexvigilant_com_search_targets",
-            "science_nexvigilant_com_get_target_profile",
-            "science_nexvigilant_com_get_crystal_structures",
-            "science_nexvigilant_com_search_clinical_candidates",
-            "science_nexvigilant_com_get_target_safety",
-        ],
-    ),
-    (
-        "gene-profile",
-        "Gene characterization: GEO expression → variants → pathway enrichment → protein interactions → literature",
-        &[
-            "science_nexvigilant_com_get_expression_profile",
-            "science_nexvigilant_com_search_variants",
-            "science_nexvigilant_com_get_pathway_enrichment",
-            "science_nexvigilant_com_search_protein_interactions",
-            "science_nexvigilant_com_search_literature",
-        ],
-    ),
+    // NOTE: target-investigation and gene-profile courses removed — they reference
+    // private science.nexvigilant.com tools not available in public deployments.
 ];
 
 /// Try to handle a tool call natively in Rust.
