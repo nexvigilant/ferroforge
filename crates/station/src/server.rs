@@ -165,6 +165,17 @@ pub fn handle_request(
 
         "ping" => Some(JsonRpcResponse::success(id, serde_json::json!({}))),
 
+        // Return empty lists for capabilities we don't support.
+        // Claude.ai sends these during bootstrap even when not advertised.
+        "resources/list" => {
+            debug!("resources/list requested (not supported, returning empty)");
+            Some(JsonRpcResponse::success(id, serde_json::json!({ "resources": [] })))
+        }
+        "prompts/list" => {
+            debug!("prompts/list requested (not supported, returning empty)");
+            Some(JsonRpcResponse::success(id, serde_json::json!({ "prompts": [] })))
+        }
+
         other => {
             debug!(method = %other, "Unknown method");
             Some(JsonRpcResponse::error(

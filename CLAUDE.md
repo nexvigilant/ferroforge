@@ -79,7 +79,27 @@ curl https://mcp.nexvigilant.com/sse
 
 **DNS:** `mcp.nexvigilant.com` and `station.nexvigilant.com` → `ghs.googlehosted.com` (Cloudflare DNS-only, not proxied). Google-managed TLS.
 
-**Transports:** SSE (`/sse`, `/message`) + HTTP REST (`/rpc`, `/tools`, `/tools/{name}`) + health (`/health`) on single port. CORS enabled for browser-based MCP agents.
+**Transports:**
+- **Streamable HTTP** (`POST/GET/DELETE /mcp`) — MCP 2025-03-26 spec. Primary transport for Claude.ai Connectors. Session tracking optional (stateless when no `Mcp-Session-Id` header). Supports JSON-RPC batch arrays.
+- **SSE** (`/sse`, `/message`) — Legacy MCP transport for mcp-remote / Claude Code.
+- **HTTP REST** (`/rpc`, `/tools`, `/tools/{name}`) — Direct REST for any agent framework.
+- **Health** (`/health`) — Liveness + stats.
+
+All on single port. CORS enabled (`Access-Control-Allow-Origin: *`, `mcp-session-id` exposed).
+
+### Claude.ai Custom Connector
+
+Add as connector in Claude.ai Settings → Connectors:
+- **URL:** `https://mcp.nexvigilant.com/mcp`
+- **Auth:** None (authless — `NEXVIGILANT_API_KEYS` not set on Cloud Run)
+- **Protocol:** MCP 2025-03-26 Streamable HTTP
+- **Tools visible:** 112 (public configs only — `--exclude-private` filters 7 private configs)
+
+Source: `crates/station/src/server_streamable.rs`. Session-optional design: Claude.ai doesn't forward `Mcp-Session-Id` header, so all requests process statelessly.
+
+### Public vs Private Configs
+
+`--exclude-private` flag in Dockerfile CMD filters configs with `"private": true`. 16 public configs (112 tools) are exposed on Cloud Run. 7 private configs (62 tools) are available locally via stdio/mcp-lazy-proxy but not on the public endpoint.
 
 **DO NOT deploy to webmcp-hub.com.** The third-party hub has a 50-config cap and is no longer the primary deployment target. All agent traffic routes through `mcp.nexvigilant.com`.
 
