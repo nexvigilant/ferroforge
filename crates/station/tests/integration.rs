@@ -1,3 +1,4 @@
+use nexvigilant_station::auth::{ApiKeyGate, AuthResult};
 use nexvigilant_station::config::{ConfigRegistry, HubConfig, ParamDef, ToolDef};
 use nexvigilant_station::protocol::{JsonRpcRequest, INVALID_PARAMS, METHOD_NOT_FOUND};
 use nexvigilant_station::router;
@@ -464,6 +465,68 @@ fn test_real_configs_all_tools_routable() {
             info.name
         );
     }
+}
+
+// =============================================
+// Phase 3: Rate Limiting
+// =============================================
+
+// =============================================
+// Phase 4: API Key Authentication
+// =============================================
+
+#[test]
+fn test_auth_dev_mode_allows_all() {
+    // No keys → dev mode → all tools allowed
+    let gate = ApiKeyGate::new(None);
+    assert!(!gate.is_enabled());
+    assert!(matches!(gate.check(None, "some_tool"), AuthResult::Allowed));
+    assert!(matches!(gate.check(Some("Bearer invalid"), "some_tool"), AuthResult::Allowed));
+}
+
+#[test]
+fn test_auth_meta_tools_always_free() {
+    let gate = ApiKeyGate::new(Some(vec!["nv_test123".into()]));
+    assert!(gate.is_enabled());
+    assert!(matches!(gate.check(None, "nexvigilant_directory"), AuthResult::Allowed));
+    assert!(matches!(gate.check(None, "nexvigilant_capabilities"), AuthResult::Allowed));
+    assert!(matches!(gate.check(None, "nexvigilant_chart_course"), AuthResult::Allowed));
+}
+
+#[test]
+fn test_auth_valid_key_allowed() {
+    let gate = ApiKeyGate::new(Some(vec!["nv_abc123".into(), "nv_def456".into()]));
+    assert!(matches!(gate.check(Some("Bearer nv_abc123"), "some_tool"), AuthResult::Allowed));
+    assert!(matches!(gate.check(Some("Bearer nv_def456"), "some_tool"), AuthResult::Allowed));
+}
+
+#[test]
+fn test_auth_invalid_key_rejected() {
+    let gate = ApiKeyGate::new(Some(vec!["nv_abc123".into()]));
+    assert!(matches!(gate.check(Some("Bearer nv_wrong"), "some_tool"), AuthResult::InvalidKey));
+}
+
+#[test]
+fn test_auth_no_key_rejected() {
+    let gate = ApiKeyGate::new(Some(vec!["nv_abc123".into()]));
+    assert!(matches!(gate.check(None, "some_tool"), AuthResult::KeyRequired));
+    assert!(matches!(gate.check(Some("Bearer "), "some_tool"), AuthResult::KeyRequired));
+}
+
+#[test]
+fn test_auth_check_rpc_extracts_tool_name() {
+    let gate = ApiKeyGate::new(Some(vec!["nv_abc123".into()]));
+
+    // Meta-tool via RPC → allowed without key
+    let params = json!({"name": "nexvigilant_directory", "arguments": {}});
+    assert!(matches!(gate.check_rpc(None, Some(&params)), AuthResult::Allowed));
+
+    // Domain tool via RPC → requires key
+    let params = json!({"name": "api_fda_gov_search_adverse_events", "arguments": {}});
+    assert!(matches!(gate.check_rpc(None, Some(&params)), AuthResult::KeyRequired));
+
+    // Domain tool via RPC with valid key → allowed
+    assert!(matches!(gate.check_rpc(Some("Bearer nv_abc123"), Some(&params)), AuthResult::Allowed));
 }
 
 // =============================================

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::Json;
@@ -9,6 +9,7 @@ use serde_json::Value;
 use tokio::sync::broadcast;
 use tracing::{debug, info};
 
+use crate::auth::{self, ApiKeyGate, AuthResult};
 use crate::config::ConfigRegistry;
 use crate::protocol::{JsonRpcRequest, StationEvent};
 use crate::server::handle_request;
@@ -18,6 +19,7 @@ struct AppState {
     registry: ConfigRegistry,
     telemetry: StationTelemetry,
     event_tx: broadcast::Sender<StationEvent>,
+    auth_gate: ApiKeyGate,
 }
 
 /// Run the MCP server over HTTP REST transport (Skyway).
@@ -34,10 +36,12 @@ pub async fn run_http(
     host: &str,
     port: u16,
 ) -> anyhow::Result<()> {
+    let auth_gate = ApiKeyGate::from_env();
     let state = Arc::new(AppState {
         registry,
         telemetry,
         event_tx,
+        auth_gate,
     });
 
     let app = axum::Router::new()
@@ -57,9 +61,22 @@ pub async fn run_http(
 // Full JSON-RPC 2.0 endpoint — speaks native MCP protocol
 async fn handle_rpc(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(request): Json<JsonRpcRequest>,
 ) -> impl IntoResponse {
     debug!(method = %request.method, "HTTP RPC request");
+
+    // Auth gate: check tools/call requests for non-meta tools
+    if request.method == "tools/call" {
+        let auth_header = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok());
+        let result = state.auth_gate.check_rpc(auth_header, request.params.as_ref());
+        if !matches!(result, AuthResult::Allowed) {
+            return (StatusCode::UNAUTHORIZED, Json(auth::auth_error_json(&result))).into_response();
+        }
+    }
+
     let response = handle_request(&state.registry, &state.telemetry, &request, Some(&state.event_tx));
     match response {
         Some(resp) => (StatusCode::OK, Json(resp)).into_response(),
@@ -79,10 +96,20 @@ async fn handle_list_tools(
 // Simplified REST: POST /tools/{name} → call a tool, body = arguments
 async fn handle_tool_call(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     axum::extract::Path(name): axum::extract::Path<String>,
     Json(arguments): Json<Value>,
 ) -> impl IntoResponse {
     info!(tool = %name, "HTTP tool call");
+
+    // Auth gate: check tool access
+    let auth_header = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
+    let result = state.auth_gate.check(auth_header, &name);
+    if !matches!(result, AuthResult::Allowed) {
+        return (StatusCode::UNAUTHORIZED, Json(auth::auth_error_json(&result))).into_response();
+    }
 
     // Synthesize a JSON-RPC request from the REST call
     let request = JsonRpcRequest {

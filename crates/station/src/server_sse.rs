@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
@@ -12,6 +12,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use crate::auth::{ApiKeyGate, AuthResult};
 use crate::config::ConfigRegistry;
 use crate::protocol::{JsonRpcRequest, StationEvent, StationEventNotification};
 use crate::server::handle_request;
@@ -24,6 +25,7 @@ struct AppState {
     telemetry: StationTelemetry,
     event_tx: broadcast::Sender<StationEvent>,
     sessions: Mutex<HashMap<String, SseChannel>>,
+    auth_gate: ApiKeyGate,
 }
 
 /// Run the MCP server over SSE (Server-Sent Events) transport.
@@ -39,11 +41,13 @@ pub async fn run_sse(
     host: &str,
     port: u16,
 ) -> anyhow::Result<()> {
+    let auth_gate = ApiKeyGate::from_env();
     let state = Arc::new(AppState {
         registry,
         telemetry,
         event_tx,
         sessions: Mutex::new(HashMap::new()),
+        auth_gate,
     });
 
     let app = axum::Router::new()
@@ -107,6 +111,7 @@ struct MessageQuery {
 
 async fn handle_message(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(query): Query<MessageQuery>,
     Json(request): Json<JsonRpcRequest>,
 ) -> impl IntoResponse {
@@ -117,6 +122,18 @@ async fn handle_message(
         warn!(session_id = %session_id, "Unknown session");
         return StatusCode::NOT_FOUND;
     };
+
+    // Auth gate: check tools/call requests
+    if request.method == "tools/call" {
+        let auth_header = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok());
+        let result = state.auth_gate.check_rpc(auth_header, request.params.as_ref());
+        if !matches!(result, AuthResult::Allowed) {
+            warn!(session_id = %session_id, "Unauthorized tool call attempt");
+            return StatusCode::UNAUTHORIZED;
+        }
+    }
 
     debug!(
         session_id = %session_id,

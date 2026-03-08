@@ -388,13 +388,19 @@ fn handle_directory(registry: &ConfigRegistry) -> ToolCallResult {
     }
 }
 
-/// Meta-tool: Station health — telemetry dashboard for the owner.
+/// Meta-tool: Station health — summary telemetry (recent_calls redacted for public surface).
 fn handle_station_health(telemetry: &StationTelemetry) -> ToolCallResult {
     let health = telemetry.health();
 
+    // Serialize then redact recent_calls — operational intelligence not for public
+    let mut health_json = serde_json::to_value(&health).unwrap_or_default();
+    if let Some(obj) = health_json.as_object_mut() {
+        obj.remove("recent_calls");
+    }
+
     ToolCallResult {
         content: vec![ContentBlock::Text {
-            text: serde_json::to_string_pretty(&health).unwrap_or_default(),
+            text: serde_json::to_string_pretty(&health_json).unwrap_or_default(),
         }],
         is_error: None,
     }

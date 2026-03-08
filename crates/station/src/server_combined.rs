@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::extract::{Query, State};
-use axum::http::{HeaderValue, Method, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, Method, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
@@ -14,6 +14,7 @@ use tower_http::cors::CorsLayer;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use crate::auth::{self, ApiKeyGate, AuthResult};
 use crate::config::ConfigRegistry;
 use crate::protocol::{JsonRpcRequest, StationEvent, StationEventNotification};
 use crate::server::handle_request;
@@ -26,6 +27,7 @@ struct AppState {
     telemetry: StationTelemetry,
     event_tx: broadcast::Sender<StationEvent>,
     sessions: Mutex<HashMap<String, SseChannel>>,
+    auth_gate: ApiKeyGate,
 }
 
 /// Run the combined MCP server — SSE + HTTP REST on one port.
@@ -44,11 +46,13 @@ pub async fn run_combined(
     host: &str,
     port: u16,
 ) -> anyhow::Result<()> {
+    let auth_gate = ApiKeyGate::from_env();
     let state = Arc::new(AppState {
         registry,
         telemetry,
         event_tx,
         sessions: Mutex::new(HashMap::new()),
+        auth_gate,
     });
 
     let cors = CorsLayer::new()
@@ -129,6 +133,7 @@ struct MessageQuery {
 
 async fn handle_message(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(query): Query<MessageQuery>,
     Json(request): Json<JsonRpcRequest>,
 ) -> impl IntoResponse {
@@ -139,6 +144,18 @@ async fn handle_message(
         warn!(session_id = %session_id, "Unknown session");
         return StatusCode::NOT_FOUND;
     };
+
+    // Auth gate: check tools/call requests
+    if request.method == "tools/call" {
+        let auth_header = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok());
+        let result = state.auth_gate.check_rpc(auth_header, request.params.as_ref());
+        if !matches!(result, AuthResult::Allowed) {
+            warn!(session_id = %session_id, "Unauthorized tool call attempt");
+            return StatusCode::UNAUTHORIZED;
+        }
+    }
 
     debug!(
         session_id = %session_id,
@@ -173,9 +190,22 @@ async fn handle_message(
 
 async fn handle_rpc(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(request): Json<JsonRpcRequest>,
 ) -> impl IntoResponse {
     debug!(method = %request.method, "HTTP RPC request");
+
+    // Auth gate: check tools/call requests for non-meta tools
+    if request.method == "tools/call" {
+        let auth_header = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok());
+        let result = state.auth_gate.check_rpc(auth_header, request.params.as_ref());
+        if !matches!(result, AuthResult::Allowed) {
+            return (StatusCode::UNAUTHORIZED, Json(auth::auth_error_json(&result))).into_response();
+        }
+    }
+
     let response = handle_request(&state.registry, &state.telemetry, &request, Some(&state.event_tx));
     match response {
         Some(resp) => (StatusCode::OK, Json(resp)).into_response(),
@@ -193,10 +223,20 @@ async fn handle_list_tools(
 
 async fn handle_tool_call(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     axum::extract::Path(name): axum::extract::Path<String>,
     Json(arguments): Json<Value>,
 ) -> impl IntoResponse {
     info!(tool = %name, "HTTP tool call");
+
+    // Auth gate: check tool access
+    let auth_header = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
+    let result = state.auth_gate.check(auth_header, &name);
+    if !matches!(result, AuthResult::Allowed) {
+        return (StatusCode::UNAUTHORIZED, Json(auth::auth_error_json(&result))).into_response();
+    }
 
     let request = JsonRpcRequest {
         jsonrpc: "2.0".into(),
