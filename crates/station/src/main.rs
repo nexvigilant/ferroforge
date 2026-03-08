@@ -6,7 +6,7 @@ use tracing::info;
 
 use nexvigilant_station::config::ConfigRegistry;
 use nexvigilant_station::protocol::StationEvent;
-use nexvigilant_station::{server, server_http, server_sse};
+use nexvigilant_station::{server, server_combined, server_http, server_sse};
 use nexvigilant_station::telemetry::StationTelemetry;
 
 #[derive(Clone, ValueEnum)]
@@ -17,6 +17,8 @@ enum Transport {
     Sse,
     /// HTTP REST + JSON-RPC (Skyway — for any agent framework)
     Http,
+    /// Combined SSE + HTTP on one port (for Cloud Run / NexVigilant domain)
+    Combined,
 }
 
 #[derive(Parser)]
@@ -82,6 +84,11 @@ fn main() -> Result<()> {
             info!(host = %cli.host, port = cli.port, "Transport: HTTP (Skyway)");
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(server_http::run_http(registry, telemetry, event_tx, &cli.host, cli.port))
+        }
+        Transport::Combined => {
+            info!(host = %cli.host, port = cli.port, "Transport: Combined (SSE + HTTP)");
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(server_combined::run_combined(registry, telemetry, event_tx, &cli.host, cli.port))
         }
     }
 }

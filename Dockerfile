@@ -1,5 +1,5 @@
 # NexVigilant Station — Multi-transport MCP server
-# Supports: stdio (local), sse (mcp-remote), http (REST API)
+# Supports: stdio (local), sse (mcp-remote), http (REST API), combined (SSE + HTTP)
 
 # Stage 1: Build the Rust binary
 FROM rust:1.93-slim AS builder
@@ -29,7 +29,7 @@ ENV RUST_LOG=nexvigilant_station=info
 
 # Cloud Run uses its own startup probe at /health — Docker HEALTHCHECK not needed
 
-# Default: HTTP transport on Cloud Run's $PORT
-# Override with --transport sse for Highway mode
+# Combined transport: SSE (MCP protocol) + HTTP REST on one port
+# SSE for mcp-remote/Claude Code, HTTP REST for any agent framework
 ENTRYPOINT ["nexvigilant-station"]
-CMD ["--config-dir", "/app/configs", "--telemetry-log", "/tmp/station-telemetry.jsonl", "--transport", "http", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["--config-dir", "/app/configs", "--telemetry-log", "/tmp/station-telemetry.jsonl", "--transport", "combined", "--host", "0.0.0.0", "--port", "8080"]
