@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::extract::{Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, Method, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
@@ -10,6 +10,7 @@ use axum::Json;
 use serde_json::Value;
 use tokio::sync::{broadcast, mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
+use tower_http::cors::CorsLayer;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -50,6 +51,14 @@ pub async fn run_combined(
         sessions: Mutex::new(HashMap::new()),
     });
 
+    let cors = CorsLayer::new()
+        .allow_origin("*".parse::<HeaderValue>().expect("valid header"))
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::AUTHORIZATION,
+        ]);
+
     let app = axum::Router::new()
         // SSE transport (MCP protocol — mcp-remote, Claude Code)
         .route("/sse", get(handle_sse))
@@ -60,6 +69,7 @@ pub async fn run_combined(
         .route("/tools/{name}", post(handle_tool_call))
         // Health
         .route("/health", get(handle_health))
+        .layer(cors)
         .with_state(state);
 
     let addr = format!("{host}:{port}");

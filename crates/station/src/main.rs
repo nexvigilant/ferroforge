@@ -44,6 +44,10 @@ struct Cli {
     /// Port to bind for SSE/HTTP transports
     #[arg(short, long, default_value = "3040")]
     port: u16,
+
+    /// Exclude configs marked as private (for public deployments)
+    #[arg(long, default_value = "false")]
+    exclude_private: bool,
 }
 
 fn main() -> Result<()> {
@@ -58,7 +62,7 @@ fn main() -> Result<()> {
         "NexVigilant Station starting"
     );
 
-    let registry = ConfigRegistry::load_from_dir(&cli.config_dir)?;
+    let registry = ConfigRegistry::load_from_dir_filtered(&cli.config_dir, cli.exclude_private)?;
     let telemetry = StationTelemetry::new(Some(cli.telemetry_log));
 
     info!(

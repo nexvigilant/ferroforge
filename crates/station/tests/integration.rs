@@ -23,6 +23,8 @@ fn test_registry() -> ConfigRegistry {
                 title: "openFDA FAERS".into(),
                 description: Some("Test config".into()),
                 proxy: None,
+                private: false,
+                copyright: None,
                 tools: vec![
                     ToolDef {
                         name: "search-adverse-events".into(),
@@ -36,6 +38,7 @@ fn test_registry() -> ConfigRegistry {
                         stub_response: Some(r#"{"status":"ok","events":42}"#.into()),
                         proxy: None,
                         output_schema: None,
+                        annotations: None,
                     },
                     ToolDef {
                         name: "get-drug-counts".into(),
@@ -44,6 +47,7 @@ fn test_registry() -> ConfigRegistry {
                         stub_response: None,
                         proxy: None,
                         output_schema: None,
+                        annotations: None,
                     },
                 ],
             },
@@ -53,6 +57,8 @@ fn test_registry() -> ConfigRegistry {
                 title: "DailyMed".into(),
                 description: None,
                 proxy: None,
+                private: false,
+                copyright: None,
                 tools: vec![ToolDef {
                     name: "get-drug-label".into(),
                     description: "Get label".into(),
@@ -60,6 +66,7 @@ fn test_registry() -> ConfigRegistry {
                     stub_response: Some(r#"{"label":"test"}"#.into()),
                     proxy: None,
                     output_schema: None,
+                    annotations: None,
                 }],
             },
         ],

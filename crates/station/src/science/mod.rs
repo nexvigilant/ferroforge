@@ -56,18 +56,6 @@ const COURSES: &[(&str, &str, &[&str])] = &[
         ],
     ),
     (
-        "hexim1-landscape",
-        "HEXIM1 research landscape: pathway → BET inhibitors → HDAC inhibitors → biomarker → GEO expression → hypotheses",
-        &[
-            "science_nexvigilant_com_get_ptefb_pathway",
-            "science_nexvigilant_com_search_bet_inhibitors",
-            "science_nexvigilant_com_search_hdac_inhibitors",
-            "science_nexvigilant_com_get_biomarker_validation",
-            "science_nexvigilant_com_mine_geo_expression",
-            "science_nexvigilant_com_get_hypothesis_tracker",
-        ],
-    ),
-    (
         "gene-profile",
         "Gene characterization: GEO expression → variants → pathway enrichment → protein interactions → literature",
         &[

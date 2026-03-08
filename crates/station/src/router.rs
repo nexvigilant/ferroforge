@@ -373,10 +373,9 @@ fn handle_directory(registry: &ConfigRegistry) -> ToolCallResult {
         "total_tools": registry.tool_count(),
         "domains": domains,
         "access_surfaces": [
-            "MCP server (stdio) — direct tool invocation",
-            "WebMCP Hub configs — browser-based agent discovery",
-            "REST API — programmatic access via nexcore-api",
-            "Standalone MCP — mcp-remote via Cloudflare Worker"
+            "MCP server (stdio) — direct tool invocation for Claude Code",
+            "Cloud Run (mcp.nexvigilant.com) — SSE + HTTP REST for any MCP client",
+            "Standalone MCP — npx mcp-remote https://mcp.nexvigilant.com/sse"
         ],
         "data_flow": "Hub Config (extraction) → Structured Data → Signal Detection (PRR/ROR/IC/EBGM) → Causality Assessment → Action",
     });

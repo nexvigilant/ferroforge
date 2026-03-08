@@ -4,7 +4,7 @@ use serde_json::Value;
 use std::path::Path;
 use tracing::info;
 
-use crate::protocol::ToolInfo;
+use crate::protocol::{ToolAnnotations, ToolInfo};
 
 /// A hub config file — defines tools for a specific domain/URL pattern.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -29,6 +29,14 @@ pub struct HubConfig {
 
     /// Tools exposed by this config
     pub tools: Vec<ToolDef>,
+
+    /// Private config — excluded from public deployments (--exclude-private)
+    #[serde(default)]
+    pub private: bool,
+
+    /// Copyright notice for proprietary frameworks
+    #[serde(default)]
+    pub copyright: Option<String>,
 }
 
 /// A single tool definition within a hub config.
@@ -55,6 +63,10 @@ pub struct ToolDef {
     /// JSON Schema describing the tool's output structure (MCP spec 2025-06-18)
     #[serde(default, rename = "outputSchema")]
     pub output_schema: Option<Value>,
+
+    /// MCP tool annotations (readOnlyHint, destructiveHint, openWorldHint)
+    #[serde(default)]
+    pub annotations: Option<ToolAnnotations>,
 }
 
 /// A parameter for a tool.
@@ -82,8 +94,14 @@ pub struct ConfigRegistry {
 }
 
 impl ConfigRegistry {
-    /// Load all config files from a directory.
+    /// Load all config files from a directory (includes all configs).
     pub fn load_from_dir(dir: &Path) -> Result<Self> {
+        Self::load_from_dir_filtered(dir, false)
+    }
+
+    /// Load all config files from a directory.
+    /// If `exclude_private` is true, configs with `"private": true` are skipped.
+    pub fn load_from_dir_filtered(dir: &Path, exclude_private: bool) -> Result<Self> {
         let mut configs = Vec::new();
 
         if !dir.exists() {
@@ -119,6 +137,16 @@ impl ConfigRegistry {
                 _ => continue,
             };
 
+            // Skip private configs when deploying publicly
+            if exclude_private && config.private {
+                info!(
+                    domain = %config.domain,
+                    path = %path.display(),
+                    "Skipping private config"
+                );
+                continue;
+            }
+
             info!(
                 domain = %config.domain,
                 tools = config.tools.len(),
@@ -147,6 +175,12 @@ impl ConfigRegistry {
 
     /// Convert all tools to MCP ToolInfo for tools/list, including meta-tools.
     pub fn tool_infos(&self) -> Vec<ToolInfo> {
+        let meta_annotations = Some(ToolAnnotations {
+            read_only_hint: Some(true),
+            destructive_hint: Some(false),
+            open_world_hint: None,
+        });
+
         let mut tools: Vec<ToolInfo> = vec![
             ToolInfo {
                 name: "nexvigilant_directory".into(),
@@ -156,6 +190,7 @@ impl ConfigRegistry {
                     "properties": {},
                 }),
                 output_schema: None,
+                annotations: meta_annotations.clone(),
             },
             ToolInfo {
                 name: "nexvigilant_capabilities".into(),
@@ -174,6 +209,7 @@ impl ConfigRegistry {
                     },
                 }),
                 output_schema: None,
+                annotations: meta_annotations.clone(),
             },
             ToolInfo {
                 name: "nexvigilant_station_health".into(),
@@ -183,6 +219,7 @@ impl ConfigRegistry {
                     "properties": {},
                 }),
                 output_schema: None,
+                annotations: meta_annotations.clone(),
             },
             ToolInfo {
                 name: "nexvigilant_chart_course".into(),
@@ -197,6 +234,7 @@ impl ConfigRegistry {
                     },
                 }),
                 output_schema: None,
+                annotations: meta_annotations,
             },
         ];
 
@@ -244,6 +282,7 @@ impl ConfigRegistry {
                         description,
                         input_schema,
                         output_schema: tool.output_schema.clone(),
+                        annotations: tool.annotations.clone(),
                     }
                 })
             })

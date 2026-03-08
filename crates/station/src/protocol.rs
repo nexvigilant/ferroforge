@@ -84,6 +84,16 @@ pub struct InitializeResult {
     pub server_info: ServerInfo,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolAnnotations {
+    #[serde(rename = "readOnlyHint", skip_serializing_if = "Option::is_none")]
+    pub read_only_hint: Option<bool>,
+    #[serde(rename = "destructiveHint", skip_serializing_if = "Option::is_none")]
+    pub destructive_hint: Option<bool>,
+    #[serde(rename = "openWorldHint", skip_serializing_if = "Option::is_none")]
+    pub open_world_hint: Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ToolInfo {
     pub name: String,
@@ -92,6 +102,8 @@ pub struct ToolInfo {
     pub input_schema: Value,
     #[serde(rename = "outputSchema", skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<ToolAnnotations>,
 }
 
 #[derive(Debug, Serialize)]
