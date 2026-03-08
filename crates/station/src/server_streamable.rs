@@ -128,14 +128,59 @@ pub async fn handle_mcp_post(
     headers: HeaderMap,
     body: String,
 ) -> impl IntoResponse {
-    // Parse the JSON-RPC request
+    // Try parsing as single request first, then as batch array.
+    // MCP Streamable HTTP spec requires batch support.
     let request: JsonRpcRequest = match serde_json::from_str(&body) {
         Ok(r) => r,
-        Err(e) => {
+        Err(_) => {
+            // Try batch: parse as array, process each, return array response.
+            // MCP Streamable HTTP spec requires batch support.
+            if let Ok(batch) = serde_json::from_str::<Vec<JsonRpcRequest>>(&body) {
+                let mut responses = Vec::new();
+                let mut session_id = None;
+                for req in &batch {
+                    // Handle initialize within batch — create session
+                    if req.method == "initialize" {
+                        let sid = Uuid::new_v4().to_string();
+                        let now = tokio::time::Instant::now();
+                        state.sessions.lock().await.insert(sid.clone(), StreamableSession {
+                            notification_tx: None,
+                            created_at: now,
+                            last_activity: now,
+                            request_count: 1,
+                        });
+                        info!(session_id = %sid, "Streamable HTTP session created (batch)");
+                        session_id = Some(sid);
+                    }
+                    // Skip notifications (no response expected)
+                    if req.id.is_none() {
+                        continue;
+                    }
+                    if let Some(resp) = handle_request(
+                        &state.registry,
+                        &state.telemetry,
+                        &state.auth_gate,
+                        req,
+                        Some(&state.event_tx),
+                    ) {
+                        responses.push(resp);
+                    }
+                }
+                let json = serde_json::to_string(&responses).unwrap_or_default();
+                let sid = session_id.as_deref().unwrap_or("");
+                return (
+                    StatusCode::OK,
+                    [
+                        ("content-type", "application/json"),
+                        ("mcp-session-id", sid),
+                    ],
+                    json,
+                ).into_response();
+            }
             let resp = JsonRpcResponse::error(
                 None,
                 crate::protocol::PARSE_ERROR,
-                format!("Parse error: {e}"),
+                "Parse error: expected JSON-RPC request object or batch array",
             );
             return (StatusCode::OK, [("content-type", "application/json")], serde_json::to_string(&resp).unwrap_or_default()).into_response();
         }
