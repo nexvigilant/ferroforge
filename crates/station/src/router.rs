@@ -535,11 +535,27 @@ fn handle_capabilities(registry: &ConfigRegistry, arguments: &Value) -> ToolCall
         }
     }
 
+    // Also match courses by name or description
+    let matching_courses: Vec<Value> = crate::science::course_summaries()
+        .into_iter()
+        .filter(|(name, desc, _)| {
+            query.is_empty()
+                || name.to_lowercase().contains(&query)
+                || desc.to_lowercase().contains(&query)
+        })
+        .map(|(name, desc, steps)| serde_json::json!({
+            "course": name,
+            "description": desc,
+            "steps": steps,
+        }))
+        .collect();
+
     let result = serde_json::json!({
         "query": query,
         "domain_filter": domain_filter,
         "matches": matches.len(),
         "tools": matches,
+        "matching_courses": matching_courses,
     });
 
     ToolCallResult {
