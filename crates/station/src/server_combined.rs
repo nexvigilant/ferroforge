@@ -390,6 +390,7 @@ async fn handle_health(
         },
         "configs": state.registry.configs.len(),
         "tools": state.registry.tool_count(),
+        "courses": crate::science::course_count(),
         "active_sessions": sessions.len(),
         "server": "nexvigilant-station",
         "version": env!("CARGO_PKG_VERSION"),

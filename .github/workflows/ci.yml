@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Build
+        run: cargo build -p nexvigilant-station --release
+
+      - name: Test
+        run: cargo test -p nexvigilant-station
+
+      - name: Clippy
+        run: cargo clippy -p nexvigilant-station -- -D warnings
+
+      - name: Verify binary starts
+        run: |
+          echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | \
+            timeout 5 ./target/release/nexvigilant-station --config-dir configs 2>/dev/null | \
+            python3 -c "import sys,json; r=json.load(sys.stdin); assert 'result' in r, 'No result'; tools=r['result']['tools']; print(f'{len(tools)} tools verified')"

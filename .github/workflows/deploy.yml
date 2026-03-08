@@ -1,0 +1,69 @@
+name: Deploy to Cloud Run
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+env:
+  PROJECT_ID: nexvigilant-digital-clubhouse
+  REGION: us-central1
+  SERVICE: nexvigilant-station
+
+jobs:
+  deploy:
+    name: Deploy Station
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --source . \
+            --region "$REGION" \
+            --project "$PROJECT_ID" \
+            --allow-unauthenticated \
+            --quiet
+
+      - name: Smoke test
+        run: |
+          sleep 10
+          HEALTH=$(curl -sf -m 15 https://mcp.nexvigilant.com/health)
+          STATUS=$(echo "$HEALTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
+          TOOLS=$(curl -sf -m 15 https://mcp.nexvigilant.com/tools | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+          echo "Health: $STATUS"
+          echo "Tools: $TOOLS"
+          if [ "$STATUS" != "ok" ]; then
+            echo "SMOKE TEST FAILED — health status: $STATUS"
+            echo "Rolling back to previous revision..."
+            PREV_REV=$(gcloud run revisions list \
+              --service="$SERVICE" \
+              --project="$PROJECT_ID" \
+              --region="$REGION" \
+              --sort-by="~creationTimestamp" \
+              --limit=2 \
+              --format="value(metadata.name)" | tail -1)
+            gcloud run services update-traffic "$SERVICE" \
+              --project="$PROJECT_ID" \
+              --region="$REGION" \
+              --to-revisions="$PREV_REV=100"
+            exit 1
+          fi
+          echo "Smoke test passed: $TOOLS tools served"

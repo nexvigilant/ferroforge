@@ -649,3 +649,128 @@ fn test_now_iso8601_format() {
     let day: u32 = ts[8..10].parse().expect("day should parse");
     assert!((1..=31).contains(&day), "Day out of range: {day}");
 }
+
+// --- Chart Course Tests ---
+
+fn real_registry() -> ConfigRegistry {
+    let configs_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("crates/")
+        .parent()
+        .expect("root")
+        .join("configs");
+    ConfigRegistry::load_from_dir(&configs_dir).expect("should load real configs")
+}
+
+#[test]
+fn test_chart_course_lists_all_six_courses() {
+    let registry = real_registry();
+    let result = nexvigilant_station::science::try_handle(
+        "nexvigilant_chart_course",
+        &json!({}),
+        &registry,
+    );
+    let result = result.expect("chart_course should be handled");
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("should be valid JSON");
+    let courses = parsed["courses"].as_array().expect("courses should be array");
+    assert_eq!(courses.len(), 6, "Expected 6 courses, got {}", courses.len());
+
+    let names: Vec<&str> = courses.iter().map(|c| c["course"].as_str().unwrap()).collect();
+    assert!(names.contains(&"drug-safety-profile"));
+    assert!(names.contains(&"signal-investigation"));
+    assert!(names.contains(&"causality-assessment"));
+    assert!(names.contains(&"benefit-risk-assessment"));
+    assert!(names.contains(&"regulatory-intelligence"));
+    assert!(names.contains(&"competitive-landscape"));
+}
+
+#[test]
+fn test_chart_course_returns_steps_for_specific_course() {
+    let registry = real_registry();
+    let result = nexvigilant_station::science::try_handle(
+        "nexvigilant_chart_course",
+        &json!({"course": "causality-assessment"}),
+        &registry,
+    );
+    let result = result.expect("chart_course should be handled");
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("should be valid JSON");
+    assert_eq!(parsed["status"], "ok");
+    assert_eq!(parsed["step_count"], 4);
+    let steps = parsed["steps"].as_array().expect("steps should be array");
+    assert_eq!(steps.len(), 4);
+    assert_eq!(steps[0]["tool"], "api_fda_gov_search_adverse_events");
+    assert_eq!(steps[3]["tool"], "pubmed_ncbi_nlm_nih_gov_search_case_reports");
+}
+
+#[test]
+fn test_chart_course_unknown_returns_error() {
+    let registry = real_registry();
+    let result = nexvigilant_station::science::try_handle(
+        "nexvigilant_chart_course",
+        &json!({"course": "nonexistent-course"}),
+        &registry,
+    );
+    let result = result.expect("chart_course should be handled");
+    assert_eq!(result.is_error, Some(true));
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("should be valid JSON");
+    assert_eq!(parsed["status"], "error");
+}
+
+#[test]
+fn test_chart_course_all_tool_names_exist_in_registry() {
+    let registry = real_registry();
+    // List all courses
+    let result = nexvigilant_station::science::try_handle(
+        "nexvigilant_chart_course",
+        &json!({}),
+        &registry,
+    )
+    .expect("chart_course should be handled");
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("should be valid JSON");
+    let courses = parsed["courses"].as_array().expect("courses should be array");
+
+    // Collect all MCP tool names from the registry
+    let registry_tools: Vec<String> = registry
+        .configs
+        .iter()
+        .flat_map(|c| {
+            let domain_prefix = c.domain.replace('.', "_");
+            c.tools.iter().map(move |t| {
+                format!("{}_{}", domain_prefix, t.name.replace('-', "_"))
+            })
+        })
+        .collect();
+
+    // Verify every tool referenced in every course exists in the registry
+    for course in courses {
+        let course_name = course["course"].as_str().unwrap();
+        let tools = course["tools"].as_array().expect("tools should be array");
+        for tool in tools {
+            let tool_name = tool.as_str().unwrap();
+            assert!(
+                registry_tools.contains(&tool_name.to_string()),
+                "Course '{}' references tool '{}' which does not exist in the registry. \
+                 Available tools with similar prefix: {:?}",
+                course_name,
+                tool_name,
+                registry_tools
+                    .iter()
+                    .filter(|t: &&String| t.starts_with(&tool_name[..tool_name.len().min(15)]))
+                    .take(5)
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+}

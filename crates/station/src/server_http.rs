@@ -157,6 +157,7 @@ async fn handle_health(
         "transport": "http",
         "configs": state.registry.configs.len(),
         "tools": state.registry.tool_count(),
+        "courses": crate::science::course_count(),
         "server": "nexvigilant-station",
         "version": env!("CARGO_PKG_VERSION"),
     }))

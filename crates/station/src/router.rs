@@ -439,13 +439,24 @@ fn handle_directory(registry: &ConfigRegistry) -> ToolCallResult {
         }));
     }
 
+    let courses: Vec<Value> = crate::science::course_summaries()
+        .into_iter()
+        .map(|(name, desc, steps)| serde_json::json!({
+            "course": name,
+            "description": desc,
+            "steps": steps,
+        }))
+        .collect();
+
     let directory = serde_json::json!({
         "station": "NexVigilant Station",
         "version": env!("CARGO_PKG_VERSION"),
         "description": "Pharmacovigilance intelligence platform — drug safety monitoring, signal detection, regulatory data extraction across FDA, EMA, WHO, and clinical trial registries.",
         "total_domains": registry.configs.len(),
         "total_tools": registry.tool_count(),
+        "total_courses": crate::science::course_count(),
         "domains": domains,
+        "courses": courses,
         "access_surfaces": [
             "MCP server (stdio) — direct tool invocation for Claude Code",
             "Cloud Run (mcp.nexvigilant.com) — SSE + HTTP REST for any MCP client",
@@ -471,6 +482,7 @@ fn handle_station_health(telemetry: &StationTelemetry, registry: &ConfigRegistry
     let mut health_json = serde_json::to_value(&health).unwrap_or_default();
     if let Some(obj) = health_json.as_object_mut() {
         obj.remove("recent_calls");
+        obj.insert("courses".into(), serde_json::json!(crate::science::course_count()));
     }
 
     ToolCallResult {

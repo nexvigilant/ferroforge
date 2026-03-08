@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
 use tokio::sync::broadcast;
-use tracing::info;
+use tracing::{info, warn};
 
 use nexvigilant_station::config::ConfigRegistry;
 use nexvigilant_station::protocol::StationEvent;
@@ -87,9 +87,22 @@ fn main() -> Result<()> {
         StationTelemetry::new(Some(cli.telemetry_log))
     };
 
+    // Validate course tool references against the registry
+    let missing = nexvigilant_station::science::validate_courses(&registry);
+    if !missing.is_empty() {
+        for (course, tool) in &missing {
+            warn!(course, tool, "Course references nonexistent tool");
+        }
+        anyhow::bail!(
+            "Course validation failed: {} tool references do not resolve",
+            missing.len()
+        );
+    }
+
     info!(
         configs = registry.configs.len(),
         tools = registry.tool_count(),
+        courses = nexvigilant_station::science::course_count(),
         "Station ready"
     );
 

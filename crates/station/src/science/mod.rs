@@ -86,6 +86,42 @@ const COURSES: &[(&str, &str, &[&str])] = &[
     // private science.nexvigilant.com tools not available in public deployments.
 ];
 
+/// Number of predefined research courses.
+pub fn course_count() -> usize {
+    COURSES.len()
+}
+
+/// Course summaries for the directory meta-tool.
+pub fn course_summaries() -> Vec<(&'static str, &'static str, usize)> {
+    COURSES.iter().map(|(name, desc, tools)| (*name, *desc, tools.len())).collect()
+}
+
+/// Validate that all course tool references resolve to real tools in the registry.
+/// Called at startup to catch stale course definitions early.
+/// Returns a list of (course_name, tool_name) pairs that failed to resolve.
+pub fn validate_courses(registry: &ConfigRegistry) -> Vec<(String, String)> {
+    let registry_tools: Vec<String> = registry
+        .configs
+        .iter()
+        .flat_map(|c| {
+            let domain_prefix = c.domain.replace('.', "_");
+            c.tools.iter().map(move |t| {
+                format!("{}_{}", domain_prefix, t.name.replace('-', "_"))
+            })
+        })
+        .collect();
+
+    let mut missing = Vec::new();
+    for (course_name, _, tools) in COURSES {
+        for tool_name in *tools {
+            if !registry_tools.contains(&tool_name.to_string()) {
+                missing.push((course_name.to_string(), tool_name.to_string()));
+            }
+        }
+    }
+    missing
+}
+
 /// Try to handle a tool call natively in Rust.
 /// Returns `Some(ToolCallResult)` if handled, `None` to fall through to proxy.
 pub fn try_handle(tool_name: &str, args: &Value, registry: &ConfigRegistry) -> Option<ToolCallResult> {
