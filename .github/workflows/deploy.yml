@@ -13,7 +13,7 @@ env:
 
 jobs:
   deploy:
-    name: Deploy Station
+    name: Deploy Station (Canary)
     runs-on: ubuntu-latest
     if: github.event.workflow_run.conclusion == 'success'
 
@@ -33,37 +33,60 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Deploy to Cloud Run
+      - name: Deploy new revision (no traffic)
         run: |
           gcloud run deploy "$SERVICE" \
             --source . \
             --region "$REGION" \
             --project "$PROJECT_ID" \
             --allow-unauthenticated \
+            --no-traffic \
             --quiet
 
-      - name: Smoke test
+      - name: Get new revision name
+        id: revision
         run: |
-          sleep 10
+          NEW_REV=$(gcloud run revisions list \
+            --service="$SERVICE" \
+            --project="$PROJECT_ID" \
+            --region="$REGION" \
+            --sort-by="~creationTimestamp" \
+            --limit=1 \
+            --format="value(metadata.name)")
+          echo "name=$NEW_REV" >> "$GITHUB_OUTPUT"
+          echo "New revision: $NEW_REV"
+
+      - name: Canary — route 10% traffic
+        run: |
+          gcloud run services update-traffic "$SERVICE" \
+            --project="$PROJECT_ID" \
+            --region="$REGION" \
+            --to-revisions="${{ steps.revision.outputs.name }}=10"
+
+      - name: Smoke test canary
+        run: |
+          sleep 15
           HEALTH=$(curl -sf -m 15 https://mcp.nexvigilant.com/health)
           STATUS=$(echo "$HEALTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
+          GIT_SHA=$(echo "$HEALTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get('git_sha','unknown'))")
           TOOLS=$(curl -sf -m 15 https://mcp.nexvigilant.com/tools | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
           echo "Health: $STATUS"
+          echo "Git SHA: $GIT_SHA"
           echo "Tools: $TOOLS"
           if [ "$STATUS" != "ok" ]; then
-            echo "SMOKE TEST FAILED — health status: $STATUS"
-            echo "Rolling back to previous revision..."
-            PREV_REV=$(gcloud run revisions list \
-              --service="$SERVICE" \
-              --project="$PROJECT_ID" \
-              --region="$REGION" \
-              --sort-by="~creationTimestamp" \
-              --limit=2 \
-              --format="value(metadata.name)" | tail -1)
+            echo "CANARY SMOKE TEST FAILED — rolling back"
             gcloud run services update-traffic "$SERVICE" \
               --project="$PROJECT_ID" \
               --region="$REGION" \
-              --to-revisions="$PREV_REV=100"
+              --to-revisions="${{ steps.revision.outputs.name }}=0"
             exit 1
           fi
-          echo "Smoke test passed: $TOOLS tools served"
+          echo "Canary healthy at 10% — promoting"
+
+      - name: Promote — route 100% traffic
+        run: |
+          gcloud run services update-traffic "$SERVICE" \
+            --project="$PROJECT_ID" \
+            --region="$REGION" \
+            --to-revisions="${{ steps.revision.outputs.name }}=100"
+          echo "Deployed ${{ steps.revision.outputs.name }} at 100%"

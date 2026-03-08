@@ -133,6 +133,9 @@ pub async fn run_combined(
         .route("/mcp", axum::routing::delete(crate::server_streamable::handle_mcp_delete))
         .with_state(streamable_state);
 
+    // Rate limiter — per-IP token bucket (120 req/min per IP)
+    let rate_limiter = crate::rate_limit::RateLimiter::new();
+
     let app = axum::Router::new()
         // Streamable HTTP transport (Claude.ai Connectors — MCP 2025-03-26)
         .merge(mcp_routes)
@@ -143,8 +146,12 @@ pub async fn run_combined(
         .route("/rpc", post(handle_rpc))
         .route("/tools", get(handle_list_tools))
         .route("/tools/{name}", post(handle_tool_call))
-        // Health
+        // Health (excluded from rate limiting below via middleware ordering)
         .route("/health", get(handle_health))
+        .layer(axum::middleware::from_fn_with_state(
+            rate_limiter,
+            crate::rate_limit::rate_limit_middleware,
+        ))
         .layer(cors)
         .with_state(state);
 
@@ -394,6 +401,7 @@ async fn handle_health(
         "active_sessions": sessions.len(),
         "server": "nexvigilant-station",
         "version": env!("CARGO_PKG_VERSION"),
+        "git_sha": env!("GIT_SHA"),
     }))
 }
 

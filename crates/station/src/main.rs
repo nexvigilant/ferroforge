@@ -103,6 +103,8 @@ fn main() -> Result<()> {
         configs = registry.configs.len(),
         tools = registry.tool_count(),
         courses = nexvigilant_station::science::course_count(),
+        version = env!("CARGO_PKG_VERSION"),
+        git_sha = env!("GIT_SHA"),
         "Station ready"
     );
 

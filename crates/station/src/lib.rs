@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod config;
 pub mod protocol;
+pub mod rate_limit;
 pub mod router;
 pub mod science;
 pub mod server;

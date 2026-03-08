@@ -451,6 +451,7 @@ fn handle_directory(registry: &ConfigRegistry) -> ToolCallResult {
     let directory = serde_json::json!({
         "station": "NexVigilant Station",
         "version": env!("CARGO_PKG_VERSION"),
+        "git_sha": env!("GIT_SHA"),
         "description": "Pharmacovigilance intelligence platform — drug safety monitoring, signal detection, regulatory data extraction across FDA, EMA, WHO, and clinical trial registries.",
         "total_domains": registry.configs.len(),
         "total_tools": registry.tool_count(),

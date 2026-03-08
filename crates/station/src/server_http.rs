@@ -160,5 +160,6 @@ async fn handle_health(
         "courses": crate::science::course_count(),
         "server": "nexvigilant-station",
         "version": env!("CARGO_PKG_VERSION"),
+        "git_sha": env!("GIT_SHA"),
     }))
 }
