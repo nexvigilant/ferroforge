@@ -4,34 +4,50 @@
 
 ## NexVigilant Station
 
-MCP (Model Context Protocol) server hub that routes AI agent traffic through pharmacovigilance tooling. Drop a config file → expose tools to any MCP-compatible agent.
+MCP (Model Context Protocol) server that routes AI agent traffic through pharmacovigilance tooling. Drop a config file → expose tools to any MCP-compatible agent.
 
 ### What It Does
 
 ```
-Agent connects via stdio → Station loads configs/ → Agent discovers 70+ PV tools → Agent calls tools
+Agent connects → Station loads configs/ → Agent discovers 174 PV tools → Agent calls tools
 ```
 
-**16 domain configs. 70 tools. One binary.**
+**23 domain configs. 174 tools. One binary.** (17 public configs / 6 private)
 
 | Domain | Tools | Coverage |
 |--------|-------|----------|
-| api.fda.gov | 2 | FAERS adverse event search, drug counts |
-| accessdata.fda.gov | 6 | Approvals, Orange Book, REMS, recalls |
-| www.fda.gov/safety | 4 | Safety communications, MedWatch, boxed warnings |
-| dailymed.nlm.nih.gov | 3 | Drug labels, adverse reactions, search |
-| clinicaltrials.gov | 5 | Trial search, safety endpoints, SAEs |
-| www.ema.europa.eu | 6 | EPARs, PRAC signals, PSURs, RMPs |
-| eudravigilance.ema.europa.eu | 4 | EU ICSRs, signal summaries, case counts |
-| vigiaccess.org | 5 | WHO global reports, demographics, regions |
-| who-umc.org | 4 | VigiBase, causality assessment, methodology |
-| ich.org | 4 | ICH guidelines, E2x PV series, MedDRA |
-| meddra.org | 4 | Term search, hierarchy, SOC, SMQs |
-| pubmed.ncbi.nlm.nih.gov | 5 | Articles, case reports, signal literature |
+| api.fda.gov | 7 | FAERS adverse event search, drug counts, outcomes |
+| accessdata.fda.gov | 6 | Approvals, Orange Book, REMS, recalls, labeling changes |
+| www.fda.gov | 7 | Safety communications, MedWatch, boxed warnings |
+| dailymed.nlm.nih.gov | 6 | Drug labels, adverse reactions, interactions, search |
+| clinicaltrials.gov | 7 | Trial search, safety endpoints, SAEs, study design |
+| www.ema.europa.eu | 6 | EPARs, PRAC signals, PSURs, RMPs, referrals |
+| eudravigilance.ema.europa.eu | 7 | EU ICSRs, signal summaries, case counts, demographics |
+| vigiaccess.org | 7 | WHO global reports, demographics, regions, reporters |
+| who-umc.org | 7 | VigiBase, causality assessment, signal methodology |
+| ich.org | 7 | ICH guidelines, E2x PV series, MedDRA, quality |
+| meddra.org | 7 | Term search, hierarchy, SOC, SMQs, multiaxiality |
+| pubmed.ncbi.nlm.nih.gov | 7 | Articles, case reports, signal literature, citations |
 | rxnav.nlm.nih.gov | 6 | RxNorm, drug interactions, NDCs, classes |
-| go.drugbank.com | 5 | Pharmacology, interactions, targets, ADRs |
-| open-vigil.fr | 4 | Disproportionality (PRR/ROR/IC), rankings |
-| cioms.ch | 3 | Working groups, CIOMS form, publications |
+| go.drugbank.com | 7 | Pharmacology, interactions, targets, ADRs, classification |
+| open-vigil.fr | 7 | Disproportionality (PRR/ROR/IC), compare drugs, rankings |
+| cioms.ch | 7 | Working groups, CIOMS forms, publications, causality |
+| calculate.nexvigilant.com | 17 | PRR, ROR, IC, EBGM, Naranjo, WHO-UMC, benefit-risk, NNH |
+
+Plus 4 Rust meta-tools: `nexvigilant_chart_course`, `nexvigilant_capabilities`, `nexvigilant_directory`, `nexvigilant_station_health`.
+
+### Research Courses
+
+6 predefined multi-tool workflows via `nexvigilant_chart_course`:
+
+| Course | Steps | Description |
+|--------|-------|-------------|
+| `drug-safety-profile` | 6 | RxNorm → FAERS → DailyMed → PubMed → EudraVigilance → VigiAccess |
+| `signal-investigation` | 6 | FAERS → disproportionality → EU signals → case reports → trial SAEs → PRAC |
+| `causality-assessment` | 4 | FAERS → disproportionality → WHO-UMC causality → case reports |
+| `benefit-risk-assessment` | 4 | Trial endpoints → FAERS outcomes → label ADRs → EU RMP |
+| `regulatory-intelligence` | 3 | ICH guidelines → EMA EPAR → FDA approval history |
+| `competitive-landscape` | 3 | Drug targets → head-to-head comparison → clinical pipeline |
 
 ### Quick Start
 
@@ -45,6 +61,23 @@ cargo build -p nexvigilant-station --release
 # Test MCP protocol
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | ./target/release/nexvigilant-station --config-dir configs
 ```
+
+### Production — Cloud Run
+
+Live at `mcp.nexvigilant.com`. Combined transport (Streamable HTTP + SSE + HTTP REST). CORS enabled. 129 public tools (125 from configs + 4 meta-tools).
+
+```bash
+# Deploy
+./scripts/deploy-cloud-run.sh
+
+# Health check
+curl https://mcp.nexvigilant.com/health
+
+# Tool count
+curl https://mcp.nexvigilant.com/tools | python3 -c "import sys,json; print(len(json.load(sys.stdin)))"
+```
+
+**Claude.ai Connector:** `https://mcp.nexvigilant.com/mcp` — authless, MCP 2025-03-26 Streamable HTTP.
 
 ### MCP Integration
 
@@ -91,17 +124,9 @@ configs/*.json  →  ConfigRegistry  →  MCP tools/list  →  Agent discovery
                                    →  MCP tools/call  →  Router  →  Handler
 ```
 
-**Primitives:**
-- `→ (Causality)` — Config → Registry → Tool → Response
-- `∂ (Boundary)` — JSON-RPC 2.0 protocol boundary, domain isolation
-- `σ (Structure)` — HubConfig schema: domain + tools + parameters
-- `ς (State)` — ConfigRegistry holds mutable tool catalog
-- `ν (Frequency)` — Each config adds N tools; total = Σ(config.tools.len())
-- `∃ (Existence)` — Tool exists iff config file exists in configs/
-
 ### Validation
 
-29 integration tests covering protocol, config loading, routing, and real config verification.
+44 integration tests covering protocol, config loading, routing, auth, and real config verification.
 
 ```bash
 cargo test -p nexvigilant-station
@@ -127,7 +152,7 @@ See `crates/borrow_miner/README.md` for full documentation.
 ```
 ferroforge/
 ├── Cargo.toml              # Workspace root
-├── configs/                # Hub config files (16 domains, 70 tools)
+├── configs/                # Hub config files (23 domains, 174 tools)
 │   ├── openfda.json
 │   ├── dailymed.json
 │   ├── clinicaltrials.json
@@ -143,7 +168,14 @@ ferroforge/
 │   ├── fda-accessdata.json
 │   ├── fda-safety.json
 │   ├── who-umc.json
-│   └── cioms.json
+│   ├── cioms.json
+│   ├── calculation.json
+│   ├── primitives.json       (private)
+│   ├── linkedin.json         (private)
+│   ├── wikipedia.json        (private)
+│   ├── science-hexim1.json   (private)
+│   ├── science-drug-targets.json (private)
+│   └── science-genomics.json (private)
 └── crates/
     ├── station/            # NexVigilant Station MCP server
     │   ├── src/
@@ -154,7 +186,7 @@ ferroforge/
     │   │   ├── router.rs   # Tool dispatch
     │   │   └── server.rs   # Stdio MCP server loop
     │   └── tests/
-    │       └── integration.rs  # 29 tests
+    │       └── integration.rs  # 44 tests
     └── borrow_miner/       # Educational Rust game
 ```
 

@@ -37,11 +37,49 @@ const COURSES: &[(&str, &str, &[&str])] = &[
         "Investigate a safety signal: FAERS data → disproportionality → EU confirmation → case reports → trial SAEs → PRAC status",
         &[
             "api_fda_gov_search_adverse_events",
-            "open_vigil_fr_compute_disproportionality",
+            "open-vigil_fr_compute_disproportionality",
             "eudravigilance_ema_europa_eu_get_signal_summary",
             "pubmed_ncbi_nlm_nih_gov_search_case_reports",
             "clinicaltrials_gov_get_serious_adverse_events",
             "www_ema_europa_eu_get_safety_signals",
+        ],
+    ),
+    (
+        "causality-assessment",
+        "Assess drug-event causality: FAERS case counts → disproportionality → WHO-UMC framework → published case reports",
+        &[
+            "api_fda_gov_search_adverse_events",
+            "open-vigil_fr_compute_disproportionality",
+            "who-umc_org_get_causality_assessment",
+            "pubmed_ncbi_nlm_nih_gov_search_case_reports",
+        ],
+    ),
+    (
+        "benefit-risk-assessment",
+        "Quantify benefit-risk: trial safety endpoints → FAERS outcome distribution → label ADRs → EU risk management plan",
+        &[
+            "clinicaltrials_gov_get_safety_endpoints",
+            "api_fda_gov_get_event_outcomes",
+            "dailymed_nlm_nih_gov_get_adverse_reactions",
+            "www_ema_europa_eu_get_rmp_summary",
+        ],
+    ),
+    (
+        "regulatory-intelligence",
+        "Trace regulatory lifecycle: ICH PV guidelines → EU assessment report → FDA approval history",
+        &[
+            "ich_org_get_pv_guidelines",
+            "www_ema_europa_eu_get_epar",
+            "accessdata_fda_gov_get_approval_history",
+        ],
+    ),
+    (
+        "competitive-landscape",
+        "Map competitive terrain: drug targets → head-to-head disproportionality → active clinical pipeline",
+        &[
+            "go_drugbank_com_get_targets",
+            "open-vigil_fr_compare_drugs",
+            "clinicaltrials_gov_search_trials",
         ],
     ),
     // NOTE: target-investigation and gene-profile courses removed — they reference

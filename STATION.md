@@ -30,7 +30,7 @@ N (Quantity)     Case counts, event frequencies, confidence intervals
 
 ## Domain Coverage Map
 
-16 configs, 70 tools as verified by `cargo test -p nexvigilant-station` (source: `crates/station/tests/integration.rs:test_load_real_configs_directory`).
+23 configs, 174 tools (17 public / 6 private). 129 public tools served (125 from configs + 4 Rust meta-tools). Verified by `cargo test -p nexvigilant-station` (44 tests, source: `crates/station/tests/integration.rs`).
 
 ```
                     ┌─────────────────────────┐
@@ -38,18 +38,19 @@ N (Quantity)     Case counts, event frequencies, confidence intervals
                     │   INTELLIGENCE GRAPH     │
                     └─────────┬───────────────┘
                               │
-         ┌────────────────────┼────────────────────┐
-         │                    │                    │
-    ┌────▼────┐         ┌────▼────┐         ┌────▼────┐
-    │ SAFETY  │         │ DRUG    │         │ REGULATORY│
-    │ DATA    │         │ INFO    │         │ GUIDANCE  │
-    └────┬────┘         └────┬────┘         └────┬─────┘
-         │                   │                    │
-    ┌────┼────┐         ┌────┼────┐         ┌────┼────┐
-    │    │    │         │    │    │         │    │    │
-   FDA  EMA  WHO     DailyMed RxNav     ICH  CIOMS MedDRA
-   FAERS EudV VigiA  DrugBank          E2x  Forms  SMQs
-   Safety     OpenV  PubMed            WGs   ICSRs  Terms
+    ┌──────────────┬──────────┼──────────┬──────────────┐
+    │              │          │          │              │
+┌───▼───┐    ┌────▼────┐ ┌───▼───┐ ┌────▼────┐   ┌────▼────┐
+│SAFETY │    │ DRUG    │ │COMPUTE│ │REGULATORY│   │RESEARCH │
+│ DATA  │    │ INFO    │ │ENGINE │ │ GUIDANCE │   │ COURSES │
+└───┬───┘    └────┬────┘ └───┬───┘ └────┬─────┘   └────┬────┘
+    │             │          │          │              │
+┌───┼───┐   ┌────┼────┐    PRR    ┌────┼────┐     6 courses
+│   │   │   │    │    │    ROR    │    │    │     (chart_course)
+FDA EMA WHO DailyMed   IC/EBGM  ICH  CIOMS
+FAERS    VigiA RxNav   Naranjo  E2x  Forms
+Safety   OpenV DrugBank WHO-UMC WGs   MedDRA
+  EudV        PubMed   B/R     SMQs
 ```
 
 ## Agent Workflow Patterns
@@ -84,7 +85,37 @@ N (Quantity)     Case counts, event frequencies, confidence intervals
 6. fda-accessdata/get-rems → US REMS requirements
 ```
 
-### Pattern 4: Drug Comparison
+### Pattern 4: Causality Assessment
+```
+1. openfda/search-adverse-events → FAERS case counts
+2. openvigilfrance/compute-disproportionality → PRR/ROR/IC
+3. who-umc/get-causality-assessment → WHO-UMC framework
+4. pubmed/search-case-reports → published case evidence
+```
+
+### Pattern 5: Benefit-Risk Assessment
+```
+1. clinicaltrials/get-safety-endpoints → trial safety data
+2. openfda/get-event-outcomes → FAERS outcome distribution
+3. dailymed/get-adverse-reactions → labeled ADRs
+4. ema/get-rmp-summary → EU risk management plan
+```
+
+### Pattern 6: Regulatory Intelligence
+```
+1. ich/get-pv-guidelines → applicable ICH guidelines
+2. ema/get-epar → EU assessment report
+3. fda-accessdata/get-approval-history → FDA approval history
+```
+
+### Pattern 7: Competitive Landscape
+```
+1. drugbank/get-targets → drug target profile
+2. openvigilfrance/compare-drugs → head-to-head disproportionality
+3. clinicaltrials/search-trials → active clinical pipeline
+```
+
+### Pattern 8: Drug Comparison
 ```
 For each drug in comparison set:
   1. rxnav/get-drug-classes → therapeutic class

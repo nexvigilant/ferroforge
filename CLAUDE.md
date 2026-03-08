@@ -10,7 +10,7 @@ Rust MCP server + 23 PV domain configs (174 tools). The station binary reads JSO
 
 ```bash
 cargo build -p nexvigilant-station --release    # Build station binary
-cargo test -p nexvigilant-station               # 37 integration tests
+cargo test -p nexvigilant-station               # 44 integration tests
 cargo clippy -p nexvigilant-station -- -D warnings
 
 # MCP protocol test
@@ -93,13 +93,13 @@ Add as connector in Claude.ai Settings → Connectors:
 - **URL:** `https://mcp.nexvigilant.com/mcp`
 - **Auth:** None (authless — `NEXVIGILANT_API_KEYS` not set on Cloud Run)
 - **Protocol:** MCP 2025-03-26 Streamable HTTP
-- **Tools visible:** 112 (public configs only — `--exclude-private` filters 7 private configs)
+- **Tools visible:** 129 (public configs only — `--exclude-private` filters 6 private configs)
 
 Source: `crates/station/src/server_streamable.rs`. Session-optional design: Claude.ai doesn't forward `Mcp-Session-Id` header, so all requests process statelessly.
 
 ### Public vs Private Configs
 
-`--exclude-private` flag in Dockerfile CMD filters configs with `"private": true`. 16 public configs (112 tools) are exposed on Cloud Run. 7 private configs (62 tools) are available locally via stdio/mcp-lazy-proxy but not on the public endpoint.
+`--exclude-private` flag in Dockerfile CMD filters configs with `"private": true`. 17 public configs (125 config tools + 4 Rust meta-tools = 129 served) are exposed on Cloud Run. 6 private configs (49 tools) are available locally via stdio/mcp-lazy-proxy but not on the public endpoint.
 
 **DO NOT deploy to webmcp-hub.com.** The third-party hub has a 50-config cap and is no longer the primary deployment target. All agent traffic routes through `mcp.nexvigilant.com`.
 

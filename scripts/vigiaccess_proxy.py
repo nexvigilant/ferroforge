@@ -3,193 +3,601 @@
 VigiAccess (WHO) Proxy — routes MoltBrowser hub tool calls for vigiaccess.org.
 
 Usage:
-    echo '{"tool": "search-reports", "args": {"drug_name": "metformin"}}' | python3 vigiaccess_proxy.py
+    echo '{"tool": "search-reports", "args": {"medicine": "metformin"}}' | python3 vigiaccess_proxy.py
 
-VigiAccess has no public API. All tools return intelligent stubs describing
-what each tool will return when live (via web scraping or WHO-UMC API access).
+VigiAccess uses Fable.Remoting over HTTPS. Requests are JSON; responses are
+MessagePack (application/vnd.msgpack). This proxy includes a minimal stdlib-only
+MessagePack decoder to handle responses without external dependencies.
 
 Reads a single JSON object from stdin, dispatches to the appropriate handler,
 writes a structured JSON response to stdout. No external dependencies — stdlib only.
 """
 
+from __future__ import annotations
+
 import json
+import re
+import struct
 import sys
+import urllib.error
+import urllib.request
+from typing import Any
+
+BASE_URL = "https://www.vigiaccess.org/protocol/IProtocol"
+REQUEST_TIMEOUT = 10
+USER_AGENT = "NexVigilant-FerroForge/1.0 (ferroforge@nexvigilant.com)"
+
+# Zero-width characters injected by VigiAccess into strings (anti-scraping).
+_ZW_RE = re.compile(
+    r"[\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff\u034f\u00ad]"
+)
 
 
-def _stub_response(tool_name: str, description: str, args: dict) -> dict:
-    """Build a standardized stub response for a VigiAccess tool."""
+# ---------------------------------------------------------------------------
+# Minimal MessagePack decoder (stdlib only, covers types returned by VigiAccess)
+# ---------------------------------------------------------------------------
+
+def _decode_msgpack(data: bytes, offset: int = 0):
+    """Decode one MessagePack value from *data* starting at *offset*.
+
+    Returns (value, new_offset).  Supports: nil, bool, positive/negative fixint,
+    uint8/16/32, int8/16/32, float32/64, fixstr/str8/str16, fixarray/array16/array32,
+    fixmap/map16, bin8/bin16.  Raises ValueError on unsupported types.
+    """
+    b = data[offset]
+
+    # nil
+    if b == 0xC0:
+        return None, offset + 1
+    # false / true
+    if b == 0xC2:
+        return False, offset + 1
+    if b == 0xC3:
+        return True, offset + 1
+
+    # positive fixint 0x00-0x7f
+    if b <= 0x7F:
+        return b, offset + 1
+    # negative fixint 0xe0-0xff
+    if b >= 0xE0:
+        return b - 256, offset + 1
+
+    # unsigned integers
+    if b == 0xCC:
+        return data[offset + 1], offset + 2
+    if b == 0xCD:
+        return struct.unpack(">H", data[offset + 1 : offset + 3])[0], offset + 3
+    if b == 0xCE:
+        return struct.unpack(">I", data[offset + 1 : offset + 5])[0], offset + 5
+
+    # signed integers
+    if b == 0xD0:
+        return struct.unpack(">b", data[offset + 1 : offset + 2])[0], offset + 2
+    if b == 0xD1:
+        return struct.unpack(">h", data[offset + 1 : offset + 3])[0], offset + 3
+    if b == 0xD2:
+        return struct.unpack(">i", data[offset + 1 : offset + 5])[0], offset + 5
+
+    # float 32 / 64
+    if b == 0xCA:
+        return struct.unpack(">f", data[offset + 1 : offset + 5])[0], offset + 5
+    if b == 0xCB:
+        return struct.unpack(">d", data[offset + 1 : offset + 9])[0], offset + 9
+
+    # fixstr 0xa0-0xbf
+    if 0xA0 <= b <= 0xBF:
+        n = b & 0x1F
+        offset += 1
+        return data[offset : offset + n].decode("utf-8", errors="replace"), offset + n
+    # str 8
+    if b == 0xD9:
+        n = data[offset + 1]
+        offset += 2
+        return data[offset : offset + n].decode("utf-8", errors="replace"), offset + n
+    # str 16
+    if b == 0xDA:
+        n = struct.unpack(">H", data[offset + 1 : offset + 3])[0]
+        offset += 3
+        return data[offset : offset + n].decode("utf-8", errors="replace"), offset + n
+    # str 32
+    if b == 0xDB:
+        n = struct.unpack(">I", data[offset + 1 : offset + 5])[0]
+        offset += 5
+        return data[offset : offset + n].decode("utf-8", errors="replace"), offset + n
+
+    # bin 8 / bin 16 (skip over, return as bytes)
+    if b == 0xC4:
+        n = data[offset + 1]
+        offset += 2
+        return data[offset : offset + n], offset + n
+    if b == 0xC5:
+        n = struct.unpack(">H", data[offset + 1 : offset + 3])[0]
+        offset += 3
+        return data[offset : offset + n], offset + n
+
+    # fixarray 0x90-0x9f
+    if 0x90 <= b <= 0x9F:
+        n = b & 0x0F
+        offset += 1
+        items = []
+        for _ in range(n):
+            val, offset = _decode_msgpack(data, offset)
+            items.append(val)
+        return items, offset
+    # array 16
+    if b == 0xDC:
+        n = struct.unpack(">H", data[offset + 1 : offset + 3])[0]
+        offset += 3
+        items = []
+        for _ in range(n):
+            val, offset = _decode_msgpack(data, offset)
+            items.append(val)
+        return items, offset
+    # array 32
+    if b == 0xDD:
+        n = struct.unpack(">I", data[offset + 1 : offset + 5])[0]
+        offset += 5
+        items = []
+        for _ in range(n):
+            val, offset = _decode_msgpack(data, offset)
+            items.append(val)
+        return items, offset
+
+    # fixmap 0x80-0x8f
+    if 0x80 <= b <= 0x8F:
+        n = b & 0x0F
+        offset += 1
+        d = {}
+        for _ in range(n):
+            k, offset = _decode_msgpack(data, offset)
+            v, offset = _decode_msgpack(data, offset)
+            d[k] = v
+        return d, offset
+    # map 16
+    if b == 0xDE:
+        n = struct.unpack(">H", data[offset + 1 : offset + 3])[0]
+        offset += 3
+        d = {}
+        for _ in range(n):
+            k, offset = _decode_msgpack(data, offset)
+            v, offset = _decode_msgpack(data, offset)
+            d[k] = v
+        return d, offset
+
+    raise ValueError(f"Unsupported msgpack type: 0x{b:02x} at offset {offset}")
+
+
+def _clean_str(s: str) -> str:
+    """Remove zero-width / soft-hyphen characters injected by VigiAccess."""
+    return _ZW_RE.sub("", s)
+
+
+def _clean(obj: Any) -> Any:
+    """Recursively clean strings in decoded msgpack data."""
+    if isinstance(obj, str):
+        return _clean_str(obj)
+    if isinstance(obj, list):
+        return [_clean(x) for x in obj]
+    if isinstance(obj, dict):
+        return {_clean(k): _clean(v) for k, v in obj.items()}
+    if isinstance(obj, bytes):
+        return None  # binary blobs not used in our data
+    return obj
+
+
+# ---------------------------------------------------------------------------
+# HTTP helpers
+# ---------------------------------------------------------------------------
+
+def _post_rpc(method: str, body_json: str) -> bytes:
+    """POST to VigiAccess Fable.Remoting endpoint. Returns raw response bytes."""
+    url = f"{BASE_URL}/{method}"
+    req = urllib.request.Request(
+        url,
+        data=body_json.encode("utf-8"),
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "Accept": "*/*",
+            "User-Agent": USER_AGENT,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+            return resp.read()
+    except urllib.error.URLError as exc:
+        reason = getattr(exc, "reason", str(exc))
+        raise RuntimeError(f"VigiAccess request failed: {reason}") from exc
+
+
+def _rpc_call(method: str, body_json: str) -> Any:
+    """Call a Fable.Remoting method and return decoded, cleaned result."""
+    raw = _post_rpc(method, body_json)
+    result, _ = _decode_msgpack(raw)
+    return _clean(result)
+
+
+def _unavailable_response(message: str = "") -> dict:
+    msg = message or "VigiAccess service unreachable. Try again later."
+    return {"status": "unavailable", "message": msg}
+
+
+# ---------------------------------------------------------------------------
+# Search helper — shared by all tools that need to resolve medicine → DrugId
+# ---------------------------------------------------------------------------
+
+def _search_drug(medicine: str):
+    """Search VigiAccess for a medicine name. Returns list of Drug dicts."""
+    body = json.dumps([medicine])
+    raw_drugs = _rpc_call("search", body)
+    if not isinstance(raw_drugs, list):
+        return []
+    drugs = []
+    for drug_raw in raw_drugs:
+        # Drug: [DrugId_option, ActiveIngredient_option, TradeName_option]
+        drug_id_union = drug_raw[0]  # [0, [0, "hash"]]
+        active_union = drug_raw[1]   # [0, "name"]
+        trade_union = drug_raw[2]    # [1, [0, "name"]] or [0]
+
+        encrypted_hash = None
+        if (isinstance(drug_id_union, list) and len(drug_id_union) >= 2
+                and drug_id_union[0] == 0 and isinstance(drug_id_union[1], list)
+                and len(drug_id_union[1]) >= 2):
+            encrypted_hash = drug_id_union[1][1]
+
+        active = None
+        if isinstance(active_union, list) and len(active_union) >= 2 and active_union[0] == 0:
+            active = active_union[1]
+
+        trade = None
+        if isinstance(trade_union, list) and len(trade_union) >= 2 and trade_union[0] == 1:
+            inner = trade_union[1]
+            if isinstance(inner, list) and len(inner) >= 2:
+                trade = inner[1]
+
+        drugs.append({
+            "encrypted_id": encrypted_hash,
+            "active_ingredient": active,
+            "trade_name": trade,
+        })
+    return drugs
+
+
+def _get_distribution(encrypted_id: str):
+    """Fetch the full distribution data for a drug by its encrypted ID.
+
+    Returns a dict with keys: total_count, reactions, regions, age_groups, sex, years.
+    """
+    body = json.dumps([{"DrugId": {"Encrypted": encrypted_id}}])
+    dist = _rpc_call("distribution", body)
+    if not isinstance(dist, list) or len(dist) < 6:
+        raise RuntimeError("Unexpected distribution response format")
+
+    # Distribution: [TotalCount, Reaction[], Region[], AgeGroup[], Sex[], Year[]]
+    total_count = dist[0]
+
+    reactions = []
+    for rxn in dist[1]:
+        # Reaction: [SocId_option, Description_option, Count]
+        desc_union = rxn[1]
+        desc = desc_union[1] if isinstance(desc_union, list) and len(desc_union) >= 2 else str(desc_union)
+        count = rxn[2]
+        reactions.append({"soc": desc, "count": count})
+
+    regions = [{"region": item[0], "count": item[1]} for item in dist[2]]
+    age_groups = [{"age_group": item[0], "count": item[1]} for item in dist[3]]
+    sex = [{"sex": item[0], "count": item[1]} for item in dist[4]]
+    years = [{"year": item[0], "count": item[1]} for item in dist[5]]
+
     return {
-        "status": "stub",
-        "tool": tool_name,
-        "description": description,
-        "parameters_received": args,
-        "data_source": "vigiaccess.org",
-        "implementation_notes": "Requires VigiAccess web scraping or WHO-UMC API access",
+        "total_count": total_count,
+        "reactions": reactions,
+        "regions": regions,
+        "age_groups": age_groups,
+        "sex": sex,
+        "years": years,
     }
 
 
+def _resolve_and_distribute(medicine: str):
+    """Search for a medicine, pick the first match, fetch distribution."""
+    drugs = _search_drug(medicine)
+    if not drugs:
+        return None, None
+    # Pick the first result (best match)
+    best = drugs[0]
+    if not best.get("encrypted_id"):
+        return best, None
+    dist = _get_distribution(best["encrypted_id"])
+    return best, dist
+
+
+# ---------------------------------------------------------------------------
+# Tool handlers
+# ---------------------------------------------------------------------------
+
 def search_reports(args: dict) -> dict:
-    """
-    Tool: search-reports
+    """Search VigiBase reports by medicine name."""
+    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    if not medicine:
+        return {"status": "error", "message": "medicine is required"}
 
-    Searches VigiAccess for individual case safety reports (ICSRs) matching
-    the given drug name. Returns report counts and summary statistics from
-    the WHO global pharmacovigilance database (VigiBase).
-    """
-    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
-    if not drug_name:
-        return {"status": "error", "message": "drug_name or medicine is required"}
+    try:
+        drugs = _search_drug(medicine)
+    except RuntimeError as exc:
+        return _unavailable_response(str(exc))
+    except Exception as exc:
+        return {"status": "error", "message": f"Search failed: {exc}"}
 
-    resp = _stub_response(
-        "search-reports",
-        (
-            "Returns total ICSR count, year-over-year trend, and geographic "
-            "summary for the specified drug from VigiBase via VigiAccess. "
-            "Includes total reports, reports by year, and top reporting regions."
-        ),
-        args,
-    )
-    resp["results"] = []
-    resp["count"] = 0
-    return resp
+    if not drugs:
+        return {"status": "ok", "count": 0, "results": [],
+                "message": f"No results found for '{medicine}'"}
+
+    # For the first/best match, get the total ICSR count
+    best = drugs[0]
+    total_count = 0
+    if best.get("encrypted_id"):
+        try:
+            dist = _get_distribution(best["encrypted_id"])
+            total_count = dist["total_count"]
+        except Exception:
+            pass  # count stays 0; search results still returned
+
+    results = []
+    for d in drugs:
+        entry = {"active_ingredient": d["active_ingredient"]}
+        if d.get("trade_name"):
+            entry["trade_name"] = d["trade_name"]
+        results.append(entry)
+
+    return {
+        "status": "ok",
+        "count": total_count,
+        "medicine": medicine,
+        "active_ingredient": best.get("active_ingredient"),
+        "total_reports": total_count,
+        "results": results,
+    }
 
 
 def get_adverse_reactions(args: dict) -> dict:
-    """
-    Tool: get-adverse-reactions
+    """Get adverse reaction breakdown by SOC for a medicine."""
+    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    if not medicine:
+        return {"status": "error", "message": "medicine is required"}
 
-    Retrieves adverse reaction profile for a drug from VigiAccess, grouped
-    by MedDRA System Organ Class (SOC). Returns reaction counts by SOC
-    with drill-down to Preferred Term level.
-    """
-    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
-    if not drug_name:
-        return {"status": "error", "message": "drug_name or medicine is required"}
+    try:
+        best, dist = _resolve_and_distribute(medicine)
+    except RuntimeError as exc:
+        return _unavailable_response(str(exc))
+    except Exception as exc:
+        return {"status": "error", "message": f"Request failed: {exc}"}
 
-    return _stub_response(
-        "get-adverse-reactions",
-        (
-            "Returns adverse reactions grouped by MedDRA System Organ Class "
-            "(SOC) with counts. Each SOC entry includes total reports and "
-            "percentage of all reports. Drill-down to Preferred Term available."
-        ),
-        args,
-    )
+    if not best:
+        return {"status": "ok", "data": {"medicine": medicine, "reactions": []},
+                "message": f"No results found for '{medicine}'"}
+    if not dist:
+        return {"status": "error", "message": "Could not retrieve distribution data"}
+
+    total = dist["total_count"]
+    reactions = []
+    for rxn in dist["reactions"]:
+        pct = round(rxn["count"] / total * 100, 1) if total > 0 else 0
+        reactions.append({
+            "soc": rxn["soc"],
+            "count": rxn["count"],
+            "percentage": pct,
+        })
+
+    return {
+        "status": "ok",
+        "data": {
+            "medicine": medicine,
+            "active_ingredient": best.get("active_ingredient"),
+            "total_reports": total,
+            "reactions": reactions,
+        },
+    }
 
 
 def get_reporter_distribution(args: dict) -> dict:
-    """
-    Tool: get-reporter-distribution
+    """Get report distribution by reporter type.
 
-    Returns the distribution of reporter types (healthcare professional,
-    consumer, pharmaceutical company, other) for a drug's VigiAccess reports.
+    Note: VigiAccess does not expose reporter-type breakdown in its public
+    interface. This tool returns the geographic (continent) distribution as
+    the closest available proxy, clearly labeled. The VigiAccess UI itself
+    does not show reporter-type data.
     """
-    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
-    if not drug_name:
-        return {"status": "error", "message": "drug_name or medicine is required"}
+    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    if not medicine:
+        return {"status": "error", "message": "medicine is required"}
 
-    return _stub_response(
-        "get-reporter-distribution",
-        (
-            "Returns reporter type breakdown: healthcare professional, "
-            "consumer/non-healthcare professional, pharmaceutical company, "
-            "and other/not specified. Includes counts and percentages."
-        ),
-        args,
-    )
+    try:
+        best, dist = _resolve_and_distribute(medicine)
+    except RuntimeError as exc:
+        return _unavailable_response(str(exc))
+    except Exception as exc:
+        return {"status": "error", "message": f"Request failed: {exc}"}
+
+    if not best:
+        return {"status": "ok", "data": {"medicine": medicine, "distribution": []},
+                "message": f"No results found for '{medicine}'"}
+    if not dist:
+        return {"status": "error", "message": "Could not retrieve distribution data"}
+
+    # VigiAccess public API does not provide reporter-type breakdown.
+    # Return what we have and note the limitation.
+    return {
+        "status": "ok",
+        "data": {
+            "medicine": medicine,
+            "active_ingredient": best.get("active_ingredient"),
+            "total_reports": dist["total_count"],
+            "note": "VigiAccess does not publicly expose reporter-type distribution. "
+                    "Geographic distribution is provided instead.",
+            "distribution": dist["regions"],
+        },
+    }
 
 
 def get_age_distribution(args: dict) -> dict:
-    """
-    Tool: get-age-distribution
+    """Get case distribution by patient age group."""
+    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    if not medicine:
+        return {"status": "error", "message": "medicine is required"}
 
-    Returns the age group distribution of patients in a drug's VigiAccess
-    reports. Age groups follow WHO standard bands (0-27 days, 28 days-23 months,
-    2-11 years, 12-17 years, 18-44, 45-64, 65-74, 75+, unknown).
-    """
-    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
-    if not drug_name:
-        return {"status": "error", "message": "drug_name or medicine is required"}
+    try:
+        best, dist = _resolve_and_distribute(medicine)
+    except RuntimeError as exc:
+        return _unavailable_response(str(exc))
+    except Exception as exc:
+        return {"status": "error", "message": f"Request failed: {exc}"}
 
-    return _stub_response(
-        "get-age-distribution",
-        (
-            "Returns patient age group distribution using WHO standard bands: "
-            "neonates (0-27 days), infants (28 days-23 months), children (2-11), "
-            "adolescents (12-17), adults (18-44, 45-64), elderly (65-74, 75+), "
-            "and unknown. Includes counts and percentages per band."
-        ),
-        args,
-    )
+    if not best:
+        return {"status": "ok", "data": {"medicine": medicine, "distribution": []},
+                "message": f"No results found for '{medicine}'"}
+    if not dist:
+        return {"status": "error", "message": "Could not retrieve distribution data"}
+
+    total = dist["total_count"]
+    age_data = []
+    for ag in dist["age_groups"]:
+        pct = round(ag["count"] / total * 100, 1) if total > 0 else 0
+        age_data.append({
+            "age_group": ag["age_group"],
+            "count": ag["count"],
+            "percentage": pct,
+        })
+
+    return {
+        "status": "ok",
+        "data": {
+            "medicine": medicine,
+            "active_ingredient": best.get("active_ingredient"),
+            "total_reports": total,
+            "distribution": age_data,
+        },
+    }
 
 
 def get_region_distribution(args: dict) -> dict:
-    """
-    Tool: get-region-distribution
+    """Get geographic distribution of reports by WHO region."""
+    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    if not medicine:
+        return {"status": "error", "message": "medicine is required"}
 
-    Returns the geographic distribution of a drug's VigiAccess reports by
-    WHO region (Africa, Americas, Eastern Mediterranean, Europe, South-East
-    Asia, Western Pacific).
-    """
-    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
-    if not drug_name:
-        return {"status": "error", "message": "drug_name or medicine is required"}
+    try:
+        best, dist = _resolve_and_distribute(medicine)
+    except RuntimeError as exc:
+        return _unavailable_response(str(exc))
+    except Exception as exc:
+        return {"status": "error", "message": f"Request failed: {exc}"}
 
-    return _stub_response(
-        "get-region-distribution",
-        (
-            "Returns geographic breakdown by WHO region: Africa, Americas, "
-            "Eastern Mediterranean, Europe, South-East Asia, Western Pacific. "
-            "Includes report counts and percentages per region."
-        ),
-        args,
-    )
+    if not best:
+        return {"status": "ok", "data": {"medicine": medicine, "distribution": []},
+                "message": f"No results found for '{medicine}'"}
+    if not dist:
+        return {"status": "error", "message": "Could not retrieve distribution data"}
+
+    total = dist["total_count"]
+    region_data = []
+    for rg in dist["regions"]:
+        pct = round(rg["count"] / total * 100, 1) if total > 0 else 0
+        region_data.append({
+            "region": rg["region"],
+            "count": rg["count"],
+            "percentage": pct,
+        })
+
+    return {
+        "status": "ok",
+        "data": {
+            "medicine": medicine,
+            "active_ingredient": best.get("active_ingredient"),
+            "total_reports": total,
+            "distribution": region_data,
+        },
+    }
 
 
 def get_sex_distribution(args: dict) -> dict:
-    """
-    Tool: get-sex-distribution
+    """Get report distribution by patient sex."""
+    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    if not medicine:
+        return {"status": "error", "message": "medicine is required"}
 
-    Returns the distribution of reports by patient sex (male, female, unknown)
-    for a drug's VigiAccess reports.
-    """
-    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
-    if not drug_name:
-        return {"status": "error", "message": "drug_name or medicine is required"}
+    try:
+        best, dist = _resolve_and_distribute(medicine)
+    except RuntimeError as exc:
+        return _unavailable_response(str(exc))
+    except Exception as exc:
+        return {"status": "error", "message": f"Request failed: {exc}"}
 
-    return _stub_response(
-        "get-sex-distribution",
-        (
-            "Returns patient sex distribution: male, female, and unknown/not "
-            "specified. Includes report counts and percentages per category. "
-            "Useful for identifying sex-specific adverse reaction patterns."
-        ),
-        args,
-    )
+    if not best:
+        return {"status": "ok", "data": {"medicine": medicine, "distribution": []},
+                "message": f"No results found for '{medicine}'"}
+    if not dist:
+        return {"status": "error", "message": "Could not retrieve distribution data"}
+
+    total = dist["total_count"]
+    sex_data = []
+    for sx in dist["sex"]:
+        pct = round(sx["count"] / total * 100, 1) if total > 0 else 0
+        sex_data.append({
+            "sex": sx["sex"],
+            "count": sx["count"],
+            "percentage": pct,
+        })
+
+    return {
+        "status": "ok",
+        "data": {
+            "medicine": medicine,
+            "active_ingredient": best.get("active_ingredient"),
+            "total_reports": total,
+            "distribution": sex_data,
+        },
+    }
 
 
 def get_year_distribution(args: dict) -> dict:
-    """
-    Tool: get-year-distribution
+    """Get report distribution by reporting year for temporal trend analysis."""
+    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    if not medicine:
+        return {"status": "error", "message": "medicine is required"}
 
-    Returns the distribution of reports by reporting year for a drug's
-    VigiAccess entries. Useful for temporal trend analysis — identifying
-    signal emergence, reporting rate changes, and post-marketing surveillance
-    patterns.
-    """
-    drug_name = args.get("drug_name", args.get("medicine", "")).strip()
-    if not drug_name:
-        return {"status": "error", "message": "drug_name or medicine is required"}
+    try:
+        best, dist = _resolve_and_distribute(medicine)
+    except RuntimeError as exc:
+        return _unavailable_response(str(exc))
+    except Exception as exc:
+        return {"status": "error", "message": f"Request failed: {exc}"}
 
-    return _stub_response(
-        "get-year-distribution",
-        (
-            "Returns report counts by year from VigiBase. Enables temporal "
-            "trend analysis: signal emergence detection, reporting rate changes "
-            "after regulatory actions, and post-marketing surveillance patterns."
-        ),
-        args,
-    )
+    if not best:
+        return {"status": "ok", "data": {"medicine": medicine, "distribution": []},
+                "message": f"No results found for '{medicine}'"}
+    if not dist:
+        return {"status": "error", "message": "Could not retrieve distribution data"}
+
+    total = dist["total_count"]
+    year_data = []
+    for yr in dist["years"]:
+        pct = round(yr["count"] / total * 100, 1) if total > 0 else 0
+        year_data.append({
+            "year": yr["year"],
+            "count": yr["count"],
+            "percentage": pct,
+        })
+
+    return {
+        "status": "ok",
+        "data": {
+            "medicine": medicine,
+            "active_ingredient": best.get("active_ingredient"),
+            "total_reports": total,
+            "distribution": year_data,
+        },
+    }
 
 
 TOOL_DISPATCH = {
