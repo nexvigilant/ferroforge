@@ -4,6 +4,11 @@
 # Stage 1: Build the Rust binary
 FROM rust:1.93-slim AS builder
 
+# Git SHA for version stamping — passed by CI, defaults to "unknown" for local builds.
+# build.rs reads this env var since .git/ is excluded from the Docker context.
+ARG GIT_SHA=unknown
+ENV GIT_SHA=${GIT_SHA}
+
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/

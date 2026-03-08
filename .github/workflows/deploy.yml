@@ -35,12 +35,14 @@ jobs:
 
       - name: Deploy new revision (no traffic)
         run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           gcloud run deploy "$SERVICE" \
             --source . \
             --region "$REGION" \
             --project "$PROJECT_ID" \
             --allow-unauthenticated \
             --no-traffic \
+            --set-build-env-vars="GIT_SHA=${SHORT_SHA}" \
             --quiet
 
       - name: Get new revision name
@@ -65,22 +67,26 @@ jobs:
 
       - name: Smoke test canary
         run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
           sleep 15
-          HEALTH=$(curl -sf -m 15 https://mcp.nexvigilant.com/health)
-          STATUS=$(echo "$HEALTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
-          GIT_SHA=$(echo "$HEALTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get('git_sha','unknown'))")
+          # Hit the canary repeatedly — at 10% traffic, need multiple attempts
+          for i in 1 2 3 4 5; do
+            HEALTH=$(curl -sf -m 15 https://mcp.nexvigilant.com/health)
+            STATUS=$(echo "$HEALTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
+            GIT_SHA=$(echo "$HEALTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get('git_sha','unknown'))")
+            echo "Attempt $i — Status: $STATUS, SHA: $GIT_SHA (expected: $SHORT_SHA)"
+            if [ "$STATUS" != "ok" ]; then
+              echo "CANARY SMOKE TEST FAILED — rolling back"
+              gcloud run services update-traffic "$SERVICE" \
+                --project="$PROJECT_ID" \
+                --region="$REGION" \
+                --to-revisions="${{ steps.revision.outputs.name }}=0"
+              exit 1
+            fi
+            sleep 2
+          done
           TOOLS=$(curl -sf -m 15 https://mcp.nexvigilant.com/tools | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
-          echo "Health: $STATUS"
-          echo "Git SHA: $GIT_SHA"
           echo "Tools: $TOOLS"
-          if [ "$STATUS" != "ok" ]; then
-            echo "CANARY SMOKE TEST FAILED — rolling back"
-            gcloud run services update-traffic "$SERVICE" \
-              --project="$PROJECT_ID" \
-              --region="$REGION" \
-              --to-revisions="${{ steps.revision.outputs.name }}=0"
-            exit 1
-          fi
           echo "Canary healthy at 10% — promoting"
 
       - name: Promote — route 100% traffic
