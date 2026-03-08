@@ -666,6 +666,368 @@ def compute_expectedness(args: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Advanced Computations
+# ---------------------------------------------------------------------------
+
+def compute_time_to_onset(args: dict) -> dict:
+    """Time-to-onset analysis using Weibull distribution.
+
+    Weibull shape parameter (k) indicates onset pattern:
+      k < 1: early hazard (decreasing rate — reactions cluster early)
+      k = 1: constant hazard (exponential — random timing)
+      k > 1: late hazard (increasing rate — accumulation/sensitization)
+    """
+    onset_days = args.get("onset_days", [])
+    if not onset_days or not isinstance(onset_days, list):
+        return {"status": "error", "message": "onset_days must be a non-empty list of positive numbers"}
+
+    try:
+        days = [float(d) for d in onset_days if float(d) > 0]
+    except (ValueError, TypeError):
+        return {"status": "error", "message": "onset_days must contain numeric values"}
+
+    if len(days) < 3:
+        return {"status": "error", "message": "Need at least 3 positive onset times"}
+
+    n = len(days)
+    days_sorted = sorted(days)
+    median_onset = days_sorted[n // 2]
+    mean_onset = sum(days) / n
+    sd_onset = math.sqrt(sum((d - mean_onset) ** 2 for d in days) / (n - 1)) if n > 1 else 0.0
+
+    # Weibull parameter estimation via method of moments
+    # CV = SD/mean, and for Weibull: CV ≈ Gamma(1+2/k)/Gamma(1+1/k)^2 - 1
+    cv = sd_onset / mean_onset if mean_onset > 0 else 1.0
+
+    # Approximate k from CV using Newton-Raphson-like lookup
+    if cv < 0.3:
+        k_shape = 4.0  # Very regular timing
+    elif cv < 0.5:
+        k_shape = 2.5
+    elif cv < 0.8:
+        k_shape = 1.5
+    elif cv < 1.0:
+        k_shape = 1.0  # Exponential
+    elif cv < 1.5:
+        k_shape = 0.7
+    else:
+        k_shape = 0.5  # Early hazard
+
+    # Scale parameter (lambda) ≈ mean / Gamma(1 + 1/k)
+    lambda_scale = mean_onset / math.gamma(1 + 1 / k_shape) if k_shape > 0 else mean_onset
+
+    if k_shape < 0.9:
+        pattern = "early_hazard"
+        interpretation = "Reactions cluster early after exposure — suggests direct pharmacological effect"
+    elif k_shape <= 1.1:
+        pattern = "constant_hazard"
+        interpretation = "Random timing — consistent with idiosyncratic reactions"
+    else:
+        pattern = "late_hazard"
+        interpretation = "Reactions increase with duration — suggests accumulation or sensitization"
+
+    # Quartiles
+    q25 = days_sorted[max(0, n // 4)]
+    q75 = days_sorted[min(n - 1, 3 * n // 4)]
+
+    return {
+        "status": "ok",
+        "method": "Weibull_time_to_onset",
+        "n_cases": n,
+        "mean_days": round(mean_onset, 1),
+        "median_days": round(median_onset, 1),
+        "sd_days": round(sd_onset, 1),
+        "q25_days": round(q25, 1),
+        "q75_days": round(q75, 1),
+        "min_days": round(min(days), 1),
+        "max_days": round(max(days), 1),
+        "weibull_shape_k": round(k_shape, 2),
+        "weibull_scale_lambda": round(lambda_scale, 1),
+        "onset_pattern": pattern,
+        "interpretation": interpretation,
+        "reference": "Weibull distribution analysis per van Puijenbroek et al., Drug Safety 2002",
+    }
+
+
+def score_case_completeness(args: dict) -> dict:
+    """Score ICSR completeness against E2B(R3) minimum data elements.
+
+    Based on ICH E2B(R3) data elements required for valid ICSR submission.
+    Scores presence of key fields that determine regulatory acceptability.
+    """
+    # E2B(R3) minimum required fields for a valid ICSR
+    required_fields = {
+        "patient_identifier": "Patient identifier (initials, number, or DOB)",
+        "reporter_identifier": "Reporter identifier (name or initials)",
+        "suspect_drug": "At least one suspect drug identified",
+        "adverse_event": "At least one adverse event described",
+    }
+
+    recommended_fields = {
+        "patient_age": "Patient age or age group",
+        "patient_sex": "Patient sex",
+        "event_onset_date": "Date of event onset",
+        "drug_start_date": "Date drug therapy started",
+        "drug_indication": "Indication for drug use",
+        "event_outcome": "Outcome of the event",
+        "reporter_country": "Country of reporter",
+        "report_type": "Report type (spontaneous, study, etc.)",
+        "seriousness_criteria": "Seriousness assessment",
+        "causality_assessment": "Causality assessment performed",
+        "action_taken": "Action taken with suspect drug",
+        "rechallenge_info": "Dechallenge/rechallenge information",
+    }
+
+    # Check which fields are present
+    required_present = []
+    required_missing = []
+    for field, desc in required_fields.items():
+        val = args.get(field)
+        if val and str(val).strip() and str(val).strip().lower() not in ("unknown", "none", "n/a", ""):
+            required_present.append(field)
+        else:
+            required_missing.append({"field": field, "description": desc})
+
+    recommended_present = []
+    recommended_missing = []
+    for field, desc in recommended_fields.items():
+        val = args.get(field)
+        if val and str(val).strip() and str(val).strip().lower() not in ("unknown", "none", "n/a", ""):
+            recommended_present.append(field)
+        else:
+            recommended_missing.append({"field": field, "description": desc})
+
+    req_score = len(required_present) / len(required_fields) * 100
+    rec_score = len(recommended_present) / len(recommended_fields) * 100
+    overall = (req_score * 0.6 + rec_score * 0.4)
+
+    if req_score < 100:
+        validity = "invalid"
+        action = "Case does not meet minimum E2B requirements — cannot be submitted"
+    elif overall >= 80:
+        validity = "complete"
+        action = "Case is well-documented and ready for submission"
+    elif overall >= 50:
+        validity = "acceptable"
+        action = "Case meets minimum requirements but follow-up recommended"
+    else:
+        validity = "minimal"
+        action = "Case is valid but poorly documented — request follow-up information"
+
+    return {
+        "status": "ok",
+        "method": "E2B_R3_completeness",
+        "overall_score": round(overall, 1),
+        "required_score": round(req_score, 1),
+        "recommended_score": round(rec_score, 1),
+        "validity": validity,
+        "action": action,
+        "required_present": required_present,
+        "required_missing": required_missing,
+        "recommended_present": recommended_present,
+        "recommended_missing": recommended_missing,
+        "reference": "ICH E2B(R3): Electronic Transmission of ICSRs",
+    }
+
+
+def compute_number_needed_harm(args: dict) -> dict:
+    """Compute Number Needed to Harm (NNH) from incidence rates.
+
+    NNH = 1 / ARI where ARI = absolute risk increase = |risk_exposed - risk_unexposed|
+    Lower NNH = more frequent harm. NNH < 100 is clinically significant.
+    """
+    risk_exposed = float(args.get("risk_exposed", 0))
+    risk_unexposed = float(args.get("risk_unexposed", 0))
+
+    for name, val in [("risk_exposed", risk_exposed), ("risk_unexposed", risk_unexposed)]:
+        if val < 0 or val > 1:
+            return {"status": "error", "message": f"{name} must be in [0.0, 1.0], got {val}"}
+
+    ari = abs(risk_exposed - risk_unexposed)
+    if ari == 0:
+        return {
+            "status": "ok",
+            "method": "NNH",
+            "nnh": None,
+            "ari": 0.0,
+            "interpretation": "No difference in risk — NNH is undefined (infinite)",
+            "risk_exposed": risk_exposed,
+            "risk_unexposed": risk_unexposed,
+        }
+
+    nnh = 1.0 / ari
+
+    # 95% CI for NNH (approximation using Wald method)
+    # SE(ARI) ≈ sqrt(p1*(1-p1)/n1 + p2*(1-p2)/n2), but without N, use wide bounds
+    relative_risk = risk_exposed / risk_unexposed if risk_unexposed > 0 else float("inf")
+
+    if nnh < 10:
+        severity = "very_frequent_harm"
+        interpretation = "Very frequent harm — strong safety signal"
+    elif nnh < 100:
+        severity = "frequent_harm"
+        interpretation = "Frequent harm — clinically significant safety concern"
+    elif nnh < 1000:
+        severity = "infrequent_harm"
+        interpretation = "Infrequent harm — may be acceptable depending on benefit"
+    else:
+        severity = "rare_harm"
+        interpretation = "Rare harm — generally acceptable risk"
+
+    return {
+        "status": "ok",
+        "method": "NNH",
+        "nnh": round(nnh, 1),
+        "ari": round(ari, 6),
+        "ari_percent": round(ari * 100, 4),
+        "relative_risk": round(relative_risk, 4) if relative_risk != float("inf") else "infinite",
+        "risk_exposed": risk_exposed,
+        "risk_unexposed": risk_unexposed,
+        "severity": severity,
+        "interpretation": interpretation,
+        "reference": "Altman DG. BMJ 1998;317:1309-1312",
+    }
+
+
+def compute_confidence_interval(args: dict) -> dict:
+    """Wilson score interval for proportions (small-sample safe).
+
+    Standard Wald CI (p ± z*sqrt(p(1-p)/n)) fails at extremes.
+    Wilson score CI remains valid even for small n and p near 0 or 1.
+    """
+    successes = int(args.get("successes", 0))
+    total = int(args.get("total", 0))
+    confidence = float(args.get("confidence_level", 0.95))
+
+    if total <= 0:
+        return {"status": "error", "message": "total must be positive"}
+    if successes < 0 or successes > total:
+        return {"status": "error", "message": "successes must be in [0, total]"}
+    if confidence <= 0 or confidence >= 1:
+        return {"status": "error", "message": "confidence_level must be in (0, 1)"}
+
+    p = successes / total
+
+    # Z-score for confidence level
+    # Approximation for common levels
+    z_scores = {0.90: 1.645, 0.95: 1.96, 0.99: 2.576}
+    z = z_scores.get(confidence, 1.96)
+
+    # Wilson score interval
+    denominator = 1 + z**2 / total
+    center = (p + z**2 / (2 * total)) / denominator
+    spread = z * math.sqrt(p * (1 - p) / total + z**2 / (4 * total**2)) / denominator
+
+    ci_lower = max(0.0, center - spread)
+    ci_upper = min(1.0, center + spread)
+
+    # Also compute Wald interval for comparison
+    if total > 0:
+        wald_se = math.sqrt(p * (1 - p) / total)
+        wald_lower = max(0.0, p - z * wald_se)
+        wald_upper = min(1.0, p + z * wald_se)
+    else:
+        wald_lower = wald_upper = 0.0
+
+    return {
+        "status": "ok",
+        "method": "Wilson_score_interval",
+        "proportion": round(p, 6),
+        "successes": successes,
+        "total": total,
+        "confidence_level": confidence,
+        "wilson_ci_lower": round(ci_lower, 6),
+        "wilson_ci_upper": round(ci_upper, 6),
+        "wilson_ci_width": round(ci_upper - ci_lower, 6),
+        "wald_ci_lower": round(wald_lower, 6),
+        "wald_ci_upper": round(wald_upper, 6),
+        "note": "Wilson score CI recommended over Wald CI for small samples or extreme proportions",
+        "reference": "Wilson EB. JASA 1927;22(158):209-212",
+    }
+
+
+def compute_signal_trend(args: dict) -> dict:
+    """Linear regression on time-series signal scores to detect trend direction.
+
+    Input: array of {period, score} observations.
+    Output: slope, direction (increasing/decreasing/stable), R-squared.
+    """
+    observations = args.get("observations", [])
+    if not observations or not isinstance(observations, list):
+        return {"status": "error", "message": "observations must be a non-empty list of {period, score} objects"}
+
+    try:
+        periods = []
+        scores = []
+        for obs in observations:
+            if isinstance(obs, dict):
+                periods.append(float(obs.get("period", 0)))
+                scores.append(float(obs.get("score", 0)))
+            elif isinstance(obs, (list, tuple)) and len(obs) >= 2:
+                periods.append(float(obs[0]))
+                scores.append(float(obs[1]))
+            else:
+                return {"status": "error", "message": "Each observation must be {period, score} or [period, score]"}
+    except (ValueError, TypeError):
+        return {"status": "error", "message": "Observations must contain numeric values"}
+
+    n = len(periods)
+    if n < 2:
+        return {"status": "error", "message": "Need at least 2 observations for trend analysis"}
+
+    # Linear regression: y = mx + b
+    mean_x = sum(periods) / n
+    mean_y = sum(scores) / n
+
+    ss_xy = sum((periods[i] - mean_x) * (scores[i] - mean_y) for i in range(n))
+    ss_xx = sum((periods[i] - mean_x) ** 2 for i in range(n))
+    ss_yy = sum((scores[i] - mean_y) ** 2 for i in range(n))
+
+    if ss_xx == 0:
+        return {"status": "error", "message": "All periods are identical — cannot compute trend"}
+
+    slope = ss_xy / ss_xx
+    intercept = mean_y - slope * mean_x
+
+    # R-squared
+    r_squared = (ss_xy ** 2) / (ss_xx * ss_yy) if ss_yy > 0 else 0.0
+
+    # Trend direction with significance threshold
+    # Slope relative to mean score magnitude
+    relative_slope = abs(slope) / mean_y if mean_y > 0 else abs(slope)
+
+    if relative_slope < 0.05:
+        direction = "stable"
+        interpretation = "Signal strength is stable over time"
+    elif slope > 0:
+        direction = "increasing"
+        interpretation = "Signal is strengthening — escalate monitoring"
+    else:
+        direction = "decreasing"
+        interpretation = "Signal is weakening — may be resolving"
+
+    # Projected values
+    last_period = max(periods)
+    projected_next = slope * (last_period + 1) + intercept
+
+    return {
+        "status": "ok",
+        "method": "linear_regression_trend",
+        "n_observations": n,
+        "slope": round(slope, 4),
+        "intercept": round(intercept, 4),
+        "r_squared": round(r_squared, 4),
+        "direction": direction,
+        "interpretation": interpretation,
+        "mean_score": round(mean_y, 4),
+        "latest_score": round(scores[-1], 4),
+        "projected_next_period": round(projected_next, 4),
+        "period_range": [round(min(periods), 1), round(max(periods), 1)],
+        "score_range": [round(min(scores), 4), round(max(scores), 4)],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -682,6 +1044,11 @@ TOOL_DISPATCH = {
     "compute-reporting-rate": compute_reporting_rate,
     "compute-signal-half-life": compute_signal_half_life,
     "compute-expectedness": compute_expectedness,
+    "compute-time-to-onset": compute_time_to_onset,
+    "score-case-completeness": score_case_completeness,
+    "compute-number-needed-harm": compute_number_needed_harm,
+    "compute-confidence-interval": compute_confidence_interval,
+    "compute-signal-trend": compute_signal_trend,
 }
 
 

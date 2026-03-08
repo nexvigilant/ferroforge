@@ -92,6 +92,29 @@ DEFAULT_TEST_ARGS: dict[str, object] = {
     "denominator_unit": "prescriptions",
     # String defaults (expectedness)
     "event_term": "hepatotoxicity",
+    # Array defaults (time-to-onset)
+    "onset_days": [2, 5, 7, 3, 14, 10, 4, 6],
+    # Float defaults (NNH)
+    "risk_exposed": 0.05,
+    "risk_unexposed": 0.01,
+    # Integer defaults (Wilson CI)
+    "successes": 8,
+    "total": 100,
+    "confidence_level": 0.95,
+    # Array defaults (signal trend)
+    "observations": [
+        {"period": 1, "score": 2.1},
+        {"period": 2, "score": 2.5},
+        {"period": 3, "score": 3.0},
+        {"period": 4, "score": 3.2},
+    ],
+    # String defaults (case completeness)
+    "patient_identifier": "PT-001",
+    "reporter_identifier": "Dr. Smith",
+    "suspect_drug": "metformin",
+    "adverse_event": "lactic acidosis",
+    "patient_age": "65",
+    "patient_sex": "male",
 }
 
 # Type-based fallback defaults when a param name isn't in DEFAULT_TEST_ARGS

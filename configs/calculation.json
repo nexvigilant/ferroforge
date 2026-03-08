@@ -240,6 +240,114 @@
         },
         "required": ["status"]
       }
+    },
+    {
+      "name": "compute-time-to-onset",
+      "description": "Analyze time-to-onset patterns using Weibull distribution. Shape parameter k indicates: k<1 early hazard (direct pharmacological), k≈1 constant hazard (idiosyncratic), k>1 late hazard (accumulation/sensitization).",
+      "parameters": [
+        { "name": "onset_days", "type": "array", "description": "Array of onset times in days after drug exposure (at least 3 positive values)", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "weibull_shape_k": { "type": "number", "description": "Weibull shape parameter" },
+          "onset_pattern": { "type": "string", "description": "early_hazard | constant_hazard | late_hazard" },
+          "mean_days": { "type": "number", "description": "Mean onset time in days" },
+          "median_days": { "type": "number", "description": "Median onset time in days" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "score-case-completeness",
+      "description": "Score ICSR completeness against E2B(R3) minimum data elements. Checks required fields (patient, reporter, drug, event) and recommended fields (age, sex, dates, outcome, causality).",
+      "parameters": [
+        { "name": "patient_identifier", "type": "string", "description": "Patient identifier (initials, number, or DOB)", "required": true },
+        { "name": "reporter_identifier", "type": "string", "description": "Reporter identifier (name or initials)", "required": true },
+        { "name": "suspect_drug", "type": "string", "description": "Suspect drug name", "required": true },
+        { "name": "adverse_event", "type": "string", "description": "Adverse event description", "required": true },
+        { "name": "patient_age", "type": "string", "description": "Patient age or age group", "required": false },
+        { "name": "patient_sex", "type": "string", "description": "Patient sex", "required": false },
+        { "name": "event_onset_date", "type": "string", "description": "Date of event onset", "required": false },
+        { "name": "drug_start_date", "type": "string", "description": "Date drug therapy started", "required": false },
+        { "name": "drug_indication", "type": "string", "description": "Indication for drug use", "required": false },
+        { "name": "event_outcome", "type": "string", "description": "Outcome of the event", "required": false },
+        { "name": "reporter_country", "type": "string", "description": "Country of reporter", "required": false },
+        { "name": "report_type", "type": "string", "description": "Report type (spontaneous, study, etc.)", "required": false },
+        { "name": "seriousness_criteria", "type": "string", "description": "Seriousness assessment", "required": false },
+        { "name": "causality_assessment", "type": "string", "description": "Causality assessment performed", "required": false },
+        { "name": "action_taken", "type": "string", "description": "Action taken with suspect drug", "required": false },
+        { "name": "rechallenge_info", "type": "string", "description": "Dechallenge/rechallenge information", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "overall_score": { "type": "number", "description": "Combined completeness score (0-100)" },
+          "validity": { "type": "string", "description": "invalid | minimal | acceptable | complete" },
+          "required_score": { "type": "number", "description": "Required fields score (0-100)" },
+          "recommended_score": { "type": "number", "description": "Recommended fields score (0-100)" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "compute-number-needed-harm",
+      "description": "Compute Number Needed to Harm (NNH) from exposed and unexposed incidence rates. NNH = 1/ARI where ARI = |risk_exposed - risk_unexposed|. Lower NNH = more frequent harm.",
+      "parameters": [
+        { "name": "risk_exposed", "type": "number", "description": "Incidence rate in exposed group (0.0-1.0)", "required": true },
+        { "name": "risk_unexposed", "type": "number", "description": "Incidence rate in unexposed group (0.0-1.0)", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "nnh": { "type": "number", "description": "Number Needed to Harm" },
+          "ari": { "type": "number", "description": "Absolute Risk Increase" },
+          "severity": { "type": "string", "description": "very_frequent_harm | frequent_harm | infrequent_harm | rare_harm" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "compute-confidence-interval",
+      "description": "Compute Wilson score confidence interval for a proportion. More reliable than Wald CI for small samples and extreme proportions (near 0 or 1).",
+      "parameters": [
+        { "name": "successes", "type": "integer", "description": "Number of successes (events observed)", "required": true },
+        { "name": "total", "type": "integer", "description": "Total number of observations", "required": true },
+        { "name": "confidence_level", "type": "number", "description": "Confidence level (0.90, 0.95, or 0.99; default 0.95)", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "proportion": { "type": "number", "description": "Observed proportion (successes/total)" },
+          "wilson_ci_lower": { "type": "number", "description": "Wilson CI lower bound" },
+          "wilson_ci_upper": { "type": "number", "description": "Wilson CI upper bound" },
+          "wald_ci_lower": { "type": "number", "description": "Wald CI lower bound (for comparison)" },
+          "wald_ci_upper": { "type": "number", "description": "Wald CI upper bound (for comparison)" }
+        },
+        "required": ["status"]
+      }
+    },
+    {
+      "name": "compute-signal-trend",
+      "description": "Detect trend direction in time-series safety signal scores using linear regression. Reports slope, R-squared, and whether the signal is increasing, decreasing, or stable.",
+      "parameters": [
+        { "name": "observations", "type": "array", "description": "Array of {period, score} objects representing signal scores over time (at least 2)", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "slope": { "type": "number", "description": "Regression slope" },
+          "r_squared": { "type": "number", "description": "R-squared (goodness of fit)" },
+          "direction": { "type": "string", "description": "increasing | decreasing | stable" },
+          "projected_next_period": { "type": "number", "description": "Projected score for next period" }
+        },
+        "required": ["status"]
+      }
     }
   ],
   "proxy": "scripts/calculation_proxy.py"

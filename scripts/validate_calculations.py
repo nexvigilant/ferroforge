@@ -352,6 +352,154 @@ CASES: list[dict] = [
             ("status", "==", "ok"),
         ],
     },
+
+    # ── Time-to-Onset (Weibull) ──
+    # Regular timing (low CV) → high k → late hazard
+    {
+        "name": "Time-to-onset regular timing (late hazard)",
+        "tool": "compute-time-to-onset",
+        "args": {"onset_days": [28, 30, 32, 29, 31, 27, 33, 30]},
+        "checks": [
+            ("status", "==", "ok"),
+            ("onset_pattern", "==", "late_hazard"),
+            ("mean_days", "approx", 30.0),
+            ("n_cases", "==", 8),
+        ],
+    },
+    # Scattered timing (high CV) → low k → early hazard
+    {
+        "name": "Time-to-onset scattered (early hazard)",
+        "tool": "compute-time-to-onset",
+        "args": {"onset_days": [1, 2, 3, 90, 120, 200]},
+        "checks": [
+            ("status", "==", "ok"),
+            ("onset_pattern", "==", "early_hazard"),
+        ],
+    },
+
+    # ── Case Completeness (E2B) ──
+    # All 4 required + 2 recommended → valid, partial completeness
+    {
+        "name": "Case completeness: all required present",
+        "tool": "score-case-completeness",
+        "args": {
+            "patient_identifier": "PT-001",
+            "reporter_identifier": "Dr. Smith",
+            "suspect_drug": "metformin",
+            "adverse_event": "lactic acidosis",
+            "patient_age": "65",
+            "patient_sex": "male",
+        },
+        "checks": [
+            ("status", "==", "ok"),
+            ("required_score", "==", 100.0),
+            ("validity", "in", ["acceptable", "complete", "minimal"]),
+        ],
+    },
+    # Missing required field → invalid
+    {
+        "name": "Case completeness: missing required",
+        "tool": "score-case-completeness",
+        "args": {
+            "patient_identifier": "PT-001",
+            "reporter_identifier": "Dr. Smith",
+        },
+        "checks": [
+            ("status", "==", "ok"),
+            ("validity", "==", "invalid"),
+        ],
+    },
+
+    # ── Number Needed to Harm ──
+    # NNH = 1 / |0.05 - 0.01| = 1/0.04 = 25
+    {
+        "name": "NNH basic calculation",
+        "tool": "compute-number-needed-harm",
+        "args": {"risk_exposed": 0.05, "risk_unexposed": 0.01},
+        "checks": [
+            ("status", "==", "ok"),
+            ("nnh", "approx", 25.0),
+            ("ari", "approx", 0.04),
+            ("severity", "==", "frequent_harm"),
+        ],
+    },
+    # Equal risks → NNH undefined
+    {
+        "name": "NNH equal risks (undefined)",
+        "tool": "compute-number-needed-harm",
+        "args": {"risk_exposed": 0.03, "risk_unexposed": 0.03},
+        "checks": [
+            ("status", "==", "ok"),
+            ("ari", "==", 0.0),
+        ],
+    },
+
+    # ── Confidence Interval (Wilson) ──
+    # p=8/100=0.08, n=100, z=1.96
+    # Wilson center = (0.08 + 1.96²/(2*100)) / (1 + 1.96²/100)
+    #               = (0.08 + 0.019208) / (1 + 0.038416) = 0.099208/1.038416 = 0.09554
+    # Wilson spread = 1.96 * sqrt(0.08*0.92/100 + 1.96²/(4*100²)) / 1.038416
+    {
+        "name": "Wilson CI for 8/100",
+        "tool": "compute-confidence-interval",
+        "args": {"successes": 8, "total": 100},
+        "checks": [
+            ("status", "==", "ok"),
+            ("proportion", "approx", 0.08),
+            ("wilson_ci_lower", ">=", 0.03),
+            ("wilson_ci_upper", "<=", 0.16),
+        ],
+    },
+    # Extreme proportion: 1/1000
+    {
+        "name": "Wilson CI for rare event (1/1000)",
+        "tool": "compute-confidence-interval",
+        "args": {"successes": 1, "total": 1000},
+        "checks": [
+            ("status", "==", "ok"),
+            ("proportion", "approx", 0.001),
+            ("wilson_ci_lower", ">=", 0.0),
+        ],
+    },
+
+    # ── Signal Trend ──
+    # Linear increasing: periods 1-4, scores 2,4,6,8 → slope=2.0, R²=1.0
+    {
+        "name": "Signal trend: perfect linear increase",
+        "tool": "compute-signal-trend",
+        "args": {
+            "observations": [
+                {"period": 1, "score": 2.0},
+                {"period": 2, "score": 4.0},
+                {"period": 3, "score": 6.0},
+                {"period": 4, "score": 8.0},
+            ]
+        },
+        "checks": [
+            ("status", "==", "ok"),
+            ("slope", "approx", 2.0),
+            ("r_squared", "approx", 1.0),
+            ("direction", "==", "increasing"),
+            ("projected_next_period", "approx", 10.0),
+        ],
+    },
+    # Stable signal
+    {
+        "name": "Signal trend: stable",
+        "tool": "compute-signal-trend",
+        "args": {
+            "observations": [
+                {"period": 1, "score": 5.0},
+                {"period": 2, "score": 5.1},
+                {"period": 3, "score": 4.9},
+                {"period": 4, "score": 5.0},
+            ]
+        },
+        "checks": [
+            ("status", "==", "ok"),
+            ("direction", "==", "stable"),
+        ],
+    },
 ]
 
 

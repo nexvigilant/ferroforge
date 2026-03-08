@@ -87,7 +87,7 @@ run_gate "Test harness smoke test" \
     python3 "$SCRIPTS_DIR/test_harness.py" $harness_args
 
 # Gate 5: Calculation validation (math correctness)
-run_gate "Calculation math validation (19 cases)" \
+run_gate "Calculation math validation (29 cases)" \
     python3 "$SCRIPTS_DIR/validate_calculations.py"
 
 # Gate 6: Dispatch routing coverage

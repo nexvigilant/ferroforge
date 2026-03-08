@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## FerroForge — NexVigilant Station
 
-Rust MCP server + 23 PV domain configs (175 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio (source: `ls configs/*.json | wc -l` = 23, tool count from JSON parsing = 175, measured 2026-03-08).
+Rust MCP server + 23 PV domain configs (180 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio (source: `ls configs/*.json | wc -l` = 23, tool count from JSON parsing = 180, measured 2026-03-08).
 
 ## Build & Test
 
@@ -38,11 +38,11 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 | `scripts/*_proxy.py` | Per-domain API proxy scripts (17 files: 6 clean live, ~6 partial, ~5 new/untested — source: Matthew's 3-tier classification, 2026-03-06) |
 | `scripts/config_forge.py` | Config generator + WebMCP Hub deployer |
 
-## Config Inventory (23 configs, 175 tools — source: measured 2026-03-08)
+## Config Inventory (23 configs, 180 tools — source: measured 2026-03-08)
 
 **Proxy scripts with HTTP calls (10):** openfda, clinicaltrials, pubmed, dailymed, rxnav, openvigilfrance, fda-accessdata, eudravigilance, fda-safety, science
 
-**Pure computation proxy (1):** calculation (12 tools — PRR/ROR/IC/EBGM, Naranjo, WHO-UMC, ICH E2A, QBR, reporting rate, signal half-life, expectedness)
+**Pure computation proxy (1):** calculation (17 tools — PRR/ROR/IC/EBGM, disproportionality table, Naranjo, WHO-UMC, ICH E2A, QBR, reporting rate, signal half-life, expectedness, time-to-onset, case completeness, NNH, Wilson CI, signal trend)
 
 **Stub configs without proxies (3):** cioms, who-umc, science-hexim1
 
@@ -97,7 +97,7 @@ HUB_URL=http://127.0.0.1:8787 HUB_API_KEY=<token> python3 scripts/config_forge.p
 |------|------|
 | `hub/app.py` | FastAPI server — API-compatible with webmcp-hub.com |
 | `hub/seed.py` | Seeds hub.db from `configs/` directory |
-| `hub/hub.db` | SQLite database (23 configs, 175 tools) |
+| `hub/hub.db` | SQLite database (23 configs, 180 tools) |
 
 **Key endpoints:** POST/PATCH/GET/DELETE `/api/configs`, GET `/api/tools` (agent discovery), GET `/mcp/tools/list` (MCP-compatible), POST `/api/import` (bulk), GET `/api/stats`, GET `/health`.
 
@@ -105,7 +105,7 @@ HUB_URL=http://127.0.0.1:8787 HUB_API_KEY=<token> python3 scripts/config_forge.p
 
 - **MCP client caching:** After rebuilding the binary, must `/mcp` restart in Claude Code or stale process returns old tools
 - **Tool naming:** `{domain_underscored}_{tool_name_underscored}` (e.g., `api_fda_gov_search_adverse_events`)
-- **outputSchema:** All 175 tools have outputSchema defined — required for MCP spec compliance
+- **outputSchema:** All 180 tools have outputSchema defined — required for MCP spec compliance
 - **dispatch.py routes by domain prefix** — 8/8 domain prefixes smoke-tested
 - **Science configs** route via `science_proxy.py`, not individual proxy files
 - **Telemetry JSONL** at `~/ferroforge/station-telemetry.jsonl` — owner dashboard via `nexvigilant_station_health` meta-tool
