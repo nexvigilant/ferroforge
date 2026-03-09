@@ -179,17 +179,20 @@ def resolve_route(tool_name: str) -> tuple[str | None, str]:
     return None, tool_name
 
 
-def call_proxy(proxy_path: str, tool_name: str, arguments: dict) -> dict:
+def call_proxy(proxy_path: str, tool_name: str, arguments: dict, request_id: str | None = None) -> dict:
     """
     Invoke proxy_path as a subprocess, passing a JSON envelope on stdin.
     Returns the parsed JSON response dict.
 
     The proxy receives:
-        {"tool": "<unprefixed_tool_name>", "arguments": {...}}
+        {"tool": "<unprefixed_tool_name>", "arguments": {...}, "request_id": "..."}
 
     The proxy must write a single JSON object to stdout and exit 0.
     """
-    payload = json.dumps({"tool": tool_name, "arguments": arguments})
+    envelope = {"tool": tool_name, "arguments": arguments}
+    if request_id:
+        envelope["request_id"] = request_id
+    payload = json.dumps(envelope)
     try:
         result = subprocess.run(
             [sys.executable, proxy_path],
@@ -268,6 +271,7 @@ def dispatch(envelope: dict) -> dict:
     """
     tool_name = envelope.get("tool", "")
     arguments = envelope.get("arguments", {})
+    request_id = envelope.get("request_id")
 
     if not tool_name:
         return {
@@ -294,7 +298,7 @@ def dispatch(envelope: dict) -> dict:
         }
 
     aligned_args = align_parameters(proxy_path, arguments)
-    return call_proxy(proxy_path, unprefixed, aligned_args)
+    return call_proxy(proxy_path, unprefixed, aligned_args, request_id)
 
 
 def main_stdin() -> None:
@@ -358,9 +362,9 @@ SMOKE_TEST_CASES: list[dict] = [
         "expect_domain": "www_fda_gov_",
     },
     {
-        "label": "VigiAccess — no proxy in config, falls to stub",
+        "label": "VigiAccess — config-discovered proxy",
         "envelope": {"tool": "vigiaccess_org_search_reports", "arguments": {"drug_name": "warfarin"}},
-        "expect_domain": None,
+        "expect_domain": "vigiaccess_org_",
     },
     {
         "label": "EMA — config-discovered proxy",
@@ -368,9 +372,9 @@ SMOKE_TEST_CASES: list[dict] = [
         "expect_domain": "www_ema_europa_eu_",
     },
     {
-        "label": "DrugBank — no proxy in config, falls to stub",
+        "label": "DrugBank — config-discovered proxy",
         "envelope": {"tool": "go_drugbank_com_get_drug_info", "arguments": {"drug_name": "metformin"}},
-        "expect_domain": None,
+        "expect_domain": "go_drugbank_com_",
     },
     {
         "label": "Unknown domain — should return stub",
