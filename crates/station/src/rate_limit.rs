@@ -89,12 +89,13 @@ impl RateLimiter {
 ///
 /// Priority: X-Forwarded-For (Cloud Run sets this) → ConnectInfo → fallback.
 fn extract_ip(headers: &HeaderMap, connect_info: Option<&ConnectInfo<std::net::SocketAddr>>) -> IpAddr {
-    // Cloud Run always sets X-Forwarded-For: "client, proxy1, proxy2"
+    // Cloud Run appends the real client IP as the rightmost entry in X-Forwarded-For.
+    // Using the last entry prevents attackers from spoofing via controlled first entries.
     if let Some(ip) = headers
         .get("x-forwarded-for")
         .and_then(|xff| xff.to_str().ok())
-        .and_then(|val| val.split(',').next())
-        .and_then(|first| first.trim().parse::<IpAddr>().ok())
+        .and_then(|val| val.split(',').next_back())
+        .and_then(|last| last.trim().parse::<IpAddr>().ok())
     {
         return ip;
     }
