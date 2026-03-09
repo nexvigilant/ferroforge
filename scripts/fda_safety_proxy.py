@@ -51,6 +51,13 @@ def _quote(value: str) -> str:
     return urllib.parse.quote(value, safe="")
 
 
+def _resolve_drug(args: dict) -> str:
+    """Resolve drug name from any known alias. Agents use varied parameter names."""
+    return (args.get("drug_name") or args.get("drug") or args.get("name")
+            or args.get("substance") or args.get("product")
+            or args.get("query") or "").strip()
+
+
 def search_safety_communications(args: dict) -> dict:
     """
     Tool: search-safety-communications
@@ -58,9 +65,9 @@ def search_safety_communications(args: dict) -> dict:
     Search FDA drug safety communications via the enforcement endpoint.
     Returns recall/enforcement actions that serve as safety communications.
     """
-    drug_name = args.get("drug_name", args.get("query", "")).strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
-        return {"status": "error", "message": "drug_name or query is required", "count": 0, "results": []}
+        return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "count": 0, "results": []}
 
     year = args.get("year", None)
     limit = int(args.get("limit", DEFAULT_LIMIT))
@@ -115,7 +122,7 @@ def get_medwatch_alerts(args: dict) -> dict:
     Get MedWatch-style safety alerts by querying FAERS for serious adverse
     events, counted by receive date. Shows volume of serious reports over time.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "data": {}}
 
@@ -176,7 +183,7 @@ def get_boxed_warning(args: dict) -> dict:
     Get the current boxed warning text for a drug from its FDA-approved label.
     Returns the boxed_warning section if present.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "data": {}}
 
@@ -231,7 +238,7 @@ def get_safety_labeling_changes(args: dict) -> dict:
     Searches drug labels and counts by effective_time to show change frequency.
     Optionally filters by label section.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "data": {}}
 
@@ -323,9 +330,9 @@ def get_recall_classification(args: dict) -> dict:
     Class I (serious health consequences/death), Class II (temporary/reversible),
     Class III (unlikely adverse health consequences).
     """
-    drug_name = args.get("drug_name", args.get("query", "")).strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required", "data": {}}
+        return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "data": {}}
 
     limit = int(args.get("limit", 25))
     limit = max(1, min(limit, 100))
@@ -389,7 +396,7 @@ def get_serious_outcomes(args: dict) -> dict:
     Get serious outcome distribution from FAERS for a drug — death,
     hospitalization, life-threatening, disability, congenital anomaly.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "data": {}}
 
@@ -452,7 +459,7 @@ def get_rems_info(args: dict) -> dict:
     Get REMS (Risk Evaluation and Mitigation Strategy) information for a drug
     from FDA-approved labeling. Checks for REMS-related content in drug labels.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "data": {}}
 

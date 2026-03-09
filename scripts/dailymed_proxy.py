@@ -73,9 +73,10 @@ def search_drugs(args: dict) -> dict:
     Searches DailyMed for SPL documents matching a drug name, ingredient, or labeler.
     Returns a list of matching products with their setId, title, and labeler.
     """
-    query = args.get("query", "").strip()
+    query = (args.get("query") or args.get("drug_name") or args.get("name")
+             or args.get("drug") or args.get("search_query") or "").strip()
     if not query:
-        return {"status": "error", "message": "query is required", "count": 0, "results": []}
+        return {"status": "error", "message": "query is required (also accepts: drug_name, name, drug)", "count": 0, "results": []}
 
     limit = int(args.get("limit", DEFAULT_LIMIT))
     limit = max(1, min(limit, 100))

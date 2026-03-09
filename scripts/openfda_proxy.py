@@ -18,6 +18,13 @@ import urllib.error
 BASE_URL = "https://api.fda.gov/drug/event.json"
 DEFAULT_LIMIT = 10
 DEFAULT_COUNT_FIELD = "patient.reaction.reactionmeddrapt.exact"
+
+
+def _resolve_drug(args: dict) -> str:
+    """Resolve drug name from any known alias. Agents use varied parameter names."""
+    return (args.get("drug_name") or args.get("drug") or args.get("name")
+            or args.get("substance") or args.get("product")
+            or args.get("query") or "").strip()
 REQUEST_TIMEOUT_SECONDS = 15
 
 
@@ -58,9 +65,9 @@ def search_adverse_events(args: dict) -> dict:
     Result set includes safetyreportid, receivedate, patient drug list, and
     reaction list for each report.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+        return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "count": 0, "results": []}
 
     reaction = args.get("reaction", "").strip()
     serious = args.get("serious", None)
@@ -135,9 +142,9 @@ def get_event_outcomes(args: dict) -> dict:
     Returns outcome breakdown (death, hospitalization, disability, etc.) for a drug.
     Maps to ICH E2A seriousness criteria via outcome-severity-classifier microgram.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+        return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "count": 0, "results": []}
 
     search_expr = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"'
     url = f"{BASE_URL}?search={search_expr}&count=serious"
@@ -191,9 +198,9 @@ def get_event_timeline(args: dict) -> dict:
     Returns FAERS report counts by receive date for a drug, enabling trend detection
     via signal-trend-detector microgram.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+        return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "count": 0, "results": []}
 
     search_expr = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"'
     url = f"{BASE_URL}?search={search_expr}&count=receivedate"
@@ -223,9 +230,9 @@ def get_reporter_breakdown(args: dict) -> dict:
     Returns reporter qualification breakdown for a drug's FAERS reports.
     Feeds into reporter-quality-classifier microgram for signal weighting.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+        return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "count": 0, "results": []}
 
     search_expr = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"'
     url = f"{BASE_URL}?search={search_expr}&count=primarysource.qualification"
@@ -267,9 +274,9 @@ def get_drug_characterization(args: dict) -> dict:
     Returns how often a drug is listed as suspect vs concomitant vs interacting
     in FAERS reports. Feeds into suspect-drug-classifier microgram.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+        return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "count": 0, "results": []}
 
     search_expr = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"'
     url = f"{BASE_URL}?search={search_expr}&count=patient.drug.drugcharacterization"
@@ -311,9 +318,9 @@ def get_indication_counts(args: dict) -> dict:
     Returns top indications (reasons for use) for a drug from FAERS reports.
     Useful for detecting off-label use patterns.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+        return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "count": 0, "results": []}
 
     search_expr = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"'
     url = f"{BASE_URL}?search={search_expr}&count=patient.drug.drugindication.exact"
@@ -341,9 +348,9 @@ def get_drug_counts(args: dict) -> dict:
     Defaults to counting by MedDRA reaction preferred term, giving a quick
     signal profile for the drug.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
-        return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
+        return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "count": 0, "results": []}
 
     count_field = args.get("count_field", DEFAULT_COUNT_FIELD).strip()
     if not count_field:

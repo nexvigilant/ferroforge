@@ -51,6 +51,13 @@ def _quote(value: str) -> str:
     return urllib.parse.quote(value, safe="")
 
 
+def _resolve_drug(args: dict) -> str:
+    """Resolve drug name from any known alias. Agents use varied parameter names."""
+    return (args.get("drug_name") or args.get("drug") or args.get("name")
+            or args.get("substance") or args.get("product")
+            or args.get("query") or "").strip()
+
+
 def search_approvals(args: dict) -> dict:
     """
     Tool: search-approvals
@@ -58,7 +65,7 @@ def search_approvals(args: dict) -> dict:
     Search FDA drug approval records from Drugs@FDA via openFDA.
     Returns application numbers, sponsor names, and approval dates.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
 
@@ -123,7 +130,7 @@ def get_approval_history(args: dict) -> dict:
     Accepts application_number (e.g. "NDA021202") or drug_name for lookup.
     """
     application_number = args.get("application_number", "").strip()
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
 
     if not application_number and not drug_name:
         return {"status": "error", "message": "application_number or drug_name is required", "data": {}}
@@ -179,7 +186,7 @@ def get_labeling_changes(args: dict) -> dict:
     Get safety-related labeling changes for a drug by searching the drug label
     endpoint and counting by effective_time to show when labels changed.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "data": {}}
 
@@ -234,7 +241,7 @@ def get_orange_book(args: dict) -> dict:
     Get Orange Book patent and exclusivity data for a drug via the
     Drugs@FDA endpoint, which includes product-level patent/exclusivity info.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "data": {}}
 
@@ -291,7 +298,7 @@ def get_rems(args: dict) -> dict:
     Get Risk Evaluation and Mitigation Strategy (REMS) information for a drug
     by checking the drug label for REMS-related sections.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "data": {}}
 
@@ -361,7 +368,7 @@ def search_recalls(args: dict) -> dict:
     Search FDA drug recall and enforcement actions via the openFDA
     enforcement endpoint.
     """
-    drug_name = args.get("drug_name", args.get("query", "")).strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
 

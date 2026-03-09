@@ -154,7 +154,9 @@ def search_guidelines(args: dict) -> dict:
     Returns matching guidelines from the ICH efficacy and multidisciplinary
     guideline families.
     """
-    query = args.get("query", "").strip().lower()
+    query = (args.get("query") or args.get("search_query") or args.get("search")
+             or args.get("q") or args.get("drug_name") or args.get("drug")
+             or "").strip().lower()
     if not query:
         return {"status": "error", "message": "query is required"}
 

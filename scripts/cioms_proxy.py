@@ -206,7 +206,9 @@ def search_publications(args: dict) -> dict:
     CIOMS publications are available at cioms.ch/publications/ but there is
     no structured API.
     """
-    query = args.get("query", "").strip()
+    query = (args.get("query") or args.get("search_query") or args.get("search")
+             or args.get("q") or args.get("drug_name") or args.get("drug")
+             or "").strip()
 
     return {
         "status": "stub",

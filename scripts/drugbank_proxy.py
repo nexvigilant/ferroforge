@@ -54,6 +54,13 @@ def _quote(value: str) -> str:
     return urllib.parse.quote(value, safe="")
 
 
+def _resolve_drug(args: dict) -> str:
+    """Resolve drug name from any known alias. Agents use varied parameter names."""
+    return (args.get("drug_name") or args.get("drug") or args.get("name")
+            or args.get("substance") or args.get("product")
+            or args.get("query") or "").strip()
+
+
 def _get_pubchem_cid(drug_name: str) -> int | None:
     """Resolve a drug name to a PubChem CID."""
     url = f"{PUBCHEM_BASE}/compound/name/{_quote(drug_name)}/cids/JSON"
@@ -142,7 +149,7 @@ def get_drug_info(args: dict) -> dict:
     Retrieves comprehensive drug information by aggregating PubChem (molecular
     data, identifiers) and openFDA (regulatory status, clinical classification).
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -206,7 +213,7 @@ def get_interactions(args: dict) -> dict:
     - RxNav interaction API (structured interaction pairs with severity)
     - openFDA drug label drug_interactions section (clinical narrative)
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -266,7 +273,7 @@ def get_pharmacology(args: dict) -> dict:
     mechanism of action, clinical pharmacology, pharmacokinetics,
     and PubChem description for molecular context.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -335,7 +342,7 @@ def get_targets(args: dict) -> dict:
     and openFDA pharmacological class annotations. Returns target genes,
     mechanism classifications, and pharmacological action types.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -422,7 +429,7 @@ def get_adverse_effects(args: dict) -> dict:
     - openFDA drug label: adverse_reactions section (clinical narrative)
     - openFDA FAERS: top reported reactions by frequency (post-marketing)
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -482,7 +489,7 @@ def get_classification(args: dict) -> dict:
     Retrieves drug classification from openFDA pharmacological classes and
     PubChem compound classification (ATC codes, pharmacologic class, MeSH).
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -556,7 +563,7 @@ def get_contraindications(args: dict) -> dict:
     drug label. Includes boxed warnings (black box), contraindications section,
     warnings and precautions, and pregnancy/lactation information.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 

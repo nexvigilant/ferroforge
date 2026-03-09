@@ -75,7 +75,8 @@ def _lookup_substance(drug: str) -> list[dict]:
 
 def search_reports(args: dict) -> dict:
     """Search EudraVigilance substance tables for a drug and return dashboard links."""
-    drug = args.get("drug", args.get("substance", "")).strip()
+    drug = (args.get("drug") or args.get("substance") or args.get("drug_name")
+            or args.get("name") or args.get("query") or "").strip()
     if not drug:
         return {"status": "error", "message": "substance is required", "results": []}
 
@@ -109,7 +110,8 @@ def search_reports(args: dict) -> dict:
 
 def get_signal_summary(args: dict) -> dict:
     """Get signal summary — resolves substance, returns dashboard link for signal data."""
-    drug = args.get("drug", args.get("substance", "")).strip()
+    drug = (args.get("drug") or args.get("substance") or args.get("drug_name")
+            or args.get("name") or args.get("query") or "").strip()
     reaction = args.get("reaction", args.get("event", "")).strip()
     if not drug:
         return {"status": "error", "message": "substance is required"}
@@ -141,7 +143,8 @@ def get_signal_summary(args: dict) -> dict:
 
 def get_case_counts(args: dict) -> dict:
     """Get case count summary — resolves substance, returns dashboard link."""
-    drug = args.get("drug", args.get("substance", "")).strip()
+    drug = (args.get("drug") or args.get("substance") or args.get("drug_name")
+            or args.get("name") or args.get("query") or "").strip()
     if not drug:
         return {"status": "error", "message": "substance is required"}
 
@@ -178,7 +181,8 @@ def get_case_counts(args: dict) -> dict:
 
 def get_geographical_distribution(args: dict) -> dict:
     """Get geographical distribution — resolves substance, returns dashboard link."""
-    drug = args.get("drug", args.get("substance", "")).strip()
+    drug = (args.get("drug") or args.get("substance") or args.get("drug_name")
+            or args.get("name") or args.get("query") or "").strip()
     if not drug:
         return {"status": "error", "message": "substance is required"}
 
@@ -206,7 +210,8 @@ def get_geographical_distribution(args: dict) -> dict:
 
 def get_soc_breakdown(args: dict) -> dict:
     """Get System Organ Class breakdown for a substance."""
-    drug = args.get("drug", args.get("substance", "")).strip()
+    drug = (args.get("drug") or args.get("substance") or args.get("drug_name")
+            or args.get("name") or args.get("query") or "").strip()
     if not drug:
         return {"status": "error", "message": "substance is required"}
 
@@ -252,7 +257,8 @@ def get_soc_breakdown(args: dict) -> dict:
 
 def get_reporter_breakdown(args: dict) -> dict:
     """Get reporter qualification breakdown for a substance."""
-    drug = args.get("drug", args.get("substance", "")).strip()
+    drug = (args.get("drug") or args.get("substance") or args.get("drug_name")
+            or args.get("name") or args.get("query") or "").strip()
     if not drug:
         return {"status": "error", "message": "substance is required"}
 
@@ -286,7 +292,8 @@ def get_reporter_breakdown(args: dict) -> dict:
 
 def get_age_sex_distribution(args: dict) -> dict:
     """Get age group and sex distribution for a substance."""
-    drug = args.get("drug", args.get("substance", "")).strip()
+    drug = (args.get("drug") or args.get("substance") or args.get("drug_name")
+            or args.get("name") or args.get("query") or "").strip()
     if not drug:
         return {"status": "error", "message": "substance is required"}
 

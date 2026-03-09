@@ -44,9 +44,11 @@ def search_terms(args: dict) -> dict:
     Stub for MedDRA term search. When live, searches the MedDRA dictionary
     for PTs, LLTs, and HLTs matching the query.
     """
-    query = args.get("query", "").strip()
+    query = (args.get("query") or args.get("search_query") or args.get("search")
+             or args.get("q") or args.get("drug_name") or args.get("drug")
+             or args.get("term") or "").strip()
     if not query:
-        return {"status": "error", "message": "query is required"}
+        return {"status": "error", "message": "query is required (also accepts: search_query, drug_name, term)"}
 
     return {
         "status": "stub",

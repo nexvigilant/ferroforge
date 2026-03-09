@@ -318,9 +318,10 @@ def _resolve_and_distribute(medicine: str):
 
 def search_reports(args: dict) -> dict:
     """Search VigiBase reports by medicine name."""
-    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    medicine = (args.get("medicine") or args.get("drug_name") or args.get("drug")
+                or args.get("name") or args.get("substance") or args.get("query") or "").strip()
     if not medicine:
-        return {"status": "error", "message": "medicine is required"}
+        return {"status": "error", "message": "medicine is required (also accepts: drug_name, drug, name, substance)"}
 
     try:
         drugs = _search_drug(medicine)
@@ -362,9 +363,10 @@ def search_reports(args: dict) -> dict:
 
 def get_adverse_reactions(args: dict) -> dict:
     """Get adverse reaction breakdown by SOC for a medicine."""
-    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    medicine = (args.get("medicine") or args.get("drug_name") or args.get("drug")
+                or args.get("name") or args.get("substance") or args.get("query") or "").strip()
     if not medicine:
-        return {"status": "error", "message": "medicine is required"}
+        return {"status": "error", "message": "medicine is required (also accepts: drug_name, drug, name, substance)"}
 
     try:
         best, dist = _resolve_and_distribute(medicine)
@@ -408,9 +410,10 @@ def get_reporter_distribution(args: dict) -> dict:
     the closest available proxy, clearly labeled. The VigiAccess UI itself
     does not show reporter-type data.
     """
-    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    medicine = (args.get("medicine") or args.get("drug_name") or args.get("drug")
+                or args.get("name") or args.get("substance") or args.get("query") or "").strip()
     if not medicine:
-        return {"status": "error", "message": "medicine is required"}
+        return {"status": "error", "message": "medicine is required (also accepts: drug_name, drug, name, substance)"}
 
     try:
         best, dist = _resolve_and_distribute(medicine)
@@ -442,9 +445,10 @@ def get_reporter_distribution(args: dict) -> dict:
 
 def get_age_distribution(args: dict) -> dict:
     """Get case distribution by patient age group."""
-    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    medicine = (args.get("medicine") or args.get("drug_name") or args.get("drug")
+                or args.get("name") or args.get("substance") or args.get("query") or "").strip()
     if not medicine:
-        return {"status": "error", "message": "medicine is required"}
+        return {"status": "error", "message": "medicine is required (also accepts: drug_name, drug, name, substance)"}
 
     try:
         best, dist = _resolve_and_distribute(medicine)
@@ -482,9 +486,10 @@ def get_age_distribution(args: dict) -> dict:
 
 def get_region_distribution(args: dict) -> dict:
     """Get geographic distribution of reports by WHO region."""
-    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    medicine = (args.get("medicine") or args.get("drug_name") or args.get("drug")
+                or args.get("name") or args.get("substance") or args.get("query") or "").strip()
     if not medicine:
-        return {"status": "error", "message": "medicine is required"}
+        return {"status": "error", "message": "medicine is required (also accepts: drug_name, drug, name, substance)"}
 
     try:
         best, dist = _resolve_and_distribute(medicine)
@@ -522,9 +527,10 @@ def get_region_distribution(args: dict) -> dict:
 
 def get_sex_distribution(args: dict) -> dict:
     """Get report distribution by patient sex."""
-    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    medicine = (args.get("medicine") or args.get("drug_name") or args.get("drug")
+                or args.get("name") or args.get("substance") or args.get("query") or "").strip()
     if not medicine:
-        return {"status": "error", "message": "medicine is required"}
+        return {"status": "error", "message": "medicine is required (also accepts: drug_name, drug, name, substance)"}
 
     try:
         best, dist = _resolve_and_distribute(medicine)
@@ -562,9 +568,10 @@ def get_sex_distribution(args: dict) -> dict:
 
 def get_year_distribution(args: dict) -> dict:
     """Get report distribution by reporting year for temporal trend analysis."""
-    medicine = args.get("medicine", args.get("drug_name", "")).strip()
+    medicine = (args.get("medicine") or args.get("drug_name") or args.get("drug")
+                or args.get("name") or args.get("substance") or args.get("query") or "").strip()
     if not medicine:
-        return {"status": "error", "message": "medicine is required"}
+        return {"status": "error", "message": "medicine is required (also accepts: drug_name, drug, name, substance)"}
 
     try:
         best, dist = _resolve_and_distribute(medicine)

@@ -54,6 +54,13 @@ def _quote(value: str) -> str:
     return urllib.parse.quote(value, safe="")
 
 
+def _resolve_drug(args: dict) -> str:
+    """Resolve drug name from any known alias. Agents use varied parameter names."""
+    return (args.get("drug") or args.get("drug_name") or args.get("name")
+            or args.get("substance") or args.get("product")
+            or args.get("query") or "").strip()
+
+
 def _get_count(search_expr: str) -> int:
     """Get total report count for a search expression."""
     url = f"{BASE_URL}?search={search_expr}&limit=1"
@@ -170,7 +177,7 @@ def compute_disproportionality(args: dict) -> dict:
     Compute PRR, ROR, and IC for a drug-event combination using FAERS data.
     Builds a 2x2 contingency table from openFDA counts.
     """
-    drug = args.get("drug", "").strip()
+    drug = _resolve_drug(args)
     event = args.get("event", "").strip()
 
     if not drug or not event:
@@ -215,7 +222,7 @@ def get_top_reactions(args: dict) -> dict:
     Get top adverse reactions for a drug ranked by report count.
     For the top reactions, computes PRR as a signal strength indicator.
     """
-    drug = args.get("drug", "").strip()
+    drug = _resolve_drug(args)
     if not drug:
         return {"status": "error", "message": "'drug' is required"}
 
@@ -306,7 +313,7 @@ def get_case_demographics(args: dict) -> dict:
     Get demographic breakdown of cases for a drug (optionally filtered by event).
     Returns age, sex, and country distributions.
     """
-    drug = args.get("drug", "").strip()
+    drug = _resolve_drug(args)
     if not drug:
         return {"status": "error", "message": "'drug' is required"}
 
@@ -426,7 +433,7 @@ def get_reporting_trends(args: dict) -> dict:
     Get annual reporting trends for a drug-event combination over time.
     Shows how reporting frequency has changed, useful for detecting emerging signals.
     """
-    drug = args.get("drug", "").strip()
+    drug = _resolve_drug(args)
     event = args.get("event", "").strip()
 
     if not drug:
@@ -481,7 +488,7 @@ def get_outcome_distribution(args: dict) -> dict:
     Get patient outcome distribution for a drug — death, hospitalization,
     life-threatening, disability, etc. Critical for seriousness assessment.
     """
-    drug = args.get("drug", "").strip()
+    drug = _resolve_drug(args)
     event = args.get("event", "").strip()
 
     if not drug:

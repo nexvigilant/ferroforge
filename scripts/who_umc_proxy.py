@@ -200,7 +200,8 @@ def search_vigibase(args: dict) -> dict:
     Searches WHO VigiBase, the global ICSR database. STUB — requires
     VigiBase access credentials from WHO-UMC.
     """
-    drug = args.get("drug", "").strip()
+    drug = (args.get("drug") or args.get("drug_name") or args.get("name")
+            or args.get("substance") or args.get("query") or "").strip()
     reaction = args.get("reaction", "").strip()
 
     return {

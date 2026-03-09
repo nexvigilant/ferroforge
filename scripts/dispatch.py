@@ -41,21 +41,44 @@ CONFIGS_DIR = SCRIPTS_DIR.parent / "configs"
 # agents can use ANY of the aliases and every proxy receives its expected key.
 # The canonical form is "drug_name" (most common: 7/17 proxies).
 
+# All known aliases for "the drug being queried". Agents may use any of these
+# interchangeably. The alignment layer ensures each proxy gets the key it expects.
+_DRUG_ALIASES = ("drug", "drug_name", "substance", "product", "name", "medicine")
+
+# All known aliases for "the search query". Some proxies accept freetext search
+# under different parameter names.
+_QUERY_ALIASES = ("query", "search_query", "search", "q")
+
+def _drug_alias_map(canonical: str) -> dict[str, str]:
+    """Build alias→canonical map for drug name parameters."""
+    return {alias: canonical for alias in _DRUG_ALIASES if alias != canonical}
+
+def _query_alias_map(canonical: str) -> dict[str, str]:
+    """Build alias→canonical map for query parameters."""
+    return {alias: canonical for alias in _QUERY_ALIASES if alias != canonical}
+
 PARAMETER_ALIGNMENT: dict[str, dict[str, str]] = {
-    # Canonical "drug_name" aliases — each proxy's expected key
-    "openfda_proxy.py":          {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
-    "dailymed_proxy.py":         {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
-    "accessdata_proxy.py":       {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
-    "fda_safety_proxy.py":       {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
-    "rxnav_proxy.py":            {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
-    "vigiaccess_proxy.py":       {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
-    "drugbank_proxy.py":         {"drug": "drug_name", "substance": "drug_name", "product": "drug_name"},
-    # Canonical "drug" aliases — proxies that expect "drug"
-    "openvigil_proxy.py":        {"drug_name": "drug", "substance": "drug", "product": "drug"},
-    "eudravigilance_proxy.py":   {"drug_name": "drug", "substance": "drug", "product": "drug"},
-    "who_umc_proxy.py":          {"drug_name": "drug", "substance": "drug", "product": "drug"},
-    # Canonical "product" aliases — proxies that expect "product"
-    "ema_proxy.py":              {"drug_name": "product", "drug": "product", "substance": "product"},
+    # --- Proxies expecting "drug_name" ---
+    "openfda_proxy.py":          {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "dailymed_proxy.py":         {**_drug_alias_map("drug_name"), **_query_alias_map("query")},
+    "accessdata_proxy.py":       {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "fda_safety_proxy.py":       {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "rxnav_proxy.py":            {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "drugbank_proxy.py":         {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "pubmed_proxy.py":           {**_drug_alias_map("drug_name"), **_query_alias_map("query")},
+    # --- Proxies expecting "drug" ---
+    "openvigil_proxy.py":        {**_drug_alias_map("drug"), **_query_alias_map("drug")},
+    "eudravigilance_proxy.py":   {**_drug_alias_map("drug"), **_query_alias_map("drug")},
+    "who_umc_proxy.py":          {**_drug_alias_map("drug"), **_query_alias_map("drug")},
+    # --- Proxies expecting "medicine" ---
+    "vigiaccess_proxy.py":       {**_drug_alias_map("medicine"), **_query_alias_map("medicine")},
+    # --- Proxies with multiple accepted keys (EMA handles internally) ---
+    "ema_proxy.py":              {**_drug_alias_map("query"), "medicine": "query", **_query_alias_map("query")},
+    # --- Proxies expecting "query" for search tools ---
+    "clinicaltrials_proxy.py":   {**_drug_alias_map("query"), **_query_alias_map("query")},
+    "meddra_proxy.py":           {**_drug_alias_map("query"), **_query_alias_map("query")},
+    "ich_proxy.py":              {**_query_alias_map("query")},
+    "cioms_proxy.py":            {**_query_alias_map("query")},
 }
 
 

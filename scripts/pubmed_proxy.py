@@ -151,6 +151,24 @@ def _parse_article(article_el: ET.Element) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Parameter resolution helpers
+# ---------------------------------------------------------------------------
+
+def _resolve_query(params: dict) -> str:
+    """Resolve query from any known alias. Agents use varied parameter names."""
+    return (params.get("query") or params.get("search_query") or params.get("search")
+            or params.get("q") or params.get("drug_name") or params.get("drug")
+            or "").strip()
+
+
+def _resolve_drug(params: dict) -> str:
+    """Resolve drug name from any known alias."""
+    return (params.get("drug_name") or params.get("drug") or params.get("name")
+            or params.get("substance") or params.get("product")
+            or params.get("query") or "").strip()
+
+
+# ---------------------------------------------------------------------------
 # Tool handlers
 # ---------------------------------------------------------------------------
 
@@ -158,9 +176,9 @@ def search_articles(params: dict) -> dict:
     """
     Two-phase search: esearch to get PMIDs, then efetch for full metadata.
     """
-    query = params.get("query", "").strip()
+    query = _resolve_query(params)
     if not query:
-        return {"error": "query parameter is required"}
+        return {"error": "query parameter is required (also accepts: drug_name, drug, search_query)"}
 
     mesh_terms = params.get("mesh_terms", "").strip()
     date_range = params.get("date_range", "").strip()
@@ -329,9 +347,9 @@ def search_case_reports(params: dict) -> dict:
     Search PubMed for adverse event case reports for a specific drug.
     Optional: narrow by adverse_event term.
     """
-    drug_name = params.get("drug_name", "").strip()
+    drug_name = _resolve_drug(params)
     if not drug_name:
-        return {"error": "drug_name parameter is required"}
+        return {"error": "drug_name parameter is required (also accepts: drug, name, substance, query)"}
 
     adverse_event = params.get("adverse_event", "").strip()
 
@@ -355,9 +373,9 @@ def search_signal_literature(params: dict) -> dict:
     Find pharmacovigilance signal detection papers for a drug.
     Targets papers using standard PV methodology terms.
     """
-    drug_name = params.get("drug_name", "").strip()
+    drug_name = _resolve_drug(params)
     if not drug_name:
-        return {"error": "drug_name parameter is required"}
+        return {"error": "drug_name parameter is required (also accepts: drug, name, substance, query)"}
 
     pv_terms = (
         "pharmacovigilance[Title/Abstract] OR "
@@ -549,7 +567,7 @@ def main() -> None:
         return
 
     tool_name = request.get("tool", "")
-    params = request.get("arguments", request.get("params", {}))
+    params = request.get("arguments", request.get("args", request.get("params", {})))
 
     handler = HANDLERS.get(tool_name)
     if handler is None:

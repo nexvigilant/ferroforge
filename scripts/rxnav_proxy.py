@@ -49,6 +49,20 @@ def _fetch(url: str) -> dict:
         raise RuntimeError(f"Network error: {exc.reason}") from exc
 
 
+def _resolve_drug(args: dict) -> str:
+    """Resolve drug name from any known alias. Agents use varied parameter names."""
+    return (args.get("drug_name") or args.get("drug") or args.get("name")
+            or args.get("substance") or args.get("product")
+            or args.get("query") or "").strip()
+
+
+def _resolve_query(args: dict) -> str:
+    """Resolve query from any known alias."""
+    return (args.get("query") or args.get("search_query") or args.get("search")
+            or args.get("q") or args.get("drug_name") or args.get("drug")
+            or "").strip()
+
+
 def get_rxcui(args: dict) -> dict:
     """
     Tool: get-rxcui
@@ -57,7 +71,7 @@ def get_rxcui(args: dict) -> dict:
     (RxCUI). Returns the primary RxCUI and any additional concept details available.
     Uses the /rxcui.json?name= endpoint for exact-match concept lookup.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -114,9 +128,9 @@ def search_drugs(args: dict) -> dict:
     with their RxCUI, name, and match score. Useful when exact name is unknown
     or misspelled. Uses /approximateTerm.json.
     """
-    query = args.get("query", "").strip()
+    query = _resolve_query(args)
     if not query:
-        return {"status": "error", "message": "query is required", "count": 0, "results": []}
+        return {"status": "error", "message": "query is required (also accepts: drug_name, drug, search_query)", "count": 0, "results": []}
 
     max_entries = int(args.get("max_entries", DEFAULT_MAX_ENTRIES))
     max_entries = max(1, min(max_entries, 100))
@@ -311,7 +325,7 @@ def get_drug_classes(args: dict) -> dict:
     Queries /rxclass/class/byDrugName.json which returns ATC, EPC, MoA,
     PE, PK, TC, VA, and other classification systems.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = _resolve_drug(args)
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 

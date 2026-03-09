@@ -90,9 +90,10 @@ def search_trials(args: dict) -> dict:
 
     Maps to: GET /studies?query.term=...&filter.overallStatus=...&...
     """
-    query = args.get("query", "").strip()
+    query = (args.get("query") or args.get("drug_name") or args.get("drug")
+             or args.get("name") or args.get("search_query") or "").strip()
     if not query:
-        return _error("'query' is required for search-trials")
+        return _error("'query' is required for search-trials (also accepts: drug_name, drug, name)")
 
     params: dict[str, str] = {
         "query.term": query,
