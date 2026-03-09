@@ -858,3 +858,283 @@ fn test_course_summaries_have_valid_data() {
         assert!(steps > 0, "course '{name}' must have at least 1 step");
     }
 }
+
+// =============================================
+// Phase 5: Telemetry Health Engine
+// =============================================
+
+fn record_call(telemetry: &StationTelemetry, domain: &str, tool: &str, duration_ms: u64, is_error: bool) {
+    telemetry.record(telemetry::ToolCallRecord {
+        timestamp: telemetry::now_iso8601(),
+        tool_name: tool.into(),
+        domain: domain.into(),
+        duration_ms,
+        status: if is_error { "error" } else { "ok" }.into(),
+        is_error,
+        error_message: if is_error { Some("test error".into()) } else { None },
+        client_id: None,
+        request_id: None,
+    });
+}
+
+#[test]
+fn test_health_empty_ring() {
+    let telemetry = StationTelemetry::new(None);
+    let health = telemetry.health();
+    assert_eq!(health.total_calls, 0);
+    assert_eq!(health.total_errors, 0);
+    assert_eq!(health.error_rate_pct, 0.0);
+    assert_eq!(health.latency_p99_ms, 0);
+    assert!(health.latency_slo_ok);
+    assert_eq!(health.slo_status, "ok");
+    assert_eq!(health.trend, "stable");
+    assert!(health.degraded_domains.is_empty());
+}
+
+#[test]
+fn test_health_counts_calls_and_errors() {
+    let telemetry = StationTelemetry::new(None);
+    record_call(&telemetry, "api.fda.gov", "search_adverse_events", 100, false);
+    record_call(&telemetry, "api.fda.gov", "search_adverse_events", 200, false);
+    record_call(&telemetry, "api.fda.gov", "get_drug_counts", 150, true);
+
+    let health = telemetry.health();
+    assert_eq!(health.total_calls, 3);
+    assert_eq!(health.total_errors, 1);
+    // 1/3 = 33.3%
+    assert!((health.error_rate_pct - 33.33).abs() < 1.0);
+}
+
+#[test]
+fn test_health_domain_aggregation() {
+    let telemetry = StationTelemetry::new(None);
+    record_call(&telemetry, "api.fda.gov", "search_adverse_events", 100, false);
+    record_call(&telemetry, "api.fda.gov", "get_drug_counts", 200, false);
+    record_call(&telemetry, "dailymed.nlm.nih.gov", "search_drugs", 300, false);
+
+    let health = telemetry.health();
+    assert_eq!(health.domains.len(), 2);
+
+    let fda = health.domains.iter().find(|d| d.domain == "api.fda.gov").expect("fda domain");
+    assert_eq!(fda.call_count, 2);
+    assert_eq!(fda.error_count, 0);
+    assert!((fda.avg_duration_ms - 150.0).abs() < 1.0);
+}
+
+#[test]
+fn test_health_top_tools_ranking() {
+    let telemetry = StationTelemetry::new(None);
+    for _ in 0..5 {
+        record_call(&telemetry, "api.fda.gov", "search_adverse_events", 100, false);
+    }
+    for _ in 0..3 {
+        record_call(&telemetry, "api.fda.gov", "get_drug_counts", 100, false);
+    }
+    record_call(&telemetry, "api.fda.gov", "get_event_outcomes", 100, false);
+
+    let health = telemetry.health();
+    assert_eq!(health.top_tools[0].0, "search_adverse_events");
+    assert_eq!(health.top_tools[0].1, 5);
+    assert_eq!(health.top_tools[1].0, "get_drug_counts");
+    assert_eq!(health.top_tools[1].1, 3);
+}
+
+#[test]
+fn test_health_p99_latency() {
+    let telemetry = StationTelemetry::new(None);
+    // 90 fast calls + 10 slow calls → P99 should pick one of the slow ones
+    for _ in 0..90 {
+        record_call(&telemetry, "api.fda.gov", "fast_tool", 50, false);
+    }
+    for _ in 0..10 {
+        record_call(&telemetry, "api.fda.gov", "slow_tool", 4000, false);
+    }
+
+    let health = telemetry.health();
+    assert_eq!(health.total_calls, 100);
+    assert_eq!(health.latency_p99_ms, 4000);
+    assert!(health.latency_slo_ok); // 4000 < 5000 target
+}
+
+#[test]
+fn test_health_p99_slo_breach() {
+    let telemetry = StationTelemetry::new(None);
+    // 90 fast + 10 over SLO threshold → P99 picks the slow ones
+    for _ in 0..90 {
+        record_call(&telemetry, "api.fda.gov", "fast_tool", 50, false);
+    }
+    for _ in 0..10 {
+        record_call(&telemetry, "api.fda.gov", "slow_tool", 6000, false);
+    }
+
+    let health = telemetry.health();
+    assert_eq!(health.latency_p99_ms, 6000);
+    assert!(!health.latency_slo_ok);
+    assert_eq!(health.slo_status, "critical"); // P99 breach → critical
+}
+
+#[test]
+fn test_health_slo_warn_on_high_error_rate() {
+    let telemetry = StationTelemetry::new(None);
+    // 6% error rate: 6 errors out of 100 calls
+    for _ in 0..94 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, false);
+    }
+    for _ in 0..6 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, true);
+    }
+
+    let health = telemetry.health();
+    assert_eq!(health.slo_status, "warn");
+}
+
+#[test]
+fn test_health_slo_critical_on_very_high_error_rate() {
+    let telemetry = StationTelemetry::new(None);
+    // 11% error rate
+    for _ in 0..89 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, false);
+    }
+    for _ in 0..11 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, true);
+    }
+
+    let health = telemetry.health();
+    assert_eq!(health.slo_status, "critical");
+}
+
+#[test]
+fn test_health_degraded_domains() {
+    let telemetry = StationTelemetry::new(None);
+    // fda: 10 calls, 1 error (10% > 5% threshold, >= 5 sample)
+    for _ in 0..9 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, false);
+    }
+    record_call(&telemetry, "api.fda.gov", "tool", 100, true);
+
+    // dailymed: 10 calls, 0 errors — healthy
+    for _ in 0..10 {
+        record_call(&telemetry, "dailymed.nlm.nih.gov", "tool", 100, false);
+    }
+
+    let health = telemetry.health();
+    assert_eq!(health.degraded_domains.len(), 1);
+    assert_eq!(health.degraded_domains[0], "api.fda.gov");
+}
+
+#[test]
+fn test_health_degraded_ignores_low_sample() {
+    let telemetry = StationTelemetry::new(None);
+    // Only 3 calls with 1 error (33%) — but below 5-call minimum sample
+    for _ in 0..2 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, false);
+    }
+    record_call(&telemetry, "api.fda.gov", "tool", 100, true);
+
+    let health = telemetry.health();
+    assert!(health.degraded_domains.is_empty(), "should ignore low-sample domains");
+}
+
+#[test]
+fn test_health_trend_stable_with_uniform_errors() {
+    let telemetry = StationTelemetry::new(None);
+    // Even distribution of errors across first and second half
+    for i in 0..20 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, i % 5 == 0);
+    }
+
+    let health = telemetry.health();
+    assert_eq!(health.trend, "stable");
+}
+
+#[test]
+fn test_health_trend_improving() {
+    let telemetry = StationTelemetry::new(None);
+    // First half: many errors
+    for _ in 0..5 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, true);
+    }
+    for _ in 0..5 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, false);
+    }
+    // Second half: no errors
+    for _ in 0..10 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, false);
+    }
+
+    let health = telemetry.health();
+    assert_eq!(health.trend, "improving");
+}
+
+#[test]
+fn test_health_trend_degrading() {
+    let telemetry = StationTelemetry::new(None);
+    // First half: no errors
+    for _ in 0..10 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, false);
+    }
+    // Second half: many errors
+    for _ in 0..5 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, false);
+    }
+    for _ in 0..5 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, true);
+    }
+
+    let health = telemetry.health();
+    assert_eq!(health.trend, "degrading");
+}
+
+#[test]
+fn test_health_trend_stable_insufficient_data() {
+    let telemetry = StationTelemetry::new(None);
+    // Only 5 calls — below the 10-call minimum for trend detection
+    for _ in 0..5 {
+        record_call(&telemetry, "api.fda.gov", "tool", 100, true);
+    }
+
+    let health = telemetry.health();
+    assert_eq!(health.trend, "stable");
+}
+
+#[test]
+fn test_health_recent_calls_limited() {
+    let telemetry = StationTelemetry::new(None);
+    for i in 0..50 {
+        record_call(&telemetry, "api.fda.gov", &format!("tool_{i}"), 100, false);
+    }
+
+    let health = telemetry.health();
+    assert_eq!(health.recent_calls.len(), 20, "recent_calls capped at 20");
+    // Most recent should be first
+    assert_eq!(health.recent_calls[0].tool_name, "tool_49");
+}
+
+#[test]
+fn test_extract_domain_known_prefixes() {
+    assert_eq!(telemetry::extract_domain("api_fda_gov_search_adverse_events"), "api.fda.gov");
+    assert_eq!(telemetry::extract_domain("dailymed_nlm_nih_gov_get_drug_label"), "dailymed.nlm.nih.gov");
+    assert_eq!(telemetry::extract_domain("clinicaltrials_gov_search_trials"), "clinicaltrials.gov");
+}
+
+#[test]
+fn test_extract_domain_meta_tools() {
+    assert_eq!(telemetry::extract_domain("nexvigilant_directory"), "nexvigilant.meta");
+    assert_eq!(telemetry::extract_domain("nexvigilant_capabilities"), "nexvigilant.meta");
+    assert_eq!(telemetry::extract_domain("nexvigilant_station_health"), "nexvigilant.meta");
+    assert_eq!(telemetry::extract_domain("nexvigilant_chart_course"), "nexvigilant.meta");
+}
+
+#[test]
+fn test_health_serializes_to_json() {
+    let telemetry = StationTelemetry::new(None);
+    record_call(&telemetry, "api.fda.gov", "tool", 100, false);
+
+    let health = telemetry.health();
+    let json = serde_json::to_value(&health).expect("should serialize");
+    assert_eq!(json["station"], "NexVigilant Station");
+    assert!(json["uptime_seconds"].is_u64());
+    assert!(json["slo_status"].is_string());
+    assert!(json["trend"].is_string());
+    assert!(json["latency_p99_ms"].is_u64());
+}
