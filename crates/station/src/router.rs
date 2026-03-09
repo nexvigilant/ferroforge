@@ -1,6 +1,7 @@
 use serde_json::Value;
 use std::process::Command;
 use tracing::{info, warn};
+use uuid::Uuid;
 
 use crate::auth::{ApiKeyGate, AuthResult, auth_error_json};
 use crate::config::{ConfigRegistry, HubConfig, ToolDef};
@@ -34,6 +35,7 @@ pub fn route_tool_call(
     }
 
     let domain = extract_domain(tool_name);
+    let request_id = Uuid::new_v4().to_string();
 
     // Rate limit check BEFORE executing
     let rate_check = telemetry.check_rate_limit(&domain);
@@ -60,7 +62,7 @@ pub fn route_tool_call(
                 rate_check.current_count, rate_check.limit
             )),
             client_id: None,
-            request_id: None,
+            request_id: Some(request_id.clone()),
         });
 
         let response = serde_json::json!({
@@ -85,7 +87,7 @@ pub fn route_tool_call(
     }
 
     let timer = start_timer();
-    let result = route_tool_call_inner(registry, telemetry, tool_name, arguments);
+    let mut result = route_tool_call_inner(registry, telemetry, tool_name, arguments, &request_id);
     let duration_ms = elapsed_ms(timer);
 
     // Extract status and error detail from the result content
@@ -100,8 +102,11 @@ pub fn route_tool_call(
         is_error,
         error_message,
         client_id: None,
-        request_id: None,
+        request_id: Some(request_id.clone()),
     });
+
+    // Inject request_id into the response JSON for client correlation
+    inject_request_id(&mut result, &request_id);
 
     result
 }
@@ -153,6 +158,7 @@ fn route_tool_call_inner(
     telemetry: &StationTelemetry,
     tool_name: &str,
     arguments: &Value,
+    request_id: &str,
 ) -> ToolCallResult {
     // Meta-tools handled directly
     if tool_name == "nexvigilant_directory" {
@@ -171,7 +177,7 @@ fn route_tool_call_inner(
     }
 
     match registry.find_tool(tool_name) {
-        Some((config, tool)) => execute_tool(config, tool, tool_name, arguments, &registry.station_root),
+        Some((config, tool)) => execute_tool(config, tool, tool_name, arguments, &registry.station_root, request_id),
         None => ToolCallResult {
             content: vec![ContentBlock::Text {
                 text: format!("Unknown tool: {tool_name}. Use nexvigilant_directory to list all available tools."),
@@ -188,6 +194,7 @@ fn execute_tool(
     mcp_name: &str,
     arguments: &Value,
     station_root: &str,
+    request_id: &str,
 ) -> ToolCallResult {
     info!(
         domain = %config.domain,
@@ -202,7 +209,7 @@ fn execute_tool(
         .or(config.proxy.as_ref());
 
     if let Some(proxy) = proxy_path {
-        return execute_proxy(proxy, mcp_name, arguments, station_root);
+        return execute_proxy(proxy, mcp_name, arguments, station_root, request_id);
     }
 
     // Fall back to stub response if no proxy is available
@@ -248,6 +255,7 @@ fn execute_proxy(
     tool_name: &str,
     arguments: &Value,
     station_root: &str,
+    request_id: &str,
 ) -> ToolCallResult {
     let resolved_path = if proxy_path.ends_with("dispatch.py") {
         format!("{}/scripts/dispatch.py", station_root)
@@ -275,6 +283,7 @@ fn execute_proxy(
         serde_json::json!({
             "tool": tool_name,
             "arguments": arguments,
+            "request_id": request_id,
         })
     } else {
         // Extract bare tool name: strip everything up to and including the
@@ -284,6 +293,7 @@ fn execute_proxy(
         serde_json::json!({
             "tool": bare,
             "arguments": arguments,
+            "request_id": request_id,
         })
     };
     let envelope_str = serde_json::to_string(&envelope).unwrap_or_else(|_| "{}".into());
@@ -378,6 +388,24 @@ fn execute_proxy(
                     text: format!("Failed to execute proxy {resolved_path}: {e}"),
                 }],
                 is_error: Some(true),
+            }
+        }
+    }
+}
+
+/// Inject `request_id` into the tool call response for client-side correlation.
+///
+/// If the response content is valid JSON (object), adds a top-level `_request_id` field.
+/// Non-JSON responses and arrays are left unchanged — the ID only makes sense
+/// when there's a natural place to attach it.
+fn inject_request_id(result: &mut ToolCallResult, request_id: &str) {
+    if let Some(ContentBlock::Text { text }) = result.content.first_mut() {
+        if let Ok(mut json) = serde_json::from_str::<Value>(text) {
+            if let Some(obj) = json.as_object_mut() {
+                obj.insert("_request_id".into(), Value::String(request_id.into()));
+                if let Ok(updated) = serde_json::to_string_pretty(&json) {
+                    *text = updated;
+                }
             }
         }
     }

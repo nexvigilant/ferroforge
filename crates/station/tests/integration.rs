@@ -301,6 +301,75 @@ fn test_route_capabilities_domain_filter() {
 }
 
 // =============================================
+// Request ID Propagation
+// =============================================
+
+#[test]
+fn test_route_injects_request_id_in_stub_response() {
+    let reg = test_registry();
+    let result = router::route_tool_call(
+        &reg, &test_telemetry(), &ApiKeyGate::new(None), None,
+        "api_fda_gov_search_adverse_events", &json!({"drug_name": "aspirin"}),
+    );
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("stub should be JSON");
+    let rid = parsed["_request_id"].as_str().expect("should have _request_id");
+    // UUID v4 format: 8-4-4-4-12 hex chars
+    assert_eq!(rid.len(), 36, "request_id should be UUID format");
+    assert_eq!(rid.matches('-').count(), 4);
+}
+
+#[test]
+fn test_route_injects_request_id_in_meta_tool() {
+    let reg = test_registry();
+    let result = router::route_tool_call(
+        &reg, &test_telemetry(), &ApiKeyGate::new(None), None,
+        "nexvigilant_directory", &json!({}),
+    );
+    let text = match &result.content[0] {
+        nexvigilant_station::protocol::ContentBlock::Text { text } => text,
+    };
+    let parsed: Value = serde_json::from_str(text).expect("should be JSON");
+    assert!(parsed["_request_id"].as_str().is_some(), "meta-tools should get request_id");
+}
+
+#[test]
+fn test_route_request_id_recorded_in_telemetry() {
+    let reg = test_registry();
+    let telemetry = test_telemetry();
+    let _ = router::route_tool_call(
+        &reg, &telemetry, &ApiKeyGate::new(None), None,
+        "api_fda_gov_search_adverse_events", &json!({"drug_name": "test"}),
+    );
+    let health = telemetry.health();
+    assert!(!health.recent_calls.is_empty());
+    let last = &health.recent_calls[0];
+    assert!(last.request_id.is_some(), "telemetry should record request_id");
+}
+
+#[test]
+fn test_route_unique_request_ids() {
+    let reg = test_registry();
+    let telemetry = test_telemetry();
+    let _ = router::route_tool_call(
+        &reg, &telemetry, &ApiKeyGate::new(None), None,
+        "api_fda_gov_search_adverse_events", &json!({"drug_name": "a"}),
+    );
+    let _ = router::route_tool_call(
+        &reg, &telemetry, &ApiKeyGate::new(None), None,
+        "api_fda_gov_search_adverse_events", &json!({"drug_name": "b"}),
+    );
+    let health = telemetry.health();
+    let ids: Vec<&str> = health.recent_calls.iter()
+        .filter_map(|c| c.request_id.as_deref())
+        .collect();
+    assert_eq!(ids.len(), 2);
+    assert_ne!(ids[0], ids[1], "each call should get a unique request_id");
+}
+
+// =============================================
 // Phase 0: MCP Server Handler
 // =============================================
 
