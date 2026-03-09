@@ -399,14 +399,13 @@ fn execute_proxy(
 /// Non-JSON responses and arrays are left unchanged — the ID only makes sense
 /// when there's a natural place to attach it.
 fn inject_request_id(result: &mut ToolCallResult, request_id: &str) {
-    if let Some(ContentBlock::Text { text }) = result.content.first_mut() {
-        if let Ok(mut json) = serde_json::from_str::<Value>(text) {
-            if let Some(obj) = json.as_object_mut() {
-                obj.insert("_request_id".into(), Value::String(request_id.into()));
-                if let Ok(updated) = serde_json::to_string_pretty(&json) {
-                    *text = updated;
-                }
-            }
+    if let Some(ContentBlock::Text { text }) = result.content.first_mut()
+        && let Ok(mut json) = serde_json::from_str::<Value>(text)
+        && let Some(obj) = json.as_object_mut()
+    {
+        obj.insert("_request_id".into(), Value::String(request_id.into()));
+        if let Ok(updated) = serde_json::to_string_pretty(&json) {
+            *text = updated;
         }
     }
 }
