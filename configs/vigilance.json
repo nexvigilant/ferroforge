@@ -1,0 +1,281 @@
+{
+  "domain": "vigilance.nexvigilant.com",
+  "private": false,
+  "url_pattern": "/vigilance/*",
+  "title": "Vigilance & Harm Taxonomy",
+  "copyright": "© 2026 NexVigilant, LLC. Guardian-AV safety margin function d(s) and risk scoring methodology are proprietary NexVigilant methods. Harm taxonomy (Types A-H) follows published pharmacovigilance classification. Theory of Vigilance level mapping is proprietary.",
+  "description": "Pharmacovigilance vigilance tools: safety margin distance d(s) for composite signal scoring, Guardian-AV risk scoring (0-10), harm classification by type (A-H) per Theory of Vigilance §9, and safety-level-to-ToV mapping. All tools are Rust-native — no network calls required.",
+  "tools": [
+    {
+      "name": "safety-margin",
+      "description": "Calculate safety margin distance d(s) — a weighted composite of four disproportionality metrics (PRR, ROR lower CI, IC025, EB05) and case count. d > 1.0 = clear signal; d > 0.5 = probable signal; d > 0.0 = borderline; d <= 0.0 = below threshold. Use after running PRR/ROR/IC/EBGM to synthesize a single decision metric.",
+      "parameters": [
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "Proportional Reporting Ratio value (from compute-prr)",
+          "required": true
+        },
+        {
+          "name": "ror_lower",
+          "type": "number",
+          "description": "ROR lower 95% confidence interval (from compute-ror)",
+          "required": true
+        },
+        {
+          "name": "ic025",
+          "type": "number",
+          "description": "IC lower credibility interval (IC025, from compute-ic)",
+          "required": true
+        },
+        {
+          "name": "eb05",
+          "type": "number",
+          "description": "EBGM 5th percentile (EB05, from compute-ebgm)",
+          "required": true
+        },
+        {
+          "name": "n",
+          "type": "integer",
+          "description": "Number of case reports for this drug-event pair",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error"
+          },
+          "d": {
+            "type": "number",
+            "description": "Composite safety distance (positive = above threshold, negative = below)"
+          },
+          "interpretation": {
+            "type": "string",
+            "description": "Plain-English interpretation of d"
+          },
+          "action": {
+            "type": "string",
+            "description": "Recommended pharmacovigilance action"
+          },
+          "components": {
+            "type": "object",
+            "description": "Per-metric normalized distances and weights"
+          }
+        },
+        "required": ["status"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "risk-score",
+      "description": "Compute Guardian-AV risk score (0-10) for a drug-event pair from four disproportionality metrics and case count. Levels: minimal (<2), low (2-4), moderate (4-6), high (6-8), critical (>=8). Combines signal magnitude, CI confidence, Bayesian evidence, information content, and reporting volume.",
+      "parameters": [
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Drug name or identifier",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "Adverse event term (MedDRA preferred term recommended)",
+          "required": true
+        },
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "Proportional Reporting Ratio value",
+          "required": true
+        },
+        {
+          "name": "ror_lower",
+          "type": "number",
+          "description": "ROR lower 95% confidence interval",
+          "required": true
+        },
+        {
+          "name": "ic025",
+          "type": "number",
+          "description": "IC lower credibility interval (IC025)",
+          "required": true
+        },
+        {
+          "name": "eb05",
+          "type": "number",
+          "description": "EBGM 5th percentile (EB05)",
+          "required": true
+        },
+        {
+          "name": "n",
+          "type": "integer",
+          "description": "Number of case reports for this drug-event pair",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error"
+          },
+          "score": {
+            "type": "number",
+            "description": "Composite risk score (0-10)"
+          },
+          "level": {
+            "type": "string",
+            "description": "minimal | low | moderate | high | critical"
+          },
+          "components": {
+            "type": "object",
+            "description": "Per-metric component scores and weights"
+          }
+        },
+        "required": ["status"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "harm-types",
+      "description": "List all 8 harm types (A-H) from the Theory of Vigilance §9. Types derive from three binary attributes: multiplicity (single|multiple) × temporal (acute|chronic) × determinism (deterministic|stochastic) = 2³ = 8 combinations. Returns the complete taxonomy with examples.",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error"
+          },
+          "taxonomy": {
+            "type": "array",
+            "description": "Array of 8 harm type objects with letter, name, attributes, description, and example"
+          },
+          "combinatorial_note": {
+            "type": "string",
+            "description": "Derivation note: 2^3 = 8 types from three binary attributes"
+          }
+        },
+        "required": ["status"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "harm-classify",
+      "description": "Classify an adverse drug reaction into a harm type (A-H) from three binary attributes per Theory of Vigilance §9. Example: single + acute + deterministic = Type A (Augmented, dose-dependent). Use to select monitoring strategy appropriate for the harm mechanism.",
+      "parameters": [
+        {
+          "name": "multiplicity",
+          "type": "string",
+          "description": "Whether the harm requires single or multiple drug exposures: 'single' or 'multiple'",
+          "required": true
+        },
+        {
+          "name": "temporal",
+          "type": "string",
+          "description": "Onset timing relative to exposure: 'acute' (during/immediately after) or 'chronic' (delayed/cumulative)",
+          "required": true
+        },
+        {
+          "name": "determinism",
+          "type": "string",
+          "description": "Predictability of the effect: 'deterministic' (dose-dependent, predictable) or 'stochastic' (idiosyncratic, unpredictable)",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error"
+          },
+          "letter": {
+            "type": "string",
+            "description": "Harm type letter (A-H)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Full harm type name (e.g., Type A (Augmented))"
+          },
+          "description": {
+            "type": "string",
+            "description": "Brief description of the harm mechanism"
+          },
+          "example": {
+            "type": "string",
+            "description": "Canonical clinical example"
+          }
+        },
+        "required": ["status"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "map-to-tov",
+      "description": "Map a safety level (1-8) to its Theory of Vigilance abstraction tier. Levels: 1=Molecular, 2=Cellular, 3=Tissue, 4=Organ, 5=System, 6=Clinical, 7=Epidemiological, 8=Regulatory. Returns the ToV group (Foundational/Structural/Functional/Population) and description.",
+      "parameters": [
+        {
+          "name": "level",
+          "type": "integer",
+          "description": "Safety abstraction level (1-8): 1=Molecular, 2=Cellular, 3=Tissue, 4=Organ, 5=System, 6=Clinical, 7=Epidemiological, 8=Regulatory",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error"
+          },
+          "level": {
+            "type": "integer",
+            "description": "Input safety level (1-8)"
+          },
+          "safety_level_name": {
+            "type": "string",
+            "description": "Safety level name (e.g., Molecular, Organ, Clinical)"
+          },
+          "tov_level": {
+            "type": "string",
+            "description": "Theory of Vigilance abstraction level: Foundational | Structural | Functional | Population"
+          },
+          "tov_group": {
+            "type": "string",
+            "description": "ToV group with level range (e.g., Foundation (1-2))"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of what this level covers"
+          },
+          "all_levels": {
+            "type": "array",
+            "description": "Complete 8-level mapping table"
+          }
+        },
+        "required": ["status"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    }
+  ]
+}

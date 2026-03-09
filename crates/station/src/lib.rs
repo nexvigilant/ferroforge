@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod compute;
 pub mod config;
 pub mod protocol;
 pub mod rate_limit;
