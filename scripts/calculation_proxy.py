@@ -1076,7 +1076,16 @@ def main() -> None:
         sys.exit(1)
 
     handler = TOOL_DISPATCH[tool_name]
-    result = handler(args)
+    try:
+        result = handler(args)
+    except RuntimeError as exc:
+        result = {"status": "error", "error": True, "message": str(exc)}
+    except Exception as exc:  # noqa: BLE001
+        result = {
+            "status": "error",
+            "error": True,
+            "message": f"Unexpected error in '{tool_name}': {type(exc).__name__}: {exc}",
+        }
     print(json.dumps(result, indent=2))
 
 
