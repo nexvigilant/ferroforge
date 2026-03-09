@@ -125,6 +125,8 @@ pub async fn run_combined(
         ])
         .expose_headers([
             "mcp-session-id".parse::<axum::http::HeaderName>().expect("valid header name"),
+            "x-request-id".parse::<axum::http::HeaderName>().expect("valid header name"),
+            "x-station-version".parse::<axum::http::HeaderName>().expect("valid header name"),
         ]);
 
     // Streamable HTTP routes (Claude.ai Connectors)
@@ -150,6 +152,7 @@ pub async fn run_combined(
         // Health + Stats (excluded from rate limiting below via middleware ordering)
         .route("/health", get(handle_health))
         .route("/stats", get(handle_stats))
+        .layer(axum::middleware::from_fn(response_headers_middleware))
         .layer(axum::middleware::from_fn_with_state(
             rate_limiter,
             crate::rate_limit::rate_limit_middleware,
@@ -378,6 +381,34 @@ async fn handle_tool_call(
         }
         None => StatusCode::NO_CONTENT.into_response(),
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Response header middleware
+// ═══════════════════════════════════════════════════════════════════
+
+/// Inject standard response headers for debugging and client-side correlation.
+///
+/// Every HTTP response gets:
+///   - `X-Station-Version`: binary version + git SHA (e.g., "0.1.0+abc1234")
+///   - `X-Request-Id`: unique UUID per request for log correlation
+async fn response_headers_middleware(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> impl IntoResponse {
+    let request_id = Uuid::new_v4().to_string();
+    let mut response = next.run(request).await;
+
+    let headers = response.headers_mut();
+    let version = format!("{}+{}", env!("CARGO_PKG_VERSION"), env!("GIT_SHA"));
+    if let Ok(v) = HeaderValue::from_str(&version) {
+        headers.insert("x-station-version", v);
+    }
+    if let Ok(v) = HeaderValue::from_str(&request_id) {
+        headers.insert("x-request-id", v);
+    }
+
+    response
 }
 
 // ═══════════════════════════════════════════════════════════════════
