@@ -21,29 +21,43 @@ EVENT_URL = "https://api.fda.gov/drug/event.json"
 LABEL_URL = "https://api.fda.gov/drug/label.json"
 DEFAULT_LIMIT = 10
 REQUEST_TIMEOUT_SECONDS = 15
+_RETRY_CODES = {429, 503}
+_MAX_RETRIES = 3
 
 
 def _fetch(url: str) -> dict:
-    """Execute an HTTP GET and return parsed JSON. Raises on HTTP/network errors."""
+    """Execute an HTTP GET and return parsed JSON. Retries on 429/503."""
+    import time
     req = urllib.request.Request(
         url,
         headers={"User-Agent": "NexVigilant-FerroForge/1.0 (ferroforge@nexvigilant.com)"},
     )
-    try:
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SECONDS) as resp:
-            body = resp.read().decode("utf-8")
-            return json.loads(body)
-    except urllib.error.HTTPError as exc:
-        error_body = {}
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
         try:
-            error_body = json.loads(exc.read().decode("utf-8"))
-        except Exception:
-            pass
-        raise RuntimeError(
-            f"HTTP {exc.code}: {error_body.get('error', {}).get('message', exc.reason)}"
-        ) from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Network error: {exc.reason}") from exc
+            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SECONDS) as resp:
+                body = resp.read().decode("utf-8")
+                return json.loads(body)
+        except urllib.error.HTTPError as exc:
+            if exc.code in _RETRY_CODES and attempt < _MAX_RETRIES - 1:
+                time.sleep(0.2 * (3 ** attempt))  # 0.2s, 0.6s, 1.8s
+                last_exc = exc
+                continue
+            error_body = {}
+            try:
+                error_body = json.loads(exc.read().decode("utf-8"))
+            except Exception:
+                pass
+            raise RuntimeError(
+                f"HTTP {exc.code}: {error_body.get('error', {}).get('message', exc.reason)}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(0.2 * (3 ** attempt))
+                last_exc = exc
+                continue
+            raise RuntimeError(f"Network error: {exc.reason}") from exc
+    raise RuntimeError(f"Failed after {_MAX_RETRIES} retries: {last_exc}")
 
 
 def _quote(value: str) -> str:

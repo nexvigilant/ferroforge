@@ -35,6 +35,8 @@ DEFAULT_LIMIT = 10
 MAX_LIMIT = 50
 # NCBI asks for no more than 3 requests / second without an API key.
 REQUEST_DELAY = 0.35  # seconds between sequential requests
+_RETRY_CODES = {429, 503}
+_MAX_RETRIES = 3
 
 
 # ---------------------------------------------------------------------------
@@ -43,12 +45,29 @@ REQUEST_DELAY = 0.35  # seconds between sequential requests
 
 def _get(url: str) -> bytes:
     """Perform a GET request and return the response body."""
+    import urllib.error
     req = urllib.request.Request(
         url,
         headers={"User-Agent": "NexVigilant-Station/1.0 (dev@nexvigilant.com)"},
     )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        return resp.read()
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return resp.read()
+        except urllib.error.HTTPError as exc:
+            if exc.code in _RETRY_CODES and attempt < _MAX_RETRIES - 1:
+                time.sleep(0.2 * (3 ** attempt))
+                last_exc = exc
+                continue
+            raise
+        except urllib.error.URLError as exc:
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(0.2 * (3 ** attempt))
+                last_exc = exc
+                continue
+            raise
+    raise RuntimeError(f"Failed after {_MAX_RETRIES} retries: {last_exc}")
 
 
 def _get_json(url: str) -> dict:

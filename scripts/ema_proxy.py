@@ -26,6 +26,8 @@ DHPC_URL = "https://www.ema.europa.eu/en/documents/report/dhpc-output-json-repor
 
 REQUEST_TIMEOUT_SECONDS = 30
 DEFAULT_LIMIT = 20
+_RETRY_CODES = {429, 503}
+_MAX_RETRIES = 3
 
 # In-process cache: URL -> parsed JSON (avoids re-fetching within a single dispatch)
 _cache: dict[str, list] = {}
@@ -33,6 +35,7 @@ _cache: dict[str, list] = {}
 
 def _fetch_json_list(url: str) -> list:
     """Fetch a JSON data file and return the list of records. Caches per-process."""
+    import time
     if url in _cache:
         return _cache[url]
 
@@ -40,14 +43,27 @@ def _fetch_json_list(url: str) -> list:
         url,
         headers={"User-Agent": "NexVigilant-FerroForge/1.0 (ferroforge@nexvigilant.com)"},
     )
-    try:
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SECONDS) as resp:
-            body = resp.read().decode("utf-8")
-            data = json.loads(body)
-    except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"HTTP {exc.code}: {exc.reason}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Network error: {exc.reason}") from exc
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SECONDS) as resp:
+                body = resp.read().decode("utf-8")
+                data = json.loads(body)
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code in _RETRY_CODES and attempt < _MAX_RETRIES - 1:
+                time.sleep(0.2 * (3 ** attempt))
+                last_exc = exc
+                continue
+            raise RuntimeError(f"HTTP {exc.code}: {exc.reason}") from exc
+        except urllib.error.URLError as exc:
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(0.2 * (3 ** attempt))
+                last_exc = exc
+                continue
+            raise RuntimeError(f"Network error: {exc.reason}") from exc
+    else:
+        raise RuntimeError(f"Failed after {_MAX_RETRIES} retries: {last_exc}")
 
     # EMA JSON files are either a bare list or a dict with a data key
     if isinstance(data, list):

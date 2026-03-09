@@ -23,6 +23,9 @@ DEFAULT_PAGE_SIZE = 10
 MAX_PAGE_SIZE = 100
 
 # Safety-relevant keywords for endpoint extraction.
+_RETRY_CODES = {429, 503}
+_MAX_RETRIES = 3
+
 SAFETY_KEYWORDS = {
     "adverse",
     "safety",
@@ -48,6 +51,7 @@ SAFETY_KEYWORDS = {
 
 def _get_json(url: str, params: dict[str, str] | None = None) -> Any:
     """Make a GET request and return parsed JSON. Raises on HTTP errors."""
+    import time
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
     req = urllib.request.Request(
@@ -57,16 +61,27 @@ def _get_json(url: str, params: dict[str, str] | None = None) -> Any:
             "User-Agent": "NexVigilant-Station/1.0 (clinicaltrials_proxy.py)",
         },
     )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(
-            f"HTTP {exc.code} from ClinicalTrials.gov: {body[:400]}"
-        ) from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Network error: {exc.reason}") from exc
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code in _RETRY_CODES and attempt < _MAX_RETRIES - 1:
+                time.sleep(0.2 * (3 ** attempt))
+                last_exc = exc
+                continue
+            body = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(
+                f"HTTP {exc.code} from ClinicalTrials.gov: {body[:400]}"
+            ) from exc
+        except urllib.error.URLError as exc:
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(0.2 * (3 ** attempt))
+                last_exc = exc
+                continue
+            raise RuntimeError(f"Network error: {exc.reason}") from exc
+    raise RuntimeError(f"Failed after {_MAX_RETRIES} retries: {last_exc}")
 
 
 def _fetch_study(nct_id: str, fields: str | None = None) -> dict:
@@ -679,7 +694,7 @@ def main() -> None:
         sys.exit(1)
 
     tool_name = payload.get("tool", "")
-    arguments = payload.get("arguments", {})
+    arguments = payload.get("arguments", payload.get("args", {}))
 
     handler = TOOLS.get(tool_name)
     if handler is None:

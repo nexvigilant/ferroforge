@@ -24,24 +24,38 @@ MEDIAWIKI_API = "https://en.wikipedia.org/w/api.php"
 REST_API = "https://en.wikipedia.org/api/rest_v1"
 REQUEST_TIMEOUT_SECONDS = 15
 USER_AGENT = "NexVigilant-FerroForge/1.0 (ferroforge@nexvigilant.com)"
+_RETRY_CODES = {429, 503}
+_MAX_RETRIES = 3
 
 
 def _fetch(url: str) -> dict:
     """Execute an HTTP GET and return parsed JSON."""
+    import time
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    try:
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SECONDS) as resp:
-            body = resp.read().decode("utf-8")
-            return json.loads(body)
-    except urllib.error.HTTPError as exc:
-        error_body = ""
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
         try:
-            error_body = exc.read().decode("utf-8")[:500]
-        except Exception:
-            pass
-        raise RuntimeError(f"HTTP {exc.code}: {exc.reason} — {error_body}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"Network error: {exc.reason}") from exc
+            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SECONDS) as resp:
+                body = resp.read().decode("utf-8")
+                return json.loads(body)
+        except urllib.error.HTTPError as exc:
+            if exc.code in _RETRY_CODES and attempt < _MAX_RETRIES - 1:
+                time.sleep(0.2 * (3 ** attempt))
+                last_exc = exc
+                continue
+            error_body = ""
+            try:
+                error_body = exc.read().decode("utf-8")[:500]
+            except Exception:
+                pass
+            raise RuntimeError(f"HTTP {exc.code}: {exc.reason} — {error_body}") from exc
+        except urllib.error.URLError as exc:
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(0.2 * (3 ** attempt))
+                last_exc = exc
+                continue
+            raise RuntimeError(f"Network error: {exc.reason}") from exc
+    raise RuntimeError(f"Failed after {_MAX_RETRIES} retries: {last_exc}")
 
 
 def _mediawiki(params: dict) -> dict:
