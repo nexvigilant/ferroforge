@@ -10,7 +10,7 @@ Rust MCP server + 23 PV domain configs (174 tools). The station binary reads JSO
 
 ```bash
 cargo build -p nexvigilant-station --release    # Build station binary
-cargo test -p nexvigilant-station               # 53 integration tests
+cargo test -p nexvigilant-station               # 75 integration tests
 cargo clippy -p nexvigilant-station -- -D warnings
 
 # MCP protocol test
