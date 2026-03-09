@@ -81,9 +81,9 @@ impl ApiKeyGate {
 
     /// Check whether a tool call is authorized.
     ///
-    /// - Free tools (meta-tools) always pass.
+    /// - Free tools (meta-tools) and public config tools always pass.
+    /// - Private config tools require a valid API key.
     /// - If no keys configured → always pass (dev mode).
-    /// - Otherwise, requires valid `Authorization: Bearer nv_...` header.
     ///
     /// Key comparison is constant-time: both the candidate and stored keys
     /// are SHA-256 hashed, then compared with `subtle::ConstantTimeEq` to
@@ -94,11 +94,35 @@ impl ApiKeyGate {
             return AuthResult::Allowed;
         }
 
-        // Dev mode — no keys configured
+        // Dev mode — no keys configured, all tools open
         let Some(key_hashes) = &self.key_hashes else {
             return AuthResult::Allowed;
         };
 
+        self.validate_token(auth_header, key_hashes)
+    }
+
+    /// Check whether a tool call is authorized using config privacy flag.
+    ///
+    /// - Public tools (is_private=false) always pass.
+    /// - Private tools require a valid API key.
+    /// - Dev mode (no keys) → all tools open.
+    pub fn check_with_privacy(&self, auth_header: Option<&str>, is_private: bool) -> AuthResult {
+        // Public tools are always free
+        if !is_private {
+            return AuthResult::Allowed;
+        }
+
+        // Dev mode — no keys configured, all tools open
+        let Some(key_hashes) = &self.key_hashes else {
+            return AuthResult::Allowed;
+        };
+
+        self.validate_token(auth_header, key_hashes)
+    }
+
+    /// Validate a Bearer token against stored key hashes.
+    fn validate_token(&self, auth_header: Option<&str>, key_hashes: &[[u8; 32]]) -> AuthResult {
         // Extract Bearer token
         let Some(header) = auth_header else {
             return AuthResult::KeyRequired;
@@ -127,6 +151,15 @@ impl ApiKeyGate {
         } else {
             AuthResult::InvalidKey
         }
+    }
+
+    /// Check if the given auth header contains a valid key.
+    /// Used by tools/list to determine which tools to show.
+    pub fn is_authenticated(&self, auth_header: Option<&str>) -> bool {
+        let Some(key_hashes) = &self.key_hashes else {
+            return true; // dev mode — show everything
+        };
+        matches!(self.validate_token(auth_header, key_hashes), AuthResult::Allowed)
     }
 
     /// Check if auth is enabled (keys are configured).

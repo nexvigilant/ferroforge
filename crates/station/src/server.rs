@@ -76,6 +76,17 @@ pub fn handle_request(
     req: &JsonRpcRequest,
     event_tx: Option<&broadcast::Sender<StationEvent>>,
 ) -> Option<JsonRpcResponse> {
+    handle_request_with_auth(registry, telemetry, auth_gate, req, event_tx, None)
+}
+
+pub fn handle_request_with_auth(
+    registry: &ConfigRegistry,
+    telemetry: &StationTelemetry,
+    auth_gate: &ApiKeyGate,
+    req: &JsonRpcRequest,
+    event_tx: Option<&broadcast::Sender<StationEvent>>,
+    auth_header: Option<&str>,
+) -> Option<JsonRpcResponse> {
     let id = req.id.clone();
 
     match req.method.as_str() {
@@ -109,8 +120,9 @@ pub fn handle_request(
         }
 
         "tools/list" => {
-            let tools = registry.tool_infos();
-            info!(count = tools.len(), "Tools list requested");
+            let authenticated = auth_gate.is_authenticated(auth_header);
+            let tools = registry.tool_infos_filtered(authenticated);
+            info!(count = tools.len(), authenticated, "Tools list requested");
             let result = ToolsListResult { tools };
             Some(JsonRpcResponse::success(
                 id,

@@ -37,4 +37,4 @@ ENV RUST_LOG=nexvigilant_station=info
 # Combined transport: SSE (MCP protocol) + HTTP REST on one port
 # SSE for mcp-remote/Claude Code, HTTP REST for any agent framework
 ENTRYPOINT ["nexvigilant-station"]
-CMD ["--config-dir", "/app/configs", "--telemetry-log", "/tmp/station-telemetry.jsonl", "--transport", "combined", "--host", "0.0.0.0", "--port", "8080", "--exclude-private"]
+CMD ["--config-dir", "/app/configs", "--telemetry-log", "/tmp/station-telemetry.jsonl", "--transport", "combined", "--host", "0.0.0.0", "--port", "8080"]

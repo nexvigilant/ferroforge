@@ -25,7 +25,7 @@ use uuid::Uuid;
 use crate::auth::{ApiKeyGate, AuthResult};
 use crate::config::ConfigRegistry;
 use crate::protocol::{JsonRpcRequest, JsonRpcResponse, StationEvent, StationEventNotification};
-use crate::server::handle_request;
+use crate::server::{handle_request, handle_request_with_auth};
 use crate::telemetry::StationTelemetry;
 
 /// Maximum concurrent Streamable HTTP sessions.
@@ -156,12 +156,16 @@ pub async fn handle_mcp_post(
                     if req.id.is_none() {
                         continue;
                     }
-                    if let Some(resp) = handle_request(
+                    let batch_auth = headers
+                        .get(axum::http::header::AUTHORIZATION)
+                        .and_then(|v| v.to_str().ok());
+                    if let Some(resp) = handle_request_with_auth(
                         &state.registry,
                         &state.telemetry,
                         &state.auth_gate,
                         req,
                         Some(&state.event_tx),
+                        batch_auth,
                     ) {
                         responses.push(resp);
                     }
@@ -248,13 +252,17 @@ pub async fn handle_mcp_post(
         return StatusCode::ACCEPTED.into_response();
     }
 
-    // Process the request through the shared handler
-    let response = handle_request(
+    // Process the request through the shared handler (with auth for tools/list filtering)
+    let auth_header = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
+    let response = handle_request_with_auth(
         &state.registry,
         &state.telemetry,
         &state.auth_gate,
         &request,
         Some(&state.event_tx),
+        auth_header,
     );
 
     match response {

@@ -327,9 +327,14 @@ async fn handle_rpc(
 
 async fn handle_list_tools(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
 ) -> Json<Value> {
-    let tools = state.registry.tool_infos();
-    info!(count = tools.len(), "HTTP tools list");
+    let auth_header = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
+    let authenticated = state.auth_gate.is_authenticated(auth_header);
+    let tools = state.registry.tool_infos_filtered(authenticated);
+    info!(count = tools.len(), authenticated, "HTTP tools list");
     Json(serde_json::to_value(tools).unwrap_or_default())
 }
 

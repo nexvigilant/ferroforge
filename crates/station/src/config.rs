@@ -291,6 +291,41 @@ impl ConfigRegistry {
         tools
     }
 
+    /// Convert tools to MCP ToolInfo, filtering by auth status.
+    /// Authenticated callers see all tools. Unauthenticated see only public config tools.
+    pub fn tool_infos_filtered(&self, authenticated: bool) -> Vec<ToolInfo> {
+        if authenticated {
+            return self.tool_infos(); // all tools
+        }
+        // Unauthenticated: meta-tools + public config tools only
+        let all = self.tool_infos();
+        let private_prefixes: Vec<String> = self.configs
+            .iter()
+            .filter(|c| c.private)
+            .map(|c| format!("{}_", c.domain.replace('.', "_")))
+            .collect();
+
+        all.into_iter()
+            .filter(|tool| {
+                // Keep meta-tools (they don't have a domain prefix from configs)
+                !private_prefixes.iter().any(|prefix| tool.name.starts_with(prefix))
+            })
+            .collect()
+    }
+
+    /// Check if a tool belongs to a private config.
+    pub fn is_tool_private(&self, mcp_name: &str) -> bool {
+        for config in &self.configs {
+            if config.private {
+                let domain_prefix = format!("{}_", config.domain.replace('.', "_"));
+                if mcp_name.starts_with(&domain_prefix) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     /// Find a tool definition by its prefixed MCP name.
     pub fn find_tool(&self, mcp_name: &str) -> Option<(&HubConfig, &ToolDef)> {
         for config in &self.configs {
