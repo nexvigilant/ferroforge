@@ -57,7 +57,8 @@ struct AppState {
 ///   POST /rpc              → JSON-RPC 2.0 direct (for any MCP client)
 ///   GET  /tools            → tool catalog as JSON array
 ///   POST /tools/{name}     → simplified REST tool call
-///   GET  /health           → liveness + stats
+///   GET  /health           → liveness + telemetry summary
+///   GET  /stats            → full telemetry (domains, top tools, recent calls)
 pub async fn run_combined(
     registry: ConfigRegistry,
     telemetry: StationTelemetry,
@@ -146,8 +147,9 @@ pub async fn run_combined(
         .route("/rpc", post(handle_rpc))
         .route("/tools", get(handle_list_tools))
         .route("/tools/{name}", post(handle_tool_call))
-        // Health (excluded from rate limiting below via middleware ordering)
+        // Health + Stats (excluded from rate limiting below via middleware ordering)
         .route("/health", get(handle_health))
+        .route("/stats", get(handle_stats))
         .layer(axum::middleware::from_fn_with_state(
             rate_limiter,
             crate::rate_limit::rate_limit_middleware,
@@ -386,6 +388,7 @@ async fn handle_health(
     State(state): State<Arc<AppState>>,
 ) -> Json<Value> {
     let sessions = state.sessions.lock().await;
+    let health = state.telemetry.health();
     Json(serde_json::json!({
         "status": "ok",
         "transport": "combined",
@@ -399,9 +402,29 @@ async fn handle_health(
         "tools": state.registry.tool_count(),
         "courses": crate::science::course_count(),
         "active_sessions": sessions.len(),
+        "telemetry": {
+            "uptime_seconds": health.uptime_seconds,
+            "total_calls": health.total_calls,
+            "total_errors": health.total_errors,
+            "error_rate_pct": health.error_rate_pct,
+            "calls_per_minute": health.calls_per_minute,
+            "latency_p99_ms": health.latency_p99_ms,
+            "slo_status": health.slo_status,
+            "trend": health.trend,
+            "degraded_domains": health.degraded_domains,
+        },
         "server": "nexvigilant-station",
         "version": env!("CARGO_PKG_VERSION"),
         "git_sha": env!("GIT_SHA"),
     }))
+}
+
+/// Full telemetry stats — domain breakdown, top tools, recent calls.
+/// Separated from /health to keep health lightweight for Cloud Run probes.
+async fn handle_stats(
+    State(state): State<Arc<AppState>>,
+) -> Json<Value> {
+    let health = state.telemetry.health();
+    Json(serde_json::to_value(health).unwrap_or_default())
 }
 
