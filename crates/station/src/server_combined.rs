@@ -413,6 +413,7 @@ async fn handle_health(
             "trend": health.trend,
             "degraded_domains": health.degraded_domains,
         },
+        "config_hash": state.registry.config_hash(),
         "server": "nexvigilant-station",
         "version": env!("CARGO_PKG_VERSION"),
         "git_sha": env!("GIT_SHA"),
