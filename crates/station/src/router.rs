@@ -171,7 +171,10 @@ fn route_tool_call_inner(
         return handle_station_health(telemetry, registry);
     }
 
-    // Rust-native science handlers — no Python proxy needed
+    // Rust-native handlers — no Python proxy needed
+    if let Some(result) = crate::compute::try_handle(tool_name, arguments) {
+        return result;
+    }
     if let Some(result) = crate::science::try_handle(tool_name, arguments, registry) {
         return result;
     }

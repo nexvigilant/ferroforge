@@ -28,10 +28,11 @@ use crate::protocol::{ContentBlock, ToolCallResult};
 /// Try to handle a tool call as a native computation.
 /// Returns `Some(ToolCallResult)` if handled, `None` to fall through.
 pub fn try_handle(tool_name: &str, args: &Value) -> Option<ToolCallResult> {
-    // Each domain registers its prefix.
-    // Tool names arrive as: compute_nexvigilant_com_<bare_name>
+    // Strip known compute domain prefixes to get the bare tool name.
     let bare = tool_name
-        .strip_prefix("compute_nexvigilant_com_")?
+        .strip_prefix("vigilance_nexvigilant_com_")
+        .or_else(|| tool_name.strip_prefix("compute_nexvigilant_com_"))
+        .or_else(|| tool_name.strip_prefix("calculate_nexvigilant_com_"))?
         .replace('_', "-");
 
     let result = epidemiology::handle(&bare, args)
