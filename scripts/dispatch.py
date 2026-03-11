@@ -79,6 +79,7 @@ PARAMETER_ALIGNMENT: dict[str, dict[str, str]] = {
     "meddra_proxy.py":           {**_drug_alias_map("query"), **_query_alias_map("query")},
     "ich_proxy.py":              {**_query_alias_map("query")},
     "cioms_proxy.py":            {**_query_alias_map("query")},
+    "wikipedia_proxy.py":        {**_query_alias_map("query")},
 }
 
 
@@ -375,6 +376,11 @@ SMOKE_TEST_CASES: list[dict] = [
         "label": "DrugBank — config-discovered proxy",
         "envelope": {"tool": "go_drugbank_com_get_drug_info", "arguments": {"drug_name": "metformin"}},
         "expect_domain": "go_drugbank_com_",
+    },
+    {
+        "label": "Wikipedia — config-discovered proxy",
+        "envelope": {"tool": "en_wikipedia_org_search_articles", "arguments": {"query": "pharmacovigilance"}},
+        "expect_domain": "en_wikipedia_org_",
     },
     {
         "label": "Unknown domain — should return stub",

@@ -124,11 +124,12 @@ fn test_registry_tool_count() {
 fn test_registry_tool_infos_includes_meta_tools() {
     let reg = test_registry();
     let infos = reg.tool_infos();
-    // 3 config tools + 4 meta tools (directory + capabilities + station_health + chart_course)
-    assert_eq!(infos.len(), 7);
+    // 3 config tools + 5 meta tools (directory + capabilities + station_health + chart_course + ring_health)
+    assert_eq!(infos.len(), 8);
     assert!(infos.iter().any(|t| t.name == "nexvigilant_directory"));
     assert!(infos.iter().any(|t| t.name == "nexvigilant_capabilities"));
     assert!(infos.iter().any(|t| t.name == "nexvigilant_station_health"));
+    assert!(infos.iter().any(|t| t.name == "nexvigilant_ring_health"));
 }
 
 #[test]
@@ -391,8 +392,8 @@ fn test_handle_tools_list() {
     let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
     let result = resp.result.expect("should have result");
     let tools = result["tools"].as_array().expect("tools array");
-    // 3 config tools + 4 meta tools
-    assert_eq!(tools.len(), 7);
+    // 3 config tools + 5 meta tools
+    assert_eq!(tools.len(), 8);
 }
 
 #[test]
