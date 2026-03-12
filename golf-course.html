@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexVigilant Station — The Golf Course</title>
+<style>
+  :root {
+    --nv-bg: #0a0f1a;
+    --nv-surface: #111827;
+    --nv-surface2: #1a2332;
+    --nv-border: #2a3a4e;
+    --nv-green: #10b981;
+    --nv-green-dim: #065f46;
+    --nv-blue: #3b82f6;
+    --nv-amber: #f59e0b;
+    --nv-red: #ef4444;
+    --nv-purple: #8b5cf6;
+    --nv-text: #e5e7eb;
+    --nv-text-dim: #9ca3af;
+    --nv-fairway: #14532d;
+    --nv-tee: #1e3a5f;
+    --nv-sand: #78350f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    background: var(--nv-bg);
+    color: var(--nv-text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  header {
+    background: linear-gradient(135deg, var(--nv-fairway), var(--nv-surface));
+    border-bottom: 2px solid var(--nv-green);
+    padding: 1.5rem 2rem;
+    text-align: center;
+  }
+  header h1 { font-size: 1.6rem; color: var(--nv-green); letter-spacing: 0.05em; }
+  header p { color: var(--nv-text-dim); font-size: 0.85rem; margin-top: 0.3rem; }
+  .health-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+    background: var(--nv-surface2);
+    border: 1px solid var(--nv-border);
+  }
+  .health-badge.live { border-color: var(--nv-green); color: var(--nv-green); }
+  .health-badge.down { border-color: var(--nv-red); color: var(--nv-red); }
+
+  nav {
+    display: flex; gap: 0.5rem; justify-content: center;
+    padding: 1rem; background: var(--nv-surface);
+    border-bottom: 1px solid var(--nv-border);
+    flex-wrap: wrap;
+  }
+  nav button {
+    background: var(--nv-surface2); color: var(--nv-text-dim);
+    border: 1px solid var(--nv-border); border-radius: 6px;
+    padding: 0.4rem 1rem; cursor: pointer; font-family: inherit;
+    font-size: 0.8rem; transition: all 0.2s;
+  }
+  nav button:hover, nav button.active {
+    color: var(--nv-green); border-color: var(--nv-green);
+    background: var(--nv-green-dim);
+  }
+
+  main { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+  section { display: none; }
+  section.visible { display: block; }
+
+  h2 { color: var(--nv-green); font-size: 1.1rem; margin-bottom: 1rem;
+       border-bottom: 1px solid var(--nv-border); padding-bottom: 0.5rem; }
+  h3 { color: var(--nv-blue); font-size: 0.95rem; margin: 1rem 0 0.5rem; }
+
+  .nine-label {
+    color: var(--nv-amber); font-size: 0.85rem; font-weight: bold;
+    margin: 1.5rem 0 0.75rem; text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  .nine-label:first-of-type { margin-top: 0; }
+
+  .holes-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.75rem; margin-bottom: 1.5rem;
+  }
+  .hole-card {
+    background: var(--nv-surface2); border: 1px solid var(--nv-border);
+    border-radius: 8px; padding: 0.75rem; cursor: pointer;
+    transition: all 0.2s; position: relative;
+  }
+  .hole-card:hover { border-color: var(--nv-green); transform: translateY(-2px); }
+  .hole-card.selected { border-color: var(--nv-green); background: var(--nv-green-dim); }
+  .hole-num {
+    position: absolute; top: 0.5rem; right: 0.5rem;
+    background: var(--nv-fairway); color: var(--nv-green);
+    width: 1.6rem; height: 1.6rem; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: bold;
+  }
+  .hole-name { font-size: 0.85rem; font-weight: bold; color: var(--nv-text); }
+  .hole-config { font-size: 0.7rem; color: var(--nv-text-dim); margin-top: 0.15rem; }
+  .hole-stats {
+    display: flex; gap: 0.75rem; margin-top: 0.5rem; font-size: 0.7rem;
+  }
+  .hole-stat { color: var(--nv-text-dim); }
+  .hole-stat span { color: var(--nv-green); font-weight: bold; }
+
+  .detail-panel {
+    background: var(--nv-surface); border: 1px solid var(--nv-green);
+    border-radius: 8px; padding: 1.25rem; margin-top: 1rem;
+  }
+  .detail-panel .dp-header { display: flex; justify-content: space-between; align-items: center; }
+  .detail-panel .dp-close {
+    background: none; border: 1px solid var(--nv-border); color: var(--nv-text-dim);
+    border-radius: 4px; padding: 0.2rem 0.5rem; cursor: pointer; font-family: inherit;
+  }
+  .tool-list {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.4rem; margin-top: 0.75rem;
+  }
+  .tool-item {
+    background: var(--nv-surface2); border: 1px solid var(--nv-border);
+    border-radius: 4px; padding: 0.4rem 0.6rem; font-size: 0.75rem;
+    color: var(--nv-text-dim);
+  }
+  .tool-item code { color: var(--nv-blue); }
+  .curl-box {
+    background: var(--nv-bg); border: 1px solid var(--nv-border);
+    border-radius: 4px; padding: 0.6rem; margin-top: 0.75rem;
+    font-size: 0.75rem; color: var(--nv-text-dim); overflow-x: auto;
+    white-space: pre;
+  }
+
+  table {
+    width: 100%; border-collapse: collapse; font-size: 0.8rem;
+    margin-top: 0.5rem;
+  }
+  th { background: var(--nv-surface2); color: var(--nv-green); text-align: left;
+       padding: 0.5rem; border: 1px solid var(--nv-border); font-weight: bold; }
+  td { padding: 0.4rem 0.5rem; border: 1px solid var(--nv-border); }
+  tr:nth-child(even) { background: var(--nv-surface2); }
+  .par-3 { color: var(--nv-green); }
+  .par-4 { color: var(--nv-blue); }
+  .par-5 { color: var(--nv-purple); }
+  .total-row { background: var(--nv-fairway); font-weight: bold; }
+  .total-row td { color: var(--nv-green); }
+
+  .conn-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1rem; margin-top: 0.75rem;
+  }
+  .conn-card {
+    background: var(--nv-surface2); border: 1px solid var(--nv-border);
+    border-radius: 8px; padding: 1rem;
+  }
+  .conn-card h4 { color: var(--nv-blue); font-size: 0.9rem; margin-bottom: 0.5rem; }
+  .conn-card .transport-badge {
+    display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.4rem;
+    border-radius: 3px; margin-bottom: 0.5rem;
+    background: var(--nv-tee); color: var(--nv-blue); border: 1px solid var(--nv-blue);
+  }
+  .conn-card pre {
+    background: var(--nv-bg); border: 1px solid var(--nv-border);
+    border-radius: 4px; padding: 0.5rem; font-size: 0.7rem;
+    overflow-x: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  .conn-card p { font-size: 0.8rem; color: var(--nv-text-dim); margin: 0.3rem 0; }
+
+  .range-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.75rem; margin-top: 0.75rem;
+  }
+  .range-card {
+    background: var(--nv-surface2); border: 1px dashed var(--nv-sand);
+    border-radius: 8px; padding: 0.75rem;
+  }
+  .range-card h4 { color: var(--nv-amber); font-size: 0.85rem; }
+  .range-card .tool-count { color: var(--nv-text-dim); font-size: 0.75rem; }
+  .range-badge {
+    display: inline-block; font-size: 0.6rem; padding: 0.1rem 0.3rem;
+    border-radius: 3px; background: var(--nv-sand); color: var(--nv-amber);
+  }
+
+  .primitive-box {
+    background: var(--nv-surface2); border-left: 3px solid var(--nv-purple);
+    padding: 0.75rem; margin: 1rem 0; font-size: 0.8rem; border-radius: 0 4px 4px 0;
+  }
+  .primitive-box code { color: var(--nv-purple); }
+
+  footer {
+    text-align: center; padding: 1.5rem; color: var(--nv-text-dim);
+    font-size: 0.7rem; border-top: 1px solid var(--nv-border); margin-top: 2rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>The NexVigilant Golf Course</h1>
+  <p>23 configs. 174 tools. 18 holes of pharmacovigilance.
+    <span id="healthBadge" class="health-badge">checking...</span>
+  </p>
+</header>
+
+<nav>
+  <button class="active" data-tab="course">Course Map</button>
+  <button data-tab="scorecard">Scorecard</button>
+  <button data-tab="connections">MCP Connections</button>
+  <button data-tab="range">Practice Range</button>
+  <button data-tab="primitives">Primitive Map</button>
+</nav>
+
+<main>
+
+<!-- ═══════════════════════════════════════════════════ COURSE MAP -->
+<section id="course" class="visible">
+  <h2>Course Map — 18 Holes, 134 Public Tools</h2>
+
+  <div class="nine-label">Front 9 — US Regulatory (57 tools)</div>
+  <div class="holes-grid" id="front9"></div>
+
+  <div class="nine-label">Back 9 — International &amp; Computation (68 tools)</div>
+  <div class="holes-grid" id="back9"></div>
+
+  <div id="detailPanel" class="detail-panel" style="display:none"></div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ SCORECARD -->
+<section id="scorecard">
+  <h2>Scorecard</h2>
+  <table>
+    <thead>
+      <tr><th>Hole</th><th>Config</th><th>Domain</th><th>Par</th><th>Tools</th><th>Yardage</th></tr>
+    </thead>
+    <tbody id="scorecardBody"></tbody>
+  </table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ CONNECTIONS -->
+<section id="connections">
+  <h2>MCP Hub Connections — 6 Ways to Play</h2>
+  <p style="color:var(--nv-text-dim);font-size:0.85rem;margin-bottom:1rem">
+    Every connection method reaches the same 174 tools. Choose your transport.
+  </p>
+  <div class="conn-grid">
+
+    <div class="conn-card">
+      <h4>1. Claude.ai Custom Connector</h4>
+      <span class="transport-badge">Streamable HTTP (MCP 2025-03-26)</span>
+      <p>Add in Claude.ai Settings &rarr; Connectors. 129 public tools, no auth required.</p>
+      <pre>URL: https://mcp.nexvigilant.com/mcp
+Auth: None
+Protocol: MCP 2025-03-26 Streamable HTTP
+Tools: 129 (17 public configs + 4 meta)</pre>
+    </div>
+
+    <div class="conn-card">
+      <h4>2. mcp-lazy-proxy (stdio)</h4>
+      <span class="transport-badge">stdio — local multiplexer</span>
+      <p>Claude Code local sessions. Full 174 tools via lazy-spawned backend.</p>
+      <pre># ~/.config/mcp-lazy-proxy/manifest.toml
+[backends.nexvigilant-station]
+command = "nexvigilant-station"
+args = ["--config-dir", "configs"]
+idle_timeout = 600
+
+# ~/.claude.json
+"mcpServers": {
+  "mcp-lazy-proxy": {
+    "command": "mcp-lazy-proxy",
+    "args": ["serve"]
+  }
+}</pre>
+    </div>
+
+    <div class="conn-card">
+      <h4>3. SSE Transport (Legacy MCP)</h4>
+      <span class="transport-badge">Server-Sent Events</span>
+      <p>For mcp-remote or older MCP clients. Persistent connection.</p>
+      <pre># Connect
+curl -N https://mcp.nexvigilant.com/sse
+
+# Send message
+curl -X POST https://mcp.nexvigilant.com/message \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,
+       "method":"tools/list"}'</pre>
+    </div>
+
+    <div class="conn-card">
+      <h4>4. HTTP REST (Direct)</h4>
+      <span class="transport-badge">REST — any HTTP client</span>
+      <p>No MCP client needed. Standard HTTP for any framework.</p>
+      <pre># List all tools
+curl https://mcp.nexvigilant.com/tools
+
+# Get single tool schema
+curl https://mcp.nexvigilant.com/tools/api_fda_gov_search_adverse_events
+
+# Call a tool
+curl -X POST https://mcp.nexvigilant.com/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,
+       "method":"tools/call",
+       "params":{"name":"api_fda_gov_search_adverse_events",
+                 "arguments":{"drug":"semaglutide"}}}'</pre>
+    </div>
+
+    <div class="conn-card">
+      <h4>5. Python SDK</h4>
+      <span class="transport-badge">Python — pip install mcp</span>
+      <p>For custom agent frameworks, notebooks, and pipelines.</p>
+      <pre>from mcp import ClientSession
+from mcp.client.sse import sse_client
+
+async with sse_client(
+    "https://mcp.nexvigilant.com/sse"
+) as (read, write):
+    async with ClientSession(read, write) as session:
+        await session.initialize()
+        tools = await session.list_tools()
+        result = await session.call_tool(
+            "api_fda_gov_search_adverse_events",
+            {"drug": "metformin"}
+        )</pre>
+    </div>
+
+    <div class="conn-card">
+      <h4>6. Direct Binary (stdio)</h4>
+      <span class="transport-badge">stdio — bare metal</span>
+      <p>Run the station binary directly. Maximum control, all 174 tools.</p>
+      <pre># Build
+cd ~/ferroforge
+cargo build -p nexvigilant-station --release
+
+# Run stdio
+echo '{"jsonrpc":"2.0","id":1,
+       "method":"tools/list"}' | \
+  ./target/release/nexvigilant-station \
+  --config-dir configs
+
+# With telemetry
+./target/release/nexvigilant-station \
+  --config-dir configs \
+  --telemetry-log</pre>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ PRACTICE RANGE -->
+<section id="range">
+  <h2>Practice Range — 6 Private Configs (49 tools)</h2>
+  <p style="color:var(--nv-text-dim);font-size:0.85rem;margin-bottom:1rem">
+    Available locally via stdio/mcp-lazy-proxy. Filtered from Cloud Run by --exclude-private.
+  </p>
+  <div class="range-grid">
+    <div class="range-card">
+      <h4>Primitives</h4>
+      <span class="range-badge">PRIVATE</span>
+      <div class="tool-count">15 tools — T1 Lex Primitiva operations</div>
+    </div>
+    <div class="range-card">
+      <h4>Science: HEXIM1</h4>
+      <span class="range-badge">PRIVATE</span>
+      <div class="tool-count">10 tools — HEXIM1 research domain</div>
+    </div>
+    <div class="range-card">
+      <h4>Science: Genomics</h4>
+      <span class="range-badge">PRIVATE</span>
+      <div class="tool-count">6 tools — Genomic data queries</div>
+    </div>
+    <div class="range-card">
+      <h4>Science: Drug Targets</h4>
+      <span class="range-badge">PRIVATE</span>
+      <div class="tool-count">6 tools — Target identification</div>
+    </div>
+    <div class="range-card">
+      <h4>LinkedIn</h4>
+      <span class="range-badge">PRIVATE</span>
+      <div class="tool-count">6 tools — Professional network ops</div>
+    </div>
+    <div class="range-card">
+      <h4>Wikipedia</h4>
+      <span class="range-badge">PRIVATE</span>
+      <div class="tool-count">6 tools — Reference extraction</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════ PRIMITIVE MAP -->
+<section id="primitives">
+  <h2>Primitive Map — The Course Through T1 Lens</h2>
+
+  <div class="primitive-box">
+    <strong>The Conservation Law:</strong> <code>∃ = ∂(×(ς, ∅))</code><br>
+    Every tool extracts existence (∃) from the void (∅) by applying boundary (∂) to state (ς).
+    The course IS the conservation law played 18 times.
+  </div>
+
+  <h3>Front 9 — State Extraction (ς dominant)</h3>
+  <p style="font-size:0.85rem;color:var(--nv-text-dim);margin-bottom:0.75rem">
+    US regulatory holes extract raw state from federal databases.
+    Each tool is a ∂ function — it draws a boundary around specific data and returns ∃.
+  </p>
+  <table>
+    <thead><tr><th>Hole</th><th>Primary</th><th>Secondary</th><th>What It Extracts</th></tr></thead>
+    <tbody>
+      <tr><td>1 openFDA</td><td>ς (state)</td><td>N (quantity)</td><td>Adverse event reports — raw signal state</td></tr>
+      <tr><td>2 FDA Safety</td><td>∂ (boundary)</td><td>∝ (irreversibility)</td><td>Safety communications — regulatory boundaries drawn</td></tr>
+      <tr><td>3 FDA Accessdata</td><td>π (persistence)</td><td>σ (sequence)</td><td>Approval history — what persisted through time</td></tr>
+      <tr><td>4 DailyMed</td><td>∂ (boundary)</td><td>κ (comparison)</td><td>Drug labeling — the official boundary of known risk</td></tr>
+      <tr><td>5 ClinicalTrials</td><td>κ (comparison)</td><td>∂ (boundary)</td><td>Trial arms — structured comparison at enrollment boundary</td></tr>
+      <tr><td>6 RxNav</td><td>μ (mapping)</td><td>λ (location)</td><td>Drug nomenclature — mapping names to identities</td></tr>
+      <tr><td>7 DrugBank</td><td>μ (mapping)</td><td>→ (causality)</td><td>Pharmacology — mechanism maps from drug to target</td></tr>
+      <tr><td>8 PubMed</td><td>κ (comparison)</td><td>ν (frequency)</td><td>Literature — evidence frequency across publications</td></tr>
+      <tr><td>9 MedDRA</td><td>σ (sequence)</td><td>∂ (boundary)</td><td>Terminology hierarchy — ordered classification system</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Back 9 — Computation &amp; Synthesis (→ dominant)</h3>
+  <p style="font-size:0.85rem;color:var(--nv-text-dim);margin-bottom:0.75rem">
+    International + computation holes transform state into causality.
+    The computation hole (17) is where ν and κ produce → (signal = frequency comparison causing action).
+  </p>
+  <table>
+    <thead><tr><th>Hole</th><th>Primary</th><th>Secondary</th><th>What It Computes</th></tr></thead>
+    <tbody>
+      <tr><td>10 EMA</td><td>∂ (boundary)</td><td>π (persistence)</td><td>EU regulatory boundary — EPARs, referrals, RMPs</td></tr>
+      <tr><td>11 EudraVigilance</td><td>ν (frequency)</td><td>N (quantity)</td><td>EU case counts — frequency of harm by geography</td></tr>
+      <tr><td>12 VigiAccess</td><td>N (quantity)</td><td>ν (frequency)</td><td>WHO global counts — worldwide harm quantification</td></tr>
+      <tr><td>13 WHO-UMC</td><td>→ (causality)</td><td>κ (comparison)</td><td>Causality methodology — the IC algorithm</td></tr>
+      <tr><td>14 OpenVigil</td><td>κ (comparison)</td><td>→ (causality)</td><td>Disproportionality — PRR/ROR cross-drug comparison</td></tr>
+      <tr><td>15 ICH</td><td>∂ (boundary)</td><td>σ (sequence)</td><td>Guidelines — the boundary definitions themselves</td></tr>
+      <tr><td>16 CIOMS</td><td>∂ (boundary)</td><td>π (persistence)</td><td>Forms &amp; standards — reporting boundary templates</td></tr>
+      <tr><td>17 Calculation</td><td>→ (causality)</td><td>ν + κ + N</td><td>Signal detection — PRR/ROR/IC/EBGM + causality</td></tr>
+      <tr><td>18 Vigilance</td><td>Σ (sum)</td><td>∃ (existence)</td><td>Harm classification — the sum of all variants</td></tr>
+    </tbody>
+  </table>
+
+  <div class="primitive-box">
+    <strong>Course Total:</strong> All 9 primes and 4 composites appear across 18 holes.<br>
+    <code>∂</code> appears 7 times (most frequent — boundary is the dominant PV primitive).<br>
+    <code>κ</code> appears 5 times (comparison drives signal detection).<br>
+    <code>→</code> appears 4 times (causality is the goal, not the starting point).<br>
+    The course recapitulates the PV pipeline: ς → κ → → (observe, compare, cause).
+  </div>
+</section>
+
+</main>
+
+<footer>
+  NexVigilant Station &middot; mcp.nexvigilant.com &middot; 23 configs &middot; 174 tools &middot; MCP 2025-03-26
+</footer>
+
+<script>
+// ═══════════════════════════════════════════ COURSE DATA
+const HOLES = [
+  // Front 9 — US Regulatory
+  { hole: 1,  name: "openFDA FAERS",      config: "openfda",          tools: 7,  par: 4, yards: 420, domain: "US Adverse Events",
+    toolNames: ["search_adverse_events","get_drug_counts","get_event_outcomes","get_event_timeline","get_drug_characterization","get_reporter_breakdown","get_indication_counts"] },
+  { hole: 2,  name: "FDA Safety",          config: "fda-safety",       tools: 7,  par: 4, yards: 400, domain: "US Safety Communications",
+    toolNames: ["search_safety_communications","get_medwatch_alerts","get_boxed_warning","get_rems_info","get_safety_labeling_changes","get_recall_classification","get_serious_outcomes"] },
+  { hole: 3,  name: "FDA Accessdata",      config: "fda-accessdata",   tools: 6,  par: 3, yards: 180, domain: "US Approvals & Recalls",
+    toolNames: ["search_approvals","search_recalls","get_orange_book","get_rems","get_labeling_changes","get_approval_history"] },
+  { hole: 4,  name: "DailyMed",            config: "dailymed",         tools: 6,  par: 3, yards: 195, domain: "US Drug Labeling",
+    toolNames: ["search_drugs","get_drug_label","get_adverse_reactions","get_boxed_warning","get_contraindications","get_drug_interactions"] },
+  { hole: 5,  name: "ClinicalTrials.gov",  config: "clinicaltrials",   tools: 7,  par: 4, yards: 430, domain: "Clinical Trials",
+    toolNames: ["search_trials","get_trial","get_study_design","get_eligibility_criteria","get_safety_endpoints","get_serious_adverse_events","compare_trial_arms"] },
+  { hole: 6,  name: "RxNav",               config: "rxnav",            tools: 6,  par: 3, yards: 165, domain: "Drug Nomenclature",
+    toolNames: ["search_drugs","get_rxcui","get_interactions","get_ingredients","get_drug_classes","get_ndc"] },
+  { hole: 7,  name: "DrugBank",            config: "drugbank",         tools: 7,  par: 4, yards: 410, domain: "Drug Pharmacology",
+    toolNames: ["get_drug_info","get_interactions","get_adverse_effects","get_contraindications","get_pharmacology","get_targets","get_classification"] },
+  { hole: 8,  name: "PubMed",              config: "pubmed",           tools: 7,  par: 4, yards: 440, domain: "PV Literature",
+    toolNames: ["search_articles","get_abstract","get_citations","get_mesh_terms","get_related_articles","search_case_reports","search_signal_literature"] },
+  { hole: 9,  name: "MedDRA",              config: "meddra",           tools: 7,  par: 4, yards: 390, domain: "Medical Terminology",
+    toolNames: ["search_terms","get_term_hierarchy","get_soc_terms","get_smq","get_hierarchy_overview","get_multiaxiality_guide","get_version_info"] },
+  // Back 9 — International & Computation
+  { hole: 10, name: "EMA Europa",          config: "ema",              tools: 6,  par: 3, yards: 175, domain: "EU Regulatory",
+    toolNames: ["search_medicines","get_epar","get_safety_signals","get_psur_assessment","get_rmp_summary","get_referral"] },
+  { hole: 11, name: "EudraVigilance",      config: "eudravigilance",   tools: 7,  par: 4, yards: 415, domain: "EU Adverse Events",
+    toolNames: ["search_reports","get_case_counts","get_signal_summary","get_soc_breakdown","get_age_sex_distribution","get_geographical_distribution","get_reporter_breakdown"] },
+  { hole: 12, name: "VigiAccess",          config: "vigiaccess",       tools: 7,  par: 4, yards: 405, domain: "WHO Global Safety",
+    toolNames: ["search_reports","get_adverse_reactions","get_age_distribution","get_sex_distribution","get_region_distribution","get_reporter_distribution","get_year_distribution"] },
+  { hole: 13, name: "WHO-UMC",             config: "who-umc",          tools: 7,  par: 4, yards: 425, domain: "WHO Methodology",
+    toolNames: ["search_vigibase","get_causality_assessment","get_signal_methodology","get_ic_computation","get_country_programs","get_adverse_reaction_terminology","get_naranjo_algorithm"] },
+  { hole: 14, name: "OpenVigil France",    config: "openvigilfrance",  tools: 7,  par: 4, yards: 395, domain: "Disproportionality",
+    toolNames: ["compute_disproportionality","compare_drugs","get_top_drugs","get_top_reactions","get_case_demographics","get_outcome_distribution","get_reporting_trends"] },
+  { hole: 15, name: "ICH Guidelines",      config: "ich",              tools: 7,  par: 4, yards: 380, domain: "ICH Regulatory",
+    toolNames: ["search_guidelines","get_guideline","get_pv_guidelines","get_safety_guidelines","get_quality_guidelines","get_meddra_guidelines","get_e2b_data_elements"] },
+  { hole: 16, name: "CIOMS",               config: "cioms",            tools: 7,  par: 4, yards: 365, domain: "Standards & Forms",
+    toolNames: ["search_publications","get_working_groups","get_cioms_form","get_cioms_form_ii","get_reporting_timelines","get_seriousness_criteria","get_causality_categories"] },
+  { hole: 17, name: "Calculation Engine",  config: "calculation",      tools: 17, par: 5, yards: 560, domain: "PV Computation",
+    toolNames: ["compute_prr","compute_ror","compute_ic","compute_ebgm","compute_disproportionality_table","assess_naranjo_causality","assess_who_umc_causality","classify_seriousness","compute_benefit_risk","compute_confidence_interval","compute_number_needed_harm","compute_reporting_rate","compute_signal_half_life","compute_expectedness","compute_time_to_onset","score_case_completeness","compute_signal_trend"] },
+  { hole: 18, name: "Vigilance + Meta",    config: "vigilance",        tools: 9,  par: 5, yards: 540, domain: "Harm & Navigation",
+    toolNames: ["harm_classify","harm_types","map_to_tov","risk_score","safety_margin","nexvigilant_capabilities","nexvigilant_directory","nexvigilant_chart_course","nexvigilant_station_health"] },
+];
+
+// ═══════════════════════════════════════════ TAB NAVIGATION
+document.querySelectorAll("nav button").forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    document.querySelectorAll("nav button").forEach(function(b) { b.classList.remove("active"); });
+    document.querySelectorAll("main section").forEach(function(s) { s.classList.remove("visible"); });
+    btn.classList.add("active");
+    var target = document.getElementById(btn.getAttribute("data-tab"));
+    if (target) target.classList.add("visible");
+  });
+});
+
+// ═══════════════════════════════════════════ BUILD COURSE MAP
+function buildHoleCard(h) {
+  var card = document.createElement("div");
+  card.className = "hole-card";
+  card.setAttribute("data-hole", h.hole);
+
+  var num = document.createElement("div");
+  num.className = "hole-num";
+  num.textContent = h.hole;
+  card.appendChild(num);
+
+  var name = document.createElement("div");
+  name.className = "hole-name";
+  name.textContent = h.name;
+  card.appendChild(name);
+
+  var cfg = document.createElement("div");
+  cfg.className = "hole-config";
+  cfg.textContent = h.config + ".json";
+  card.appendChild(cfg);
+
+  var stats = document.createElement("div");
+  stats.className = "hole-stats";
+
+  var parSpan = document.createElement("div");
+  parSpan.className = "hole-stat";
+  var parLabel = document.createElement("span");
+  parLabel.textContent = h.par;
+  parLabel.className = h.par === 3 ? "par-3" : h.par === 5 ? "par-5" : "par-4";
+  parSpan.appendChild(document.createTextNode("Par "));
+  parSpan.appendChild(parLabel);
+  stats.appendChild(parSpan);
+
+  var toolSpan = document.createElement("div");
+  toolSpan.className = "hole-stat";
+  var toolNum = document.createElement("span");
+  toolNum.textContent = h.tools;
+  toolSpan.appendChild(toolNum);
+  toolSpan.appendChild(document.createTextNode(" tools"));
+  stats.appendChild(toolSpan);
+
+  var yardSpan = document.createElement("div");
+  yardSpan.className = "hole-stat";
+  yardSpan.textContent = h.yards + " yds";
+  stats.appendChild(yardSpan);
+
+  card.appendChild(stats);
+
+  card.addEventListener("click", function() {
+    document.querySelectorAll(".hole-card").forEach(function(c) { c.classList.remove("selected"); });
+    card.classList.add("selected");
+    showDetail(h);
+  });
+
+  return card;
+}
+
+function showDetail(h) {
+  var panel = document.getElementById("detailPanel");
+  // Clear existing content
+  while (panel.firstChild) panel.removeChild(panel.firstChild);
+
+  var header = document.createElement("div");
+  header.className = "dp-header";
+
+  var title = document.createElement("h3");
+  title.textContent = "Hole " + h.hole + " — " + h.name + " (" + h.domain + ")";
+  header.appendChild(title);
+
+  var closeBtn = document.createElement("button");
+  closeBtn.className = "dp-close";
+  closeBtn.textContent = "Close";
+  closeBtn.addEventListener("click", function() {
+    panel.style.display = "none";
+    document.querySelectorAll(".hole-card").forEach(function(c) { c.classList.remove("selected"); });
+  });
+  header.appendChild(closeBtn);
+  panel.appendChild(header);
+
+  var info = document.createElement("p");
+  info.style.cssText = "font-size:0.8rem;color:var(--nv-text-dim);margin:0.5rem 0";
+  info.textContent = "Par " + h.par + " | " + h.tools + " tools | " + h.yards + " yards | Config: " + h.config + ".json";
+  panel.appendChild(info);
+
+  var toolLabel = document.createElement("h3");
+  toolLabel.textContent = "Tools";
+  toolLabel.style.fontSize = "0.85rem";
+  panel.appendChild(toolLabel);
+
+  var toolList = document.createElement("div");
+  toolList.className = "tool-list";
+  h.toolNames.forEach(function(t) {
+    var item = document.createElement("div");
+    item.className = "tool-item";
+    var code = document.createElement("code");
+    code.textContent = h.config.replace(/-/g, "_") + "_" + t;
+    item.appendChild(code);
+    toolList.appendChild(item);
+  });
+  panel.appendChild(toolList);
+
+  var curlLabel = document.createElement("h3");
+  curlLabel.textContent = "Test Command";
+  curlLabel.style.fontSize = "0.85rem";
+  panel.appendChild(curlLabel);
+
+  var curlBox = document.createElement("div");
+  curlBox.className = "curl-box";
+  var prefix = h.config.replace(/-/g, "_");
+  var firstTool = prefix + "_" + h.toolNames[0];
+  curlBox.textContent = 'curl -X POST https://mcp.nexvigilant.com/rpc \\\n' +
+    '  -H "Content-Type: application/json" \\\n' +
+    '  -d \'{"jsonrpc":"2.0","id":1,"method":"tools/call",\n' +
+    '       "params":{"name":"' + firstTool + '",\n' +
+    '                 "arguments":{}}}\'';
+  panel.appendChild(curlBox);
+
+  panel.style.display = "block";
+}
+
+// Populate grids
+var front9 = document.getElementById("front9");
+var back9 = document.getElementById("back9");
+HOLES.forEach(function(h) {
+  var target = h.hole <= 9 ? front9 : back9;
+  target.appendChild(buildHoleCard(h));
+});
+
+// ═══════════════════════════════════════════ BUILD SCORECARD
+var scorecardBody = document.getElementById("scorecardBody");
+var totalTools = 0;
+var totalPar = 0;
+HOLES.forEach(function(h) {
+  var tr = document.createElement("tr");
+  var parClass = h.par === 3 ? "par-3" : h.par === 5 ? "par-5" : "par-4";
+
+  var cells = [h.hole, h.config, h.domain, h.par, h.tools, h.yards + " yds"];
+  cells.forEach(function(val, i) {
+    var td = document.createElement("td");
+    td.textContent = val;
+    if (i === 3) td.className = parClass;
+    tr.appendChild(td);
+  });
+  scorecardBody.appendChild(tr);
+  totalTools += h.tools;
+  totalPar += h.par;
+
+  // Add subtotals after hole 9
+  if (h.hole === 9 || h.hole === 18) {
+    var subTr = document.createElement("tr");
+    subTr.className = "total-row";
+    var label = h.hole === 9 ? "Front 9" : "Back 9";
+    var subTools = 0;
+    var subPar = 0;
+    HOLES.forEach(function(sh) {
+      if (h.hole === 9 && sh.hole <= 9) { subTools += sh.tools; subPar += sh.par; }
+      if (h.hole === 18 && sh.hole > 9) { subTools += sh.tools; subPar += sh.par; }
+    });
+    ["", label, "", subPar, subTools, ""].forEach(function(val) {
+      var td = document.createElement("td");
+      td.textContent = val;
+      subTr.appendChild(td);
+    });
+    scorecardBody.appendChild(subTr);
+  }
+});
+
+// Grand total
+var totalTr = document.createElement("tr");
+totalTr.className = "total-row";
+["", "TOTAL", "18 holes", totalPar, totalTools + " (incl. 4 meta)", ""].forEach(function(val) {
+  var td = document.createElement("td");
+  td.textContent = val;
+  totalTr.appendChild(td);
+});
+scorecardBody.appendChild(totalTr);
+
+// ═══════════════════════════════════════════ HEALTH CHECK
+(function checkHealth() {
+  var badge = document.getElementById("healthBadge");
+  fetch("https://mcp.nexvigilant.com/health", { mode: "cors" })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      badge.textContent = "LIVE — " + (data.tools_count || "?") + " tools";
+      badge.className = "health-badge live";
+    })
+    .catch(function() {
+      badge.textContent = "checking via CORS...";
+      badge.className = "health-badge";
+      // CORS may block — try image ping as fallback
+      var img = new Image();
+      img.onload = function() {
+        badge.textContent = "REACHABLE";
+        badge.className = "health-badge live";
+      };
+      img.onerror = function() {
+        badge.textContent = "CORS blocked (server is likely up)";
+        badge.className = "health-badge";
+      };
+      img.src = "https://mcp.nexvigilant.com/health?" + Date.now();
+    });
+})();
+</script>
+
+</body>
+</html>

@@ -170,6 +170,9 @@ fn route_tool_call_inner(
     if tool_name == "nexvigilant_station_health" {
         return handle_station_health(telemetry, registry);
     }
+    if tool_name == "nexvigilant_ring_health" {
+        return handle_ring_health(registry);
+    }
 
     // Rust-native handlers — no Python proxy needed
     if let Some(result) = crate::compute::try_handle(tool_name, arguments) {
@@ -519,6 +522,344 @@ fn handle_station_health(telemetry: &StationTelemetry, registry: &ConfigRegistry
     ToolCallResult {
         content: vec![ContentBlock::Text {
             text: serde_json::to_string_pretty(&health_json).unwrap_or_default(),
+        }],
+        is_error: None,
+    }
+}
+
+// ─── Glass helpers: filesystem probes for dynamic edge measurement ───────────
+
+/// Count directory entries whose name contains any keyword and ends with ext.
+/// Returns None if the directory is inaccessible (Cloud Run / missing path).
+fn count_dir_entries(dir: &str, keywords: &[&str], ext: &str) -> Option<usize> {
+    let entries = std::fs::read_dir(dir).ok()?;
+    Some(
+        entries
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                let name = e.file_name().to_string_lossy().to_lowercase();
+                (ext.is_empty() || name.ends_with(ext))
+                    && (keywords.is_empty() || keywords.iter().any(|k| name.contains(k)))
+            })
+            .count(),
+    )
+}
+
+/// Recursively count files named `filename` whose full path contains `path_filter`.
+/// Returns None if root directory is inaccessible.
+fn count_tree_files(root: &str, filename: &str, path_filter: &str) -> Option<usize> {
+    use std::path::Path;
+    fn walk(dir: &Path, target: &str, filter: &str, count: &mut usize) {
+        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, target, filter, count);
+            } else {
+                let name = entry.file_name();
+                if name.to_string_lossy() == target
+                    && (filter.is_empty() || path.to_string_lossy().contains(filter))
+                {
+                    *count += 1;
+                }
+            }
+        }
+    }
+    if !std::path::Path::new(root).is_dir() {
+        return None;
+    }
+    let mut count = 0;
+    walk(std::path::Path::new(root), filename, path_filter, &mut count);
+    Some(count)
+}
+
+/// Greedy milestone computation: simulate 0.1-step increments on weakest edge.
+fn compute_milestones(strengths: &[f64; 6]) -> (usize, usize, usize) {
+    let alpha = 4.0_f64;
+    let n = 6.0_f64;
+
+    let homa_fn = |e: &[f64; 6]| -> f64 {
+        let sum_sq: f64 = e.iter().map(|r| (1.0 - r).powi(2)).sum();
+        1.0 - (alpha / n) * sum_sq
+    };
+
+    let current = homa_fn(strengths);
+
+    // Already past milestones?
+    let mut to_zero = if current >= 0.0 { 0 } else { usize::MAX };
+    let mut to_aromatic = if current >= 0.5 { 0 } else { usize::MAX };
+    let mut to_perfect = if current >= 0.999 { 0 } else { usize::MAX };
+
+    if to_zero == 0 && to_aromatic == 0 && to_perfect == 0 {
+        return (0, 0, 0);
+    }
+
+    let mut e = *strengths;
+    for step in 1..=100_usize {
+        // Find weakest edge index
+        let idx = e
+            .iter()
+            .enumerate()
+            .min_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        e[idx] = (e[idx] + 0.1).min(1.0);
+
+        let h = homa_fn(&e);
+        if to_zero == usize::MAX && h >= 0.0 {
+            to_zero = step;
+        }
+        if to_aromatic == usize::MAX && h >= 0.5 {
+            to_aromatic = step;
+        }
+        if h >= 0.999 {
+            if to_perfect == usize::MAX {
+                to_perfect = step;
+            }
+            break;
+        }
+    }
+    // Cap any unreached milestones
+    if to_zero == usize::MAX { to_zero = 100; }
+    if to_aromatic == usize::MAX { to_aromatic = 100; }
+    if to_perfect == usize::MAX { to_perfect = 100; }
+
+    (to_zero, to_aromatic, to_perfect)
+}
+
+// ─── Glass: The Looking Glass ────────────────────────────────────────────────
+
+/// Meta-tool: Aromatic ring health — The Looking Glass.
+///
+/// Computes HOMA (Harmonic Oscillator Model of Aromaticity) for the
+/// NexVigilant mission ring: Station → Micrograms → NexCore → Nucleus →
+/// Academy → Glass → Station.
+///
+/// HOMA = 1 - (α/n) × Σ(R_opt - R_i)²
+///   α = 4.0, n = 6, R_opt = 1.0
+///   HOMA > 0.5 → aromatic (mission delocalized)
+///   HOMA < 0.0 → anti-aromatic (ring destabilizes)
+///
+/// Edge strengths are derived from live filesystem measurements when running
+/// locally (dev mode). On Cloud Run where paths are unavailable, falls back
+/// to static architectural estimates. Glass → Station self-scores based on
+/// how many edges it measured dynamically.
+///
+/// Source: Crystalbook Part V — The Looking Glass (2026-03-11).
+/// Chemistry transfer: Krygowski & Cyranski, Chem. Rev. 2001, 101, 1385.
+fn handle_ring_health(registry: &ConfigRegistry) -> ToolCallResult {
+    let config_count = registry.configs.len();
+    let tool_count: usize = registry.configs.iter().map(|c| c.tools.len()).sum();
+    let home = std::env::var("HOME").unwrap_or_default();
+    let mut dynamic_edges = 0_u8;
+
+    // ── Edge 1: Station → Micrograms ─────────────────────────────────────
+    // PV-related microgram .yaml files / 100 (healthy ecosystem baseline)
+    let (station_to_mcg, mcg_count) = count_dir_entries(
+        &format!("{home}/Projects/rsk-core/rsk/micrograms"),
+        &[
+            "signal", "prr", "ror", "faers", "adverse", "causality",
+            "seriousness", "naranjo", "case-", "report", "expedit",
+            "benefit", "risk", "harm", "meddra",
+        ],
+        ".yaml",
+    )
+    .map(|n| {
+        dynamic_edges += 1;
+        ((n as f64 / 100.0).clamp(0.05, 1.0), Some(n))
+    })
+    .unwrap_or((0.9, None));
+
+    // ── Edge 2: Micrograms → NexCore ─────────────────────────────────────
+    // NexCore crate directories with PV/signal names / 20 (target count)
+    let (mcg_to_nexcore, nexcore_count) = count_dir_entries(
+        &format!("{home}/Projects/Active/nexcore/crates"),
+        &[
+            "pv-", "pv_", "signal", "vigilance", "faers", "pvdsl",
+            "pvos", "guardian", "vigil",
+        ],
+        "",
+    )
+    .map(|n| {
+        dynamic_edges += 1;
+        ((n as f64 / 20.0).clamp(0.05, 1.0), Some(n))
+    })
+    .unwrap_or((0.85, None));
+
+    // ── Edge 3: NexCore → Nucleus ────────────────────────────────────────
+    // PV page count: vigilance/ route pages + authenticated pv-compute wizards
+    // Both represent NexCore computation wired to the frontend.
+    // Baseline: 100 (target total PV page count)
+    let nucleus_app = format!("{home}/Projects/Active/nucleus/src/app");
+    let has_nucleus = std::path::Path::new(&nucleus_app).is_dir();
+
+    let (nexcore_to_nucleus, vigilance_count) = if has_nucleus {
+        dynamic_edges += 1;
+        let vigilance = count_tree_files(&nucleus_app, "page.tsx", "vigilance").unwrap_or(0);
+        let wizards = count_tree_files(&nucleus_app, "page.tsx", "authenticated").unwrap_or(0);
+        let total = vigilance + wizards;
+        ((total as f64 / 100.0).clamp(0.05, 1.0), Some(total))
+    } else {
+        (0.4, None)
+    };
+
+    // ── Edge 4: Nucleus → Academy ────────────────────────────────────────
+    // page.tsx under academy/ + learn/ paths / 20 (target educational pages)
+    let (nucleus_to_academy, academy_page_count) = if has_nucleus {
+        dynamic_edges += 1;
+        let academy = count_tree_files(&nucleus_app, "page.tsx", "academy").unwrap_or(0);
+        let learn = count_tree_files(&nucleus_app, "page.tsx", "learn").unwrap_or(0);
+        let total = academy + learn;
+        ((total as f64 / 20.0).clamp(0.05, 1.0), Some(total))
+    } else {
+        (0.3, None)
+    };
+
+    // ── Edge 5: Academy → Glass ──────────────────────────────────────────
+    // Academy-related agent files / 10 (6 agents + 4 certification tiers)
+    let (academy_to_glass, agent_count) = count_dir_entries(
+        &format!("{home}/.claude/agents"),
+        &[
+            "academy", "pv-foundation", "case-processor", "signal-analyst",
+            "causality-assessor", "regulatory-intel",
+        ],
+        ".md",
+    )
+    .map(|n| {
+        dynamic_edges += 1;
+        ((n as f64 / 10.0).clamp(0.05, 1.0), Some(n))
+    })
+    .unwrap_or((0.1, None));
+
+    // ── Edge 6: Glass → Station (self-referential) ───────────────────────
+    // Fraction of edges measured dynamically. Glass that sees more = stronger edge.
+    let glass_to_station = if dynamic_edges > 0 {
+        (dynamic_edges as f64 / 5.0).clamp(0.1, 1.0)
+    } else {
+        0.1
+    };
+    let glass_source = if dynamic_edges > 0 { "dynamic" } else { "static" };
+
+    let edges: [(&str, f64); 6] = [
+        ("Station → Micrograms", station_to_mcg),
+        ("Micrograms → NexCore", mcg_to_nexcore),
+        ("NexCore → Nucleus", nexcore_to_nucleus),
+        ("Nucleus → Academy", nucleus_to_academy),
+        ("Academy → Glass", academy_to_glass),
+        ("Glass → Station", glass_to_station),
+    ];
+    let raw_counts: [Option<usize>; 6] = [
+        mcg_count, nexcore_count, vigilance_count,
+        academy_page_count, agent_count, Some(dynamic_edges as usize),
+    ];
+    let sources: [&str; 6] = [
+        if mcg_count.is_some() { "dynamic" } else { "static" },
+        if nexcore_count.is_some() { "dynamic" } else { "static" },
+        if vigilance_count.is_some() { "dynamic" } else { "static" },
+        if academy_page_count.is_some() { "dynamic" } else { "static" },
+        if agent_count.is_some() { "dynamic" } else { "static" },
+        glass_source,
+    ];
+
+    // ── HOMA computation ─────────────────────────────────────────────────
+    let alpha = 4.0_f64;
+    let n = edges.len() as f64;
+    let r_opt = 1.0_f64;
+
+    let sum_sq: f64 = edges.iter().map(|(_, r)| (r_opt - r).powi(2)).sum();
+    let homa = 1.0 - (alpha / n) * sum_sq;
+
+    let status = if homa >= 0.5 {
+        "aromatic"
+    } else if homa > 0.0 {
+        "weakly_aromatic"
+    } else {
+        "anti_aromatic"
+    };
+
+    // ── Gradient: steepest improvement ───────────────────────────────────
+    let weakest = edges
+        .iter()
+        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(name, r)| {
+            let gradient = (2.0 * alpha / n) * (r_opt - r);
+            serde_json::json!({
+                "edge": name,
+                "current_strength": r,
+                "gradient": (gradient * 1000.0).round() / 1000.0,
+                "action": format!("Strengthen {} to increase HOMA most efficiently", name),
+            })
+        });
+
+    // ── Milestones: greedy step count to HOMA targets ────────────────────
+    let strengths: [f64; 6] = [
+        station_to_mcg, mcg_to_nexcore, nexcore_to_nucleus,
+        nucleus_to_academy, academy_to_glass, glass_to_station,
+    ];
+    let (to_zero, to_aromatic, to_perfect) = compute_milestones(&strengths);
+    let milestones = serde_json::json!({
+        "steps_to_zero": to_zero,
+        "steps_to_aromatic": to_aromatic,
+        "steps_to_perfect": to_perfect,
+    });
+
+    // ── Edge details with measurement transparency ───────────────────────
+    let edge_details: Vec<serde_json::Value> = edges
+        .iter()
+        .enumerate()
+        .map(|(i, (name, r))| {
+            let health = if *r >= 0.7 {
+                "strong"
+            } else if *r >= 0.4 {
+                "partial"
+            } else if *r > 0.0 {
+                "minimal"
+            } else {
+                "absent"
+            };
+            let mut detail = serde_json::json!({
+                "edge": name,
+                "strength": (*r * 1000.0).round() / 1000.0,
+                "health": health,
+                "source": sources[i],
+            });
+            if let Some(count) = raw_counts[i] {
+                detail["raw_count"] = serde_json::json!(count);
+            }
+            detail
+        })
+        .collect();
+
+    let result = serde_json::json!({
+        "ring": "NexVigilant Aromatic Ring",
+        "homa": (homa * 1000.0).round() / 1000.0,
+        "status": status,
+        "interpretation": match status {
+            "aromatic" => "Mission delocalized across all nodes. Ring is stable.",
+            "weakly_aromatic" => "Partial delocalization. Ring closing but not yet stable.",
+            _ => "Ring open or strained. Mission localized in strong edges only.",
+        },
+        "edges": edge_details,
+        "next_step": weakest,
+        "milestones": milestones,
+        "dynamic_edges": dynamic_edges,
+        "total_edges": 6,
+        "configs": config_count,
+        "tools": tool_count,
+        "model": {
+            "name": "HOMA (Harmonic Oscillator Model of Aromaticity)",
+            "formula": "HOMA = 1 - (α/n) × Σ(R_opt - R_i)²",
+            "alpha": alpha,
+            "n": n as usize,
+            "r_opt": r_opt,
+            "source": "Crystalbook Part V — The Looking Glass",
+            "chemistry_ref": "Krygowski & Cyranski, Chem. Rev. 2001, 101, 1385",
+        },
+    });
+
+    ToolCallResult {
+        content: vec![ContentBlock::Text {
+            text: serde_json::to_string_pretty(&result).unwrap_or_default(),
         }],
         is_error: None,
     }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## FerroForge — NexVigilant Station
 
-Rust MCP server + 23 PV domain configs (174 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio (source: `ls configs/*.json | wc -l` = 23, tool count from JSON parsing = 174, measured 2026-03-08).
+Rust MCP server + 25 PV domain configs (193 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio (source: `ls configs/*.json | wc -l` = 25, tool count from JSON parsing = 188 + 5 Rust meta-tools = 193, measured 2026-03-11).
 
 ## Build & Test
 
@@ -38,7 +38,7 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 | `scripts/*_proxy.py` | Per-domain API proxy scripts (21 files — source: measured 2026-03-08) |
 | `scripts/config_forge.py` | Config generator + hub deployer (self-hosted or Cloud Run) |
 
-## Config Inventory (23 configs, 174 tools — source: measured 2026-03-08)
+## Config Inventory (25 configs, 193 tools — source: measured 2026-03-08)
 
 **Proxy scripts with HTTP calls (10):** openfda, clinicaltrials, pubmed, dailymed, rxnav, openvigilfrance, fda-accessdata, eudravigilance, fda-safety, science
 
@@ -58,7 +58,7 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 
 ## Production Deployment — Cloud Run (`mcp.nexvigilant.com`)
 
-**Primary deployment target.** The station binary runs on Google Cloud Run with combined transport (SSE + HTTP REST), CORS enabled, and all 174 tools annotated with MCP annotations (`readOnlyHint: true`, `destructiveHint: false`).
+**Primary deployment target.** The station binary runs on Google Cloud Run with combined transport (SSE + HTTP REST), CORS enabled, and all 193 tools annotated with MCP annotations (`readOnlyHint: true`, `destructiveHint: false`).
 
 ```bash
 # Build container and deploy
@@ -133,14 +133,14 @@ python3 hub/seed.py --direct
 |------|------|
 | `hub/app.py` | FastAPI server (local dev only) |
 | `hub/seed.py` | Seeds hub.db from `configs/` directory |
-| `hub/hub.db` | SQLite database (23 configs, 174 tools) |
+| `hub/hub.db` | SQLite database (25 configs, 193 tools) |
 
 ## Key Gotchas
 
 - **MCP client caching:** After rebuilding the binary, must `/mcp` restart in Claude Code or stale process returns old tools
 - **Tool naming:** `{domain_underscored}_{tool_name_underscored}` (e.g., `api_fda_gov_search_adverse_events`)
-- **outputSchema:** All 174 tools have outputSchema defined — required for MCP spec compliance
-- **MCP annotations:** All 174 tools have `readOnlyHint: true`, `destructiveHint: false` — required for agent auto-approval
+- **outputSchema:** All 193 tools have outputSchema defined — required for MCP spec compliance
+- **MCP annotations:** All 193 tools have `readOnlyHint: true`, `destructiveHint: false` — required for agent auto-approval
 - **dispatch.py routes by domain prefix** — 8/8 domain prefixes smoke-tested
 - **Science configs** route via `science_proxy.py`, not individual proxy files
 - **Telemetry JSONL** at `~/ferroforge/station-telemetry.jsonl` — owner dashboard via `nexvigilant_station_health` meta-tool

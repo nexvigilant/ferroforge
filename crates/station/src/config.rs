@@ -234,6 +234,16 @@ impl ConfigRegistry {
                     },
                 }),
                 output_schema: None,
+                annotations: meta_annotations.clone(),
+            },
+            ToolInfo {
+                name: "nexvigilant_ring_health".into(),
+                description: "[NexVigilant Station] Aromatic ring health — computes HOMA (Harmonic Oscillator Model of Aromaticity) for the NexVigilant mission ring: Station → Micrograms → NexCore → Nucleus → Academy → Glass → Station. HOMA > 0.5 = aromatic (mission delocalized, stable). HOMA < 0 = anti-aromatic (ring destabilizes). Returns edge strengths, gradient, and next step.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                }),
+                output_schema: None,
                 annotations: meta_annotations,
             },
         ];

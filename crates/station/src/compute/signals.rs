@@ -23,6 +23,7 @@ pub fn handle(bare_name: &str, args: &Value) -> Option<Value> {
         "signal-trend" => Some(signal_trend(args)),
         "expectedness" => Some(expectedness(args)),
         "time-to-onset" => Some(time_to_onset(args)),
+        "batch-signals" => Some(batch_signals(args)),
         _ => None,
     }
 }
@@ -637,4 +638,56 @@ fn percentile(data: &[f64], p: f64) -> f64 {
     sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let idx = (p / 100.0 * (sorted.len() - 1) as f64).round() as usize;
     sorted[idx.min(sorted.len() - 1)]
+}
+
+/// Batch signal detection: run PRR+ROR+IC+EBGM on multiple drug-event pairs at once.
+fn batch_signals(args: &Value) -> Value {
+    let pairs = match args.get("pairs").and_then(|v| v.as_array()) {
+        Some(a) if !a.is_empty() => a,
+        _ => return err("Missing or empty 'pairs' array. Each element needs a, b, c, d fields."),
+    };
+
+    if pairs.len() > 100 {
+        return err("Maximum 100 pairs per batch");
+    }
+
+    let mut results = Vec::new();
+    let mut signal_count = 0_usize;
+
+    for (i, pair) in pairs.iter().enumerate() {
+        let label = pair.get("label")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let table_result = disproportionality_table(pair);
+        let is_signal = table_result.get("any_signal")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        if is_signal {
+            signal_count += 1;
+        }
+
+        results.push(json!({
+            "index": i,
+            "label": label,
+            "any_signal": is_signal,
+            "consensus": table_result.get("consensus"),
+            "signal_count": table_result.get("signal_count"),
+            "prr": table_result.pointer("/prr/value"),
+            "ror": table_result.pointer("/ror/value"),
+            "ic": table_result.pointer("/ic/value"),
+            "ebgm": table_result.pointer("/ebgm/value"),
+        }));
+    }
+
+    json!({
+        "status": "ok",
+        "method": "batch_signals",
+        "total_pairs": pairs.len(),
+        "signals_detected": signal_count,
+        "signal_rate": signal_count as f64 / pairs.len() as f64,
+        "results": results,
+    })
 }

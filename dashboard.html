@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexVigilant Station — Mission Control</title>
+<style>
+  :root {
+    --bg: #0a0e17;
+    --card: #111827;
+    --border: #1e293b;
+    --accent: #3b82f6;
+    --accent-dim: #1e3a5f;
+    --green: #10b981;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --radius: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+  .header h1 span { color: var(--accent); }
+  .refresh-btn {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 6px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .refresh-btn:hover { background: var(--accent); color: white; }
+  .last-update { font-size: 12px; color: var(--muted); margin-left: 12px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .card-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .card-value {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .card-sub { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .card-value.green { color: var(--green); }
+  .card-value.accent { color: var(--accent); }
+  .card-value.amber { color: var(--amber); }
+  .section-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 32px 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th {
+    text-align: left; padding: 10px 12px;
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tr:hover { background: rgba(59, 130, 246, 0.05); }
+  .badge {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 4px; font-size: 11px; font-weight: 600;
+  }
+  .badge.public { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+  .badge.private { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+  .badge.rust { background: rgba(59, 130, 246, 0.15); color: var(--accent); }
+  .badge.proxy { background: rgba(139, 92, 246, 0.15); color: #a78bfa; }
+  .progress-bar {
+    width: 100%; height: 8px;
+    background: var(--border); border-radius: 4px;
+    overflow: hidden; margin-top: 8px;
+  }
+  .progress-fill {
+    height: 100%; border-radius: 4px;
+    transition: width 0.6s ease; background: var(--accent);
+  }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+  .transport-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; margin-top: 12px;
+  }
+  .transport-item {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px; text-align: center; font-size: 12px;
+  }
+  .transport-path { color: var(--accent); font-weight: 600; font-size: 13px; }
+  .transport-label { color: var(--muted); margin-top: 4px; }
+  .migration-track { display: flex; gap: 4px; margin-top: 8px; }
+  .migration-block {
+    flex: 1; height: 28px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; cursor: default;
+  }
+  .migration-block.done { background: var(--green); color: #0a0e17; }
+  .migration-block.partial { background: var(--amber); color: #0a0e17; }
+  .migration-block.pending { background: var(--border); color: var(--muted); }
+  #loading {
+    text-align: center; padding: 60px; color: var(--muted); font-size: 16px;
+  }
+  .spinner {
+    display: inline-block; width: 24px; height: 24px;
+    border: 3px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .dot {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; margin-right: 6px; animation: pulse 2s infinite;
+  }
+  .dot.green { background: var(--green); }
+  .dot.red { background: var(--red); }
+  .bar-chart { display: flex; gap: 3px; height: 40px; align-items: flex-end; }
+  .bar-segment {
+    flex: 1; border-radius: 2px; min-width: 8px; cursor: default;
+    transition: opacity 0.2s;
+  }
+  .bar-segment:hover { opacity: 0.8; }
+  .legend { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>NexVigilant</span> Station — Mission Control</h1>
+  <div>
+    <button class="refresh-btn" onclick="refresh()">Refresh</button>
+    <span class="last-update" id="lastUpdate"></span>
+  </div>
+</div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div>Connecting to Station...</div>
+</div>
+
+<div id="dashboard" style="display:none"></div>
+
+<script>
+const STATION_URL = 'https://mcp.nexvigilant.com';
+
+const DISK_DATA = {
+  configs: [
+    { domain: 'calculate.nexvigilant.com', tools: 17, private: false, handler: 'rust', file: 'calculation.json' },
+    { domain: 'cioms.ch', tools: 7, private: false, handler: 'proxy', file: 'cioms.json' },
+    { domain: 'clinicaltrials.gov', tools: 7, private: false, handler: 'proxy', file: 'clinicaltrials.json' },
+    { domain: 'dailymed.nlm.nih.gov', tools: 6, private: false, handler: 'proxy', file: 'dailymed.json' },
+    { domain: 'go.drugbank.com', tools: 7, private: false, handler: 'proxy', file: 'drugbank.json' },
+    { domain: 'www.ema.europa.eu', tools: 6, private: false, handler: 'proxy', file: 'ema.json' },
+    { domain: 'eudravigilance.ema.europa.eu', tools: 7, private: false, handler: 'proxy', file: 'eudravigilance.json' },
+    { domain: 'accessdata.fda.gov', tools: 6, private: false, handler: 'proxy', file: 'fda-accessdata.json' },
+    { domain: 'www.fda.gov', tools: 7, private: false, handler: 'proxy', file: 'fda-safety.json' },
+    { domain: 'ich.org', tools: 7, private: false, handler: 'proxy', file: 'ich.json' },
+    { domain: 'www.linkedin.com', tools: 6, private: true, handler: 'proxy', file: 'linkedin.json' },
+    { domain: 'meddra.org', tools: 7, private: false, handler: 'proxy', file: 'meddra.json' },
+    { domain: 'api.fda.gov', tools: 7, private: false, handler: 'proxy', file: 'openfda.json' },
+    { domain: 'open-vigil.fr', tools: 7, private: false, handler: 'proxy', file: 'openvigilfrance.json' },
+    { domain: 'primitives.nexvigilant.com', tools: 15, private: true, handler: 'rust', file: 'primitives.json' },
+    { domain: 'pubmed.ncbi.nlm.nih.gov', tools: 7, private: false, handler: 'proxy', file: 'pubmed.json' },
+    { domain: 'rxnav.nlm.nih.gov', tools: 6, private: false, handler: 'proxy', file: 'rxnav.json' },
+    { domain: 'science.nexvigilant.com (targets)', tools: 6, private: true, handler: 'proxy', file: 'science-drug-targets.json' },
+    { domain: 'science.nexvigilant.com (genomics)', tools: 6, private: true, handler: 'proxy', file: 'science-genomics.json' },
+    { domain: 'science.nexvigilant.com (hexim1)', tools: 10, private: true, handler: 'proxy', file: 'science-hexim1.json' },
+    { domain: 'vigiaccess.org', tools: 7, private: false, handler: 'proxy', file: 'vigiaccess.json' },
+    { domain: 'vigilance.nexvigilant.com', tools: 5, private: false, handler: 'rust', file: 'vigilance.json' },
+    { domain: 'who-umc.org', tools: 7, private: false, handler: 'proxy', file: 'who-umc.json' },
+    { domain: 'en.wikipedia.org', tools: 6, private: true, handler: 'proxy', file: 'wikipedia.json' },
+  ],
+  pvCrates: [
+    { name: 'nexcore-pv-core', status: 'partial', desc: 'Signal detection (PRR/ROR/IC/EBGM) — partially surfaced via compute module' },
+    { name: 'nexcore-signal-pipeline', status: 'pending', desc: 'Signal pipeline orchestration' },
+    { name: 'nexcore-signal-theory', status: 'pending', desc: 'Signal theory foundations' },
+    { name: 'nexcore-signal-types', status: 'pending', desc: 'Signal type definitions' },
+    { name: 'nexcore-signal-fence', status: 'pending', desc: 'Signal boundary validation' },
+    { name: 'nexcore-vigilance', status: 'pending', desc: 'Core vigilance domain' },
+    { name: 'nexcore-pvdsl', status: 'pending', desc: 'PV domain-specific language' },
+    { name: 'nexcore-pvos', status: 'pending', desc: 'PV operating system' },
+    { name: 'nexcore-qbr', status: 'pending', desc: 'Quantitative benefit-risk' },
+    { name: 'nexcore-faers-etl', status: 'pending', desc: 'FAERS data pipeline' },
+    { name: 'nexcore-dataframe', status: 'pending', desc: 'Columnar data operations' },
+  ],
+  totalToolsDisk: 179,
+  publicToolsDisk: 130,
+  privateToolsDisk: 49,
+};
+
+const COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16',
+                '#f97316','#6366f1','#14b8a6','#e11d48','#a855f7','#0ea5e9','#eab308','#d946ef',
+                '#22d3ee','#4ade80','#fb923c','#818cf8','#2dd4bf','#f43f5e','#c084fc','#38bdf8'];
+
+function el(tag, attrs, children) {
+  const e = document.createElement(tag);
+  if (attrs) {
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'style' && typeof v === 'object') {
+        Object.assign(e.style, v);
+      } else if (k === 'className') {
+        e.className = v;
+      } else if (k.startsWith('on')) {
+        e.addEventListener(k.slice(2).toLowerCase(), v);
+      } else {
+        e.setAttribute(k, v);
+      }
+    }
+  }
+  if (children) {
+    if (typeof children === 'string') {
+      e.textContent = children;
+    } else if (Array.isArray(children)) {
+      children.forEach(c => { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    } else {
+      e.appendChild(children);
+    }
+  }
+  return e;
+}
+
+function formatUptime(s) {
+  if (s < 3600) return Math.floor(s / 60) + 'm';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ' + Math.floor((s % 3600) / 60) + 'm';
+  return Math.floor(s / 86400) + 'd ' + Math.floor((s % 86400) / 3600) + 'h';
+}
+
+function kpiCard(label, value, sub, colorClass) {
+  return el('div', { className: 'card' }, [
+    el('div', { className: 'card-label' }, label),
+    el('div', { className: 'card-value ' + (colorClass || '') }, String(value)),
+    el('div', { className: 'card-sub' }, sub),
+  ]);
+}
+
+function badge(text, type) {
+  return el('span', { className: 'badge ' + type }, text);
+}
+
+async function refresh() {
+  try {
+    const [healthRes, toolsRes] = await Promise.all([
+      fetch(STATION_URL + '/health'),
+      fetch(STATION_URL + '/tools'),
+    ]);
+    const health = await healthRes.json();
+    const tools = await toolsRes.json();
+    render(health, tools);
+  } catch (e) {
+    document.getElementById('loading').style.display = 'block';
+    const ld = document.getElementById('loading');
+    ld.replaceChildren(
+      el('div', { style: { color: 'var(--red)' } }, 'Station unreachable'),
+      el('div', { style: { color: 'var(--muted)', marginTop: '8px' } }, e.message)
+    );
+  }
+}
+
+function render(health, liveTools) {
+  document.getElementById('loading').style.display = 'none';
+  const dash = document.getElementById('dashboard');
+  dash.style.display = 'block';
+  dash.replaceChildren();
+
+  const t = health.telemetry;
+  const liveCount = liveTools.length;
+  const diskTotal = DISK_DATA.totalToolsDisk + 4; // + meta tools
+
+  // KPI Row
+  const kpiGrid = el('div', { className: 'grid' }, [
+    kpiCard('Production', health.status === 'ok' ? 'ONLINE' : 'DEGRADED',
+      'v' + health.version + ' \u2022 SHA ' + health.git_sha,
+      health.status === 'ok' ? 'green' : 'amber'),
+    kpiCard('Tools (Disk)', diskTotal,
+      DISK_DATA.publicToolsDisk + ' public + ' + DISK_DATA.privateToolsDisk + ' private + 4 meta', 'accent'),
+    kpiCard('Tools (Live)', liveCount,
+      liveCount + ' / ' + diskTotal + ' accessible (' + Math.round(liveCount / diskTotal * 100) + '%)',
+      liveCount >= DISK_DATA.publicToolsDisk ? 'green' : 'amber'),
+    kpiCard('Configs', health.configs + ' / ' + DISK_DATA.configs.length,
+      health.configs === DISK_DATA.configs.length ? 'All configs loaded' :
+        (DISK_DATA.configs.length - health.configs) + ' configs not deployed', 'accent'),
+    kpiCard('API Calls', t.total_calls,
+      t.calls_per_minute.toFixed(2) + ' calls/min \u2022 P99: ' + t.latency_p99_ms + 'ms \u2022 Errors: ' + t.error_rate_pct + '%'),
+    kpiCard('Uptime', formatUptime(t.uptime_seconds),
+      'SLO: ' + t.slo_status + ' \u2022 Trend: ' + t.trend, 'green'),
+  ]);
+  dash.appendChild(kpiGrid);
+
+  // Transport
+  dash.appendChild(el('div', { className: 'section-title' }, 'Transport Surfaces'));
+  const labels = { streamable_http: 'Streamable HTTP (MCP 2025-03-26)', sse: 'SSE (Legacy)', rpc: 'JSON-RPC', rest: 'REST API' };
+  const tCard = el('div', { className: 'card' });
+  const tGrid = el('div', { className: 'transport-grid' });
+  for (const [key, path] of Object.entries(health.surfaces)) {
+    tGrid.appendChild(el('div', { className: 'transport-item' }, [
+      el('div', { className: 'transport-path' }, path),
+      el('div', { className: 'transport-label' }, labels[key] || key),
+    ]));
+  }
+  tCard.appendChild(tGrid);
+  dash.appendChild(tCard);
+
+  // Migration
+  dash.appendChild(el('div', { className: 'section-title' }, 'Crate \u2192 Station Migration'));
+  const migRow = el('div', { className: 'two-col' });
+
+  const crateCard = el('div', { className: 'card' });
+  crateCard.appendChild(el('div', { className: 'card-label' }, 'NexCore PV Crates'));
+  const track = el('div', { className: 'migration-track' });
+  let doneCount = 0;
+  DISK_DATA.pvCrates.forEach(crate => {
+    const block = el('div', {
+      className: 'migration-block ' + crate.status,
+      title: crate.name + ': ' + crate.desc,
+    }, crate.name.replace('nexcore-', '').substring(0, 6));
+    track.appendChild(block);
+    if (crate.status === 'done') doneCount++;
+    if (crate.status === 'partial') doneCount += 0.5;
+  });
+  crateCard.appendChild(track);
+  migRow.appendChild(crateCard);
+
+  const pct = Math.round((doneCount / DISK_DATA.pvCrates.length) * 100);
+  const covCard = el('div', { className: 'card' }, [
+    el('div', { className: 'card-label' }, 'Migration Coverage'),
+    el('div', { className: 'card-value accent' }, pct + '%'),
+  ]);
+  const bar = el('div', { className: 'progress-bar' });
+  const fill = el('div', { className: 'progress-fill' });
+  fill.style.width = pct + '%';
+  bar.appendChild(fill);
+  covCard.appendChild(bar);
+  covCard.appendChild(el('div', { className: 'card-sub' },
+    doneCount + '/' + DISK_DATA.pvCrates.length + ' PV crates surfaced \u2022 ' +
+    DISK_DATA.configs.filter(c => c.handler === 'rust').length + ' Rust-native configs'));
+  migRow.appendChild(covCard);
+  dash.appendChild(migRow);
+
+  // Config Inventory
+  dash.appendChild(el('div', { className: 'section-title' }, 'Config Inventory'));
+  const tbl = el('table');
+  const thead = el('thead');
+  const hRow = el('tr');
+  ['Domain','Tools','Access','Handler','File'].forEach(h =>
+    hRow.appendChild(el('th', null, h)));
+  thead.appendChild(hRow);
+  tbl.appendChild(thead);
+
+  const tbody = el('tbody');
+  DISK_DATA.configs.forEach(c => {
+    const row = el('tr');
+    row.appendChild(el('td', null, c.domain));
+    row.appendChild(el('td', null, String(c.tools)));
+    const accessTd = el('td');
+    accessTd.appendChild(badge(c.private ? 'Private' : 'Public', c.private ? 'private' : 'public'));
+    row.appendChild(accessTd);
+    const handlerTd = el('td');
+    handlerTd.appendChild(badge(c.handler === 'rust' ? 'Rust Native' : 'Python Proxy', c.handler === 'rust' ? 'rust' : 'proxy'));
+    row.appendChild(handlerTd);
+    row.appendChild(el('td', { style: { color: 'var(--muted)' } }, c.file));
+    tbody.appendChild(row);
+  });
+  tbl.appendChild(tbody);
+  const tblCard = el('div', { className: 'card', style: { overflowX: 'auto' } });
+  tblCard.appendChild(tbl);
+  dash.appendChild(tblCard);
+
+  // Domain Distribution
+  dash.appendChild(el('div', { className: 'section-title' }, 'Tool Distribution by Domain'));
+  const chartCard = el('div', { className: 'card' });
+  const chartDiv = el('div', { className: 'bar-chart' });
+  const maxTools = Math.max(...DISK_DATA.configs.map(c => c.tools));
+  const legendDiv = el('div', { className: 'legend' });
+  DISK_DATA.configs.forEach((c, i) => {
+    const h = Math.max(8, (c.tools / maxTools) * 40);
+    chartDiv.appendChild(el('div', {
+      className: 'bar-segment',
+      title: c.domain + ': ' + c.tools + ' tools',
+      style: { height: h + 'px', background: COLORS[i % COLORS.length], opacity: c.private ? '0.5' : '1' },
+    }));
+    legendDiv.appendChild(el('span', { style: { color: COLORS[i % COLORS.length] } },
+      c.domain.split('.')[0] + '(' + c.tools + ')'));
+  });
+  chartCard.appendChild(chartDiv);
+  chartCard.appendChild(legendDiv);
+  dash.appendChild(chartCard);
+
+  // Deployment
+  dash.appendChild(el('div', { className: 'section-title' }, 'Deployment Pipeline'));
+  const deployCard = el('div', { className: 'card' });
+  deployCard.appendChild(el('div', { className: 'card-label' }, 'VDAG: Compile \u2192 Test \u2192 Commit \u2192 Deploy \u2192 Verify'));
+  const vdagTrack = el('div', { className: 'migration-track' });
+  const vdagSteps = [
+    { name: 'Compile', status: 'done' },
+    { name: 'Test', status: 'done' },
+    { name: 'Commit', status: 'done' },
+    { name: 'Deploy', status: 'partial' },
+    { name: 'Verify', status: 'pending' },
+  ];
+  vdagSteps.forEach(step => {
+    vdagTrack.appendChild(el('div', { className: 'migration-block ' + step.status }, step.name));
+  });
+  deployCard.appendChild(vdagTrack);
+  deployCard.appendChild(el('div', { className: 'card-sub', style: { marginTop: '8px' } },
+    'Production at SHA ' + health.git_sha + ' \u2022 Local HEAD has 4 commits ahead'));
+  dash.appendChild(deployCard);
+
+  document.getElementById('lastUpdate').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+}
+
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>

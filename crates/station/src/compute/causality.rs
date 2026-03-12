@@ -9,6 +9,8 @@ pub fn handle(bare_name: &str, args: &Value) -> Option<Value> {
         "classify-seriousness" => Some(classify_seriousness(args)),
         "case-completeness" => Some(case_completeness(args)),
         "number-needed-harm" => Some(number_needed_harm(args)),
+        "assess-rucam" => Some(rucam(args)),
+        "assess-severity" => Some(hartwig_siegel(args)),
         _ => None,
     }
 }
@@ -287,5 +289,153 @@ fn number_needed_harm(args: &Value) -> Value {
         "risk_control": risk_control,
         "description": format!("1 additional {} per {:.0} patients exposed",
             if ard > 0.0 { "harm" } else { "benefit" }, nnh)
+    })
+}
+
+/// RUCAM — Roussel Uclaf Causality Assessment Method for drug-induced liver injury.
+/// 7 criteria scored individually, total determines causality category.
+fn rucam(args: &Value) -> Value {
+    // 1. Time to onset (challenge): +1 to +2
+    let onset = get_str(args, "time_to_onset").unwrap_or("unknown");
+    let onset_score = match onset {
+        "suggestive" => 2,      // 5-90 days (hepatocellular), 5-90 days (cholestatic)
+        "compatible" => 1,      // <5 or >90 days
+        "against" => -1,        // <3 days after start for rechallenge
+        _ => 0,
+    };
+
+    // 2. Course after cessation (dechallenge)
+    let dechallenge = get_str(args, "dechallenge").unwrap_or("unknown");
+    let dechallenge_score = match dechallenge {
+        "highly_suggestive" => 3,   // ALT decrease ≥50% in 8 days
+        "suggestive" => 2,          // ALT decrease ≥50% in 30 days
+        "inconclusive" => 0,
+        "against" => -2,            // No improvement or worsening
+        _ => 0,
+    };
+
+    // 3. Risk factors
+    let alcohol = get_bool(args, "alcohol_use").unwrap_or(false);
+    let age_over_55 = get_bool(args, "age_over_55").unwrap_or(false);
+    let risk_score: i64 = if alcohol { 1 } else { 0 } + if age_over_55 { 1 } else { 0 };
+
+    // 4. Concomitant drugs
+    let concomitant = get_str(args, "concomitant_drugs").unwrap_or("unknown");
+    let concomitant_score = match concomitant {
+        "none" => 0,
+        "present_no_info" => -1,
+        "known_hepatotoxin" => -2,
+        "proven_role" => -3,
+        _ => -1,
+    };
+
+    // 5. Non-drug causes excluded
+    let nondrug = get_str(args, "nondrug_causes").unwrap_or("unknown");
+    let nondrug_score = match nondrug {
+        "all_excluded" => 2,         // All 6 causes ruled out
+        "most_excluded" => 1,        // 4-5 causes ruled out
+        "partially_excluded" => 0,
+        "possible" => -1,
+        "probable" => -3,
+        _ => 0,
+    };
+
+    // 6. Previous hepatotoxicity known
+    let known_hepatotox = get_bool(args, "known_hepatotoxicity").unwrap_or(false);
+    let known_score: i64 = if known_hepatotox { 2 } else { 0 };
+
+    // 7. Rechallenge
+    let rechallenge = get_str(args, "rechallenge").unwrap_or("not_done");
+    let rechallenge_score = match rechallenge {
+        "positive" => 3,            // ALT doubles on re-exposure
+        "compatible" => 1,
+        "negative" => -2,
+        "not_done" => 0,
+        _ => 0,
+    };
+
+    let total = onset_score + dechallenge_score + risk_score
+        + concomitant_score + nondrug_score + known_score + rechallenge_score;
+
+    let category = match total {
+        9.. => "highly_probable",
+        6..=8 => "probable",
+        3..=5 => "possible",
+        1..=2 => "unlikely",
+        _ => "excluded",
+    };
+
+    json!({
+        "status": "ok",
+        "method": "rucam",
+        "total_score": total,
+        "max_possible": 14,
+        "category": category,
+        "interpretation": match category {
+            "highly_probable" => "Highly probable DILI (score ≥ 9)",
+            "probable" => "Probable DILI (score 6-8)",
+            "possible" => "Possible DILI (score 3-5)",
+            "unlikely" => "Unlikely DILI (score 1-2)",
+            _ => "DILI excluded (score ≤ 0)",
+        },
+        "components": {
+            "time_to_onset": {"score": onset_score, "input": onset},
+            "dechallenge": {"score": dechallenge_score, "input": dechallenge},
+            "risk_factors": {"score": risk_score, "alcohol": alcohol, "age_over_55": age_over_55},
+            "concomitant_drugs": {"score": concomitant_score, "input": concomitant},
+            "nondrug_causes": {"score": nondrug_score, "input": nondrug},
+            "known_hepatotoxicity": {"score": known_score, "known": known_hepatotox},
+            "rechallenge": {"score": rechallenge_score, "input": rechallenge},
+        },
+        "reference": "Danan G, Teschke R (2019) Drug-Induced Liver Injury: RUCAM Update. Int J Mol Sci"
+    })
+}
+
+/// Hartwig-Siegel ADR severity scale (levels 1-7).
+fn hartwig_siegel(args: &Value) -> Value {
+    let required_treatment = get_bool(args, "required_treatment").unwrap_or(false);
+    let treatment_change = get_bool(args, "treatment_change").unwrap_or(false);
+    let hospitalization = get_bool(args, "hospitalization").unwrap_or(false);
+    let prolonged_hospital = get_bool(args, "prolonged_hospitalization").unwrap_or(false);
+    let permanent_disability = get_bool(args, "permanent_disability").unwrap_or(false);
+    let icu_admission = get_bool(args, "icu_admission").unwrap_or(false);
+    let death = get_bool(args, "death").unwrap_or(false);
+
+    let (level, severity, description) = if death {
+        ("7", "fatal", "The ADR was directly or indirectly responsible for the patient's death")
+    } else if permanent_disability {
+        ("6", "severe", "The ADR caused permanent disability or long-lasting impairment")
+    } else if icu_admission {
+        ("5", "severe", "The ADR required ICU admission and/or intensive medical intervention")
+    } else if prolonged_hospital || hospitalization {
+        if prolonged_hospital {
+            ("4b", "moderate", "The ADR prolonged the patient's hospital stay")
+        } else {
+            ("4a", "moderate", "The ADR required hospital admission")
+        }
+    } else if treatment_change {
+        ("3", "moderate", "The ADR required a change in drug therapy (dose change, addition, or discontinuation)")
+    } else if required_treatment {
+        ("2", "mild", "The ADR required treatment or intervention but no change in drug therapy")
+    } else {
+        ("1", "mild", "The ADR required no change in treatment or additional intervention")
+    };
+
+    json!({
+        "status": "ok",
+        "method": "hartwig_siegel",
+        "level": level,
+        "severity": severity,
+        "description": description,
+        "inputs": {
+            "required_treatment": required_treatment,
+            "treatment_change": treatment_change,
+            "hospitalization": hospitalization,
+            "prolonged_hospitalization": prolonged_hospital,
+            "permanent_disability": permanent_disability,
+            "icu_admission": icu_admission,
+            "death": death,
+        },
+        "reference": "Hartwig SC, Siegel J, Schneider PJ (1992) Drug Intelligence and Clinical Pharmacy"
     })
 }
