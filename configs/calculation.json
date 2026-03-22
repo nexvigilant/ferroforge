@@ -3,7 +3,7 @@
   "private": false,
   "url_pattern": "/calculate/*",
   "title": "PV Calculation Engine",
-  "copyright": "© 2026 NexVigilant, LLC. Signal half-life model, NexVigilant QBR Framework, and composite scoring methodology are proprietary. Standard PV algorithms (PRR, ROR, IC, EBGM, Naranjo, WHO-UMC) follow published methodologies.",
+  "copyright": "\u00a9 2026 NexVigilant, LLC. Signal half-life model, NexVigilant QBR Framework, and composite scoring methodology are proprietary. Standard PV algorithms (PRR, ROR, IC, EBGM, Naranjo, WHO-UMC) follow published methodologies.",
   "description": "Pharmacovigilance computation tools: signal detection (PRR/ROR/IC/EBGM), causality assessment (Naranjo, WHO-UMC), seriousness classification (ICH E2A), benefit-risk analysis, and reporting rate calculations. Standard algorithms follow published WHO, FDA, and ICH methodologies. Composite scoring and signal half-life models are proprietary NexVigilant methods.",
   "tools": [
     {
@@ -42,13 +42,53 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "PRR value, chi-squared, 95% CI, signal determination"
-          },
           "method": {
             "type": "string",
             "description": "Evans 2001 PRR criteria"
+          },
+          "prr": {
+            "type": "number",
+            "description": "Proportional Reporting Ratio"
+          },
+          "ci_95_lower": {
+            "type": "number",
+            "description": "Lower bound 95% confidence interval"
+          },
+          "ci_95_upper": {
+            "type": "number",
+            "description": "Upper bound 95% confidence interval"
+          },
+          "drug_reporting_rate": {
+            "type": "number",
+            "description": "Drug-specific reporting rate"
+          },
+          "background_rate": {
+            "type": "number",
+            "description": "Background reporting rate"
+          },
+          "chi_square": {
+            "type": "number",
+            "description": "Chi-squared test statistic"
+          },
+          "case_count": {
+            "type": "number",
+            "description": "Number of target drug-event reports (a)"
+          },
+          "signal": {
+            "type": "boolean",
+            "description": "True if PRR>=2, chi2>=4, N>=3"
+          },
+          "signal_criteria": {
+            "type": "object",
+            "description": "Individual signal criteria evaluation"
+          },
+          "contingency_table": {
+            "type": "object",
+            "description": "2x2 table {a, b, c, d, N}"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Citation"
           }
         },
         "required": [
@@ -96,13 +136,37 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "ROR value, 95% CI bounds, signal determination"
-          },
           "method": {
             "type": "string",
-            "description": "Reporting Odds Ratio with log-normal CI"
+            "description": "Reporting Odds Ratio"
+          },
+          "ror": {
+            "type": "number",
+            "description": "Reporting Odds Ratio value"
+          },
+          "ci_95_lower": {
+            "type": "number",
+            "description": "Lower bound 95% CI"
+          },
+          "ci_95_upper": {
+            "type": "number",
+            "description": "Upper bound 95% CI"
+          },
+          "signal": {
+            "type": "boolean",
+            "description": "True if lower CI > 1"
+          },
+          "signal_criterion": {
+            "type": "string",
+            "description": "Signal criterion description"
+          },
+          "contingency_table": {
+            "type": "object",
+            "description": "2x2 table {a, b, c, d, N}"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Citation"
           }
         },
         "required": [
@@ -150,13 +214,49 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "IC value, IC025/IC975 credibility interval, signal determination"
-          },
           "method": {
             "type": "string",
-            "description": "BCPNN (Bayesian Confidence Propagation Neural Network)"
+            "description": "Information Component (WHO-UMC)"
+          },
+          "ic": {
+            "type": "number",
+            "description": "Information Component value"
+          },
+          "ic_025": {
+            "type": "number",
+            "description": "IC lower credibility interval"
+          },
+          "ic_975": {
+            "type": "number",
+            "description": "IC upper credibility interval"
+          },
+          "ic_shrunk": {
+            "type": "number",
+            "description": "Shrinkage-adjusted IC"
+          },
+          "observed": {
+            "type": "number",
+            "description": "Observed count"
+          },
+          "expected": {
+            "type": "number",
+            "description": "Expected count"
+          },
+          "signal": {
+            "type": "boolean",
+            "description": "True if IC_025 > 0"
+          },
+          "signal_criterion": {
+            "type": "string",
+            "description": "Signal criterion description"
+          },
+          "contingency_table": {
+            "type": "object",
+            "description": "2x2 table"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Citation"
           }
         },
         "required": [
@@ -204,13 +304,49 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "EBGM value, EB05/EB95 bounds, signal determination"
-          },
           "method": {
             "type": "string",
-            "description": "GPS (Gamma Poisson Shrinker) simplified"
+            "description": "Empirical Bayesian Geometric Mean (FDA)"
+          },
+          "ebgm": {
+            "type": "number",
+            "description": "EBGM value"
+          },
+          "eb05": {
+            "type": "number",
+            "description": "5th percentile lower bound"
+          },
+          "eb95": {
+            "type": "number",
+            "description": "95th percentile upper bound"
+          },
+          "rr": {
+            "type": "number",
+            "description": "Relative reporting ratio"
+          },
+          "observed": {
+            "type": "number",
+            "description": "Observed count"
+          },
+          "expected": {
+            "type": "number",
+            "description": "Expected count"
+          },
+          "signal": {
+            "type": "boolean",
+            "description": "True if EB05 >= 2"
+          },
+          "signal_criterion": {
+            "type": "string",
+            "description": "Signal criterion description"
+          },
+          "contingency_table": {
+            "type": "object",
+            "description": "2x2 table"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Citation"
           }
         },
         "required": [
@@ -294,13 +430,33 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "Total score, category, per-question breakdown"
-          },
           "method": {
             "type": "string",
-            "description": "Naranjo ADR Probability Scale"
+            "description": "Naranjo Algorithm"
+          },
+          "total_score": {
+            "type": "integer",
+            "description": "Total Naranjo score"
+          },
+          "category": {
+            "type": "string",
+            "description": "Definite/Probable/Possible/Doubtful"
+          },
+          "interpretation": {
+            "type": "string",
+            "description": "Score interpretation"
+          },
+          "max_possible": {
+            "type": "integer",
+            "description": "Maximum possible score"
+          },
+          "details": {
+            "type": "array",
+            "description": "Per-question scores and answers"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Citation"
           }
         },
         "required": [
@@ -360,13 +516,29 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "Classification (serious/non-serious), criteria met, severity rank, reporting timeline"
-          },
           "method": {
             "type": "string",
-            "description": "ICH E2A Clinical Safety Data Management"
+            "description": "ICH E2A Seriousness Classification"
+          },
+          "is_serious": {
+            "type": "boolean",
+            "description": "Whether event meets seriousness criteria"
+          },
+          "criteria_met": {
+            "type": "array",
+            "description": "Which ICH E2A criteria are met"
+          },
+          "criteria_count": {
+            "type": "integer",
+            "description": "Number of criteria met"
+          },
+          "reporting_timeline": {
+            "type": "string",
+            "description": "Regulatory reporting timeline"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Citation"
           }
         },
         "required": [
@@ -420,13 +592,29 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "Benefit score, risk score, B/R ratio, classification (favorable/unfavorable/marginal)"
-          },
           "method": {
             "type": "string",
             "description": "NexVigilant QBR Framework"
+          },
+          "benefit_risk_ratio": {
+            "type": "number",
+            "description": "Composite benefit-risk ratio"
+          },
+          "benefit_score": {
+            "type": "number",
+            "description": "Weighted benefit score"
+          },
+          "risk_score": {
+            "type": "number",
+            "description": "Weighted risk score"
+          },
+          "assessment": {
+            "type": "string",
+            "description": "Favorable/Unfavorable/Neutral"
+          },
+          "interpretation": {
+            "type": "string",
+            "description": "Clinical interpretation"
           }
         },
         "required": [
@@ -474,13 +662,41 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "All four scores (PRR, ROR, IC, EBGM) with CIs and consensus signal"
-          },
           "method": {
             "type": "string",
-            "description": "Combined disproportionality analysis"
+            "description": "Full disproportionality analysis"
+          },
+          "contingency_table": {
+            "type": "object",
+            "description": "2x2 table {a, b, c, d, N}"
+          },
+          "prr": {
+            "type": "object",
+            "description": "PRR result with signal flag"
+          },
+          "ror": {
+            "type": "object",
+            "description": "ROR result with signal flag"
+          },
+          "ic": {
+            "type": "object",
+            "description": "IC result with signal flag"
+          },
+          "ebgm": {
+            "type": "object",
+            "description": "EBGM result with signal flag"
+          },
+          "consensus": {
+            "type": "string",
+            "description": "Agreement across methods"
+          },
+          "any_signal": {
+            "type": "boolean",
+            "description": "True if any method signals"
+          },
+          "signal_count": {
+            "type": "integer",
+            "description": "Number of methods signaling"
           }
         },
         "required": [
@@ -540,13 +756,37 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "Causality category, reasoning, criteria met"
-          },
           "method": {
             "type": "string",
-            "description": "WHO-UMC Causality Assessment System"
+            "description": "WHO-UMC System"
+          },
+          "category": {
+            "type": "string",
+            "description": "Certain/Probable/Possible/Unlikely/Conditional/Unassessable"
+          },
+          "description": {
+            "type": "string",
+            "description": "Category description"
+          },
+          "temporal_relationship": {
+            "type": "boolean",
+            "description": "Temporal relationship present"
+          },
+          "known_response_pattern": {
+            "type": "boolean",
+            "description": "Known response pattern"
+          },
+          "dechallenge": {
+            "type": "boolean",
+            "description": "Positive dechallenge"
+          },
+          "rechallenge": {
+            "type": "boolean",
+            "description": "Positive rechallenge"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Citation"
           }
         },
         "required": [
@@ -594,13 +834,29 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "Reporting rate, annualized rate, 95% Poisson CI"
-          },
           "method": {
             "type": "string",
-            "description": "Poisson-based reporting rate calculation"
+            "description": "Reporting rate calculation"
+          },
+          "rate": {
+            "type": "number",
+            "description": "Reporting rate value"
+          },
+          "cases": {
+            "type": "number",
+            "description": "Number of cases"
+          },
+          "exposure": {
+            "type": "number",
+            "description": "Exposure denominator"
+          },
+          "multiplier": {
+            "type": "number",
+            "description": "Rate multiplier"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Rate unit description"
           }
         },
         "required": [
@@ -642,13 +898,29 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "Half-life in months, months to threshold, 6/12/24 month projections"
-          },
           "method": {
             "type": "string",
-            "description": "Exponential decay model"
+            "description": "NexVigilant signal half-life model"
+          },
+          "half_life": {
+            "type": "number",
+            "description": "Signal half-life value"
+          },
+          "half_life_months": {
+            "type": "number",
+            "description": "Half-life in months"
+          },
+          "decay_rate": {
+            "type": "number",
+            "description": "Exponential decay rate"
+          },
+          "initial_signal_strength": {
+            "type": "number",
+            "description": "Initial signal strength"
+          },
+          "trend": {
+            "type": "string",
+            "description": "Signal trend direction"
           }
         },
         "required": [
@@ -690,13 +962,33 @@
             "type": "string",
             "description": "ok | error"
           },
-          "result": {
-            "type": "object",
-            "description": "Expectedness classification, reference source, reporting implications"
-          },
           "method": {
             "type": "string",
-            "description": "Reference Safety Information comparison"
+            "description": "Expectedness assessment"
+          },
+          "classification": {
+            "type": "string",
+            "description": "Expected/Unexpected/Unclassifiable"
+          },
+          "listed_in_label": {
+            "type": "boolean",
+            "description": "Listed in product label"
+          },
+          "listed_in_class_label": {
+            "type": "boolean",
+            "description": "Listed in drug class label"
+          },
+          "mechanistic_plausibility": {
+            "type": "string",
+            "description": "Pharmacological plausibility"
+          },
+          "regulatory_impact": {
+            "type": "string",
+            "description": "Impact on regulatory reporting"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Citation"
           }
         },
         "required": [
@@ -726,13 +1018,13 @@
             "type": "string",
             "description": "ok | error"
           },
-          "weibull_shape_k": {
-            "type": "number",
-            "description": "Weibull shape parameter"
-          },
-          "onset_pattern": {
+          "method": {
             "type": "string",
-            "description": "early_hazard | constant_hazard | late_hazard"
+            "description": "Time-to-onset analysis"
+          },
+          "n": {
+            "type": "integer",
+            "description": "Number of cases"
           },
           "mean_days": {
             "type": "number",
@@ -741,6 +1033,30 @@
           "median_days": {
             "type": "number",
             "description": "Median onset time in days"
+          },
+          "sd_days": {
+            "type": "number",
+            "description": "Standard deviation in days"
+          },
+          "cv": {
+            "type": "number",
+            "description": "Coefficient of variation"
+          },
+          "quartiles": {
+            "type": "object",
+            "description": "Quartile breakdown"
+          },
+          "onset_pattern": {
+            "type": "string",
+            "description": "Early/intermediate/late onset pattern"
+          },
+          "weibull_shape": {
+            "type": "number",
+            "description": "Weibull shape parameter"
+          },
+          "weibull_scale": {
+            "type": "number",
+            "description": "Weibull scale parameter"
           }
         },
         "required": [
@@ -860,21 +1176,33 @@
             "type": "string",
             "description": "ok | error"
           },
-          "overall_score": {
-            "type": "number",
-            "description": "Combined completeness score (0-100)"
-          },
-          "validity": {
+          "method": {
             "type": "string",
-            "description": "invalid | minimal | acceptable | complete"
+            "description": "ICSR completeness scoring"
           },
-          "required_score": {
+          "score": {
             "type": "number",
-            "description": "Required fields score (0-100)"
+            "description": "Total completeness score"
           },
-          "recommended_score": {
+          "max_score": {
             "type": "number",
-            "description": "Recommended fields score (0-100)"
+            "description": "Maximum possible score"
+          },
+          "percentage": {
+            "type": "number",
+            "description": "Completeness percentage"
+          },
+          "grade": {
+            "type": "string",
+            "description": "Grade (A/B/C/D)"
+          },
+          "components": {
+            "type": "array",
+            "description": "Per-field scores with present/weight"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Citation"
           }
         },
         "required": [
@@ -910,17 +1238,33 @@
             "type": "string",
             "description": "ok | error"
           },
-          "nnh": {
-            "type": "number",
-            "description": "Number Needed to Harm"
-          },
-          "ari": {
-            "type": "number",
-            "description": "Absolute Risk Increase"
-          },
-          "severity": {
+          "method": {
             "type": "string",
-            "description": "very_frequent_harm | frequent_harm | infrequent_harm | rare_harm"
+            "description": "Number needed to harm"
+          },
+          "value": {
+            "type": "number",
+            "description": "NNH or NNT value"
+          },
+          "metric": {
+            "type": "string",
+            "description": "NNH or NNT"
+          },
+          "absolute_risk_difference": {
+            "type": "number",
+            "description": "Absolute risk difference"
+          },
+          "risk_exposed": {
+            "type": "number",
+            "description": "Risk in exposed group"
+          },
+          "risk_control": {
+            "type": "number",
+            "description": "Risk in control group"
+          },
+          "description": {
+            "type": "string",
+            "description": "Interpretation"
           }
         },
         "required": [
@@ -962,25 +1306,37 @@
             "type": "string",
             "description": "ok | error"
           },
+          "method": {
+            "type": "string",
+            "description": "Confidence interval method"
+          },
+          "ci_lower": {
+            "type": "number",
+            "description": "Lower bound"
+          },
+          "ci_upper": {
+            "type": "number",
+            "description": "Upper bound"
+          },
+          "confidence": {
+            "type": "number",
+            "description": "Confidence level"
+          },
           "proportion": {
             "type": "number",
-            "description": "Observed proportion (successes/total)"
+            "description": "Observed proportion"
           },
-          "wilson_ci_lower": {
+          "n": {
             "type": "number",
-            "description": "Wilson CI lower bound"
+            "description": "Sample size"
           },
-          "wilson_ci_upper": {
+          "se": {
             "type": "number",
-            "description": "Wilson CI upper bound"
+            "description": "Standard error"
           },
-          "wald_ci_lower": {
+          "successes": {
             "type": "number",
-            "description": "Wald CI lower bound (for comparison)"
-          },
-          "wald_ci_upper": {
-            "type": "number",
-            "description": "Wald CI upper bound (for comparison)"
+            "description": "Number of successes"
           }
         },
         "required": [
@@ -1010,21 +1366,29 @@
             "type": "string",
             "description": "ok | error"
           },
+          "method": {
+            "type": "string",
+            "description": "Signal trend analysis"
+          },
           "slope": {
             "type": "number",
-            "description": "Regression slope"
+            "description": "Linear regression slope"
+          },
+          "intercept": {
+            "type": "number",
+            "description": "Linear regression intercept"
           },
           "r_squared": {
             "type": "number",
-            "description": "R-squared (goodness of fit)"
+            "description": "R-squared goodness of fit"
           },
-          "direction": {
+          "trend": {
             "type": "string",
-            "description": "increasing | decreasing | stable"
+            "description": "Increasing/Decreasing/Stable"
           },
-          "projected_next_period": {
-            "type": "number",
-            "description": "Projected score for next period"
+          "data_points": {
+            "type": "integer",
+            "description": "Number of data points"
           }
         },
         "required": [
