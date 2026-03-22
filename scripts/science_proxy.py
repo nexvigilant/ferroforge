@@ -471,7 +471,7 @@ def route(tool_name: str, args: dict) -> dict:
         return search_pubmed(f"{gene} protein-protein interaction network STRING", max_results=10)
 
     # PubMed search (general)
-    if tool_name in ("search-articles", "search-literature"):
+    if tool_name == "search-literature":
         return search_pubmed(args.get("query", ""), max_results=args.get("limit", 10))
 
     return {"status": "error", "message": f"Unknown science tool: {tool_name}"}

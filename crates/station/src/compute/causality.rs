@@ -4,19 +4,15 @@ use serde_json::{Value, json};
 
 pub fn handle(bare_name: &str, args: &Value) -> Option<Value> {
     match bare_name {
-        "naranjo-causality" => Some(naranjo(args)),
-        "who-umc-causality" => Some(who_umc(args)),
+        "naranjo-causality" | "assess-naranjo-causality" => Some(naranjo(args)),
+        "who-umc-causality" | "assess-who-umc-causality" => Some(who_umc(args)),
         "classify-seriousness" => Some(classify_seriousness(args)),
-        "case-completeness" => Some(case_completeness(args)),
-        "number-needed-harm" => Some(number_needed_harm(args)),
+        "case-completeness" | "score-case-completeness" => Some(case_completeness(args)),
+        "number-needed-harm" | "compute-number-needed-harm" => Some(number_needed_harm(args)),
         "assess-rucam" => Some(rucam(args)),
         "assess-severity" => Some(hartwig_siegel(args)),
         _ => None,
     }
-}
-
-fn get_i64(args: &Value, key: &str) -> Option<i64> {
-    args.get(key).and_then(|v| v.as_i64())
 }
 
 fn get_str<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
@@ -35,6 +31,28 @@ fn err(msg: &str) -> Value {
     json!({"status": "error", "message": msg})
 }
 
+/// Get a value from args, trying multiple key aliases.
+fn get_any<'a>(args: &'a Value, keys: &[&str]) -> Option<&'a Value> {
+    keys.iter().find_map(|k| args.get(*k).filter(|v| !v.is_null()))
+}
+
+/// Parse a yes/no/unknown answer from either bool or string input.
+/// Accepts: true/"yes"/"true" → "yes", false/"no"/"false" → "no", anything else → "unknown"
+fn parse_answer(v: &Value) -> &str {
+    if let Some(b) = v.as_bool() {
+        return if b { "yes" } else { "no" };
+    }
+    if let Some(s) = v.as_str() {
+        return match s {
+            "yes" | "true" => "yes",
+            "no" | "false" => "no",
+            "not_done" | "unknown" | "" => "unknown",
+            other => other, // Pass through for edge cases
+        };
+    }
+    "unknown"
+}
+
 /// Naranjo Adverse Drug Reaction Probability Scale.
 /// 10 questions, each scored +2/+1/0/-1.
 fn naranjo(args: &Value) -> Value {
@@ -49,42 +67,31 @@ fn naranjo(args: &Value) -> Value {
     // Q9: Patient had similar reaction previously? (+1 yes, 0 no, 0 unknown)
     // Q10: Confirmed by objective evidence? (+1 yes, 0 no, 0 unknown)
 
-    let questions = [
-        ("previous_reports", "Previous conclusive reports of this reaction?"),
-        ("ae_after_drug", "Did the AE appear after the drug was administered?"),
-        ("improved_on_discontinuation", "Did the AE improve when the drug was discontinued?"),
-        ("reappeared_on_readministration", "Did the AE reappear on re-administration?"),
-        ("alternative_causes", "Are there alternative causes that could explain the AE?"),
-        ("reaction_with_placebo", "Did the reaction appear when a placebo was given?"),
-        ("toxic_concentrations", "Was the drug detected in blood at toxic concentrations?"),
-        ("dose_response", "Was the reaction more severe with higher dose or less severe with lower dose?"),
-        ("similar_reaction_before", "Did the patient have a similar reaction to the same or similar drugs previously?"),
-        ("objective_evidence", "Was the reaction confirmed by any objective evidence?"),
-    ];
-
-    let score_map: [(i64, i64, i64); 10] = [
-        (1, 0, 0),    // Q1
-        (2, -1, 0),   // Q2
-        (1, 0, 0),    // Q3
-        (2, -1, 0),   // Q4
-        (-1, 2, 0),   // Q5
-        (-1, 1, 0),   // Q6
-        (1, 0, 0),    // Q7
-        (1, 0, 0),    // Q8
-        (1, 0, 0),    // Q9
-        (1, 0, 0),    // Q10
+    // Each question has: (aliases[], display_text, yes_score, no_score, unknown_score)
+    // Aliases cover both Rust-native and Python proxy parameter names
+    let questions: [(&[&str], &str, i64, i64, i64); 10] = [
+        (&["previous_reports"],                                     "Previous conclusive reports of this reaction?", 1, 0, 0),
+        (&["ae_after_drug", "after_drug"],                          "Did the AE appear after the drug was administered?", 2, -1, 0),
+        (&["improved_on_discontinuation", "improved_on_withdrawal"],"Did the AE improve when the drug was discontinued?", 1, 0, 0),
+        (&["reappeared_on_readministration", "reappeared_on_rechallenge"], "Did the AE reappear on re-administration?", 2, -1, 0),
+        (&["alternative_causes"],                                   "Are there alternative causes that could explain the AE?", -1, 2, 0),
+        (&["reaction_with_placebo", "placebo_reaction"],            "Did the reaction appear when a placebo was given?", -1, 1, 0),
+        (&["toxic_concentrations", "drug_detected"],                "Was the drug detected in blood at toxic concentrations?", 1, 0, 0),
+        (&["dose_response", "dose_related"],                        "Was the reaction more severe with higher dose or less severe with lower dose?", 1, 0, 0),
+        (&["similar_reaction_before", "previous_exposure"],         "Did the patient have a similar reaction to the same or similar drugs previously?", 1, 0, 0),
+        (&["objective_evidence"],                                   "Was the reaction confirmed by any objective evidence?", 1, 0, 0),
     ];
 
     let mut total_score = 0_i64;
     let mut details = Vec::new();
 
-    for (i, (key, question)) in questions.iter().enumerate() {
-        let answer = get_str(args, key).unwrap_or("unknown");
-        let (yes_score, no_score, unk_score) = score_map[i];
+    for (i, (aliases, question, yes_score, no_score, unk_score)) in questions.iter().enumerate() {
+        let raw_value = get_any(args, aliases);
+        let answer = raw_value.map_or("unknown", parse_answer);
         let score = match answer {
-            "yes" => yes_score,
-            "no" => no_score,
-            _ => unk_score,
+            "yes" => *yes_score,
+            "no" => *no_score,
+            _ => *unk_score,
         };
         total_score += score;
         details.push(json!({
@@ -105,6 +112,7 @@ fn naranjo(args: &Value) -> Value {
     json!({
         "status": "ok",
         "method": "naranjo",
+        "score": total_score,
         "total_score": total_score,
         "max_possible": 13,
         "category": category,
@@ -121,12 +129,19 @@ fn naranjo(args: &Value) -> Value {
 
 /// WHO-UMC causality assessment system.
 fn who_umc(args: &Value) -> Value {
-    let temporal = get_str(args, "temporal_relationship").unwrap_or("unknown");
-    let dechallenge = get_str(args, "dechallenge").unwrap_or("unknown");
-    let rechallenge = get_str(args, "rechallenge").unwrap_or("unknown");
-    let alternative = get_str(args, "alternative_causes").unwrap_or("unknown");
-    let known_response = get_bool(args, "known_response_pattern").unwrap_or(false);
-    let plausible = get_bool(args, "pharmacologically_plausible").unwrap_or(false);
+    // Accept both Rust-native and Python proxy parameter names, and both bool/string
+    let temporal = get_any(args, &["temporal_relationship"])
+        .map_or("unknown", parse_answer);
+    let dechallenge = get_any(args, &["dechallenge", "dechallenge_positive"])
+        .map_or("unknown", parse_answer);
+    let rechallenge = get_any(args, &["rechallenge", "rechallenge_positive"])
+        .map_or("unknown", parse_answer);
+    let alternative = get_any(args, &["alternative_causes", "alternative_explanation"])
+        .map_or("unknown", parse_answer);
+    let known_response = get_any(args, &["known_response_pattern", "known_response"])
+        .map_or(false, |v| v.as_bool().unwrap_or(parse_answer(v) == "yes"));
+    let plausible = get_any(args, &["pharmacologically_plausible", "sufficient_information"])
+        .map_or(false, |v| v.as_bool().unwrap_or(parse_answer(v) == "yes"));
 
     let category = if temporal == "yes" && dechallenge == "yes" && rechallenge == "yes"
         && alternative == "no" && known_response
@@ -175,12 +190,19 @@ fn who_umc(args: &Value) -> Value {
 
 /// ICH E2A seriousness classification.
 fn classify_seriousness(args: &Value) -> Value {
-    let death = get_bool(args, "death").unwrap_or(false);
-    let life_threatening = get_bool(args, "life_threatening").unwrap_or(false);
-    let hospitalization = get_bool(args, "hospitalization").unwrap_or(false);
-    let disability = get_bool(args, "disability").unwrap_or(false);
-    let congenital = get_bool(args, "congenital_anomaly").unwrap_or(false);
-    let medically_important = get_bool(args, "medically_important").unwrap_or(false);
+    // Accept both short names (Rust-native) and full ICH E2A names (Python proxy)
+    let death = get_any(args, &["death", "resulted_in_death"])
+        .and_then(|v| v.as_bool()).unwrap_or(false);
+    let life_threatening = get_any(args, &["life_threatening"])
+        .and_then(|v| v.as_bool()).unwrap_or(false);
+    let hospitalization = get_any(args, &["hospitalization", "required_hospitalization"])
+        .and_then(|v| v.as_bool()).unwrap_or(false);
+    let disability = get_any(args, &["disability", "resulted_in_disability"])
+        .and_then(|v| v.as_bool()).unwrap_or(false);
+    let congenital = get_any(args, &["congenital_anomaly"])
+        .and_then(|v| v.as_bool()).unwrap_or(false);
+    let medically_important = get_any(args, &["medically_important"])
+        .and_then(|v| v.as_bool()).unwrap_or(false);
 
     let is_serious = death || life_threatening || hospitalization
         || disability || congenital || medically_important;

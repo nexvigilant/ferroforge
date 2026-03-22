@@ -12,18 +12,18 @@ use serde_json::{Value, json};
 
 pub fn handle(bare_name: &str, args: &Value) -> Option<Value> {
     match bare_name {
-        "prr" => Some(prr(args)),
-        "ror" => Some(ror(args)),
-        "ic" => Some(ic(args)),
-        "ebgm" => Some(ebgm(args)),
-        "disproportionality-table" => Some(disproportionality_table(args)),
-        "signal-strength" => Some(signal_strength(args)),
-        "reporting-rate" => Some(reporting_rate(args)),
-        "signal-half-life" => Some(signal_half_life(args)),
-        "signal-trend" => Some(signal_trend(args)),
-        "expectedness" => Some(expectedness(args)),
-        "time-to-onset" => Some(time_to_onset(args)),
-        "batch-signals" => Some(batch_signals(args)),
+        "prr" | "compute-prr" => Some(prr(args)),
+        "ror" | "compute-ror" => Some(ror(args)),
+        "ic" | "compute-ic" => Some(ic(args)),
+        "ebgm" | "compute-ebgm" => Some(ebgm(args)),
+        "disproportionality-table" | "compute-disproportionality-table" => Some(disproportionality_table(args)),
+        "signal-strength" | "compute-signal-strength" => Some(signal_strength(args)),
+        "reporting-rate" | "compute-reporting-rate" => Some(reporting_rate(args)),
+        "signal-half-life" | "compute-signal-half-life" => Some(signal_half_life(args)),
+        "signal-trend" | "compute-signal-trend" => Some(signal_trend(args)),
+        "expectedness" | "compute-expectedness" => Some(expectedness(args)),
+        "time-to-onset" | "compute-time-to-onset" => Some(time_to_onset(args)),
+        "batch-signals" | "compute-batch-signals" => Some(batch_signals(args)),
         _ => None,
     }
 }
@@ -357,10 +357,15 @@ fn disproportionality_table(args: &Value) -> Value {
         },
         "any_signal": any_signal,
         "signal_count": signal_count,
+        "signals_detected": signal_count,
         "consensus": if signal_count >= 3 { "strong" }
             else if signal_count >= 2 { "moderate" }
             else if signal_count >= 1 { "weak" }
-            else { "none" }
+            else { "none" },
+        "consensus_signal": if signal_count >= 3 { "strong_signal" }
+            else if signal_count >= 2 { "moderate_signal" }
+            else if signal_count >= 1 { "weak_signal" }
+            else { "no_signal" }
     })
 }
 
@@ -434,11 +439,51 @@ fn reporting_rate(args: &Value) -> Value {
     })
 }
 
-/// Signal half-life: time for PRR to decay by 50% based on trend data.
+/// Signal half-life: time for PRR to decay by 50%.
+///
+/// Two input modes:
+/// 1. Direct: `{initial_signal_strength, decay_rate}` → exponential decay formula
+/// 2. Time-series: `{periods: [{time, prr}]}` → log-linear regression
 fn signal_half_life(args: &Value) -> Value {
+    // Mode 1: Direct exponential decay parameters (Python proxy compatibility)
+    if let (Some(initial), Some(decay_rate)) = (
+        get_f64(args, "initial_signal_strength"),
+        get_f64(args, "decay_rate"),
+    ) {
+        if decay_rate <= 0.0 {
+            return err("decay_rate must be positive");
+        }
+        let half_life = 0.693147 / decay_rate;
+        let threshold = get_f64(args, "detection_threshold").unwrap_or(1.0);
+        let months_until = if initial > threshold && decay_rate > 0.0 {
+            (initial / threshold).ln() / decay_rate
+        } else {
+            0.0
+        };
+        let mut projections = serde_json::Map::new();
+        for months in [6.0, 12.0, 24.0] {
+            let value = initial * (-decay_rate * months).exp();
+            projections.insert(
+                format!("{}_months", months as u32),
+                json!({"value": (value * 10000.0).round() / 10000.0, "above_threshold": value > threshold}),
+            );
+        }
+        return json!({
+            "status": "ok",
+            "method": "signal_half_life",
+            "half_life_months": (half_life * 100.0).round() / 100.0,
+            "months_until_undetectable": (months_until * 100.0).round() / 100.0,
+            "initial_signal_strength": initial,
+            "decay_rate": decay_rate,
+            "detection_threshold": threshold,
+            "projections": projections
+        });
+    }
+
+    // Mode 2: Time-series regression
     let periods = match args.get("periods").and_then(|v| v.as_array()) {
         Some(a) if a.len() >= 2 => a,
-        _ => return err("Need at least 2 periods with 'time' and 'prr' fields"),
+        _ => return err("Need 'initial_signal_strength' + 'decay_rate', or 'periods' array with 'time' and 'prr' fields"),
     };
 
     let data: Vec<(f64, f64)> = periods

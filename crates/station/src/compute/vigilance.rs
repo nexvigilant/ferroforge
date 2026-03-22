@@ -16,6 +16,7 @@ pub fn handle(bare_name: &str, args: &Value) -> Option<Value> {
         "harm-types" => Some(harm_types(args)),
         "harm-classify" => Some(harm_classify(args)),
         "map-to-tov" => Some(map_to_tov(args)),
+        "benefit-risk" | "compute-benefit-risk" => Some(benefit_risk(args)),
         _ => None,
     }
 }
@@ -424,5 +425,60 @@ fn map_to_tov(args: &Value) -> Value {
             {"level": 8, "safety": "Regulatory",      "tov": "Population"}
         ],
         "reference": "Theory of Vigilance — 8-level safety abstraction hierarchy"
+    })
+}
+
+/// NexVigilant QBR: benefit = efficacy × population, risk = severity × frequency × (1 - detectability × 0.5)
+fn benefit_risk(args: &Value) -> Value {
+    let efficacy = match get_f64(args, "efficacy_score") {
+        Some(v) if (0.0..=1.0).contains(&v) => v,
+        _ => return json!({"status": "error", "message": "efficacy_score required (0-1)"}),
+    };
+    let population = match get_f64(args, "population_impact") {
+        Some(v) if (0.0..=1.0).contains(&v) => v,
+        _ => return json!({"status": "error", "message": "population_impact required (0-1)"}),
+    };
+    let severity = match get_f64(args, "risk_severity") {
+        Some(v) if (0.0..=1.0).contains(&v) => v,
+        _ => return json!({"status": "error", "message": "risk_severity required (0-1)"}),
+    };
+    let frequency = match get_f64(args, "risk_frequency") {
+        Some(v) if (0.0..=1.0).contains(&v) => v,
+        _ => return json!({"status": "error", "message": "risk_frequency required (0-1)"}),
+    };
+    let detectability = get_f64(args, "risk_detectability").unwrap_or(0.5).clamp(0.0, 1.0);
+
+    let benefit = efficacy * population;
+    let risk = severity * frequency * (1.0 - detectability * 0.5);
+    let ratio = if risk > 0.0 { benefit / risk } else { f64::INFINITY };
+
+    let assessment = if ratio >= 5.0 {
+        "favorable"
+    } else if ratio >= 2.0 {
+        "acceptable"
+    } else if ratio >= 1.0 {
+        "borderline"
+    } else {
+        "unfavorable"
+    };
+
+    json!({
+        "status": "ok",
+        "method": "NexVigilant QBR",
+        "benefit_score": (benefit * 10000.0).round() / 10000.0,
+        "risk_score": (risk * 10000.0).round() / 10000.0,
+        "benefit_risk_ratio": (ratio * 100.0).round() / 100.0,
+        "assessment": assessment,
+        "components": {
+            "efficacy_score": efficacy,
+            "population_impact": population,
+            "risk_severity": severity,
+            "risk_frequency": frequency,
+            "risk_detectability": detectability
+        },
+        "interpretation": format!(
+            "Benefit ({:.4}) vs Risk ({:.4}) yields ratio {:.2} — {}",
+            benefit, risk, ratio, assessment
+        )
     })
 }

@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 pub fn handle(bare_name: &str, args: &Value) -> Option<Value> {
     match bare_name {
-        "confidence-interval" => Some(confidence_interval(args)),
+        "confidence-interval" | "compute-confidence-interval" => Some(confidence_interval(args)),
         "p-value" => Some(p_value(args)),
         "z-test" => Some(z_test(args)),
         "bayesian-update" => Some(bayesian_update(args)),

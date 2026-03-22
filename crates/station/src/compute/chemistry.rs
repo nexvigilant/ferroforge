@@ -339,8 +339,10 @@ fn binding_affinity(args: &Value) -> Value {
 
     if let Some(lt) = ligand {
         let occupancy = lt / (kd + lt);
-        result.as_object_mut().unwrap().insert("fractional_occupancy".into(), json!(occupancy));
-        result.as_object_mut().unwrap().insert("percent_bound".into(), json!(occupancy * 100.0));
+        if let Some(obj) = result.as_object_mut() {
+            obj.insert("fractional_occupancy".into(), json!(occupancy));
+            obj.insert("percent_bound".into(), json!(occupancy * 100.0));
+        }
     }
 
     result
