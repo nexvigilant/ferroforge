@@ -181,7 +181,8 @@ pub async fn run_combined(
 
 async fn handle_sse(
     State(state): State<Arc<AppState>>,
-) -> Sse<impl tokio_stream::Stream<Item = Result<Event, axum::Error>>> {
+) -> impl axum::response::IntoResponse {
+    let headers = crate::SSE_STREAM_HEADERS;
     let session_id = Uuid::new_v4().to_string();
     let (tx, rx) = mpsc::channel::<Result<Event, axum::Error>>(32);
 
@@ -199,7 +200,7 @@ async fn handle_sse(
         let sessions = state.sessions.lock().await;
         if sessions.len() >= MAX_SESSIONS {
             warn!(count = sessions.len(), max = MAX_SESSIONS, "Session cap reached, rejecting");
-            return Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default());
+            return (headers, Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default()));
         }
     }
 
@@ -229,7 +230,7 @@ async fn handle_sse(
         }
     });
 
-    Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default())
+    (headers, Sse::new(ReceiverStream::new(rx)).keep_alive(KeepAlive::default()))
 }
 
 #[derive(serde::Deserialize)]

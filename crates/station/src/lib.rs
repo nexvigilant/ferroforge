@@ -1,3 +1,11 @@
+/// Headers that disable response buffering for SSE streams.
+/// Cloud Run and reverse proxies (nginx) buffer by default, which
+/// prevents SSE events from streaming incrementally to the client.
+pub const SSE_STREAM_HEADERS: [(&str, &str); 2] = [
+    ("X-Accel-Buffering", "no"),
+    ("Cache-Control", "no-cache, no-transform"),
+];
+
 pub mod auth;
 pub mod compute;
 pub mod config;
