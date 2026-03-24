@@ -1,0 +1,122 @@
+name: elastic-equilibrium
+description: 'Flywheel material elastic equilibrium classifier. FATIGUE_FAILURE_IMMINENT (cycles > limit, takes priority), YIELD_EXCEEDED (stress >= yield_point), NOMINAL (within elastic range). Requires pre-computed fatigue_exceeded (1=exceeded, 0=ok) and stress_exceeded (1=at-or-above-yield, 0=ok).'
+version: 0.1.0
+interface:
+  inputs:
+    stress:
+      type: float
+      required: false
+    yield_point:
+      type: float
+      required: false
+    fatigue_cycles:
+      type: int
+      required: false
+    fatigue_limit:
+      type: int
+      required: false
+    fatigue_exceeded:
+      type: int
+      required: false
+    stress_exceeded:
+      type: int
+      required: false
+  outputs:
+    state:
+      type: string
+tree:
+  start: check_fatigue
+  nodes:
+    check_fatigue:
+      type: condition
+      variable: fatigue_exceeded
+      operator: gte
+      value: 1
+      true_next: fatigue_failure_imminent
+      false_next: check_yield
+    check_yield:
+      type: condition
+      variable: stress_exceeded
+      operator: gte
+      value: 1
+      true_next: yield_exceeded
+      false_next: nominal
+    fatigue_failure_imminent:
+      type: return
+      value:
+        state: fatigue_failure_imminent
+    yield_exceeded:
+      type: return
+      value:
+        state: yield_exceeded
+    nominal:
+      type: return
+      value:
+        state: nominal
+tests:
+- input:
+    stress: 50.0
+    yield_point: 100.0
+    fatigue_cycles: 100
+    fatigue_limit: 1000
+    fatigue_exceeded: 0
+    stress_exceeded: 0
+  expect:
+    state: nominal
+- input:
+    stress: 150.0
+    yield_point: 100.0
+    fatigue_cycles: 100
+    fatigue_limit: 1000
+    fatigue_exceeded: 0
+    stress_exceeded: 1
+  expect:
+    state: yield_exceeded
+- input:
+    stress: 50.0
+    yield_point: 100.0
+    fatigue_cycles: 1500
+    fatigue_limit: 1000
+    fatigue_exceeded: 1
+    stress_exceeded: 0
+  expect:
+    state: fatigue_failure_imminent
+- input:
+    stress: 0.0
+    yield_point: 100.0
+    fatigue_cycles: 0
+    fatigue_limit: 1000
+    fatigue_exceeded: 0
+    stress_exceeded: 0
+  expect:
+    state: nominal
+- input:
+    stress: 100.0
+    yield_point: 100.0
+    fatigue_cycles: 0
+    fatigue_limit: 1000
+    fatigue_exceeded: 0
+    stress_exceeded: 1
+  expect:
+    state: yield_exceeded
+- input:
+    stress: 200.0
+    yield_point: 100.0
+    fatigue_cycles: 2000
+    fatigue_limit: 1000
+    fatigue_exceeded: 1
+    stress_exceeded: 1
+  expect:
+    state: fatigue_failure_imminent
+- input:
+    stress: 75.0
+    yield_point: 100.0
+    fatigue_cycles: 500
+    fatigue_limit: 1000
+    fatigue_exceeded: 0
+    stress_exceeded: 0
+  expect:
+    state: nominal
+- input: {}
+  expect:
+    state: nominal

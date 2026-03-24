@@ -1,0 +1,87 @@
+name: adapt-evidence-to-signal
+description: "Adapter: convert evidence_strength from pubmed/literature configmigrams to signal pipeline inputs"
+version: 0.1.0
+
+interface:
+  inputs:
+    evidence_strength:
+      type: string
+      required: false
+      description: "From config-pubmed-signal-strength: strong, moderate, emerging, weak, absent"
+  outputs:
+    signal_detected:
+      type: bool
+    prr:
+      type: float
+
+tree:
+  start: check_evidence
+  nodes:
+    check_evidence:
+      type: condition
+      variable: evidence_strength
+      operator: is_null
+      true_next: no_evidence
+      false_next: check_strong
+
+    check_strong:
+      type: condition
+      variable: evidence_strength
+      operator: eq
+      value: "strong"
+      true_next: strong_out
+      false_next: check_moderate
+
+    check_moderate:
+      type: condition
+      variable: evidence_strength
+      operator: eq
+      value: "moderate"
+      true_next: moderate_out
+      false_next: check_emerging
+
+    check_emerging:
+      type: condition
+      variable: evidence_strength
+      operator: eq
+      value: "emerging"
+      true_next: emerging_out
+      false_next: no_evidence
+
+    strong_out:
+      type: return
+      value:
+        signal_detected: true
+        prr: 5.0
+
+    moderate_out:
+      type: return
+      value:
+        signal_detected: true
+        prr: 3.0
+
+    emerging_out:
+      type: return
+      value:
+        signal_detected: true
+        prr: 2.0
+
+    no_evidence:
+      type: return
+      value:
+        signal_detected: false
+        prr: 0.5
+
+tests:
+  - input: { evidence_strength: "strong" }
+    expect: { signal_detected: true, prr: 5.0 }
+  - input: { evidence_strength: "moderate" }
+    expect: { signal_detected: true, prr: 3.0 }
+  - input: { evidence_strength: "emerging" }
+    expect: { signal_detected: true, prr: 2.0 }
+  - input: { evidence_strength: "weak" }
+    expect: { signal_detected: false, prr: 0.5 }
+  - input: { evidence_strength: "absent" }
+    expect: { signal_detected: false, prr: 0.5 }
+  - input: {}
+    expect: { signal_detected: false, prr: 0.5 }

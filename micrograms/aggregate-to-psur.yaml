@@ -1,0 +1,154 @@
+name: aggregate-to-psur
+description: Routes aggregate data assessment to PSUR section assignment and prioritization
+version: 0.1.0
+tree:
+  start: check_data_type
+  nodes:
+    check_interval:
+      type: condition
+      variable: data_type
+      operator: eq
+      value: interval
+      true_next: check_new_signal_interval
+      false_next: both_data_type
+    interval_no_new_signal:
+      type: return
+      value:
+        psur_section: periodic_update
+        priority_flag: false
+        rationale: Interval data without new signals assigned to routine periodic
+          update section
+    check_data_type:
+      type: condition
+      variable: data_type
+      operator: eq
+      value: cumulative
+      true_next: check_new_signal_cumulative
+      false_next: check_interval
+    both_new_signal:
+      type: return
+      value:
+        priority_flag: true
+        psur_section: comprehensive_safety_review
+        rationale: Both cumulative and interval data with new signals require comprehensive
+          priority review
+    cumulative_no_new_signal:
+      type: return
+      value:
+        rationale: Cumulative data without new signals follows routine periodic update
+          section
+        priority_flag: false
+        psur_section: periodic_safety_update
+    both_data_type:
+      type: condition
+      variable: has_new_signal
+      operator: eq
+      value: true
+      true_next: both_new_signal
+      false_next: both_no_new_signal
+    both_no_new_signal:
+      type: return
+      value:
+        rationale: Both data types without new signals follow routine update procedures
+        priority_flag: false
+        psur_section: routine_update
+    interval_new_signal:
+      type: return
+      value:
+        priority_flag: true
+        psur_section: safety_specification
+        rationale: Interval data with new signals requires priority discussion in
+          safety specification section
+    check_new_signal_cumulative:
+      type: condition
+      variable: has_new_signal
+      operator: eq
+      value: true
+      true_next: cumulative_new_signal
+      false_next: cumulative_no_new_signal
+    check_new_signal_interval:
+      type: condition
+      variable: has_new_signal
+      operator: eq
+      value: true
+      true_next: interval_new_signal
+      false_next: interval_no_new_signal
+    cumulative_new_signal:
+      type: return
+      value:
+        psur_section: safety_update
+        priority_flag: true
+        rationale: Cumulative data with new signals requires priority review in safety
+          update section
+tests:
+- input:
+    data_type: ''
+    has_new_signal: false
+  expect:
+    rationale: Both data types without new signals follow routine update procedures
+    priority_flag: false
+    psur_section: routine_update
+- input:
+    data_type: ''
+    has_new_signal: true
+  expect:
+    priority_flag: true
+    psur_section: comprehensive_safety_review
+    rationale: Both cumulative and interval data with new signals require comprehensive
+      priority review
+- input:
+    data_type: cumulative
+    has_new_signal: false
+  expect:
+    rationale: Cumulative data without new signals follows routine periodic update
+      section
+    priority_flag: false
+    psur_section: periodic_safety_update
+- input:
+    data_type: cumulative
+    has_new_signal: true
+  expect:
+    psur_section: safety_update
+    priority_flag: true
+    rationale: Cumulative data with new signals requires priority review in safety
+      update section
+- input:
+    data_type: interval
+    has_new_signal: false
+  expect:
+    psur_section: periodic_update
+    priority_flag: false
+    rationale: Interval data without new signals assigned to routine periodic update
+      section
+- input:
+    data_type: interval
+    has_new_signal: true
+  expect:
+    priority_flag: true
+    psur_section: safety_specification
+    rationale: Interval data with new signals requires priority discussion in safety
+      specification section
+- input: {}
+  expect:
+    rationale: Both data types without new signals follow routine update procedures
+    priority_flag: false
+    psur_section: routine_update
+interface:
+  inputs:
+    data_type:
+      type: string
+      required: true
+    has_new_signal:
+      type: boolean
+      required: true
+  outputs:
+    rationale:
+      type: string
+      required: false
+    psur_section:
+      type: string
+      required: false
+    priority_flag:
+      type: boolean
+      required: false
+  aliases: {}

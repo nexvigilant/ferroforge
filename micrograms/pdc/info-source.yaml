@@ -1,0 +1,191 @@
+name: info-source
+description: "Domain 15: Route to information source type by data need — literature, regulatory databases, RWD, social media, genomic, digital health."
+version: 0.1.0
+interface:
+  inputs:
+    source_type:
+      type: string
+      required: false
+  outputs:
+    access:
+      type: string
+    ai_assist:
+      type: string
+    approach:
+      type: string
+    bias_risk:
+      type: string
+    databases:
+      type: string
+    framework:
+      type: string
+    quality:
+      type: string
+    search_tip:
+      type: string
+    source:
+      type: string
+tree:
+  start: check_type
+  nodes:
+    check_type:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: literature
+      true_next: literature
+      false_next: check_regulatory
+    check_regulatory:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: regulatory_database
+      true_next: regulatory_db
+      false_next: check_rwd
+    check_rwd:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: real_world_data
+      true_next: rwd
+      false_next: check_social
+    check_social:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: social_media
+      true_next: social_media
+      false_next: check_genomic
+    check_genomic:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: genomic
+      true_next: genomic
+      false_next: check_digital
+    check_digital:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: digital_health
+      true_next: digital_health
+      false_next: check_grey
+    check_grey:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: grey_literature
+      true_next: grey_literature
+      false_next: multi_source
+    literature:
+      type: return
+      value:
+        source: SCIENTIFIC_LITERATURE
+        databases: "PubMed, Embase, Cochrane Library, Web of Science"
+        quality: "peer-reviewed, highest evidence credibility"
+        access: "subscription/open access, institutional licenses"
+        bias_risk: "publication bias, positive result bias, language bias"
+        ai_assist: "automated monitoring, relevance ranking, NLP extraction, systematic review acceleration"
+        search_tip: "use MeSH/Emtree controlled vocabulary + free text, document strategy for reproducibility"
+    regulatory_db:
+      type: return
+      value:
+        source: REGULATORY_DATABASE
+        databases: "FAERS, EudraVigilance, VigiBase, JADER, Canada Vigilance"
+        quality: "standardized reporting, variable completeness, reporter-dependent"
+        access: "public (FAERS, adrreports.eu) or restricted (VigiBase, EV)"
+        bias_risk: "reporting bias, stimulated reporting, Weber effect, underreporting"
+        ai_assist: "disproportionality analysis, duplicate detection, trend monitoring"
+        search_tip: "understand reporting biases before interpreting — not all signals are real"
+    rwd:
+      type: return
+      value:
+        source: REAL_WORLD_DATA
+        databases: "EHR systems, claims databases, patient registries, linked datasets"
+        quality: "large populations, longitudinal, but collected for non-research purposes"
+        access: "data use agreements, IRB/ethics approval, privacy compliance"
+        bias_risk: "selection bias, misclassification, confounding by indication, missing data"
+        ai_assist: "NLP for outcome phenotyping, ML cohort identification, causal inference"
+        search_tip: "validate outcome definitions — codes alone are not diagnoses"
+    social_media:
+      type: return
+      value:
+        source: SOCIAL_MEDIA
+        databases: "Twitter/X, patient forums, Reddit, Facebook groups, health apps"
+        quality: "unverified, unstructured, but captures patient experience"
+        access: "API access, web scraping, social listening platforms"
+        bias_risk: "self-selection, no verification, context loss, demographic skew"
+        ai_assist: "NLP for AE extraction, sentiment analysis, trend detection"
+        search_tip: "supplement, never replace — social media signals need clinical validation"
+    genomic:
+      type: return
+      value:
+        source: GENOMIC_BIOMARKER
+        databases: "PharmGKB, ClinVar, CPIC, dbSNP, 1000 Genomes"
+        quality: "curated genetic variant databases, evidence-graded"
+        access: "mostly open access, some institutional"
+        bias_risk: "population representation bias, variant interpretation uncertainty"
+        ai_assist: "pharmacogenomic risk prediction, variant classification, interaction modeling"
+        search_tip: "check CPIC guidelines for clinically actionable pharmacogenomic associations"
+    digital_health:
+      type: return
+      value:
+        source: DIGITAL_HEALTH
+        databases: "wearable device data, mHealth apps, digital therapeutics, IoT medical devices"
+        quality: "continuous monitoring, high volume, variable validation"
+        access: "device manufacturer partnerships, research collaborations"
+        bias_risk: "device accuracy, user compliance, digital divide"
+        ai_assist: "real-time monitoring, pattern detection, anomaly alerts"
+        search_tip: "emerging source — establish validation framework before relying on signals"
+    grey_literature:
+      type: return
+      value:
+        source: GREY_LITERATURE
+        databases: "conference abstracts, regulatory docs, HTA reports, industry white papers"
+        quality: "variable, limited peer review, potential publication bias countermeasure"
+        access: "conference proceedings, regulatory websites, industry contacts"
+        bias_risk: "limited peer review, selective reporting, access barriers"
+        ai_assist: "automated conference monitoring, document classification"
+        search_tip: "valuable for emerging data not yet published — verify with primary sources when available"
+    multi_source:
+      type: return
+      value:
+        source: MULTI_SOURCE
+        approach: "combine multiple source types for comprehensive safety assessment"
+        framework: "literature + regulatory + RWD = triangulation of evidence"
+        ai_assist: "cross-source integration, network analysis, knowledge graphs"
+        search_tip: "no single source is sufficient — triangulate across source types"
+tests:
+- input:
+    source_type: literature
+  expect:
+    source: SCIENTIFIC_LITERATURE
+    databases: "PubMed, Embase, Cochrane Library, Web of Science"
+- input:
+    source_type: regulatory_database
+  expect:
+    source: REGULATORY_DATABASE
+- input:
+    source_type: real_world_data
+  expect:
+    source: REAL_WORLD_DATA
+- input:
+    source_type: social_media
+  expect:
+    source: SOCIAL_MEDIA
+    search_tip: "supplement, never replace — social media signals need clinical validation"
+- input:
+    source_type: genomic
+  expect:
+    source: GENOMIC_BIOMARKER
+- input:
+    source_type: digital_health
+  expect:
+    source: DIGITAL_HEALTH
+- input:
+    source_type: grey_literature
+  expect:
+    source: GREY_LITERATURE
+- input: {}
+  expect:
+    source: MULTI_SOURCE

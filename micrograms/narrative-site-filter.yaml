@@ -1,0 +1,256 @@
+name: narrative-site-filter
+description: "Gate 2 of narrative safe-extract: detect clinical trial site identifiers, institution names, and investigator details that could compromise trial blinding or reveal proprietary relationships"
+version: 0.1.0
+interface:
+  inputs:
+    has_site_number:
+      type: bool
+      required: false
+    has_institution_name:
+      type: bool
+      required: false
+    has_investigator_name:
+      type: bool
+      required: false
+    has_irb_identifier:
+      type: bool
+      required: false
+    has_protocol_number:
+      type: bool
+      required: false
+    is_blinded_study:
+      type: bool
+      required: false
+  outputs:
+    site_id_detected:
+      type: bool
+    risk_level:
+      type: string
+    gate_pass:
+      type: bool
+    action:
+      type: string
+    detected_categories:
+      type: string
+tree:
+  start: check_blinded
+  nodes:
+    check_blinded:
+      type: condition
+      variable: is_blinded_study
+      operator: eq
+      value: true
+      true_next: blinded_site_check
+      false_next: open_site_check
+    blinded_site_check:
+      type: condition
+      variable: has_site_number
+      operator: eq
+      value: true
+      true_next: critical_unblinding
+      false_next: blinded_institution_check
+    blinded_institution_check:
+      type: condition
+      variable: has_institution_name
+      operator: eq
+      value: true
+      true_next: critical_unblinding
+      false_next: blinded_investigator_check
+    blinded_investigator_check:
+      type: condition
+      variable: has_investigator_name
+      operator: eq
+      value: true
+      true_next: critical_unblinding
+      false_next: check_irb
+    critical_unblinding:
+      type: return
+      value:
+        site_id_detected: true
+        risk_level: CRITICAL
+        gate_pass: false
+        action: "BLOCK — site identifier in blinded study risks unblinding"
+        detected_categories: "unblinding_risk"
+    open_site_check:
+      type: condition
+      variable: has_site_number
+      operator: eq
+      value: true
+      true_next: check_investigator_with_site
+      false_next: check_institution_open
+    check_investigator_with_site:
+      type: condition
+      variable: has_investigator_name
+      operator: eq
+      value: true
+      true_next: high_site_exposure
+      false_next: moderate_site_number
+    check_institution_open:
+      type: condition
+      variable: has_institution_name
+      operator: eq
+      value: true
+      true_next: check_investigator_with_institution
+      false_next: check_investigator_alone
+    check_investigator_with_institution:
+      type: condition
+      variable: has_investigator_name
+      operator: eq
+      value: true
+      true_next: high_site_exposure
+      false_next: moderate_institution
+    check_investigator_alone:
+      type: condition
+      variable: has_investigator_name
+      operator: eq
+      value: true
+      true_next: moderate_investigator
+      false_next: check_irb
+    check_irb:
+      type: condition
+      variable: has_irb_identifier
+      operator: eq
+      value: true
+      true_next: low_irb
+      false_next: check_protocol
+    check_protocol:
+      type: condition
+      variable: has_protocol_number
+      operator: eq
+      value: true
+      true_next: low_protocol
+      false_next: no_site_ids
+    high_site_exposure:
+      type: return
+      value:
+        site_id_detected: true
+        risk_level: HIGH
+        gate_pass: false
+        action: "BLOCK — site + investigator combination enables site identification"
+        detected_categories: "site_investigator_pair"
+    moderate_site_number:
+      type: return
+      value:
+        site_id_detected: true
+        risk_level: MODERATE
+        gate_pass: false
+        action: "BLOCK — site number present, replace with generic identifier"
+        detected_categories: "site_number"
+    moderate_institution:
+      type: return
+      value:
+        site_id_detected: true
+        risk_level: MODERATE
+        gate_pass: false
+        action: "BLOCK — institution name present, generalize to region"
+        detected_categories: "institution"
+    moderate_investigator:
+      type: return
+      value:
+        site_id_detected: true
+        risk_level: MODERATE
+        gate_pass: false
+        action: "BLOCK — investigator name present, remove"
+        detected_categories: "investigator"
+    low_irb:
+      type: return
+      value:
+        site_id_detected: true
+        risk_level: LOW
+        gate_pass: false
+        action: "REVIEW — IRB identifier may enable site identification"
+        detected_categories: "irb_id"
+    low_protocol:
+      type: return
+      value:
+        site_id_detected: true
+        risk_level: LOW
+        gate_pass: true
+        action: "PASS with note — protocol numbers are generally acceptable in regulatory submissions"
+        detected_categories: "protocol_number"
+    no_site_ids:
+      type: return
+      value:
+        site_id_detected: false
+        risk_level: NONE
+        gate_pass: true
+        action: "PASS — no site identifiers detected"
+        detected_categories: "none"
+tests:
+- input:
+    is_blinded_study: true
+    has_site_number: true
+  expect:
+    site_id_detected: true
+    risk_level: CRITICAL
+    gate_pass: false
+- input:
+    is_blinded_study: true
+    has_institution_name: true
+  expect:
+    site_id_detected: true
+    risk_level: CRITICAL
+    gate_pass: false
+- input:
+    is_blinded_study: true
+    has_investigator_name: true
+  expect:
+    risk_level: CRITICAL
+    gate_pass: false
+- input:
+    is_blinded_study: true
+  expect:
+    gate_pass: true
+    risk_level: NONE
+- input:
+    has_site_number: true
+    has_investigator_name: true
+  expect:
+    risk_level: HIGH
+    gate_pass: false
+- input:
+    has_site_number: true
+  expect:
+    risk_level: MODERATE
+    gate_pass: false
+- input:
+    has_institution_name: true
+    has_investigator_name: true
+  expect:
+    risk_level: HIGH
+    gate_pass: false
+- input:
+    has_institution_name: true
+  expect:
+    risk_level: MODERATE
+    gate_pass: false
+- input:
+    has_investigator_name: true
+  expect:
+    risk_level: MODERATE
+    gate_pass: false
+- input:
+    has_irb_identifier: true
+  expect:
+    risk_level: LOW
+    gate_pass: false
+- input:
+    has_protocol_number: true
+  expect:
+    risk_level: LOW
+    gate_pass: true
+- input: {}
+  expect:
+    site_id_detected: false
+    risk_level: NONE
+    gate_pass: true
+- input:
+    is_blinded_study: false
+    has_site_number: false
+    has_institution_name: false
+    has_investigator_name: false
+    has_irb_identifier: false
+    has_protocol_number: false
+  expect:
+    gate_pass: true
+    risk_level: NONE

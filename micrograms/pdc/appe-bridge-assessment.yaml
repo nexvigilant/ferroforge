@@ -1,0 +1,226 @@
+name: appe-bridge-assessment
+description: "APPE Ch7.6: APPE-to-Fellowship bridge assessment. Routes to Fellowship, Industry, or ContinuingEd. Chains from appe-integration-scorer and level-gate."
+version: 0.1.0
+interface:
+  inputs:
+    d1_level:
+      type: int
+      required: false
+    d2_level:
+      type: float
+      required: false
+    d3_level:
+      type: int
+      required: false
+    growth_evidence_score:
+      type: float
+      required: false
+    integration_score:
+      type: int
+      required: false
+    learning_agility_score:
+      type: float
+      required: false
+  outputs:
+    alternative:
+      type: string
+    application_strength:
+      type: string
+    career_plan:
+      type: string
+    confidence:
+      type: string
+    development_area:
+      type: string
+    fellowship_ready:
+      type: bool
+    pathway:
+      type: string
+    plan:
+      type: string
+    pre_fellowship_plan:
+      type: string
+    recommendation:
+      type: string
+    strengths:
+      type: string
+tree:
+  start: check_d1
+  nodes:
+    # Domain mastery gates — all must be L2
+    check_d1:
+      type: condition
+      variable: d1_level
+      operator: gte
+      value: 2
+      true_next: check_d2
+      false_next: not_ready_domains
+    check_d2:
+      type: condition
+      variable: d2_level
+      operator: gte
+      value: 2
+      true_next: check_d3
+      false_next: not_ready_domains
+    check_d3:
+      type: condition
+      variable: d3_level
+      operator: gte
+      value: 2
+      true_next: check_integration
+      false_next: not_ready_domains
+
+    # Integration module gate
+    check_integration:
+      type: condition
+      variable: integration_score
+      operator: gte
+      value: 3
+      true_next: check_agility
+      false_next: check_integration_partial
+
+    check_integration_partial:
+      type: condition
+      variable: integration_score
+      operator: gte
+      value: 2
+      true_next: industry_ready
+      false_next: continuing_ed
+
+    # Learning agility check
+    check_agility:
+      type: condition
+      variable: learning_agility_score
+      operator: gte
+      value: 3.5
+      true_next: check_growth
+      false_next: check_agility_mid
+
+    check_agility_mid:
+      type: condition
+      variable: learning_agility_score
+      operator: gte
+      value: 2.5
+      true_next: fellowship_possible
+      false_next: industry_ready
+
+    # Growth evidence check
+    check_growth:
+      type: condition
+      variable: growth_evidence_score
+      operator: gte
+      value: 3.5
+      true_next: fellowship_strong
+      false_next: fellowship_ready
+
+    # Outcome nodes
+    fellowship_strong:
+      type: return
+      value:
+        pathway: FELLOWSHIP
+        confidence: HIGH
+        fellowship_ready: true
+        recommendation: "Strong Fellowship candidate. Meets all L2 anchors, exemplary integration, high agility."
+        pre_fellowship_plan:
+          months_1_3: "Advanced PV reading + professional organization involvement"
+          months_4_6: "Epidemiology/biostatistics coursework + conference presentation"
+        application_strength: "Behavioral evidence portfolio, Foundation-Communication mastery, growth trajectory"
+        alternative: "Could also excel in direct industry entry at advanced level"
+
+    fellowship_ready:
+      type: return
+      value:
+        pathway: FELLOWSHIP
+        confidence: MODERATE
+        fellowship_ready: true
+        recommendation: "Fellowship-ready with development areas. Strong domains, good integration, growth evidence developing."
+        pre_fellowship_plan:
+          months_1_3: "Leadership development + mentorship relationship building"
+          months_4_6: "Research collaboration + portfolio enhancement"
+        application_strength: "Domain mastery demonstrated, communication integration"
+        development_area: "Strengthen growth mindset evidence through additional challenges"
+
+    fellowship_possible:
+      type: return
+      value:
+        pathway: FELLOWSHIP_OR_INDUSTRY
+        confidence: LOW
+        fellowship_ready: false
+        recommendation: "Consider 6-12 month industry experience before Fellowship application."
+        pre_fellowship_plan:
+          months_1_6: "Industry entry-level role building practical experience"
+          months_7_12: "Reassess Fellowship readiness with expanded portfolio"
+        development_area: "Learning agility needs strengthening through diverse challenge exposure"
+        alternative: "Direct industry entry is equally valid — not a lesser path"
+
+    industry_ready:
+      type: return
+      value:
+        pathway: INDUSTRY
+        confidence: HIGH
+        fellowship_ready: false
+        recommendation: "Well-prepared for direct industry entry. Solid foundational competencies."
+        career_plan:
+          immediate: "Job search with competency-based portfolio"
+          year_1: "Entry-level PV role with mentorship"
+          year_3: "Reassess Fellowship interest with experience base"
+        strengths: "Domain 1-3 at L2, practical workflow experience"
+        development_area: "Build integration score and agility through workplace learning"
+
+    continuing_ed:
+      type: return
+      value:
+        pathway: CONTINUING_EDUCATION
+        confidence: MODERATE
+        fellowship_ready: false
+        recommendation: "Foundation-Communication integration needs development. Continue structured learning."
+        plan:
+          immediate: "Advanced coursework in PV communication"
+          months_3_6: "Structured integration exercises with mentor"
+          months_6_12: "Reassess pathway with enhanced integration evidence"
+        development_area: "Integration module score below 2 — both technical and communication need parallel development"
+
+    not_ready_domains:
+      type: return
+      value:
+        pathway: EXTENDED_APPE
+        confidence: LOW
+        fellowship_ready: false
+        recommendation: "One or more foundational domains below L2. Extended rotation or targeted remediation needed."
+        plan:
+          immediate: "Identify specific domain gaps via anchor assessment"
+          weeks_1_4: "Targeted remediation in gap domains"
+          reassessment: "Re-evaluate after remediation completion"
+        development_area: "Domain mastery prerequisite not met for any post-APPE pathway"
+
+tests:
+# Strong Fellowship candidate
+- input: { d1_level: 2, d2_level: 2.5, d3_level: 2, integration_score: 4, learning_agility_score: 4.0, growth_evidence_score: 4.0 }
+  expect: { pathway: FELLOWSHIP, confidence: HIGH, fellowship_ready: true }
+# Fellowship ready, moderate confidence
+- input: { d1_level: 2, d2_level: 2, d3_level: 2, integration_score: 3, learning_agility_score: 3.5, growth_evidence_score: 3.0 }
+  expect: { pathway: FELLOWSHIP, confidence: MODERATE, fellowship_ready: true }
+# Fellowship possible but industry recommended
+- input: { d1_level: 2, d2_level: 2, d3_level: 2, integration_score: 3, learning_agility_score: 3.0, growth_evidence_score: 3.0 }
+  expect: { pathway: FELLOWSHIP_OR_INDUSTRY, confidence: LOW, fellowship_ready: false }
+# Industry ready — integration good but agility low
+- input: { d1_level: 2, d2_level: 2, d3_level: 2, integration_score: 3, learning_agility_score: 2.0, growth_evidence_score: 2.0 }
+  expect: { pathway: INDUSTRY, confidence: HIGH, fellowship_ready: false }
+# Industry ready — domains met but integration partial
+- input: { d1_level: 2, d2_level: 2, d3_level: 2, integration_score: 2.5, learning_agility_score: 3.0, growth_evidence_score: 3.0 }
+  expect: { pathway: INDUSTRY, confidence: HIGH, fellowship_ready: false }
+# Continuing education — integration too low
+- input: { d1_level: 2, d2_level: 2, d3_level: 2, integration_score: 1.5, learning_agility_score: 3.0, growth_evidence_score: 3.0 }
+  expect: { pathway: CONTINUING_EDUCATION, fellowship_ready: false }
+# Not ready — domain gaps
+- input: { d1_level: 1.5, d2_level: 2, d3_level: 2, integration_score: 3, learning_agility_score: 4.0, growth_evidence_score: 4.0 }
+  expect: { pathway: EXTENDED_APPE, fellowship_ready: false }
+# Not ready — D3 gap
+- input: { d1_level: 2, d2_level: 2, d3_level: 1.5, integration_score: 3, learning_agility_score: 4.0, growth_evidence_score: 4.0 }
+  expect: { pathway: EXTENDED_APPE, fellowship_ready: false }
+# Edge: all zeros
+- input: { d1_level: 0, d2_level: 0, d3_level: 0, integration_score: 0, learning_agility_score: 0, growth_evidence_score: 0 }
+  expect: { pathway: EXTENDED_APPE, fellowship_ready: false }
+# Edge: empty input
+- input: {}
+  expect: { pathway: EXTENDED_APPE, fellowship_ready: false }

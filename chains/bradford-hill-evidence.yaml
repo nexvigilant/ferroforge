@@ -1,0 +1,70 @@
+name: bradford-hill-evidence
+description: 'Bradford Hill evidence assessment chain: signal comparison → dose-response classification → causality assessment. Composes cross-variable comparison micrograms into a multi-criterion causality evaluation. Tests the new template resolution in condition values across a full chain.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - signal-comparator
+  - dose-response-classifier
+  - naranjo-quick
+
+tests:
+# Concordant signals + monotonic dose-response + high Naranjo → strong causality
+- name: strong multi-criterion evidence
+  input:
+    signal_a: 5.0
+    signal_b: 4.2
+    low_dose_rate: 10
+    mid_dose_rate: 25
+    high_dose_rate: 50
+    naranjo_score: 7
+  expect:
+    agreement: CONCORDANT
+    pattern: MONOTONIC_INCREASE
+    dose_response_met: 'yes'
+    causality: PROBABLE
+
+# Discordant signals + flat dose-response + low Naranjo → weak evidence
+- name: weak multi-criterion evidence
+  input:
+    signal_a: 3.0
+    signal_b: 0.5
+    low_dose_rate: 15
+    mid_dose_rate: 15
+    high_dose_rate: 15
+    naranjo_score: 2
+  expect:
+    agreement: DISCORDANT
+    pattern: FLAT
+    dose_response_met: 'no'
+    causality: POSSIBLE
+
+# No signals + inverse dose-response → contradictory evidence
+- name: contradictory evidence
+  input:
+    signal_a: 0.8
+    signal_b: 1.1
+    low_dose_rate: 50
+    mid_dose_rate: 30
+    high_dose_rate: 10
+    naranjo_score: 3
+  expect:
+    agreement: BOTH_NULL
+    pattern: INVERSE
+    dose_response_met: 'no'
+    causality: POSSIBLE
+
+# Bell curve dose-response with concordant signals
+- name: complex dose-response with signals
+  input:
+    signal_a: 6.0
+    signal_b: 6.0
+    low_dose_rate: 10
+    mid_dose_rate: 40
+    high_dose_rate: 20
+    naranjo_score: 5
+  expect:
+    agreement: CONCORDANT
+    stronger: EQUAL
+    pattern: BELL_CURVE
+    causality: PROBABLE

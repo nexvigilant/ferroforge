@@ -1,0 +1,296 @@
+name: narrative-phi-detector
+description: "Gate 1 of narrative safe-extract: detect direct PHI elements (names, dates, addresses, phone numbers, medical record numbers) in ICSR narrative fields per HIPAA Safe Harbor 18 identifiers"
+version: 0.1.0
+interface:
+  inputs:
+    has_patient_name:
+      type: bool
+      required: false
+    has_date_of_birth:
+      type: bool
+      required: false
+    has_address:
+      type: bool
+      required: false
+    has_phone:
+      type: bool
+      required: false
+    has_mrn:
+      type: bool
+      required: false
+    has_ssn:
+      type: bool
+      required: false
+    has_email:
+      type: bool
+      required: false
+    phi_field_count:
+      type: int
+      required: false
+  outputs:
+    phi_detected:
+      type: bool
+    phi_severity:
+      type: string
+    phi_categories:
+      type: string
+    gate_pass:
+      type: bool
+    action:
+      type: string
+tree:
+  start: check_ssn
+  nodes:
+    check_ssn:
+      type: condition
+      variable: has_ssn
+      operator: eq
+      value: true
+      true_next: critical_phi
+      false_next: check_mrn
+    check_mrn:
+      type: condition
+      variable: has_mrn
+      operator: eq
+      value: true
+      true_next: critical_phi
+      false_next: check_name
+    check_name:
+      type: condition
+      variable: has_patient_name
+      operator: eq
+      value: true
+      true_next: check_dob_with_name
+      false_next: check_dob_alone
+    check_dob_with_name:
+      type: condition
+      variable: has_date_of_birth
+      operator: eq
+      value: true
+      true_next: critical_phi
+      false_next: high_phi_name
+    check_dob_alone:
+      type: condition
+      variable: has_date_of_birth
+      operator: eq
+      value: true
+      true_next: check_address_with_dob
+      false_next: check_address_alone
+    check_address_with_dob:
+      type: condition
+      variable: has_address
+      operator: eq
+      value: true
+      true_next: critical_phi
+      false_next: moderate_phi_dob
+    check_address_alone:
+      type: condition
+      variable: has_address
+      operator: eq
+      value: true
+      true_next: check_phone_with_address
+      false_next: check_phone_alone
+    check_phone_with_address:
+      type: condition
+      variable: has_phone
+      operator: eq
+      value: true
+      true_next: high_phi_contact
+      false_next: moderate_phi_address
+    check_phone_alone:
+      type: condition
+      variable: has_phone
+      operator: eq
+      value: true
+      true_next: check_email_with_phone
+      false_next: check_email_alone
+    check_email_with_phone:
+      type: condition
+      variable: has_email
+      operator: eq
+      value: true
+      true_next: high_phi_contact
+      false_next: moderate_phi_phone
+    check_email_alone:
+      type: condition
+      variable: has_email
+      operator: eq
+      value: true
+      true_next: moderate_phi_email
+      false_next: check_count
+    check_count:
+      type: condition
+      variable: phi_field_count
+      operator: gt
+      value: 0
+      true_next: low_phi_indirect
+      false_next: no_phi
+    critical_phi:
+      type: return
+      value:
+        phi_detected: true
+        phi_severity: CRITICAL
+        phi_categories: "direct_identifier"
+        gate_pass: false
+        action: "BLOCK — direct identifiers detected, must redact before extraction"
+    high_phi_name:
+      type: return
+      value:
+        phi_detected: true
+        phi_severity: HIGH
+        phi_categories: "patient_name"
+        gate_pass: false
+        action: "BLOCK — patient name present, redact or pseudonymize"
+    high_phi_contact:
+      type: return
+      value:
+        phi_detected: true
+        phi_severity: HIGH
+        phi_categories: "contact_info"
+        gate_pass: false
+        action: "BLOCK — contact information present, redact all contact fields"
+    moderate_phi_dob:
+      type: return
+      value:
+        phi_detected: true
+        phi_severity: MODERATE
+        phi_categories: "date_of_birth"
+        gate_pass: false
+        action: "BLOCK — date of birth present, generalize to year only"
+    moderate_phi_address:
+      type: return
+      value:
+        phi_detected: true
+        phi_severity: MODERATE
+        phi_categories: "address"
+        gate_pass: false
+        action: "BLOCK — address present, generalize to region/country"
+    moderate_phi_phone:
+      type: return
+      value:
+        phi_detected: true
+        phi_severity: MODERATE
+        phi_categories: "phone"
+        gate_pass: false
+        action: "BLOCK — phone number present, remove"
+    moderate_phi_email:
+      type: return
+      value:
+        phi_detected: true
+        phi_severity: MODERATE
+        phi_categories: "email"
+        gate_pass: false
+        action: "BLOCK — email present, remove"
+    low_phi_indirect:
+      type: return
+      value:
+        phi_detected: true
+        phi_severity: LOW
+        phi_categories: "indirect_identifiers"
+        gate_pass: false
+        action: "REVIEW — indirect identifiers detected, assess re-identification risk"
+    no_phi:
+      type: return
+      value:
+        phi_detected: false
+        phi_severity: NONE
+        phi_categories: "none"
+        gate_pass: true
+        action: "PASS — no PHI detected in narrative"
+tests:
+- input:
+    has_ssn: true
+  expect:
+    phi_detected: true
+    phi_severity: CRITICAL
+    gate_pass: false
+- input:
+    has_mrn: true
+  expect:
+    phi_detected: true
+    phi_severity: CRITICAL
+    gate_pass: false
+- input:
+    has_patient_name: true
+    has_date_of_birth: true
+  expect:
+    phi_detected: true
+    phi_severity: CRITICAL
+    gate_pass: false
+- input:
+    has_patient_name: true
+    has_date_of_birth: false
+  expect:
+    phi_detected: true
+    phi_severity: HIGH
+    gate_pass: false
+- input:
+    has_date_of_birth: true
+    has_address: true
+  expect:
+    phi_detected: true
+    phi_severity: CRITICAL
+    gate_pass: false
+- input:
+    has_date_of_birth: true
+  expect:
+    phi_detected: true
+    phi_severity: MODERATE
+    gate_pass: false
+- input:
+    has_address: true
+    has_phone: true
+  expect:
+    phi_detected: true
+    phi_severity: HIGH
+    gate_pass: false
+- input:
+    has_address: true
+  expect:
+    phi_detected: true
+    phi_severity: MODERATE
+    gate_pass: false
+- input:
+    has_phone: true
+    has_email: true
+  expect:
+    phi_detected: true
+    phi_severity: HIGH
+    gate_pass: false
+- input:
+    has_phone: true
+  expect:
+    phi_detected: true
+    phi_severity: MODERATE
+    gate_pass: false
+- input:
+    has_email: true
+  expect:
+    phi_detected: true
+    phi_severity: MODERATE
+    gate_pass: false
+- input:
+    phi_field_count: 3
+  expect:
+    phi_detected: true
+    phi_severity: LOW
+    gate_pass: false
+- input: {}
+  expect:
+    phi_detected: false
+    phi_severity: NONE
+    gate_pass: true
+    action: "PASS — no PHI detected in narrative"
+- input:
+    has_patient_name: false
+    has_date_of_birth: false
+    has_address: false
+    has_phone: false
+    has_mrn: false
+    has_ssn: false
+    has_email: false
+    phi_field_count: 0
+  expect:
+    phi_detected: false
+    phi_severity: NONE
+    gate_pass: true

@@ -1,0 +1,116 @@
+name: underreporting-estimator
+description: 'PVOS underreporting estimation: categorizes reporting completeness based on reported-to-expected case ratio'
+version: 0.1.0
+interface:
+  inputs:
+    reporting_ratio:
+      type: float
+      required: false
+  outputs:
+    category:
+      type: string
+    description:
+      type: string
+    estimated_reporting_pct:
+      type: string
+    recommendation:
+      type: string
+tree:
+  start: check_severe
+  nodes:
+    check_severe:
+      type: condition
+      variable: reporting_ratio
+      operator: lt
+      value: 0.01
+      true_next: severe_underreporting
+      false_next: check_significant
+    check_significant:
+      type: condition
+      variable: reporting_ratio
+      operator: lt
+      value: 0.05
+      true_next: significant_underreporting
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: reporting_ratio
+      operator: lt
+      value: 0.10
+      true_next: moderate_underreporting
+      false_next: acceptable_reporting
+    severe_underreporting:
+      type: return
+      value:
+        category: SEVERE_UNDERREPORTING
+        estimated_reporting_pct: 1-10%
+        description: Severe underreporting detected - estimated 1-10% of cases reported
+        recommendation: Initiate active surveillance and reporting system audit
+    significant_underreporting:
+      type: return
+      value:
+        category: SIGNIFICANT_UNDERREPORTING
+        estimated_reporting_pct: 5-10%
+        description: Significant underreporting detected - estimated 5-10% of cases reported
+        recommendation: Enhance passive surveillance and educate reporters
+    moderate_underreporting:
+      type: return
+      value:
+        category: MODERATE_UNDERREPORTING
+        estimated_reporting_pct: 10%
+        description: Moderate underreporting detected - estimated ~10% of cases reported
+        recommendation: Monitor reporting trends and apply adjustment factors
+    acceptable_reporting:
+      type: return
+      value:
+        category: ACCEPTABLE_REPORTING
+        estimated_reporting_pct: '>10%'
+        description: Reporting rate within acceptable range for spontaneous reporting systems
+        recommendation: Continue routine monitoring
+tests:
+- input:
+    reporting_ratio: 0.005
+    data_source: spontaneous
+  expect:
+    category: SEVERE_UNDERREPORTING
+    estimated_reporting_pct: 1-10%
+    description: Severe underreporting detected - estimated 1-10% of cases reported
+    recommendation: Initiate active surveillance and reporting system audit
+- input:
+    reporting_ratio: 0.03
+    data_source: spontaneous
+  expect:
+    category: SIGNIFICANT_UNDERREPORTING
+    estimated_reporting_pct: 5-10%
+    description: Significant underreporting detected - estimated 5-10% of cases reported
+    recommendation: Enhance passive surveillance and educate reporters
+- input:
+    reporting_ratio: 0.08
+    data_source: registry
+  expect:
+    category: MODERATE_UNDERREPORTING
+    estimated_reporting_pct: 10%
+    description: Moderate underreporting detected - estimated ~10% of cases reported
+    recommendation: Monitor reporting trends and apply adjustment factors
+- input:
+    reporting_ratio: 0.15
+    data_source: clinical_trial
+  expect:
+    category: ACCEPTABLE_REPORTING
+    estimated_reporting_pct: '>10%'
+    description: Reporting rate within acceptable range for spontaneous reporting systems
+    recommendation: Continue routine monitoring
+- input:
+    reporting_ratio: 0.10
+    data_source: spontaneous
+  expect:
+    category: ACCEPTABLE_REPORTING
+    estimated_reporting_pct: '>10%'
+    description: Reporting rate within acceptable range for spontaneous reporting systems
+    recommendation: Continue routine monitoring
+- input: {}
+  expect:
+    category: ACCEPTABLE_REPORTING
+    description: Reporting rate within acceptable range for spontaneous reporting systems
+    estimated_reporting_pct: ">10%"
+    recommendation: Continue routine monitoring

@@ -1,0 +1,351 @@
+name: ai-prereq-gate
+description: "PDC: Validate EPA10 AI Gateway prerequisites by phase — checks domain levels, exam scores, and project evidence"
+version: 0.1.0
+interface:
+  inputs:
+    ai_exam_score:
+      type: int
+      required: false
+    cross_functional_experience:
+      type: bool
+      required: false
+    domain_1_level:
+      type: int
+      required: false
+    domain_4_level:
+      type: int
+      required: false
+    domain_8_level:
+      type: int
+      required: false
+    domains_at_l3:
+      type: int
+      required: false
+    domains_at_l4:
+      type: int
+      required: false
+    epa10_level:
+      type: int
+      required: false
+    ethics_training:
+      type: bool
+      required: false
+    leadership_experience:
+      type: bool
+      required: false
+    project_roi_pct:
+      type: int
+      required: false
+    supervised_project_complete:
+      type: bool
+      required: false
+    target_phase:
+      type: int
+      required: false
+  outputs:
+    approved:
+      type: bool
+    cpa8_unlocked:
+      type: bool
+    error:
+      type: string
+    gap:
+      type: string
+    next_phase:
+      type: string
+    outcome:
+      type: string
+    phase:
+      type: string
+    phase_name:
+      type: string
+tree:
+  start: check_phase
+  nodes:
+    check_phase:
+      type: condition
+      variable: target_phase
+      operator: lte
+      value: 1
+      true_next: check_entry_prereqs
+      false_next: check_phase_2
+    check_phase_2:
+      type: condition
+      variable: target_phase
+      operator: eq
+      value: 2
+      true_next: check_dev_prereqs
+      false_next: check_phase_3
+    check_phase_3:
+      type: condition
+      variable: target_phase
+      operator: eq
+      value: 3
+      true_next: check_advanced_prereqs
+      false_next: check_phase_4
+    check_phase_4:
+      type: condition
+      variable: target_phase
+      operator: eq
+      value: 4
+      true_next: check_expert_prereqs
+      false_next: check_capstone
+    check_capstone:
+      type: condition
+      variable: target_phase
+      operator: eq
+      value: 5
+      true_next: check_capstone_prereqs
+      false_next: invalid_phase
+    check_entry_prereqs:
+      type: condition
+      variable: ethics_training
+      operator: eq
+      value: true
+      true_next: entry_check_exam
+      false_next: entry_blocked
+    entry_check_exam:
+      type: condition
+      variable: ai_exam_score
+      operator: gte
+      value: 80
+      true_next: entry_approved
+      false_next: entry_blocked
+    entry_approved:
+      type: return
+      value:
+        phase: ENTRY
+        phase_name: "AI Foundation and Observation"
+        approved: true
+        next_phase: 2
+        outcome: "Basic AI literacy across all domains"
+    entry_blocked:
+      type: return
+      value:
+        phase: ENTRY
+        approved: false
+        gap: "Requires ethics training AND AI exam score >= 80%"
+    check_dev_prereqs:
+      type: condition
+      variable: domain_1_level
+      operator: gte
+      value: 2
+      true_next: dev_check_d4
+      false_next: dev_blocked
+    dev_check_d4:
+      type: condition
+      variable: domain_4_level
+      operator: gte
+      value: 2
+      true_next: dev_check_d8
+      false_next: dev_blocked
+    dev_check_d8:
+      type: condition
+      variable: domain_8_level
+      operator: gte
+      value: 2
+      true_next: dev_check_project
+      false_next: dev_blocked
+    dev_check_project:
+      type: condition
+      variable: supervised_project_complete
+      operator: eq
+      value: true
+      true_next: dev_approved
+      false_next: dev_blocked
+    dev_approved:
+      type: return
+      value:
+        phase: DEVELOPMENT
+        phase_name: "Supervised AI Application"
+        approved: true
+        next_phase: 3
+        outcome: "Independent AI tool utilization capability"
+    dev_blocked:
+      type: return
+      value:
+        phase: DEVELOPMENT
+        approved: false
+        gap: "Requires L2+ in Domains 1,4,8 AND supervised project completion"
+    check_advanced_prereqs:
+      type: condition
+      variable: domains_at_l3
+      operator: gte
+      value: 5
+      true_next: adv_check_epa10
+      false_next: advanced_blocked
+    adv_check_epa10:
+      type: condition
+      variable: epa10_level
+      operator: gte
+      value: 3
+      true_next: adv_check_roi
+      false_next: advanced_blocked
+    adv_check_roi:
+      type: condition
+      variable: project_roi_pct
+      operator: gte
+      value: 15
+      true_next: advanced_approved
+      false_next: advanced_blocked
+    advanced_approved:
+      type: return
+      value:
+        phase: ADVANCED
+        phase_name: "Independent AI Implementation"
+        approved: true
+        next_phase: 4
+        outcome: "AI optimization and leadership capabilities"
+    advanced_blocked:
+      type: return
+      value:
+        phase: ADVANCED
+        approved: false
+        gap: "Requires L3 in 5+ domains AND EPA10 at L3 AND project ROI >= 15%"
+    check_expert_prereqs:
+      type: condition
+      variable: domains_at_l4
+      operator: gte
+      value: 8
+      true_next: expert_check_leadership
+      false_next: expert_blocked
+    expert_check_leadership:
+      type: condition
+      variable: leadership_experience
+      operator: eq
+      value: true
+      true_next: expert_approved
+      false_next: expert_blocked
+    expert_approved:
+      type: return
+      value:
+        phase: EXPERT
+        phase_name: "AI Innovation and Governance"
+        approved: true
+        next_phase: 5
+        outcome: "AI thought leadership and transformation capability"
+    expert_blocked:
+      type: return
+      value:
+        phase: EXPERT
+        approved: false
+        gap: "Requires L4 in 8+ domains AND demonstrated leadership experience"
+    check_capstone_prereqs:
+      type: condition
+      variable: epa10_level
+      operator: gte
+      value: 4
+      true_next: capstone_check_xfunc
+      false_next: capstone_blocked
+    capstone_check_xfunc:
+      type: condition
+      variable: cross_functional_experience
+      operator: eq
+      value: true
+      true_next: capstone_approved
+      false_next: capstone_blocked
+    capstone_approved:
+      type: return
+      value:
+        phase: CAPSTONE
+        phase_name: "CPA8 - AI-Enhanced Pharmacovigilance Activities"
+        approved: true
+        next_phase: null
+        outcome: "Complete AI-Enhanced PV Activities mastery"
+        cpa8_unlocked: true
+    capstone_blocked:
+      type: return
+      value:
+        phase: CAPSTONE
+        approved: false
+        gap: "Requires EPA10 at L4+ AND cross-functional experience"
+        cpa8_unlocked: false
+    invalid_phase:
+      type: return
+      value:
+        approved: false
+        error: "Phase must be 1-5 (Entry, Development, Advanced, Expert, Capstone)"
+tests:
+- input:
+    target_phase: 1
+    ethics_training: true
+    ai_exam_score: 85
+  expect:
+    phase: ENTRY
+    approved: true
+- input:
+    target_phase: 1
+    ethics_training: false
+    ai_exam_score: 90
+  expect:
+    phase: ENTRY
+    approved: false
+- input:
+    target_phase: 1
+    ethics_training: true
+    ai_exam_score: 75
+  expect:
+    approved: false
+- input:
+    target_phase: 2
+    domain_1_level: 2
+    domain_4_level: 2
+    domain_8_level: 2
+    supervised_project_complete: true
+  expect:
+    phase: DEVELOPMENT
+    approved: true
+- input:
+    target_phase: 2
+    domain_1_level: 2
+    domain_4_level: 1
+    domain_8_level: 2
+    supervised_project_complete: true
+  expect:
+    approved: false
+- input:
+    target_phase: 3
+    domains_at_l3: 6
+    epa10_level: 3
+    project_roi_pct: 20
+  expect:
+    phase: ADVANCED
+    approved: true
+- input:
+    target_phase: 3
+    domains_at_l3: 4
+    epa10_level: 3
+    project_roi_pct: 20
+  expect:
+    approved: false
+- input:
+    target_phase: 4
+    domains_at_l4: 9
+    leadership_experience: true
+  expect:
+    phase: EXPERT
+    approved: true
+- input:
+    target_phase: 4
+    domains_at_l4: 7
+    leadership_experience: true
+  expect:
+    approved: false
+- input:
+    target_phase: 5
+    epa10_level: 4
+    cross_functional_experience: true
+  expect:
+    phase: CAPSTONE
+    approved: true
+    cpa8_unlocked: true
+- input:
+    target_phase: 5
+    epa10_level: 3
+    cross_functional_experience: true
+  expect:
+    approved: false
+    cpa8_unlocked: false
+- input: {}
+  expect:
+    approved: false

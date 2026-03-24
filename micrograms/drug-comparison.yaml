@@ -1,0 +1,245 @@
+name: drug-comparison
+description: 'Differential drug safety classification: compares two drug profiles by pre-computed signal ratio and PRR ratio to determine which has worse safety profile'
+version: 0.2.0
+interface:
+  inputs:
+    signal_count_a:
+      type: number
+      required: true
+    signal_count_b:
+      type: number
+      required: true
+    signal_ratio:
+      type: number
+      required: true
+      description: 'signal_count_a / signal_count_b (999 if b=0 and a>0, 1.0 if both=0)'
+    prr_ratio:
+      type: number
+      required: true
+      description: 'prr_max_a / prr_max_b (999 if b=0 and a>0, 1.0 if both=0)'
+  outputs:
+    differential:
+      type: string
+    confidence:
+      type: string
+    reason:
+      type: string
+tree:
+  start: check_a_zero
+  nodes:
+    check_a_zero:
+      type: condition
+      variable: signal_count_a
+      operator: eq
+      value: 0
+      true_next: check_b_also_zero
+      false_next: check_ratio_a_much_worse
+    check_b_also_zero:
+      type: condition
+      variable: signal_count_b
+      operator: eq
+      value: 0
+      true_next: similar_no_signals
+      false_next: b_worse_a_clean
+    check_ratio_a_much_worse:
+      type: condition
+      variable: signal_ratio
+      operator: gte
+      value: 2.0
+      true_next: a_worse_signals
+      false_next: check_ratio_b_much_worse
+    check_ratio_b_much_worse:
+      type: condition
+      variable: signal_ratio
+      operator: lte
+      value: 0.5
+      true_next: b_worse_signals
+      false_next: check_prr_a_higher
+    check_prr_a_higher:
+      type: condition
+      variable: prr_ratio
+      operator: gte
+      value: 1.5
+      true_next: a_worse_prr
+      false_next: check_prr_b_higher
+    check_prr_b_higher:
+      type: condition
+      variable: prr_ratio
+      operator: lte
+      value: 0.667
+      true_next: b_worse_prr
+      false_next: check_a_slightly_more
+    check_a_slightly_more:
+      type: condition
+      variable: signal_ratio
+      operator: gt
+      value: 1.0
+      true_next: a_slightly_worse
+      false_next: check_b_slightly_more
+    check_b_slightly_more:
+      type: condition
+      variable: signal_ratio
+      operator: lt
+      value: 1.0
+      true_next: b_slightly_worse
+      false_next: similar_balanced
+    similar_no_signals:
+      type: return
+      value:
+        differential: SIMILAR
+        confidence: high
+        reason: Neither drug has detected signals
+    b_worse_a_clean:
+      type: return
+      value:
+        differential: B_WORSE
+        confidence: high
+        reason: Drug A has no signals while Drug B does
+    a_worse_signals:
+      type: return
+      value:
+        differential: A_WORSE
+        confidence: high
+        reason: Drug A has at least double the signal count of Drug B
+    b_worse_signals:
+      type: return
+      value:
+        differential: B_WORSE
+        confidence: high
+        reason: Drug B has at least double the signal count of Drug A
+    a_worse_prr:
+      type: return
+      value:
+        differential: A_WORSE
+        confidence: medium
+        reason: Drug A has substantially higher max PRR
+    b_worse_prr:
+      type: return
+      value:
+        differential: B_WORSE
+        confidence: medium
+        reason: Drug B has substantially higher max PRR
+    a_slightly_worse:
+      type: return
+      value:
+        differential: A_WORSE
+        confidence: low
+        reason: Drug A has more signals but difference is modest
+    b_slightly_worse:
+      type: return
+      value:
+        differential: B_WORSE
+        confidence: low
+        reason: Drug B has more signals but difference is modest
+    similar_balanced:
+      type: return
+      value:
+        differential: SIMILAR
+        confidence: medium
+        reason: Both drugs have comparable safety profiles
+tests:
+# No signals on either side
+- input:
+    signal_count_a: 0
+    signal_count_b: 0
+    signal_ratio: 1.0
+    prr_ratio: 1.0
+  expect:
+    differential: SIMILAR
+    confidence: high
+    reason: Neither drug has detected signals
+# A has no signals, B has some
+- input:
+    signal_count_a: 0
+    signal_count_b: 5
+    signal_ratio: 0.0
+    prr_ratio: 0.0
+  expect:
+    differential: B_WORSE
+    confidence: high
+    reason: Drug A has no signals while Drug B does
+# A has double the signals of B (10/4 = 2.5)
+- input:
+    signal_count_a: 10
+    signal_count_b: 4
+    signal_ratio: 2.5
+    prr_ratio: 1.2
+  expect:
+    differential: A_WORSE
+    confidence: high
+    reason: Drug A has at least double the signal count of Drug B
+# B has double the signals of A (3/8 = 0.375)
+- input:
+    signal_count_a: 3
+    signal_count_b: 8
+    signal_ratio: 0.375
+    prr_ratio: 0.4
+  expect:
+    differential: B_WORSE
+    confidence: high
+    reason: Drug B has at least double the signal count of Drug A
+# Similar signal counts but A has much higher PRR (12/3 = 4.0)
+- input:
+    signal_count_a: 5
+    signal_count_b: 4
+    signal_ratio: 1.25
+    prr_ratio: 4.0
+  expect:
+    differential: A_WORSE
+    confidence: medium
+    reason: Drug A has substantially higher max PRR
+# Similar signal counts but B has much higher PRR (2.5/9.0 = 0.278)
+- input:
+    signal_count_a: 4
+    signal_count_b: 5
+    signal_ratio: 0.8
+    prr_ratio: 0.278
+  expect:
+    differential: B_WORSE
+    confidence: medium
+    reason: Drug B has substantially higher max PRR
+# A slightly more signals, similar PRR (6/5 = 1.2, 4.0/3.5 = 1.143)
+- input:
+    signal_count_a: 6
+    signal_count_b: 5
+    signal_ratio: 1.2
+    prr_ratio: 1.143
+  expect:
+    differential: A_WORSE
+    confidence: low
+    reason: Drug A has more signals but difference is modest
+# Equal signals, equal PRR (5/5 = 1.0, 4.0/4.0 = 1.0)
+- input:
+    signal_count_a: 5
+    signal_count_b: 5
+    signal_ratio: 1.0
+    prr_ratio: 1.0
+  expect:
+    differential: SIMILAR
+    confidence: medium
+    reason: Both drugs have comparable safety profiles
+# B slightly more signals (4/6 = 0.667, prr similar)
+- input:
+    signal_count_a: 4
+    signal_count_b: 6
+    signal_ratio: 0.667
+    prr_ratio: 0.95
+  expect:
+    differential: B_WORSE
+    confidence: low
+    reason: Drug B has more signals but difference is modest
+# A has signals, B has zero (signal_ratio = 999)
+- input:
+    signal_count_a: 7
+    signal_count_b: 0
+    signal_ratio: 999
+    prr_ratio: 999
+  expect:
+    differential: A_WORSE
+    confidence: high
+    reason: Drug A has at least double the signal count of Drug B
+- input: {}
+  expect:
+    confidence: medium
+    differential: SIMILAR
+    reason: Both drugs have comparable safety profiles

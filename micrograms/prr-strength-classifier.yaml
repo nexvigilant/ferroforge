@@ -1,0 +1,80 @@
+name: prr-strength-classifier
+description: 'PRR signal strength: classifies PRR value into strength tier for drug safety assessment display'
+version: 0.1.0
+interface:
+  inputs:
+    prr:
+      type: number
+      required: true
+      description: 'Proportional Reporting Ratio value'
+  outputs:
+    strength:
+      type: string
+tree:
+  start: check_critical
+  nodes:
+    check_critical:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 10
+      true_next: critical
+      false_next: check_signal
+    check_signal:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2
+      true_next: signal
+      false_next: subthreshold
+    critical:
+      type: return
+      value:
+        strength: critical
+    signal:
+      type: return
+      value:
+        strength: signal
+    subthreshold:
+      type: return
+      value:
+        strength: subthreshold
+tests:
+# Zero PRR = subthreshold
+- input:
+    prr: 0
+  expect:
+    strength: subthreshold
+# Below signal threshold
+- input:
+    prr: 1.5
+  expect:
+    strength: subthreshold
+# At signal boundary
+- input:
+    prr: 2.0
+  expect:
+    strength: signal
+# Mid signal range
+- input:
+    prr: 5.0
+  expect:
+    strength: signal
+# Just below critical
+- input:
+    prr: 9.99
+  expect:
+    strength: signal
+# At critical boundary
+- input:
+    prr: 10.0
+  expect:
+    strength: critical
+# Strong critical signal
+- input:
+    prr: 16.553
+  expect:
+    strength: critical
+- input: {}
+  expect:
+    strength: subthreshold

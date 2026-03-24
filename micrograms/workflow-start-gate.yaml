@@ -1,0 +1,120 @@
+name: workflow-start-gate
+description: 'PVOS workflow gating: gates workflow start on valid workflow type and data readiness prerequisites'
+version: 0.1.0
+interface:
+  inputs:
+    data_ready:
+      type: bool
+      required: false
+    workflow_type:
+      type: string
+      required: false
+  outputs:
+    description:
+      type: string
+    gate:
+      type: string
+    workflow:
+      type: string
+tree:
+  start: check_data_ready
+  nodes:
+    check_data_ready:
+      type: condition
+      variable: data_ready
+      operator: eq
+      value: true
+      true_next: check_signal_investigation
+      false_next: blocked_no_data
+    check_signal_investigation:
+      type: condition
+      variable: workflow_type
+      operator: eq
+      value: signal_investigation
+      true_next: start_signal_investigation
+      false_next: check_case_processing
+    check_case_processing:
+      type: condition
+      variable: workflow_type
+      operator: eq
+      value: case_processing
+      true_next: start_case_processing
+      false_next: check_periodic_review
+    check_periodic_review:
+      type: condition
+      variable: workflow_type
+      operator: eq
+      value: periodic_review
+      true_next: start_periodic_review
+      false_next: unknown_workflow
+    start_signal_investigation:
+      type: return
+      value:
+        gate: OPEN
+        workflow: signal_investigation
+        description: Signal investigation workflow approved - proceed with PRR/ROR detection
+    start_case_processing:
+      type: return
+      value:
+        gate: OPEN
+        workflow: case_processing
+        description: Case processing workflow approved - proceed with ingestion and triage
+    start_periodic_review:
+      type: return
+      value:
+        gate: OPEN
+        workflow: periodic_review
+        description: Periodic review workflow approved - proceed with PSUR/PBRER cycle
+    blocked_no_data:
+      type: return
+      value:
+        gate: BLOCKED
+        workflow: none
+        description: Data not ready - workflow cannot start without prerequisite data
+    unknown_workflow:
+      type: return
+      value:
+        gate: BLOCKED
+        workflow: none
+        description: Unknown workflow type - choose signal_investigation/case_processing/periodic_review
+tests:
+- input:
+    workflow_type: signal_investigation
+    data_ready: true
+  expect:
+    gate: OPEN
+    workflow: signal_investigation
+    description: Signal investigation workflow approved - proceed with PRR/ROR detection
+- input:
+    workflow_type: case_processing
+    data_ready: true
+  expect:
+    gate: OPEN
+    workflow: case_processing
+    description: Case processing workflow approved - proceed with ingestion and triage
+- input:
+    workflow_type: periodic_review
+    data_ready: true
+  expect:
+    gate: OPEN
+    workflow: periodic_review
+    description: Periodic review workflow approved - proceed with PSUR/PBRER cycle
+- input:
+    workflow_type: signal_investigation
+    data_ready: false
+  expect:
+    gate: BLOCKED
+    workflow: none
+    description: Data not ready - workflow cannot start without prerequisite data
+- input:
+    workflow_type: unknown_type
+    data_ready: true
+  expect:
+    gate: BLOCKED
+    workflow: none
+    description: Unknown workflow type - choose signal_investigation/case_processing/periodic_review
+- input: {}
+  expect:
+    description: Data not ready - workflow cannot start without prerequisite data
+    gate: BLOCKED
+    workflow: none

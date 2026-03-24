@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 """
+DEPRECATED — All 17 tools handled natively in Rust by crates/station/src/compute/
+Parity tests: crates/station/tests/compute_parity.rs (47 tests)
+This file is never reached: router.rs:178 intercepts via compute::try_handle()
+Safe to delete after confirming zero calls in station-telemetry.jsonl
+
+---
 NexVigilant Calculation Station Proxy — Pure PV Computation Engine
 
 All computation, no network calls. Implements signal detection (PRR/ROR/IC/EBGM),

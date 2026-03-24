@@ -1,0 +1,100 @@
+name: signal-enriched-compliance
+description: 'Full signal-enriched compliance pipeline: ICSR validation + case assessment + PRR signal detection + expedited reporting + signal-compliance convergence + Guardian bridge + evidence mapping. Takes both case data and signal data as input.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - e2a-minimum-criteria
+  - case-seriousness
+  - transform-seriousness-to-bool
+  - expectedness-check
+  - transform-expectedness-to-bool
+  - prr-signal
+  - expedited-reporting
+  - signal-compliance-bridge
+  - guardian-signal-bridge
+  - compliance-evidence-mapper
+tests:
+- name: signal confirmed + fatal unexpected premarket = CRITICAL P1
+  input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspected_drug: true
+    adverse_event: true
+    death: true
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+    event_in_label: false
+    event_class_in_label: false
+    study_type: premarket
+    prr: 8.5
+  expect:
+    valid_icsr: true
+    serious: true
+    fatal: true
+    unexpected: true
+    signal_detected: true
+    timeline: 7_CALENDAR_DAYS
+    report_type: IND_SAFETY
+    days_from_awareness: 7
+    compliance_verdict: CRITICAL
+    compliance_priority: P1
+    requires_signal_review: true
+    guardian_pattern: expedited_critical
+    guardian_severity: 0.95
+    control_id: ICH-E2C-2
+    compliance_status: implemented
+- name: signal confirmed + non-serious = SIGNAL_WATCH
+  input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspected_drug: true
+    adverse_event: true
+    death: false
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+    event_in_label: true
+    severity_in_label: true
+    study_type: postmarket
+    prr: 3.0
+  expect:
+    valid_icsr: true
+    serious: false
+    signal_detected: true
+    compliance_verdict: SIGNAL_WATCH
+    compliance_priority: P3
+    requires_signal_review: true
+- name: no signal + serious unexpected postmarket = ELEVATED
+  input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspected_drug: true
+    adverse_event: true
+    death: false
+    hospitalization: true
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+    event_in_label: false
+    event_class_in_label: false
+    study_type: postmarket
+    prr: 1.2
+  expect:
+    valid_icsr: true
+    serious: true
+    unexpected: true
+    signal_detected: false
+    timeline: 15_CALENDAR_DAYS
+    report_type: FIELD_ALERT
+    compliance_verdict: ELEVATED
+    compliance_priority: P2
+    requires_signal_review: false
+    guardian_pattern: expedited_high
+    guardian_severity: 0.80

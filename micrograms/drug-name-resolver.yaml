@@ -1,0 +1,110 @@
+name: drug-name-resolver
+description: 'Resolves drug name type and routes to appropriate nomenclature source (RxNorm, WHO-DD, DailyMed)'
+version: 0.1.0
+interface:
+  inputs:
+    drug_name:
+      type: string
+      required: false
+    name_type:
+      type: string
+      required: false
+  outputs:
+    normalized_name:
+      type: string
+    resolution_source:
+      type: string
+    needs_resolution:
+      type: bool
+    confidence:
+      type: string
+tree:
+  start: check_generic
+  nodes:
+    check_generic:
+      type: condition
+      variable: name_type
+      operator: eq
+      value: generic
+      true_next: generic_route
+      false_next: check_brand
+    check_brand:
+      type: condition
+      variable: name_type
+      operator: eq
+      value: brand
+      true_next: brand_route
+      false_next: check_inn
+    check_inn:
+      type: condition
+      variable: name_type
+      operator: eq
+      value: inn
+      true_next: inn_route
+      false_next: unknown_route
+    generic_route:
+      type: return
+      value:
+        normalized_name: generic
+        resolution_source: rxnorm
+        needs_resolution: false
+        confidence: high
+    brand_route:
+      type: return
+      value:
+        normalized_name: brand
+        resolution_source: dailymed
+        needs_resolution: false
+        confidence: high
+    inn_route:
+      type: return
+      value:
+        normalized_name: inn
+        resolution_source: who_dd
+        needs_resolution: false
+        confidence: high
+    unknown_route:
+      type: return
+      value:
+        normalized_name: unknown
+        resolution_source: multi_source
+        needs_resolution: true
+        confidence: low
+tests:
+- input:
+    drug_name: metformin
+    name_type: generic
+  expect:
+    resolution_source: rxnorm
+    needs_resolution: false
+    confidence: high
+- input:
+    drug_name: Lipitor
+    name_type: brand
+  expect:
+    resolution_source: dailymed
+    needs_resolution: false
+    confidence: high
+- input:
+    drug_name: atorvastatin
+    name_type: inn
+  expect:
+    resolution_source: who_dd
+    needs_resolution: false
+    confidence: high
+- input:
+    drug_name: mystery_drug
+    name_type: unknown
+  expect:
+    needs_resolution: true
+    resolution_source: multi_source
+    confidence: low
+- input:
+    drug_name: something
+  expect:
+    needs_resolution: true
+    confidence: low
+- input: {}
+  expect:
+    needs_resolution: true
+    confidence: low

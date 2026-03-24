@@ -1,0 +1,283 @@
+name: session-behavior-classifier
+description: 'Chain: routes session activities through primitive-recognizer to produce a session primitive profile. Consumes primitive-recognizer output.'
+version: 0.1.0
+interface:
+  inputs:
+    activity:
+      type: string
+      required: true
+      # One of: audit, commit, build_hook, build_microgram, test, diagnose, 
+      #         signal_detect, visualize, research, chain
+    produced_artifact:
+      type: bool
+      required: false
+    changed_infrastructure:
+      type: bool
+      required: false
+    test_count:
+      type: int
+      required: false
+  outputs:
+    behavior_type:
+      type: string
+    primitive_profile:
+      type: string
+    session_contribution:
+      type: string
+    risk_level:
+      type: string
+    failure_expected:
+      type: bool
+
+tree:
+  start: route_activity
+  nodes:
+    route_activity:
+      type: condition
+      variable: activity
+      operator: eq
+      value: audit
+      true_next: audit_behavior
+      false_next: check_commit
+
+    check_commit:
+      type: condition
+      variable: activity
+      operator: eq
+      value: commit
+      true_next: commit_behavior
+      false_next: check_build_hook
+
+    check_build_hook:
+      type: condition
+      variable: activity
+      operator: eq
+      value: build_hook
+      true_next: hook_behavior
+      false_next: check_build_mcg
+
+    check_build_mcg:
+      type: condition
+      variable: activity
+      operator: eq
+      value: build_microgram
+      true_next: microgram_behavior
+      false_next: check_test
+
+    check_test:
+      type: condition
+      variable: activity
+      operator: eq
+      value: test
+      true_next: test_behavior
+      false_next: check_signal
+
+    check_signal:
+      type: condition
+      variable: activity
+      operator: eq
+      value: signal_detect
+      true_next: signal_behavior
+      false_next: check_visualize
+
+    check_visualize:
+      type: condition
+      variable: activity
+      operator: eq
+      value: visualize
+      true_next: viz_behavior
+      false_next: check_research
+
+    check_research:
+      type: condition
+      variable: activity
+      operator: eq
+      value: research
+      true_next: research_behavior
+      false_next: check_chain
+
+    check_chain:
+      type: condition
+      variable: activity
+      operator: eq
+      value: chain
+      true_next: chain_behavior
+      false_next: check_diagnose
+
+    check_diagnose:
+      type: condition
+      variable: activity
+      operator: eq
+      value: diagnose
+      true_next: diagnose_behavior
+      false_next: unknown_activity
+
+    # ─── Behaviors ───
+
+    audit_behavior:
+      type: return
+      value:
+        behavior_type: measurement
+        primitive_profile: "varsigma(partial(system))"
+        session_contribution: "observation"
+        risk_level: "none"
+        failure_expected: false
+
+    commit_behavior:
+      type: condition
+      variable: changed_infrastructure
+      operator: eq
+      value: true
+      true_next: infra_commit
+      false_next: code_commit
+
+    infra_commit:
+      type: return
+      value:
+        behavior_type: persistence
+        primitive_profile: "proportional(pi(varsigma))"
+        session_contribution: "irreversible_progress"
+        risk_level: "low"
+        failure_expected: false
+
+    code_commit:
+      type: return
+      value:
+        behavior_type: persistence
+        primitive_profile: "pi(varsigma)"
+        session_contribution: "progress"
+        risk_level: "none"
+        failure_expected: false
+
+    hook_behavior:
+      type: return
+      value:
+        behavior_type: boundary_crossing
+        primitive_profile: "partial(arrow(varsigma))"
+        session_contribution: "capability"
+        risk_level: "medium"
+        failure_expected: true
+
+    microgram_behavior:
+      type: condition
+      variable: test_count
+      operator: gte
+      value: 10
+      true_next: tested_microgram
+      false_next: untested_microgram
+
+    tested_microgram:
+      type: return
+      value:
+        behavior_type: transformation
+        primitive_profile: "arrow(varsigma) [tested]"
+        session_contribution: "validated_capability"
+        risk_level: "low"
+        failure_expected: false
+
+    untested_microgram:
+      type: return
+      value:
+        behavior_type: transformation
+        primitive_profile: "arrow(varsigma) [untested]"
+        session_contribution: "speculative_capability"
+        risk_level: "high"
+        failure_expected: true
+
+    test_behavior:
+      type: return
+      value:
+        behavior_type: comparison
+        primitive_profile: "kappa(varsigma_actual, varsigma_expected)"
+        session_contribution: "verification"
+        risk_level: "none"
+        failure_expected: false
+
+    signal_behavior:
+      type: return
+      value:
+        behavior_type: measurement
+        primitive_profile: "varsigma(N(events)/N(exposure))"
+        session_contribution: "intelligence"
+        risk_level: "none"
+        failure_expected: false
+
+    viz_behavior:
+      type: return
+      value:
+        behavior_type: state_change
+        primitive_profile: "sigma(varsigma) [visual encoding]"
+        session_contribution: "communication"
+        risk_level: "none"
+        failure_expected: false
+
+    research_behavior:
+      type: return
+      value:
+        behavior_type: accumulation
+        primitive_profile: "N(kappa(sources))"
+        session_contribution: "knowledge"
+        risk_level: "none"
+        failure_expected: false
+
+    chain_behavior:
+      type: return
+      value:
+        behavior_type: convergence
+        primitive_profile: "rho(pi(chain(mcg_a, mcg_b)))"
+        session_contribution: "compound_capability"
+        risk_level: "medium"
+        failure_expected: true
+
+    diagnose_behavior:
+      type: return
+      value:
+        behavior_type: boundary_crossing
+        primitive_profile: "partial(kappa(varsigma_observed, varsigma_expected))"
+        session_contribution: "root_cause"
+        risk_level: "low"
+        failure_expected: false
+
+    unknown_activity:
+      type: return
+      value:
+        behavior_type: convergence
+        primitive_profile: "emptyset"
+        session_contribution: "unknown"
+        risk_level: "high"
+        failure_expected: true
+
+tests:
+  - input: { activity: audit }
+    expect: { behavior_type: measurement, risk_level: "none" }
+
+  - input: { activity: commit, changed_infrastructure: true }
+    expect: { session_contribution: "irreversible_progress" }
+
+  - input: { activity: commit, changed_infrastructure: false }
+    expect: { session_contribution: "progress", primitive_profile: "pi(varsigma)" }
+
+  - input: { activity: build_hook }
+    expect: { failure_expected: true, risk_level: "medium" }
+
+  - input: { activity: build_microgram, test_count: 13 }
+    expect: { session_contribution: "validated_capability", failure_expected: false }
+
+  - input: { activity: build_microgram, test_count: 2 }
+    expect: { session_contribution: "speculative_capability", failure_expected: true }
+
+  - input: { activity: signal_detect }
+    expect: { behavior_type: measurement, primitive_profile: "varsigma(N(events)/N(exposure))" }
+
+  - input: { activity: chain }
+    expect: { failure_expected: true, session_contribution: "compound_capability" }
+
+  - input: { activity: something_new }
+    expect: { risk_level: "high", failure_expected: true }
+  - input: {}
+    expect:
+      behavior_type: convergence
+      failure_expected: true
+      primitive_profile: emptyset
+      risk_level: high
+      session_contribution: unknown

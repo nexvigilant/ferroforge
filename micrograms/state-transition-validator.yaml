@@ -1,0 +1,521 @@
+name: state-transition-validator
+description: Validates case lifecycle state transitions are legal. Fills the ς (State) primitive gap by enforcing forward-only flow through new→triaged→assessed→reported→closed. Routes by current state and validates proposed transitions against preconditions (e.g., has_report before transitioning to reported).
+version: 0.1.0
+tree:
+  start: check_new_noop
+  nodes:
+    check_closed_reopen:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: closed
+      true_next: return_reopen
+      false_next: return_invalid_state
+    check_assessed_noop:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: assessed
+      true_next: is_proposed_assessed
+      false_next: check_reported_noop
+    check_triaged_regression:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: new
+      true_next: return_regression
+      false_next: return_invalid_skip_triaged
+    return_invalid_state:
+      type: return
+      value:
+        chemistry_analog: Unknown species; reaction mechanism undefined
+        transition_valid: false
+        action: Current state not recognized in state machine
+        transition_class: INVALID_SKIP
+        state_primitive: ς — undefined origin
+    check_triaged_noop:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: triaged
+      true_next: is_proposed_triaged
+      false_next: check_assessed_noop
+    return_valid_new:
+      type: return
+      value:
+        state_primitive: ς → triage readiness achieved
+        transition_valid: true
+        transition_class: VALID
+        action: Case transitions from new to triaged; initial assessment begins
+        chemistry_analog: Activation barrier crossed; substrate commits to reaction pathway
+    check_assessed_regression:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: new
+      true_next: return_regression
+      false_next: check_assessed_regression_triaged
+    check_has_report:
+      type: condition
+      variable: has_report
+      operator: eq
+      value: true
+      true_next: return_valid_assessed_reported
+      false_next: return_blocked_report
+    is_proposed_new:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: new
+      true_next: return_noop
+      false_next: validate_new
+    validate_assessed:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: reported
+      true_next: check_has_report
+      false_next: check_assessed_closed
+    return_invalid_skip_assessed:
+      type: return
+      value:
+        state_primitive: ς — invalid target; π path blocked
+        action: From 'assessed', only 'reported' or 'closed' are valid next states
+        transition_valid: false
+        transition_class: INVALID_SKIP
+        chemistry_analog: Coordination sphere mismatch; product geometry incompatible
+    is_proposed_closed:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: closed
+      true_next: return_noop
+      false_next: check_closed_reopen
+    return_noop:
+      type: return
+      value:
+        transition_valid: false
+        action: No state change requested; case remains in current state
+        transition_class: NOOP
+        state_primitive: ς — no change (operation is idempotent)
+        chemistry_analog: System at equilibrium; no driving force for transition
+    return_invalid_skip_new:
+      type: return
+      value:
+        action: From 'new', only 'triaged' is a valid next state
+        chemistry_analog: Reaction coordinate blocked; intermediate unavailable
+        transition_class: INVALID_SKIP
+        state_primitive: ς — wrong path; π not yet available
+        transition_valid: false
+    is_proposed_reported:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: reported
+      true_next: return_noop
+      false_next: validate_reported
+    check_assessed_closed:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: closed
+      true_next: return_valid_assessed_closed
+      false_next: check_assessed_regression
+    validate_reported:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: closed
+      true_next: return_valid_reported_closed
+      false_next: return_regression_reported
+    check_assessed_regression_triaged:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: triaged
+      true_next: return_regression
+      false_next: return_invalid_skip_assessed
+    return_reopen:
+      type: return
+      value:
+        transition_class: INVALID_REOPEN
+        chemistry_analog: Microscopic irreversibility; second law blocks spontaneous backward reaction
+        action: Cannot reopen closed case without special approval
+        state_primitive: ς — violation of closure finality
+        transition_valid: false
+    return_valid_triaged:
+      type: return
+      value:
+        action: Case transitions from triaged to assessed; causality assessment underway
+        transition_valid: true
+        state_primitive: ς → assessment initiated
+        transition_class: VALID
+        chemistry_analog: Reaction proceeds along coordination; products begin to form
+    validate_triaged:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: assessed
+      true_next: return_valid_triaged
+      false_next: check_triaged_regression
+    return_valid_assessed_closed:
+      type: return
+      value:
+        transition_valid: true
+        transition_class: VALID
+        action: Case transitions from assessed to closed without public report (non-expedited closure)
+        state_primitive: ς → closure allowed; assessment sufficient
+        chemistry_analog: Reaction terminates early with intermediate products; steady state achieved locally
+    return_blocked_report:
+      type: return
+      value:
+        action: Cannot transition to 'reported' without has_report=true; regulatory filing must exist
+        state_primitive: ς — blocked by precondition
+        transition_valid: false
+        transition_class: BLOCKED_MISSING_REPORT
+        chemistry_analog: Reaction blocked at rate-limiting step; precursor (report) unavailable
+    check_reported_noop:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: reported
+      true_next: is_proposed_reported
+      false_next: check_closed_noop
+    validate_new:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: triaged
+      true_next: return_valid_new
+      false_next: return_invalid_skip_new
+    check_new_noop:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: new
+      true_next: is_proposed_new
+      false_next: check_triaged_noop
+    return_regression_reported:
+      type: return
+      value:
+        action: From 'reported', only 'closed' is a valid next state; backward transitions forbidden
+        chemistry_analog: Microscopic reversibility violated; products cannot spontaneously decompose to reactants
+        transition_class: INVALID_REGRESSION
+        state_primitive: ς — regression attempt blocked
+        transition_valid: false
+    return_regression:
+      type: return
+      value:
+        state_primitive: ς — timeline violation; ↓ entropy rule
+        transition_class: INVALID_REGRESSION
+        action: Backward or sideways transitions violate case lifecycle ordering
+        chemistry_analog: Spontaneous backward reaction forbidden by second law
+        transition_valid: false
+    return_valid_assessed_reported:
+      type: return
+      value:
+        state_primitive: ς → reporting complete
+        transition_valid: true
+        chemistry_analog: Product species now observable downstream; reaction committed to completion
+        action: Case transitions from assessed to reported; regulatory filing complete
+        transition_class: VALID
+    is_proposed_triaged:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: triaged
+      true_next: return_noop
+      false_next: validate_triaged
+    check_closed_noop:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: closed
+      true_next: is_proposed_closed
+      false_next: return_invalid_state
+    return_valid_reported_closed:
+      type: return
+      value:
+        chemistry_analog: Reaction products deposited in stable sink; process irreversible
+        action: Case transitions from reported to closed; case lifecycle complete
+        state_primitive: ς → finality achieved
+        transition_class: VALID
+        transition_valid: true
+    is_proposed_assessed:
+      type: condition
+      variable: proposed_state
+      operator: eq
+      value: assessed
+      true_next: return_noop
+      false_next: validate_assessed
+    return_invalid_skip_triaged:
+      type: return
+      value:
+        action: From 'triaged', must transition to 'assessed' before advancing further
+        transition_valid: false
+        transition_class: INVALID_SKIP
+        chemistry_analog: Activation energy insufficient for multi-step bypass
+        state_primitive: ς — sequence violated; skipped assessment stage
+tests:
+- input:
+    has_assessment: false
+    proposed_state: triaged
+    has_report: false
+    current_state: new
+  expect:
+    transition_valid: true
+    transition_class: VALID
+- input:
+    has_assessment: false
+    proposed_state: assessed
+    current_state: new
+    has_report: false
+  expect:
+    transition_valid: false
+    transition_class: INVALID_SKIP
+- input:
+    has_assessment: false
+    current_state: new
+    proposed_state: new
+    has_report: false
+  expect:
+    transition_class: NOOP
+    transition_valid: false
+- input:
+    proposed_state: assessed
+    current_state: triaged
+    has_report: false
+    has_assessment: true
+  expect:
+    transition_class: VALID
+    transition_valid: true
+- input:
+    proposed_state: new
+    has_assessment: false
+    current_state: triaged
+    has_report: false
+  expect:
+    transition_class: INVALID_REGRESSION
+    transition_valid: false
+- input:
+    proposed_state: closed
+    has_assessment: false
+    current_state: triaged
+    has_report: false
+  expect:
+    transition_class: INVALID_SKIP
+    transition_valid: false
+- input:
+    has_report: true
+    has_assessment: true
+    proposed_state: reported
+    current_state: assessed
+  expect:
+    transition_class: VALID
+    transition_valid: true
+- input:
+    has_assessment: true
+    has_report: false
+    proposed_state: reported
+    current_state: assessed
+  expect:
+    transition_valid: false
+    transition_class: BLOCKED_MISSING_REPORT
+- input:
+    has_report: false
+    current_state: assessed
+    has_assessment: true
+    proposed_state: closed
+  expect:
+    transition_valid: true
+    transition_class: VALID
+- input:
+    proposed_state: new
+    current_state: assessed
+    has_assessment: true
+    has_report: false
+  expect:
+    transition_class: INVALID_REGRESSION
+    transition_valid: false
+- input:
+    current_state: reported
+    has_report: true
+    has_assessment: true
+    proposed_state: closed
+  expect:
+    transition_class: VALID
+    transition_valid: true
+- input:
+    has_report: true
+    current_state: reported
+    proposed_state: new
+    has_assessment: true
+  expect:
+    transition_class: INVALID_REGRESSION
+    transition_valid: false
+- input:
+    has_assessment: true
+    proposed_state: new
+    current_state: closed
+    has_report: true
+  expect:
+    transition_class: INVALID_REOPEN
+    transition_valid: false
+- input:
+    proposed_state: triaged
+    has_assessment: true
+    current_state: closed
+    has_report: true
+  expect:
+    transition_class: INVALID_REOPEN
+    transition_valid: false
+- input: {}
+  expect:
+    transition_valid: false
+    transition_class: INVALID_SKIP
+    state_primitive: ς — undefined origin
+    action: Current state not recognized in state machine
+    chemistry_analog: Unknown species; reaction mechanism undefined
+- input: {}
+  expect:
+    action: Current state not recognized in state machine
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    transition_class: INVALID_SKIP
+    state_primitive: ς — undefined origin
+    transition_valid: false
+- input: {}
+  expect:
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    state_primitive: ς — undefined origin
+    transition_class: INVALID_SKIP
+    transition_valid: false
+    action: Current state not recognized in state machine
+- input: {}
+  expect:
+    transition_valid: false
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    action: Current state not recognized in state machine
+    state_primitive: ς — undefined origin
+    transition_class: INVALID_SKIP
+- input: {}
+  expect:
+    transition_class: INVALID_SKIP
+    state_primitive: ς — undefined origin
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    action: Current state not recognized in state machine
+    transition_valid: false
+- input: {}
+  expect:
+    action: Current state not recognized in state machine
+    state_primitive: ς — undefined origin
+    transition_valid: false
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    transition_class: INVALID_SKIP
+- input: {}
+  expect:
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    transition_valid: false
+    action: Current state not recognized in state machine
+    state_primitive: ς — undefined origin
+    transition_class: INVALID_SKIP
+- input: {}
+  expect:
+    transition_class: INVALID_SKIP
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    state_primitive: ς — undefined origin
+    action: Current state not recognized in state machine
+    transition_valid: false
+- input: {}
+  expect:
+    state_primitive: ς — undefined origin
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    transition_valid: false
+    action: Current state not recognized in state machine
+    transition_class: INVALID_SKIP
+- input: {}
+  expect:
+    action: Current state not recognized in state machine
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    transition_class: INVALID_SKIP
+    state_primitive: ς — undefined origin
+    transition_valid: false
+- input: {}
+  expect:
+    transition_valid: false
+    transition_class: INVALID_SKIP
+    state_primitive: ς — undefined origin
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    action: Current state not recognized in state machine
+- input: {}
+  expect:
+    transition_valid: false
+    action: Current state not recognized in state machine
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    transition_class: INVALID_SKIP
+    state_primitive: ς — undefined origin
+- input: {}
+  expect:
+    state_primitive: ς — undefined origin
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    transition_class: INVALID_SKIP
+    action: Current state not recognized in state machine
+    transition_valid: false
+- input: {}
+  expect:
+    action: Current state not recognized in state machine
+    transition_class: INVALID_SKIP
+    transition_valid: false
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    state_primitive: ς — undefined origin
+- input: {}
+  expect:
+    action: Current state not recognized in state machine
+    state_primitive: ς — undefined origin
+    transition_valid: false
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    transition_class: INVALID_SKIP
+- input: {}
+  expect:
+    state_primitive: ς — undefined origin
+    transition_class: INVALID_SKIP
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    transition_valid: false
+    action: Current state not recognized in state machine
+- input: {}
+  expect:
+    state_primitive: ς — undefined origin
+    transition_valid: false
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    transition_class: INVALID_SKIP
+    action: Current state not recognized in state machine
+- input: {}
+  expect:
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    action: Current state not recognized in state machine
+    transition_valid: false
+    transition_class: INVALID_SKIP
+    state_primitive: ς — undefined origin
+- input: {}
+  expect:
+    transition_valid: false
+    state_primitive: ς — undefined origin
+    action: Current state not recognized in state machine
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    transition_class: INVALID_SKIP
+- input: {}
+  expect:
+    transition_class: INVALID_SKIP
+    state_primitive: ς — undefined origin
+    chemistry_analog: Unknown species; reaction mechanism undefined
+    action: Current state not recognized in state machine
+    transition_valid: false
+# Coverage gap tests — assessed state regression and invalid skip
+- input: { current_state: assessed, proposed_state: triaged, has_assessment: true, has_report: false }
+  expect:
+    transition_valid: false
+    transition_class: INVALID_REGRESSION
+- input: { current_state: assessed, proposed_state: unknown, has_assessment: true, has_report: false }
+  expect:
+    transition_valid: false
+    transition_class: INVALID_SKIP
+interface: null

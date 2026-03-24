@@ -1,0 +1,169 @@
+name: pathway-router
+description: "PDC: Route professional to development pathway based on experience and career goal"
+version: 0.1.0
+interface:
+  inputs:
+    career_goal:
+      type: string
+      required: false
+    is_student:
+      type: bool
+      required: false
+    years_experience:
+      type: int
+      required: false
+  outputs:
+    assessment_first:
+      type: bool
+    entry_program:
+      type: string
+    pathway:
+      type: string
+    sequence:
+      type: string
+    specialization:
+      type: string
+tree:
+  start: check_experience
+  nodes:
+    check_experience:
+      type: condition
+      variable: years_experience
+      operator: gte
+      value: 3
+      true_next: check_goal_experienced
+      false_next: check_student
+    check_student:
+      type: condition
+      variable: is_student
+      operator: eq
+      value: true
+      true_next: academic_pathway
+      false_next: early_career_pathway
+    check_goal_experienced:
+      type: condition
+      variable: career_goal
+      operator: eq
+      value: technology
+      true_next: technology_track
+      false_next: check_global
+    check_global:
+      type: condition
+      variable: career_goal
+      operator: eq
+      value: global
+      true_next: global_track
+      false_next: check_regulatory
+    check_regulatory:
+      type: condition
+      variable: career_goal
+      operator: eq
+      value: regulatory
+      true_next: regulatory_track
+      false_next: check_research
+    check_research:
+      type: condition
+      variable: career_goal
+      operator: eq
+      value: research
+      true_next: research_track
+      false_next: experienced_pathway
+    academic_pathway:
+      type: return
+      value:
+        pathway: TRADITIONAL_ACADEMIC
+        sequence: "APPE -> Fellowship -> Practice -> SMP -> Executive"
+        entry_program: APPE_ROTATION
+        assessment_first: false
+    early_career_pathway:
+      type: return
+      value:
+        pathway: EARLY_CAREER
+        sequence: "Fellowship_12 -> Practice -> Fellowship_18/24 -> SMP"
+        entry_program: FELLOWSHIP_12
+        assessment_first: false
+    experienced_pathway:
+      type: return
+      value:
+        pathway: EXPERIENCED_PROFESSIONAL
+        sequence: "Assessment -> Gap Analysis -> Targeted Dev -> Advanced EPA -> Exec"
+        entry_program: COMPETENCY_ASSESSMENT
+        assessment_first: true
+    technology_track:
+      type: return
+      value:
+        pathway: TECHNOLOGY_LEADERSHIP
+        sequence: "Assessment -> EPA 10 Accelerated -> CPA 8 Focus -> AI Transformation"
+        entry_program: COMPETENCY_ASSESSMENT
+        assessment_first: true
+        specialization: "EPA 10, CPA 8"
+    global_track:
+      type: return
+      value:
+        pathway: GLOBAL_LEADERSHIP
+        sequence: "Assessment -> International Experience -> Cultural Competency -> Global Exec"
+        entry_program: COMPETENCY_ASSESSMENT
+        assessment_first: true
+        specialization: "Domain 13, Cross-cultural"
+    regulatory_track:
+      type: return
+      value:
+        pathway: REGULATORY_AFFAIRS
+        sequence: "Assessment -> Domain 12 Deep -> Policy Development -> Regulatory Exec"
+        entry_program: COMPETENCY_ASSESSMENT
+        assessment_first: true
+        specialization: "Domain 12, Policy"
+    research_track:
+      type: return
+      value:
+        pathway: RESEARCH_DEVELOPMENT
+        sequence: "Assessment -> Research Competency -> Innovation Leadership -> R&D Exec"
+        entry_program: COMPETENCY_ASSESSMENT
+        assessment_first: true
+        specialization: "CPA 7, Innovation"
+tests:
+- input:
+    is_student: true
+    years_experience: 0
+  expect:
+    pathway: TRADITIONAL_ACADEMIC
+    entry_program: APPE_ROTATION
+    assessment_first: false
+- input:
+    is_student: false
+    years_experience: 1
+  expect:
+    pathway: EARLY_CAREER
+    entry_program: FELLOWSHIP_12
+- input:
+    years_experience: 5
+    career_goal: technology
+  expect:
+    pathway: TECHNOLOGY_LEADERSHIP
+    assessment_first: true
+- input:
+    years_experience: 10
+    career_goal: global
+  expect:
+    pathway: GLOBAL_LEADERSHIP
+- input:
+    years_experience: 7
+    career_goal: regulatory
+  expect:
+    pathway: REGULATORY_AFFAIRS
+    specialization: "Domain 12, Policy"
+- input:
+    years_experience: 4
+    career_goal: research
+  expect:
+    pathway: RESEARCH_DEVELOPMENT
+- input:
+    years_experience: 8
+    career_goal: general
+  expect:
+    pathway: EXPERIENCED_PROFESSIONAL
+    assessment_first: true
+- input: {}
+  expect:
+    pathway: EARLY_CAREER
+    entry_program: FELLOWSHIP_12

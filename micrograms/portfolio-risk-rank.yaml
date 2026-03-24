@@ -1,0 +1,182 @@
+name: portfolio-risk-rank
+description: 'Portfolio risk tier classification: maps signal_count and signal_ratio to critical/high/medium/low tiers for drug portfolio monitoring'
+version: 0.1.0
+interface:
+  inputs:
+    signal_count:
+      type: number
+      required: true
+    event_count:
+      type: number
+      required: true
+    total_reports:
+      type: number
+      required: true
+    signal_ratio:
+      type: number
+      required: true
+  outputs:
+    tier:
+      type: string
+    reason:
+      type: string
+tree:
+  start: check_critical_count
+  nodes:
+    check_critical_count:
+      type: condition
+      variable: signal_count
+      operator: gte
+      value: 10
+      true_next: critical
+      false_next: check_critical_ratio
+    check_critical_ratio:
+      type: condition
+      variable: signal_ratio
+      operator: gt
+      value: 0.6
+      true_next: critical
+      false_next: check_high_count
+    check_high_count:
+      type: condition
+      variable: signal_count
+      operator: gte
+      value: 5
+      true_next: high
+      false_next: check_high_ratio
+    check_high_ratio:
+      type: condition
+      variable: signal_ratio
+      operator: gt
+      value: 0.4
+      true_next: high
+      false_next: check_medium_count
+    check_medium_count:
+      type: condition
+      variable: signal_count
+      operator: gte
+      value: 2
+      true_next: medium
+      false_next: check_medium_reports
+    check_medium_reports:
+      type: condition
+      variable: total_reports
+      operator: gt
+      value: 50000
+      true_next: medium
+      false_next: low
+    critical:
+      type: return
+      value:
+        tier: critical
+        reason: High signal count or signal ratio exceeds 60%
+    high:
+      type: return
+      value:
+        tier: high
+        reason: Elevated signal count or signal ratio exceeds 40%
+    medium:
+      type: return
+      value:
+        tier: medium
+        reason: Multiple signals detected or high report volume
+    low:
+      type: return
+      value:
+        tier: low
+        reason: Minimal signal activity
+tests:
+# Critical by signal count
+- input:
+    signal_count: 12
+    event_count: 20
+    total_reports: 5000
+    signal_ratio: 0.6
+  expect:
+    tier: critical
+    reason: High signal count or signal ratio exceeds 60%
+# Critical by ratio (count < 10 but ratio > 0.6)
+- input:
+    signal_count: 8
+    event_count: 12
+    total_reports: 3000
+    signal_ratio: 0.67
+  expect:
+    tier: critical
+    reason: High signal count or signal ratio exceeds 60%
+# Boundary: exactly 10 signals = critical
+- input:
+    signal_count: 10
+    event_count: 25
+    total_reports: 10000
+    signal_ratio: 0.4
+  expect:
+    tier: critical
+    reason: High signal count or signal ratio exceeds 60%
+# High by signal count
+- input:
+    signal_count: 7
+    event_count: 20
+    total_reports: 8000
+    signal_ratio: 0.35
+  expect:
+    tier: high
+    reason: Elevated signal count or signal ratio exceeds 40%
+# High by ratio
+- input:
+    signal_count: 3
+    event_count: 6
+    total_reports: 2000
+    signal_ratio: 0.5
+  expect:
+    tier: high
+    reason: Elevated signal count or signal ratio exceeds 40%
+# Medium by signal count
+- input:
+    signal_count: 3
+    event_count: 20
+    total_reports: 5000
+    signal_ratio: 0.15
+  expect:
+    tier: medium
+    reason: Multiple signals detected or high report volume
+# Medium by high report volume
+- input:
+    signal_count: 1
+    event_count: 10
+    total_reports: 60000
+    signal_ratio: 0.1
+  expect:
+    tier: medium
+    reason: Multiple signals detected or high report volume
+# Low - minimal signals
+- input:
+    signal_count: 1
+    event_count: 15
+    total_reports: 3000
+    signal_ratio: 0.07
+  expect:
+    tier: low
+    reason: Minimal signal activity
+# Zero signals
+- input:
+    signal_count: 0
+    event_count: 10
+    total_reports: 1000
+    signal_ratio: 0.0
+  expect:
+    tier: low
+    reason: Minimal signal activity
+# Boundary: exactly 5 signals = high
+- input:
+    signal_count: 5
+    event_count: 20
+    total_reports: 8000
+    signal_ratio: 0.25
+  expect:
+    tier: high
+    reason: Elevated signal count or signal ratio exceeds 40%
+- input: {}
+  expect:
+    reason: Minimal signal activity
+    tier: low

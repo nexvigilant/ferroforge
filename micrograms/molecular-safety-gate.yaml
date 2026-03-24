@@ -1,0 +1,217 @@
+name: molecular-safety-gate
+description: 'Chemistry-based molecular safety screening: evaluates molecular weight, heavy atom count, bond saturation, and charge to gate drug candidates using prima-chem molecular primitives'
+version: 0.1.0
+interface:
+  inputs:
+    molecular_weight:
+      type: number
+      required: true
+      description: 'Molecular weight in g/mol'
+    heavy_atom_count:
+      type: number
+      required: true
+      description: 'Number of non-hydrogen atoms'
+    bond_count:
+      type: number
+      required: true
+      description: 'Total number of bonds'
+    aromatic_bond_count:
+      type: number
+      required: true
+      description: 'Number of aromatic bonds'
+    net_charge:
+      type: number
+      required: true
+      description: 'Net molecular charge'
+  outputs:
+    gate_result:
+      type: string
+    risk_flags:
+      type: string
+    lipinski_mw_pass:
+      type: boolean
+tree:
+  start: check_mw_upper
+  nodes:
+    check_mw_upper:
+      type: condition
+      variable: molecular_weight
+      operator: gt
+      value: 500
+      true_next: check_mw_extreme
+      false_next: check_mw_lower
+    check_mw_extreme:
+      type: condition
+      variable: molecular_weight
+      operator: gt
+      value: 1000
+      true_next: reject_biologic
+      false_next: warn_mw_high
+    check_mw_lower:
+      type: condition
+      variable: molecular_weight
+      operator: lt
+      value: 100
+      true_next: reject_fragment
+      false_next: check_heavy_atoms
+    check_heavy_atoms:
+      type: condition
+      variable: heavy_atom_count
+      operator: gt
+      value: 40
+      true_next: warn_complexity
+      false_next: check_saturation
+    check_saturation:
+      type: condition
+      variable: aromatic_bond_count
+      operator: gt
+      value: 15
+      true_next: warn_aromatic
+      false_next: check_charge
+    check_charge:
+      type: condition
+      variable: net_charge
+      operator: eq
+      value: 0
+      true_next: pass_neutral
+      false_next: check_high_charge
+    check_high_charge:
+      type: condition
+      variable: net_charge
+      operator: gt
+      value: 2
+      true_next: warn_charged
+      false_next: check_neg_charge
+    check_neg_charge:
+      type: condition
+      variable: net_charge
+      operator: lt
+      value: -2
+      true_next: warn_charged
+      false_next: pass_minor_charge
+    reject_biologic:
+      type: return
+      value:
+        gate_result: WARN
+        risk_flags: 'MW > 1000 — likely biologic (Lipinski not applicable to biologics)'
+        lipinski_mw_pass: false
+    warn_mw_high:
+      type: return
+      value:
+        gate_result: WARN
+        risk_flags: 'MW 500-1000 — Lipinski Rule of 5 MW violation, poor oral bioavailability likely'
+        lipinski_mw_pass: false
+    reject_fragment:
+      type: return
+      value:
+        gate_result: WARN
+        risk_flags: 'MW < 100 — molecular fragment, not a viable drug candidate (Lipinski MW passes but too small for drug)'
+        lipinski_mw_pass: true
+    warn_complexity:
+      type: return
+      value:
+        gate_result: WARN
+        risk_flags: 'Heavy atom count > 40 — high molecular complexity, synthesis and formulation challenges'
+        lipinski_mw_pass: true
+    warn_aromatic:
+      type: return
+      value:
+        gate_result: WARN
+        risk_flags: 'High aromaticity — potential mutagenicity, phototoxicity risk'
+        lipinski_mw_pass: true
+    pass_neutral:
+      type: return
+      value:
+        gate_result: PASS
+        risk_flags: 'No flags — neutral charge, acceptable MW and complexity'
+        lipinski_mw_pass: true
+    warn_charged:
+      type: return
+      value:
+        gate_result: WARN
+        risk_flags: 'High net charge — poor membrane permeability expected'
+        lipinski_mw_pass: true
+    pass_minor_charge:
+      type: return
+      value:
+        gate_result: PASS
+        risk_flags: 'Minor charge within acceptable range'
+        lipinski_mw_pass: true
+tests:
+- input:
+    molecular_weight: 1200
+    heavy_atom_count: 80
+    bond_count: 90
+    aromatic_bond_count: 5
+    net_charge: 0
+  expect:
+    gate_result: WARN
+    lipinski_mw_pass: false
+- input:
+    molecular_weight: 600
+    heavy_atom_count: 35
+    bond_count: 40
+    aromatic_bond_count: 6
+    net_charge: 0
+  expect:
+    gate_result: WARN
+    lipinski_mw_pass: false
+- input:
+    molecular_weight: 50
+    heavy_atom_count: 3
+    bond_count: 2
+    aromatic_bond_count: 0
+    net_charge: 0
+  expect:
+    gate_result: WARN
+    lipinski_mw_pass: true
+- input:
+    molecular_weight: 350
+    heavy_atom_count: 45
+    bond_count: 50
+    aromatic_bond_count: 8
+    net_charge: 0
+  expect:
+    gate_result: WARN
+    lipinski_mw_pass: true
+- input:
+    molecular_weight: 300
+    heavy_atom_count: 20
+    bond_count: 22
+    aromatic_bond_count: 18
+    net_charge: 0
+  expect:
+    gate_result: WARN
+    lipinski_mw_pass: true
+- input:
+    molecular_weight: 250
+    heavy_atom_count: 18
+    bond_count: 20
+    aromatic_bond_count: 6
+    net_charge: 0
+  expect:
+    gate_result: PASS
+    lipinski_mw_pass: true
+- input:
+    molecular_weight: 400
+    heavy_atom_count: 30
+    bond_count: 35
+    aromatic_bond_count: 6
+    net_charge: 3
+  expect:
+    gate_result: WARN
+    lipinski_mw_pass: true
+- input:
+    molecular_weight: 300
+    heavy_atom_count: 22
+    bond_count: 24
+    aromatic_bond_count: 6
+    net_charge: -1
+  expect:
+    gate_result: PASS
+    lipinski_mw_pass: true
+- input: {}
+  expect:
+    gate_result: PASS
+    lipinski_mw_pass: true
+    risk_flags: Minor charge within acceptable range

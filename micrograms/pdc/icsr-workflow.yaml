@@ -1,0 +1,152 @@
+name: icsr-workflow
+description: "Domain 4: Full ICSR processing workflow — intake through submission. Routes by case type, seriousness, and completeness."
+version: 0.1.0
+interface:
+  inputs:
+    has_minimum_data:
+      type: bool
+      required: false
+    is_fatal_or_life_threatening:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+  outputs:
+    ai_assist:
+      type: string
+    deadline_days:
+      type: int
+    followup:
+      type: string
+    human_oversight:
+      type: string
+    minimum_data:
+      type: string
+    priority:
+      type: string
+    steps:
+      type: string
+    workflow:
+      type: string
+tree:
+  start: check_valid
+  nodes:
+    check_valid:
+      type: condition
+      variable: has_minimum_data
+      operator: eq
+      value: true
+      true_next: check_serious
+      false_next: incomplete_case
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_expedited
+      false_next: standard_workflow
+    check_expedited:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: check_fatal_lt
+      false_next: serious_expected
+    check_fatal_lt:
+      type: condition
+      variable: is_fatal_or_life_threatening
+      operator: eq
+      value: true
+      true_next: expedited_7day
+      false_next: expedited_15day
+    expedited_7day:
+      type: return
+      value:
+        workflow: EXPEDITED_URGENT
+        deadline_days: 7
+        steps: "intake -> triage -> medical_review -> meddra_code -> causality_assess -> narrative -> qc -> regulatory_submit"
+        priority: CRITICAL
+        ai_assist: "auto-triage, coding suggestions, narrative draft, duplicate check, timeline alert"
+        human_oversight: "mandatory medical review, causality sign-off, narrative approval"
+        followup: "required within 30 days, active pursuit"
+    expedited_15day:
+      type: return
+      value:
+        workflow: EXPEDITED_STANDARD
+        deadline_days: 15
+        steps: "intake -> triage -> medical_review -> meddra_code -> causality_assess -> narrative -> qc -> regulatory_submit"
+        priority: HIGH
+        ai_assist: "auto-triage, coding suggestions, narrative draft, compliance check"
+        human_oversight: "medical review required, causality assessment"
+        followup: "required within 90 days"
+    serious_expected:
+      type: return
+      value:
+        workflow: PERIODIC_SERIOUS
+        deadline_days: 90
+        steps: "intake -> triage -> medical_review -> meddra_code -> causality_assess -> narrative -> qc -> periodic_submit"
+        priority: MEDIUM
+        ai_assist: "coding suggestions, quality check, listedness verification"
+        human_oversight: "medical review, quality check"
+        followup: "as needed based on clinical significance"
+    standard_workflow:
+      type: return
+      value:
+        workflow: STANDARD
+        deadline_days: 90
+        steps: "intake -> triage -> code -> assess -> narrative -> qc -> periodic_submit"
+        priority: NORMAL
+        ai_assist: "auto-code, quality check, narrative assist"
+        human_oversight: "quality spot-check"
+        followup: "only if clinically significant"
+    incomplete_case:
+      type: return
+      value:
+        workflow: FOLLOWUP_REQUIRED
+        deadline_days: 0
+        steps: "document_receipt -> request_followup -> await_minimum_data"
+        priority: PENDING
+        minimum_data: "identifiable patient, identifiable reporter, suspect product, adverse event"
+        ai_assist: "source identification, auto-followup generation"
+tests:
+- input:
+    has_minimum_data: true
+    is_serious: true
+    is_unexpected: true
+    is_fatal_or_life_threatening: true
+  expect:
+    workflow: EXPEDITED_URGENT
+    deadline_days: 7
+    priority: CRITICAL
+- input:
+    has_minimum_data: true
+    is_serious: true
+    is_unexpected: true
+    is_fatal_or_life_threatening: false
+  expect:
+    workflow: EXPEDITED_STANDARD
+    deadline_days: 15
+- input:
+    has_minimum_data: true
+    is_serious: true
+    is_unexpected: false
+  expect:
+    workflow: PERIODIC_SERIOUS
+    deadline_days: 90
+- input:
+    has_minimum_data: true
+    is_serious: false
+  expect:
+    workflow: STANDARD
+    priority: NORMAL
+- input:
+    has_minimum_data: false
+  expect:
+    workflow: FOLLOWUP_REQUIRED
+- input: {}
+  expect:
+    workflow: FOLLOWUP_REQUIRED

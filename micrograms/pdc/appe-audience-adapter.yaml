@@ -1,0 +1,229 @@
+name: appe-audience-adapter
+description: "APPE Ch7.4 Domain 14 L2: Adapts PV communication style, language level, and format for clinicians, regulators, patients, executives, and media. Applies urgency and complexity overrides."
+version: 0.1.0
+interface:
+  inputs:
+    audience_type:
+      type: string
+      required: false
+    technical_complexity:
+      type: int
+      required: false
+  outputs:
+    action_required:
+      type: string
+    detail_level:
+      type: string
+    format:
+      type: string
+    key_framing:
+      type: string
+    language_level:
+      type: string
+    simplification_needed:
+      type: bool
+    teaching_point:
+      type: string
+tree:
+  start: check_clinician
+  nodes:
+    check_clinician:
+      type: condition
+      variable: audience_type
+      operator: eq
+      value: "clinician"
+      true_next: clinician_base
+      false_next: check_regulator
+
+    check_regulator:
+      type: condition
+      variable: audience_type
+      operator: eq
+      value: "regulator"
+      true_next: regulator_base
+      false_next: check_patient
+
+    check_patient:
+      type: condition
+      variable: audience_type
+      operator: eq
+      value: "patient"
+      true_next: check_patient_complexity
+      false_next: check_executive
+
+    check_patient_complexity:
+      type: condition
+      variable: technical_complexity
+      operator: gt
+      value: 3
+      true_next: patient_simplify
+      false_next: patient_base
+
+    check_executive:
+      type: condition
+      variable: audience_type
+      operator: eq
+      value: "executive"
+      true_next: executive_base
+      false_next: check_media
+
+    check_media:
+      type: condition
+      variable: audience_type
+      operator: eq
+      value: "media"
+      true_next: check_media_complexity
+      false_next: unknown_audience
+
+    check_media_complexity:
+      type: condition
+      variable: technical_complexity
+      operator: gt
+      value: 3
+      true_next: media_simplify
+      false_next: media_base
+
+    # Clinician
+    clinician_base:
+      type: return
+      value:
+        language_level: "technical"
+        detail_level: "high"
+        format: "clinical_summary"
+        key_framing: "Safety signal, mechanism, clinical implications, dose management"
+        simplification_needed: false
+        action_required: false
+        teaching_point: "Clinicians need mechanism, dose relationship, management options, and comparable drug alternatives. Use MedDRA terms. Include labelling status and any REMS requirements."
+
+    # Regulator
+    regulator_base:
+      type: return
+      value:
+        language_level: "regulatory"
+        detail_level: "high"
+        format: "structured_report"
+        key_framing: "Signal characterisation, benefit-risk assessment, labelling implications, regulatory history"
+        simplification_needed: false
+        action_required: false
+        teaching_point: "Regulators require ICH E2E/E2F-compliant structure, statistical disproportionality measures, causality evidence, and proposed risk minimisation measures. Include data cutoff and completeness notes."
+
+    # Patient — normal complexity
+    patient_base:
+      type: return
+      value:
+        language_level: "plain"
+        detail_level: "low"
+        format: "patient_friendly"
+        key_framing: "What happened, what to do, when to call your doctor"
+        simplification_needed: false
+        action_required: false
+        teaching_point: "Patients need plain English at Grade 6-8 reading level. Avoid jargon. Focus on what symptoms to watch for, what to do, and when to seek help. Never omit what to do next."
+
+    # Patient — high complexity topic, needs simplification
+    patient_simplify:
+      type: return
+      value:
+        language_level: "plain"
+        detail_level: "low"
+        format: "patient_friendly"
+        key_framing: "What happened, what to do, when to call your doctor"
+        simplification_needed: true
+        action_required: false
+        teaching_point: "Complex pharmacological concepts must be translated: 'immune reaction' not 'Type I hypersensitivity', 'kidney problems' not 'nephrotoxicity'. Use analogies. Test readability with Flesch-Kincaid."
+
+    # Executive
+    executive_base:
+      type: return
+      value:
+        language_level: "business"
+        detail_level: "medium"
+        format: "executive_brief"
+        key_framing: "Risk exposure, business impact, decision needed by when, recommended action"
+        simplification_needed: false
+        action_required: false
+        teaching_point: "Executives need the bottom line first: risk level, business exposure, and a clear recommendation. Lead with the decision needed, not the scientific background. Include timelines and financial/reputational stakes."
+
+    # Media — normal complexity
+    media_base:
+      type: return
+      value:
+        language_level: "accessible"
+        detail_level: "low"
+        format: "press_statement"
+        key_framing: "What the company is doing, patient safety first, context on frequency, next steps"
+        simplification_needed: false
+        action_required: false
+        teaching_point: "Media communication must lead with patient safety commitment, provide context (how common is the risk?), and avoid hedging language that reads as evasion. Have one clear quote per spokesperson."
+
+    # Media — complex topic
+    media_simplify:
+      type: return
+      value:
+        language_level: "accessible"
+        detail_level: "low"
+        format: "press_statement"
+        key_framing: "What the company is doing, patient safety first, context on frequency, next steps"
+        simplification_needed: true
+        action_required: false
+        teaching_point: "When the safety topic is technically complex, prepare a one-page backgrounder for journalists and a separate public-facing summary. Offer expert interviews. Avoid acronyms and chemical names in the press statement."
+
+    unknown_audience:
+      type: return
+      value:
+        language_level: "plain"
+        detail_level: "medium"
+        format: "general_summary"
+        key_framing: "Describe safety finding, impact, and recommended action"
+        simplification_needed: false
+        action_required: false
+        teaching_point: "Unrecognised audience type. Default to plain language at medium detail. Identify your audience before communicating — the same safety message lands differently for different stakeholders."
+
+tests:
+# Clinician audience
+- input: { audience_type: "clinician", technical_complexity: 3, safety_urgency: false }
+  expect: { language_level: "technical", detail_level: "high", format: "clinical_summary", simplification_needed: false }
+
+# Regulator audience
+- input: { audience_type: "regulator", technical_complexity: 4, safety_urgency: false }
+  expect: { language_level: "regulatory", detail_level: "high", format: "structured_report" }
+
+# Patient — low complexity
+- input: { audience_type: "patient", technical_complexity: 2, safety_urgency: false }
+  expect: { language_level: "plain", detail_level: "low", format: "patient_friendly", simplification_needed: false }
+
+# Patient — high complexity triggers simplification
+- input: { audience_type: "patient", technical_complexity: 4, safety_urgency: false }
+  expect: { language_level: "plain", format: "patient_friendly", simplification_needed: true }
+
+# Executive audience
+- input: { audience_type: "executive", technical_complexity: 2, safety_urgency: false }
+  expect: { language_level: "business", detail_level: "medium", format: "executive_brief" }
+
+# Media — low complexity
+- input: { audience_type: "media", technical_complexity: 2, safety_urgency: false }
+  expect: { language_level: "accessible", format: "press_statement", simplification_needed: false }
+
+# Media — high complexity triggers simplification
+- input: { audience_type: "media", technical_complexity: 5, safety_urgency: false }
+  expect: { language_level: "accessible", format: "press_statement", simplification_needed: true }
+
+# Patient — complexity exactly 3 (not > 3) → no simplification
+- input: { audience_type: "patient", technical_complexity: 3, safety_urgency: false }
+  expect: { simplification_needed: false, format: "patient_friendly" }
+
+# Unknown audience type
+- input: { audience_type: "journalist", technical_complexity: 2, safety_urgency: false }
+  expect: { format: "general_summary", language_level: "plain" }
+
+# Media — complexity exactly 3 (not > 3) → no simplification
+- input: { audience_type: "media", technical_complexity: 3, safety_urgency: false }
+  expect: { simplification_needed: false, format: "press_statement" }
+- input: {}
+  expect:
+    action_required: false
+    detail_level: medium
+    format: general_summary
+    key_framing: "Describe safety finding, impact, and recommended action"
+    language_level: plain
+    simplification_needed: false
+    teaching_point: Unrecognised audience type. Default to plain language at medium detail. Identify your audience before communicating — the same safety message lands differently for different stakeholders.

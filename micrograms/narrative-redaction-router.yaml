@@ -1,0 +1,285 @@
+name: narrative-redaction-router
+description: "Gate 4 of narrative safe-extract: route narrative through redaction decision based on combined PHI severity, site exposure, and inference risk to produce a final extract/block/review verdict"
+version: 0.1.0
+interface:
+  inputs:
+    phi_severity:
+      type: string
+      required: false
+    site_risk_level:
+      type: string
+      required: false
+    inference_risk:
+      type: string
+      required: false
+    is_expedited_report:
+      type: bool
+      required: false
+    regulatory_submission:
+      type: bool
+      required: false
+  outputs:
+    verdict:
+      type: string
+    overall_risk:
+      type: string
+    can_extract:
+      type: bool
+    requires_redaction:
+      type: bool
+    action:
+      type: string
+tree:
+  start: check_phi
+  nodes:
+    check_phi:
+      type: condition
+      variable: phi_severity
+      operator: eq
+      value: "CRITICAL"
+      true_next: block_critical
+      false_next: check_phi_high
+    check_phi_high:
+      type: condition
+      variable: phi_severity
+      operator: eq
+      value: "HIGH"
+      true_next: block_high_phi
+      false_next: check_site_critical
+    check_site_critical:
+      type: condition
+      variable: site_risk_level
+      operator: eq
+      value: "CRITICAL"
+      true_next: block_critical
+      false_next: check_site_high
+    check_site_high:
+      type: condition
+      variable: site_risk_level
+      operator: eq
+      value: "HIGH"
+      true_next: block_high_site
+      false_next: check_inference_critical
+    check_inference_critical:
+      type: condition
+      variable: inference_risk
+      operator: eq
+      value: "CRITICAL"
+      true_next: block_critical
+      false_next: check_inference_high
+    check_inference_high:
+      type: condition
+      variable: inference_risk
+      operator: eq
+      value: "HIGH"
+      true_next: block_high_inference
+      false_next: check_moderate_phi
+    check_moderate_phi:
+      type: condition
+      variable: phi_severity
+      operator: eq
+      value: "MODERATE"
+      true_next: check_regulatory_moderate
+      false_next: check_moderate_site
+    check_regulatory_moderate:
+      type: condition
+      variable: regulatory_submission
+      operator: eq
+      value: true
+      true_next: redact_and_extract
+      false_next: review_moderate
+    check_moderate_site:
+      type: condition
+      variable: site_risk_level
+      operator: eq
+      value: "MODERATE"
+      true_next: review_moderate
+      false_next: check_moderate_inference
+    check_moderate_inference:
+      type: condition
+      variable: inference_risk
+      operator: eq
+      value: "MODERATE"
+      true_next: review_moderate
+      false_next: check_low_phi
+    check_low_phi:
+      type: condition
+      variable: phi_severity
+      operator: eq
+      value: "LOW"
+      true_next: review_low
+      false_next: check_expedited
+    check_expedited:
+      type: condition
+      variable: is_expedited_report
+      operator: eq
+      value: true
+      true_next: extract_expedited
+      false_next: extract_clean
+    block_critical:
+      type: return
+      value:
+        verdict: BLOCK
+        overall_risk: CRITICAL
+        can_extract: false
+        requires_redaction: true
+        action: "Full redaction required — CRITICAL risk elements must be removed before any extraction"
+    block_high_phi:
+      type: return
+      value:
+        verdict: BLOCK
+        overall_risk: HIGH
+        can_extract: false
+        requires_redaction: true
+        action: "PHI redaction required — HIGH severity identifiers must be removed or pseudonymized"
+    block_high_site:
+      type: return
+      value:
+        verdict: BLOCK
+        overall_risk: HIGH
+        can_extract: false
+        requires_redaction: true
+        action: "Site identifier redaction required — replace site details with generic labels"
+    block_high_inference:
+      type: return
+      value:
+        verdict: BLOCK
+        overall_risk: HIGH
+        can_extract: false
+        requires_redaction: true
+        action: "Quasi-identifier generalization required — reduce specificity of identifying combinations"
+    redact_and_extract:
+      type: return
+      value:
+        verdict: REDACT_AND_EXTRACT
+        overall_risk: MODERATE
+        can_extract: true
+        requires_redaction: true
+        action: "Regulatory submission — apply standard redactions (HIPAA Safe Harbor) then extract"
+    review_moderate:
+      type: return
+      value:
+        verdict: REVIEW
+        overall_risk: MODERATE
+        can_extract: false
+        requires_redaction: true
+        action: "Manual review required — MODERATE risk elements need expert assessment"
+    review_low:
+      type: return
+      value:
+        verdict: REVIEW
+        overall_risk: LOW
+        can_extract: false
+        requires_redaction: false
+        action: "Low-risk review — confirm no additional context creates combined risk"
+    extract_expedited:
+      type: return
+      value:
+        verdict: EXTRACT
+        overall_risk: NONE
+        can_extract: true
+        requires_redaction: false
+        action: "Clean narrative — safe to extract for expedited regulatory submission"
+    extract_clean:
+      type: return
+      value:
+        verdict: EXTRACT
+        overall_risk: NONE
+        can_extract: true
+        requires_redaction: false
+        action: "Clean narrative — safe to extract, no identifiers detected"
+tests:
+- input:
+    phi_severity: "CRITICAL"
+  expect:
+    verdict: BLOCK
+    overall_risk: CRITICAL
+    can_extract: false
+    requires_redaction: true
+- input:
+    phi_severity: "HIGH"
+  expect:
+    verdict: BLOCK
+    overall_risk: HIGH
+    can_extract: false
+- input:
+    site_risk_level: "CRITICAL"
+  expect:
+    verdict: BLOCK
+    overall_risk: CRITICAL
+    can_extract: false
+- input:
+    site_risk_level: "HIGH"
+  expect:
+    verdict: BLOCK
+    overall_risk: HIGH
+    can_extract: false
+- input:
+    inference_risk: "CRITICAL"
+  expect:
+    verdict: BLOCK
+    overall_risk: CRITICAL
+    can_extract: false
+- input:
+    inference_risk: "HIGH"
+  expect:
+    verdict: BLOCK
+    overall_risk: HIGH
+    can_extract: false
+- input:
+    phi_severity: "MODERATE"
+    regulatory_submission: true
+  expect:
+    verdict: REDACT_AND_EXTRACT
+    can_extract: true
+    requires_redaction: true
+- input:
+    phi_severity: "MODERATE"
+    regulatory_submission: false
+  expect:
+    verdict: REVIEW
+    overall_risk: MODERATE
+- input:
+    site_risk_level: "MODERATE"
+  expect:
+    verdict: REVIEW
+    overall_risk: MODERATE
+- input:
+    inference_risk: "MODERATE"
+  expect:
+    verdict: REVIEW
+    overall_risk: MODERATE
+- input:
+    phi_severity: "LOW"
+  expect:
+    verdict: REVIEW
+    overall_risk: LOW
+    requires_redaction: false
+- input:
+    is_expedited_report: true
+  expect:
+    verdict: EXTRACT
+    can_extract: true
+    requires_redaction: false
+- input: {}
+  expect:
+    verdict: EXTRACT
+    overall_risk: NONE
+    can_extract: true
+    requires_redaction: false
+- input:
+    phi_severity: "NONE"
+    site_risk_level: "NONE"
+    inference_risk: "NONE"
+  expect:
+    verdict: EXTRACT
+    can_extract: true
+    requires_redaction: false
+- input:
+    phi_severity: "NONE"
+    site_risk_level: "NONE"
+    inference_risk: "NONE"
+    is_expedited_report: true
+  expect:
+    verdict: EXTRACT
+    can_extract: true

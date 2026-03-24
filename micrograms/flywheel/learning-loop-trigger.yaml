@@ -1,0 +1,103 @@
+name: learning-loop-trigger
+description: 'Determine which VDAG learning loop to activate based on failure rate and evaluation count. Triple every 5th evaluation, Double when failure_rate > 20%, Single otherwise.'
+version: 0.1.0
+interface:
+  inputs:
+    failure_rate:
+      type: integer
+      required: true
+    is_fifth_evaluation:
+      type: boolean
+      required: true
+  outputs:
+    loop_type:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_fifth
+  nodes:
+    check_fifth:
+      type: condition
+      variable: is_fifth_evaluation
+      operator: eq
+      value: true
+      true_next: return_triple
+      false_next: check_failure_rate
+    check_failure_rate:
+      type: condition
+      variable: failure_rate
+      operator: gt
+      value: 20
+      true_next: return_double
+      false_next: return_single
+    return_triple:
+      type: return
+      value:
+        loop_type: TRIPLE
+        action: Question the loop model itself — are loop weights and evidence grading still appropriate?
+    return_double:
+      type: return
+      value:
+        loop_type: DOUBLE
+        action: Question thresholds — failure rate exceeds 20%, thresholds may be miscalibrated
+    return_single:
+      type: return
+      value:
+        loop_type: SINGLE
+        action: Fix execution errors — identify and correct the most recent failure
+tests:
+- input:
+    failure_rate: 0
+    is_fifth_evaluation: true
+  expect:
+    loop_type: TRIPLE
+- input:
+    failure_rate: 50
+    is_fifth_evaluation: true
+  expect:
+    loop_type: TRIPLE
+- input:
+    failure_rate: 25
+    is_fifth_evaluation: false
+  expect:
+    loop_type: DOUBLE
+- input:
+    failure_rate: 100
+    is_fifth_evaluation: false
+  expect:
+    loop_type: DOUBLE
+- input:
+    failure_rate: 21
+    is_fifth_evaluation: false
+  expect:
+    loop_type: DOUBLE
+- input:
+    failure_rate: 20
+    is_fifth_evaluation: false
+  expect:
+    loop_type: SINGLE
+- input:
+    failure_rate: 0
+    is_fifth_evaluation: false
+  expect:
+    loop_type: SINGLE
+- input:
+    failure_rate: 10
+    is_fifth_evaluation: false
+  expect:
+    loop_type: SINGLE
+- input:
+    failure_rate: 19
+    is_fifth_evaluation: false
+  expect:
+    loop_type: SINGLE
+- input:
+    failure_rate: 1
+    is_fifth_evaluation: false
+  expect:
+    loop_type: SINGLE
+- input: {}
+  expect:
+    action: Fix execution errors — identify and correct the most recent failure
+    loop_type: SINGLE

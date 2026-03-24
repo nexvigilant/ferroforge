@@ -1,0 +1,65 @@
+name: signal-strength-classifier
+description: 'Signal level to strength mapper: converts traffic level (red/yellow/green) to signal strength label for dashboard display'
+version: 0.1.0
+interface:
+  inputs:
+    level:
+      type: string
+      required: true
+      description: 'Traffic level from signal detection (red, yellow, green)'
+  outputs:
+    strength:
+      type: string
+tree:
+  start: check_red
+  nodes:
+    check_red:
+      type: condition
+      variable: level
+      operator: eq
+      value: red
+      true_next: strong
+      false_next: check_yellow
+    check_yellow:
+      type: condition
+      variable: level
+      operator: eq
+      value: yellow
+      true_next: moderate
+      false_next: none_strength
+    strong:
+      type: return
+      value:
+        strength: strong
+    moderate:
+      type: return
+      value:
+        strength: moderate
+    none_strength:
+      type: return
+      value:
+        strength: none
+tests:
+# Red = strong
+- input:
+    level: red
+  expect:
+    strength: strong
+# Yellow = moderate
+- input:
+    level: yellow
+  expect:
+    strength: moderate
+# Green = none
+- input:
+    level: green
+  expect:
+    strength: none
+# Unknown level = none (fallthrough)
+- input:
+    level: unknown
+  expect:
+    strength: none
+- input: {}
+  expect:
+    strength: none

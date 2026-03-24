@@ -1,0 +1,107 @@
+name: smm-preem-eval
+description: 'SMM pre-empirical evaluation chain (SMM-002 path). Routes through fatal screen → violation severity → maturation gate → integration disposition. For frameworks, reviews, and theoretical works.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - smm-fatal-screen
+  - smm-violation-severity
+  - smm-maturation-gate
+  - smm-integration-disposition
+tests:
+- name: clean pre-empirical — mature framework
+  input:
+    study_type: pre_empirical
+    has_fatal_violation: false
+    n_critical: 0
+    n_major: 0
+    n_minor: 0
+    severity_band: EXEMPLARY
+    integration_weight: full
+    score_band: CLEAN
+  expect:
+    fatal_detected: false
+    proceed_to_scoring: true
+    severity_band: EXEMPLARY
+    maturation_level: MATURE
+    disposition: INCLUDE
+    weight_in_synthesis: "1.00"
+    can_cite: true
+- name: minor gaps — developing maturation
+  input:
+    study_type: pre_empirical
+    has_fatal_violation: false
+    n_critical: 0
+    n_major: 2
+    n_minor: 1
+    severity_band: HIGH
+    integration_weight: high
+    score_band: CLEAN
+  expect:
+    fatal_detected: false
+    severity_band: HIGH
+    maturation_level: DEVELOPING
+    disposition: INCLUDE_WITH_CAVEATS
+    weight_in_synthesis: "0.80"
+- name: moderate gaps — conditional maturation
+  input:
+    study_type: pre_empirical
+    has_fatal_violation: false
+    n_critical: 1
+    n_major: 2
+    n_minor: 0
+    severity_band: MODERATE
+    integration_weight: conditional
+    score_band: CLEAN
+  expect:
+    severity_band: MODERATE
+    maturation_level: CONDITIONAL
+    disposition: INCLUDE_CONDITIONAL
+    requires_sensitivity_analysis: true
+- name: heavy violations — immature
+  input:
+    study_type: pre_empirical
+    has_fatal_violation: false
+    n_critical: 3
+    n_major: 3
+    n_minor: 2
+    severity_band: LOW
+    integration_weight: low
+    score_band: CLEAN
+  expect:
+    severity_band: LOW
+    maturation_level: IMMATURE
+    disposition: FLAG_FOR_REVIEW
+    weight_in_synthesis: "0.25"
+- name: fatal pre-empirical — return to workshop
+  input:
+    study_type: pre_empirical
+    has_fatal_violation: true
+    n_critical: 5
+    n_major: 4
+    n_minor: 3
+    severity_band: VERY_LOW
+    integration_weight: exclude
+    score_band: FATAL_FLOOR
+  expect:
+    fatal_detected: true
+    score_band: FATAL_FLOOR
+    fatal_multiplier: "0.30"
+    disposition: FLAG_FOR_REVIEW
+    weight_in_synthesis: "0.05"
+    can_cite: true
+- name: 4+ critical no fatal — premature
+  input:
+    study_type: pre_empirical
+    has_fatal_violation: false
+    n_critical: 5
+    n_major: 3
+    n_minor: 1
+    severity_band: VERY_LOW
+    integration_weight: exclude
+    score_band: CLEAN
+  expect:
+    severity_band: VERY_LOW
+    maturation_level: PREMATURE
+    disposition: EXCLUDE
+    can_cite: false

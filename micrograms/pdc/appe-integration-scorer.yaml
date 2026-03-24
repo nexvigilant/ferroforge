@@ -1,0 +1,214 @@
+name: appe-integration-scorer
+description: "APPE Ch7.4: Score Foundation-Communication Integration Module (D1+D14) quality. Chains from anchor-d1 + integration-d14 outputs."
+version: 0.1.0
+interface:
+  inputs:
+    audience_types_demonstrated:
+      type: int
+      required: false
+    communication_clarity_pct:
+      type: int
+      required: false
+    peer_teaching_score:
+      type: float
+      required: false
+    technical_accuracy_pct:
+      type: int
+      required: false
+  outputs:
+    ch7_section:
+      type: string
+    gap:
+      type: string
+    integration_level:
+      type: string
+    message:
+      type: string
+    module_status:
+      type: string
+    ready_for_bridge:
+      type: bool
+    score:
+      type: int
+    strengths:
+      type: string
+tree:
+  start: check_technical
+  nodes:
+    # Technical accuracy gate (D1 component)
+    check_technical:
+      type: condition
+      variable: technical_accuracy_pct
+      operator: gte
+      value: 95
+      true_next: check_comm_high
+      false_next: check_technical_mid
+    check_technical_mid:
+      type: condition
+      variable: technical_accuracy_pct
+      operator: gte
+      value: 80
+      true_next: check_comm_mid
+      false_next: check_technical_low
+    check_technical_low:
+      type: condition
+      variable: technical_accuracy_pct
+      operator: gte
+      value: 60
+      true_next: developing
+      false_next: beginning
+
+    # High tech path: check communication for L2
+    check_comm_high:
+      type: condition
+      variable: communication_clarity_pct
+      operator: gte
+      value: 80
+      true_next: check_audiences_l2
+      false_next: proficient_tech_only
+
+    check_audiences_l2:
+      type: condition
+      variable: audience_types_demonstrated
+      operator: gte
+      value: 3
+      true_next: check_teaching
+      false_next: proficient_limited_audience
+
+    check_teaching:
+      type: condition
+      variable: peer_teaching_score
+      operator: gte
+      value: 4.0
+      true_next: exemplary
+      false_next: proficient_full
+
+    # Mid tech path: L1+ integration
+    check_comm_mid:
+      type: condition
+      variable: communication_clarity_pct
+      operator: gte
+      value: 70
+      true_next: proficient_basic
+      false_next: developing_comm_gap
+
+    # Return nodes
+    exemplary:
+      type: return
+      value:
+        integration_level: "L2_EXEMPLARY"
+        score: 4
+        module_status: MASTERY
+        ready_for_bridge: true
+        message: "Exceptional integration — tech accuracy >95%, communication >80%, 3+ audiences, teaching >4.0"
+        strengths: "Seamless D1+D14 integration with mentorship capability"
+        ch7_section: "7.4 Phase 3"
+
+    proficient_full:
+      type: return
+      value:
+        integration_level: "L2_PROFICIENT"
+        score: 3
+        module_status: ACHIEVED
+        ready_for_bridge: true
+        message: "Strong integration — tech >95%, comm >80%, 3+ audiences. Teaching developing."
+        gap: "Peer teaching score below 4.0 — practice pedagogical techniques"
+        ch7_section: "7.4 Phase 3"
+
+    proficient_limited_audience:
+      type: return
+      value:
+        integration_level: "L2_DEVELOPING"
+        score: 2.5
+        module_status: PARTIAL
+        ready_for_bridge: false
+        message: "Technical accuracy excellent but audience adaptation limited to <3 types."
+        gap: "Demonstrate adaptation across 3+ audience types (clinician, regulator, patient)"
+        ch7_section: "7.4 Phase 2"
+
+    proficient_tech_only:
+      type: return
+      value:
+        integration_level: "L1_PLUS"
+        score: 2
+        module_status: PARTIAL
+        ready_for_bridge: false
+        message: "Strong technical accuracy (>95%) but communication clarity below 80%."
+        gap: "Communication exercises — audience adaptation, clear language for technical concepts"
+        ch7_section: "7.4 Phase 2"
+
+    proficient_basic:
+      type: return
+      value:
+        integration_level: "L1_PLUS"
+        score: 2
+        module_status: DEVELOPING
+        ready_for_bridge: false
+        message: "Adequate integration — tech 80-95%, comm >70%. Progressing."
+        gap: "Strengthen both technical precision and communication clarity for L2"
+        ch7_section: "7.4 Phase 1-2"
+
+    developing_comm_gap:
+      type: return
+      value:
+        integration_level: "L1"
+        score: 1.5
+        module_status: DEVELOPING
+        ready_for_bridge: false
+        message: "Technical adequate but communication below 70%. Integration incomplete."
+        gap: "Intensive communication practice — documentation standards, audience identification"
+        ch7_section: "7.4 Phase 1"
+
+    developing:
+      type: return
+      value:
+        integration_level: "L1"
+        score: 1
+        module_status: FOUNDATION
+        ready_for_bridge: false
+        message: "Technical accuracy 60-80%. Both domains need reinforcement."
+        gap: "Terminology mastery exercises + communication basics"
+        ch7_section: "7.4 Phase 1"
+
+    beginning:
+      type: return
+      value:
+        integration_level: "PRE_L1"
+        score: 0.5
+        module_status: BELOW_THRESHOLD
+        ready_for_bridge: false
+        message: "Technical accuracy below 60%. Foundation establishment needed."
+        gap: "Restart Phase 1 — intensive terminology workshops with communication application"
+        ch7_section: "7.1"
+
+tests:
+# Exemplary: all criteria met
+- input: { technical_accuracy_pct: 97, communication_clarity_pct: 85, audience_types_demonstrated: 4, peer_teaching_score: 4.5 }
+  expect: { integration_level: "L2_EXEMPLARY", score: 4, module_status: MASTERY, ready_for_bridge: true }
+# Proficient full: good but teaching needs work
+- input: { technical_accuracy_pct: 96, communication_clarity_pct: 82, audience_types_demonstrated: 3, peer_teaching_score: 3.5 }
+  expect: { integration_level: "L2_PROFICIENT", score: 3, module_status: ACHIEVED, ready_for_bridge: true }
+# Limited audience
+- input: { technical_accuracy_pct: 98, communication_clarity_pct: 88, audience_types_demonstrated: 2, peer_teaching_score: 4.0 }
+  expect: { integration_level: "L2_DEVELOPING", score: 2.5, module_status: PARTIAL, ready_for_bridge: false }
+# Tech only — low comm
+- input: { technical_accuracy_pct: 96, communication_clarity_pct: 70, audience_types_demonstrated: 1, peer_teaching_score: 3.0 }
+  expect: { integration_level: "L1_PLUS", score: 2, module_status: PARTIAL, ready_for_bridge: false }
+# Basic proficient
+- input: { technical_accuracy_pct: 85, communication_clarity_pct: 75, audience_types_demonstrated: 2, peer_teaching_score: 3.0 }
+  expect: { integration_level: "L1_PLUS", score: 2, module_status: DEVELOPING, ready_for_bridge: false }
+# Developing comm gap
+- input: { technical_accuracy_pct: 88, communication_clarity_pct: 60, audience_types_demonstrated: 1, peer_teaching_score: 2.5 }
+  expect: { integration_level: "L1", score: 1.5, module_status: DEVELOPING, ready_for_bridge: false }
+# Developing
+- input: { technical_accuracy_pct: 65, communication_clarity_pct: 55, audience_types_demonstrated: 1, peer_teaching_score: 2.0 }
+  expect: { integration_level: "L1", score: 1, module_status: FOUNDATION, ready_for_bridge: false }
+# Beginning
+- input: { technical_accuracy_pct: 45, communication_clarity_pct: 40, audience_types_demonstrated: 0, peer_teaching_score: 1.0 }
+  expect: { integration_level: "PRE_L1", score: 0.5, module_status: BELOW_THRESHOLD, ready_for_bridge: false }
+# Edge: high tech, exactly 80 comm, exactly 3 audiences, exactly 4.0 teaching
+- input: { technical_accuracy_pct: 95, communication_clarity_pct: 80, audience_types_demonstrated: 3, peer_teaching_score: 4.0 }
+  expect: { integration_level: "L2_EXEMPLARY", score: 4, ready_for_bridge: true }
+# Edge: empty defaults
+- input: {}
+  expect: { integration_level: "PRE_L1", module_status: BELOW_THRESHOLD }

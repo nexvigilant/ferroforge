@@ -1,0 +1,109 @@
+name: response-completeness-gate
+description: Gates API response based on result count and error status. Determines if response is complete enough for use.
+version: 0.1.0
+interface:
+  inputs:
+    result_count:
+      type: int
+      required: false
+    min_threshold:
+      type: int
+      required: false
+    has_error:
+      type: bool
+      required: false
+  outputs:
+    quality:
+      type: string
+    usable:
+      type: bool
+tree:
+  start: check_error
+  nodes:
+    check_error:
+      type: condition
+      variable: has_error
+      operator: eq
+      value: true
+      true_next: return_error
+      false_next: check_null_count
+    check_null_count:
+      type: condition
+      variable: result_count
+      operator: is_null
+      true_next: return_empty
+      false_next: check_zero
+    check_zero:
+      type: condition
+      variable: result_count
+      operator: eq
+      value: 0
+      true_next: return_empty
+      false_next: check_threshold
+    check_threshold:
+      type: condition
+      variable: result_count
+      operator: gte
+      value: 5
+      true_next: return_complete
+      false_next: return_partial
+    return_error:
+      type: return
+      value:
+        quality: error
+        usable: false
+    return_empty:
+      type: return
+      value:
+        quality: empty
+        usable: false
+    return_partial:
+      type: return
+      value:
+        quality: partial
+        usable: true
+    return_complete:
+      type: return
+      value:
+        quality: complete
+        usable: true
+tests:
+  - input:
+      result_count: 10
+      min_threshold: 5
+      has_error: false
+    expect:
+      quality: complete
+      usable: true
+  - input:
+      result_count: 3
+      min_threshold: 5
+      has_error: false
+    expect:
+      quality: partial
+      usable: true
+  - input:
+      result_count: 0
+      min_threshold: 5
+      has_error: false
+    expect:
+      quality: empty
+      usable: false
+  - input:
+      result_count: 8
+      min_threshold: 5
+      has_error: true
+    expect:
+      quality: error
+      usable: false
+  - input:
+      result_count: 5
+      min_threshold: 5
+      has_error: false
+    expect:
+      quality: complete
+      usable: true
+  - input: {}
+    expect:
+      quality: empty
+      usable: false

@@ -1,0 +1,206 @@
+name: cytokine-storm-classifier
+description: 'Cytokine release syndrome classifier: grades CRS severity per ASTCT
+  2019 consensus grading'
+version: 0.1.0
+tree:
+  start: check_crs
+  nodes:
+    serious_crs:
+      type: return
+      value:
+        action: expedited_report
+        crs_grade: 3
+        severity: serious
+        soc: Immune system disorders
+    check_immune_reaction:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: IMMUNE
+      true_next: moderate
+      false_next: mild
+    critical_crs:
+      type: return
+      value:
+        soc: Immune system disorders
+        severity: critical
+        action: immediate_expedited_report
+        crs_grade: 4
+    check_anaphylaxis:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: ANAPHYLAC
+      true_next: critical_anaphylaxis
+      false_next: check_immune_reaction
+    check_crs:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: CYTOKINE
+      true_next: check_vasopressors
+      false_next: check_anaphylaxis
+    check_hypotension:
+      type: condition
+      variable: hypotension
+      operator: eq
+      value: true
+      true_next: serious_crs
+      false_next: check_fever
+    moderate_crs:
+      type: return
+      value:
+        crs_grade: 2
+        soc: Immune system disorders
+        severity: moderate
+        action: monitor_and_assess
+    check_vasopressors:
+      type: condition
+      variable: vasopressors_required
+      operator: eq
+      value: true
+      true_next: critical_crs
+      false_next: check_hypotension
+    moderate:
+      type: return
+      value:
+        soc: Immune system disorders
+        action: monitor_and_assess
+        severity: moderate
+        crs_grade: 0
+    critical_anaphylaxis:
+      type: return
+      value:
+        crs_grade: 0
+        soc: Immune system disorders
+        severity: critical
+        action: immediate_expedited_report
+    mild_crs:
+      type: return
+      value:
+        severity: mild
+        crs_grade: 1
+        soc: Immune system disorders
+        action: routine_surveillance
+    mild:
+      type: return
+      value:
+        crs_grade: 0
+        action: routine_surveillance
+        severity: mild
+        soc: Immune system disorders
+    check_fever:
+      type: condition
+      variable: fever_celsius
+      operator: gte
+      value: 39
+      true_next: moderate_crs
+      false_next: mild_crs
+tests:
+- input:
+    fever_celsius: 0
+    hypotension: false
+    reaction_pt: ''
+    vasopressors_required: false
+  expect:
+    crs_grade: 0
+    action: routine_surveillance
+    severity: mild
+    soc: Immune system disorders
+- input:
+    fever_celsius: 0
+    hypotension: false
+    reaction_pt: ANAPHYLAC
+    vasopressors_required: false
+  expect:
+    crs_grade: 0
+    soc: Immune system disorders
+    severity: critical
+    action: immediate_expedited_report
+- input:
+    fever_celsius: 0
+    hypotension: false
+    reaction_pt: CYTOKINE
+    vasopressors_required: false
+  expect:
+    severity: mild
+    crs_grade: 1
+    soc: Immune system disorders
+    action: routine_surveillance
+- input:
+    fever_celsius: 0
+    hypotension: false
+    reaction_pt: CYTOKINE
+    vasopressors_required: true
+  expect:
+    soc: Immune system disorders
+    severity: critical
+    action: immediate_expedited_report
+    crs_grade: 4
+- input:
+    fever_celsius: 0
+    hypotension: false
+    reaction_pt: IMMUNE
+    vasopressors_required: false
+  expect:
+    soc: Immune system disorders
+    action: monitor_and_assess
+    severity: moderate
+    crs_grade: 0
+- input:
+    fever_celsius: 0
+    hypotension: true
+    reaction_pt: CYTOKINE
+    vasopressors_required: false
+  expect:
+    action: expedited_report
+    crs_grade: 3
+    severity: serious
+    soc: Immune system disorders
+- input:
+    fever_celsius: 39
+    hypotension: false
+    reaction_pt: CYTOKINE
+    vasopressors_required: false
+  expect:
+    crs_grade: 2
+    soc: Immune system disorders
+    severity: moderate
+    action: monitor_and_assess
+- input: {}
+  expect:
+    crs_grade: 0
+    action: routine_surveillance
+    severity: mild
+    soc: Immune system disorders
+interface:
+  inputs:
+    fever_celsius:
+      type: float
+      required: false
+    hypotension:
+      type: bool
+      required: false
+    reaction_pt:
+      type: string
+      required: true
+    vasopressors_required:
+      type: bool
+      required: false
+    hypoxia:
+      type: bool
+      required: false
+  outputs:
+    severity:
+      type: string
+      required: false
+    crs_grade:
+      type: int
+      required: false
+    soc:
+      type: string
+      required: false
+    action:
+      type: string
+      required: false
+  aliases: {}

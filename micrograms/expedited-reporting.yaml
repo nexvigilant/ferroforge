@@ -1,0 +1,250 @@
+name: expedited-reporting
+description: 'ICH E2D / FDA 21 CFR 312.32 expedited reporting timeline: determines report type and deadline from case characteristics and study phase'
+version: 0.1.0
+interface:
+  inputs:
+    fatal:
+      type: bool
+      required: false
+    life_threatening:
+      type: bool
+      required: false
+    serious:
+      type: bool
+      required: false
+    study_type:
+      type: string
+      required: false
+    unexpected:
+      type: bool
+      required: false
+  outputs:
+    days_from_awareness:
+      type: int
+    regulatory_reference:
+      type: string
+    report_type:
+      type: string
+    timeline:
+      type: string
+tree:
+  start: serious_check
+  nodes:
+    serious_check:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: fatal_check
+      false_next: not_serious
+    fatal_check:
+      type: condition
+      variable: fatal
+      operator: eq
+      value: true
+      true_next: fatal_study_check
+      false_next: life_threatening_check
+    life_threatening_check:
+      type: condition
+      variable: life_threatening
+      operator: eq
+      value: true
+      true_next: lt_study_check
+      false_next: unexpected_check
+    fatal_study_check:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: premarket
+      true_next: day7_ind
+      false_next: day15_postmarket
+    lt_study_check:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: premarket
+      true_next: day7_ind
+      false_next: day15_postmarket
+    unexpected_check:
+      type: condition
+      variable: unexpected
+      operator: eq
+      value: true
+      true_next: unexpected_study_check
+      false_next: serious_expected
+    unexpected_study_check:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: premarket
+      true_next: day15_ind
+      false_next: day15_field_alert
+    not_serious:
+      type: return
+      value:
+        timeline: PERIODIC
+        report_type: LINE_LISTING
+        regulatory_reference: ICH E2C(R2)
+        days_from_awareness: 90
+    serious_expected:
+      type: return
+      value:
+        timeline: PERIODIC
+        report_type: PSUR_DSUR
+        regulatory_reference: ICH E2C(R2)
+        days_from_awareness: 90
+    day7_ind:
+      type: return
+      value:
+        timeline: 7_CALENDAR_DAYS
+        report_type: IND_SAFETY
+        regulatory_reference: 21 CFR 312.32(c)(2)
+        days_from_awareness: 7
+    day15_postmarket:
+      type: return
+      value:
+        timeline: 15_CALENDAR_DAYS
+        report_type: FIELD_ALERT
+        regulatory_reference: 21 CFR 314.80
+        days_from_awareness: 15
+    day15_ind:
+      type: return
+      value:
+        timeline: 15_CALENDAR_DAYS
+        report_type: IND_SAFETY
+        regulatory_reference: 21 CFR 312.32(c)(1)
+        days_from_awareness: 15
+    day15_field_alert:
+      type: return
+      value:
+        timeline: 15_CALENDAR_DAYS
+        report_type: FIELD_ALERT
+        regulatory_reference: 21 CFR 314.80
+        days_from_awareness: 15
+tests:
+- input:
+    serious: true
+    fatal: true
+    life_threatening: false
+    unexpected: true
+    study_type: premarket
+  expect:
+    timeline: 7_CALENDAR_DAYS
+    report_type: IND_SAFETY
+    regulatory_reference: 21 CFR 312.32(c)(2)
+    days_from_awareness: 7
+- input:
+    serious: true
+    fatal: false
+    life_threatening: true
+    unexpected: true
+    study_type: premarket
+  expect:
+    timeline: 7_CALENDAR_DAYS
+    report_type: IND_SAFETY
+    regulatory_reference: 21 CFR 312.32(c)(2)
+    days_from_awareness: 7
+- input:
+    serious: true
+    fatal: false
+    life_threatening: false
+    unexpected: true
+    study_type: premarket
+  expect:
+    timeline: 15_CALENDAR_DAYS
+    report_type: IND_SAFETY
+    regulatory_reference: 21 CFR 312.32(c)(1)
+    days_from_awareness: 15
+- input:
+    serious: true
+    fatal: false
+    life_threatening: false
+    unexpected: true
+    study_type: postmarket
+  expect:
+    timeline: 15_CALENDAR_DAYS
+    report_type: FIELD_ALERT
+    regulatory_reference: 21 CFR 314.80
+    days_from_awareness: 15
+- input:
+    serious: true
+    fatal: true
+    life_threatening: false
+    unexpected: false
+    study_type: postmarket
+  expect:
+    timeline: 15_CALENDAR_DAYS
+    report_type: FIELD_ALERT
+    regulatory_reference: 21 CFR 314.80
+    days_from_awareness: 15
+- input:
+    serious: true
+    fatal: false
+    life_threatening: true
+    unexpected: true
+    study_type: postmarket
+  expect:
+    timeline: 15_CALENDAR_DAYS
+    report_type: FIELD_ALERT
+    regulatory_reference: 21 CFR 314.80
+    days_from_awareness: 15
+- input:
+    serious: true
+    fatal: false
+    life_threatening: false
+    unexpected: false
+    study_type: premarket
+  expect:
+    timeline: PERIODIC
+    report_type: PSUR_DSUR
+    regulatory_reference: ICH E2C(R2)
+    days_from_awareness: 90
+- input:
+    serious: true
+    fatal: false
+    life_threatening: false
+    unexpected: false
+    study_type: postmarket
+  expect:
+    timeline: PERIODIC
+    report_type: PSUR_DSUR
+    regulatory_reference: ICH E2C(R2)
+    days_from_awareness: 90
+- input:
+    serious: false
+    fatal: false
+    life_threatening: false
+    unexpected: true
+    study_type: premarket
+  expect:
+    timeline: PERIODIC
+    report_type: LINE_LISTING
+    regulatory_reference: ICH E2C(R2)
+    days_from_awareness: 90
+- input:
+    serious: false
+    fatal: false
+    life_threatening: false
+    unexpected: false
+    study_type: postmarket
+  expect:
+    timeline: PERIODIC
+    report_type: LINE_LISTING
+    regulatory_reference: ICH E2C(R2)
+    days_from_awareness: 90
+- input: {}
+  expect:
+    timeline: PERIODIC
+    report_type: LINE_LISTING
+    regulatory_reference: ICH E2C(R2)
+    days_from_awareness: 90
+- input:
+    serious: true
+    fatal: true
+    life_threatening: true
+    unexpected: true
+    study_type: premarket
+  expect:
+    timeline: 7_CALENDAR_DAYS
+    report_type: IND_SAFETY
+    days_from_awareness: 7

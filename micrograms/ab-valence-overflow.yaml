@@ -1,0 +1,47 @@
+name: ab-valence-overflow
+description: 'Antibody: detects valence overflow (prima-chem Bond invariant). Input is pre-computed valence_excess = bond_valence_sum - max_valence.'
+version: 0.1.0
+interface:
+  inputs:
+    valence_excess:
+      type: number
+      required: true
+      description: 'bond_valence_sum - max_valence (positive = overflow)'
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: valence_excess
+      operator: gt
+      value: 0
+      true_next: violation
+      false_next: clean
+    violation:
+      type: return
+      value:
+        threat: true
+        response: 'BLOCK: bond valence exceeds element max — impossible bonding'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { valence_excess: 0 }
+  expect: { threat: false }
+- input: { valence_excess: 1 }
+  expect: { threat: true }
+- input: { valence_excess: -1 }
+  expect: { threat: false }
+- input: { valence_excess: 3 }
+  expect: { threat: true }
+- input: {}
+  expect:
+    response: PASS
+    threat: false

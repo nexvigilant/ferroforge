@@ -1,0 +1,296 @@
+name: config-drugbank-ddi-gate
+description: Gate drug-drug interaction data from DrugBank get-interactions. Classifies by mechanism risk and interaction density.
+version: 0.1.0
+tree:
+  start: check_narrow_ti
+  nodes:
+    moderate_risk_inducer:
+      type: return
+      value:
+        risk_class: moderate_risk
+        prescribing_caution: true
+        mechanism_flag: cyp_inducer
+    high_risk_nti:
+      type: return
+      value:
+        risk_class: high_risk
+        mechanism_flag: narrow_therapeutic_index
+        prescribing_caution: true
+    check_cyp_inhibitor:
+      type: condition
+      variable: cyp_inhibition
+      operator: eq
+      value: true
+      true_next: check_interaction_density_cyp
+      false_next: check_cyp_inducer
+    check_interaction_volume:
+      type: condition
+      variable: interaction_count
+      operator: is_null
+      value: null
+      true_next: minimal_risk
+      false_next: check_many_interactions
+    minimal_risk:
+      type: return
+      value:
+        mechanism_flag: none
+        prescribing_caution: false
+        risk_class: minimal
+    check_high_density_cyp:
+      type: condition
+      variable: interaction_count
+      operator: gte
+      value: 20
+      true_next: high_risk_cyp
+      false_next: moderate_risk_cyp
+    check_narrow_ti:
+      type: condition
+      variable: narrow_ti_involved
+      operator: eq
+      value: true
+      true_next: high_risk_nti
+      false_next: check_cyp_inhibitor
+    moderate_risk_volume:
+      type: return
+      value:
+        mechanism_flag: high_interaction_count
+        prescribing_caution: false
+        risk_class: moderate_risk
+    check_cyp_inducer:
+      type: condition
+      variable: cyp_induction
+      operator: eq
+      value: true
+      true_next: moderate_risk_inducer
+      false_next: check_interaction_volume
+    check_many_interactions:
+      type: condition
+      variable: interaction_count
+      operator: gte
+      value: 30
+      true_next: moderate_risk_volume
+      false_next: check_food
+    check_food:
+      type: condition
+      variable: food_interaction
+      operator: eq
+      value: true
+      true_next: low_risk_food
+      false_next: check_few_interactions
+    high_risk_cyp:
+      type: return
+      value:
+        mechanism_flag: cyp_inhibitor_high_density
+        prescribing_caution: true
+        risk_class: high_risk
+    check_few_interactions:
+      type: condition
+      variable: interaction_count
+      operator: gte
+      value: 5
+      true_next: low_risk
+      false_next: minimal_risk
+    low_risk_food:
+      type: return
+      value:
+        risk_class: low_risk
+        mechanism_flag: food_interaction
+        prescribing_caution: false
+    low_risk:
+      type: return
+      value:
+        risk_class: low_risk
+        prescribing_caution: false
+        mechanism_flag: none
+    moderate_risk_cyp:
+      type: return
+      value:
+        risk_class: moderate_risk
+        prescribing_caution: true
+        mechanism_flag: cyp_inhibitor
+    check_interaction_density_cyp:
+      type: condition
+      variable: interaction_count
+      operator: is_null
+      value: null
+      true_next: moderate_risk_cyp
+      false_next: check_high_density_cyp
+tests:
+- input:
+    interaction_count: 15
+    food_interaction: false
+    narrow_ti_involved: true
+    cyp_inhibition: true
+  expect:
+    prescribing_caution: true
+    mechanism_flag: narrow_therapeutic_index
+    risk_class: high_risk
+- input:
+    interaction_count: 25
+    narrow_ti_involved: false
+    cyp_inhibition: true
+  expect:
+    risk_class: high_risk
+    mechanism_flag: cyp_inhibitor_high_density
+    prescribing_caution: true
+- input:
+    interaction_count: 10
+    cyp_inhibition: true
+    narrow_ti_involved: false
+  expect:
+    prescribing_caution: true
+    mechanism_flag: cyp_inhibitor
+    risk_class: moderate_risk
+- input:
+    interaction_count: 12
+    cyp_induction: true
+    narrow_ti_involved: false
+  expect:
+    risk_class: moderate_risk
+    prescribing_caution: true
+    mechanism_flag: cyp_inducer
+- input:
+    cyp_inhibition: false
+    interaction_count: 35
+    narrow_ti_involved: false
+    cyp_induction: false
+  expect:
+    risk_class: moderate_risk
+    mechanism_flag: high_interaction_count
+    prescribing_caution: false
+- input:
+    interaction_count: 8
+    food_interaction: true
+  expect:
+    risk_class: low_risk
+    mechanism_flag: food_interaction
+    prescribing_caution: false
+- input:
+    interaction_count: 3
+  expect:
+    risk_class: minimal
+    mechanism_flag: none
+    prescribing_caution: false
+- input: {}
+  expect:
+    prescribing_caution: false
+    mechanism_flag: none
+    risk_class: minimal
+- input:
+    interaction_count: 0
+  expect:
+    mechanism_flag: none
+    risk_class: minimal
+    prescribing_caution: false
+- input:
+    interaction_count: -1
+  expect:
+    mechanism_flag: none
+    prescribing_caution: false
+    risk_class: minimal
+- input:
+    interaction_count: 19
+  expect:
+    risk_class: low_risk
+    prescribing_caution: false
+    mechanism_flag: none
+- input:
+    interaction_count: 21
+  expect:
+    risk_class: low_risk
+    prescribing_caution: false
+    mechanism_flag: none
+- input:
+    interaction_count: 2000
+  expect:
+    mechanism_flag: high_interaction_count
+    prescribing_caution: false
+    risk_class: moderate_risk
+- input:
+    interaction_count: 0
+  expect:
+    mechanism_flag: none
+    prescribing_caution: false
+    risk_class: minimal
+- input:
+    interaction_count: -1
+  expect:
+    prescribing_caution: false
+    risk_class: minimal
+    mechanism_flag: none
+- input:
+    interaction_count: 29
+  expect:
+    risk_class: low_risk
+    prescribing_caution: false
+    mechanism_flag: none
+- input:
+    interaction_count: 31
+  expect:
+    prescribing_caution: false
+    mechanism_flag: high_interaction_count
+    risk_class: moderate_risk
+- input:
+    interaction_count: 3000
+  expect:
+    risk_class: moderate_risk
+    prescribing_caution: false
+    mechanism_flag: high_interaction_count
+- input:
+    interaction_count: 0
+  expect:
+    risk_class: minimal
+    mechanism_flag: none
+    prescribing_caution: false
+- input:
+    interaction_count: -1
+  expect:
+    risk_class: minimal
+    mechanism_flag: none
+    prescribing_caution: false
+- input:
+    interaction_count: 4
+  expect:
+    mechanism_flag: none
+    prescribing_caution: false
+    risk_class: minimal
+- input:
+    interaction_count: 6
+  expect:
+    mechanism_flag: none
+    risk_class: low_risk
+    prescribing_caution: false
+- input:
+    interaction_count: 500
+  expect:
+    risk_class: moderate_risk
+    mechanism_flag: high_interaction_count
+    prescribing_caution: false
+interface:
+  inputs:
+    food_interaction:
+      type: bool
+      required: false
+    cyp_inhibition:
+      type: bool
+      required: false
+    cyp_induction:
+      type: bool
+      required: false
+    interaction_count:
+      type: int
+      required: false
+    narrow_ti_involved:
+      type: bool
+      required: false
+  outputs:
+    mechanism_flag:
+      type: string
+      required: false
+    risk_class:
+      type: string
+      required: false
+    prescribing_caution:
+      type: bool
+      required: false
+  aliases: {}

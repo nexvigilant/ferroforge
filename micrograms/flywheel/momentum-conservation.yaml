@@ -1,0 +1,137 @@
+name: momentum-conservation
+description: 'Angular momentum classifier for flywheel conservation law. HIGH (L > 2x critical), NORMAL (L >= critical), LOW (L > 0.5x critical), STALLED (L <= 0.5x critical). Requires pre-computed momentum_ratio = L / critical_threshold.'
+version: 0.1.0
+interface:
+  inputs:
+    inertia:
+      type: float
+      required: false
+    omega:
+      type: float
+      required: false
+    friction_drain:
+      type: float
+      required: false
+    critical_threshold:
+      type: float
+      required: false
+    momentum_ratio:
+      type: float
+      required: false
+  outputs:
+    classification:
+      type: string
+    above_critical:
+      type: bool
+tree:
+  start: check_high
+  nodes:
+    check_high:
+      type: condition
+      variable: momentum_ratio
+      operator: gt
+      value: 2.0
+      true_next: high
+      false_next: check_normal
+    check_normal:
+      type: condition
+      variable: momentum_ratio
+      operator: gte
+      value: 1.0
+      true_next: normal
+      false_next: check_low
+    check_low:
+      type: condition
+      variable: momentum_ratio
+      operator: gt
+      value: 0.5
+      true_next: low
+      false_next: stalled
+    high:
+      type: return
+      value:
+        classification: high
+        above_critical: true
+    normal:
+      type: return
+      value:
+        classification: normal
+        above_critical: true
+    low:
+      type: return
+      value:
+        classification: low
+        above_critical: false
+    stalled:
+      type: return
+      value:
+        classification: stalled
+        above_critical: false
+tests:
+- input:
+    inertia: 100.0
+    omega: 5.0
+    friction_drain: 0.0
+    critical_threshold: 100.0
+    momentum_ratio: 5.0
+  expect:
+    classification: high
+    above_critical: true
+- input:
+    inertia: 10.0
+    omega: 5.0
+    friction_drain: 0.0
+    critical_threshold: 40.0
+    momentum_ratio: 1.25
+  expect:
+    classification: normal
+    above_critical: true
+- input:
+    inertia: 10.0
+    omega: 3.0
+    friction_drain: 5.0
+    critical_threshold: 40.0
+    momentum_ratio: 0.625
+  expect:
+    classification: low
+    above_critical: false
+- input:
+    inertia: 1.0
+    omega: 1.0
+    friction_drain: 5.0
+    critical_threshold: 40.0
+    momentum_ratio: -0.1
+  expect:
+    classification: stalled
+    above_critical: false
+- input:
+    inertia: 10.0
+    omega: 5.0
+    friction_drain: 50.0
+    critical_threshold: 100.0
+    momentum_ratio: 0.0
+  expect:
+    classification: stalled
+    above_critical: false
+- input:
+    inertia: 20.0
+    omega: 5.0
+    friction_drain: 0.0
+    critical_threshold: 100.0
+    momentum_ratio: 1.0
+  expect:
+    classification: normal
+    above_critical: true
+- input:
+    inertia: 50.0
+    omega: 5.0
+    friction_drain: 0.0
+    critical_threshold: 100.0
+    momentum_ratio: 2.5
+  expect:
+    classification: high
+    above_critical: true
+- input: {}
+  expect:
+    above_critical: false
+    classification: stalled

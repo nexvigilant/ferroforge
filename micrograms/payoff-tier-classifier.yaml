@@ -1,0 +1,80 @@
+name: payoff-tier-classifier
+description: 'Nash payoff tier: classifies game theory payoff value into display tier for war-game dashboard'
+version: 0.1.0
+interface:
+  inputs:
+    value:
+      type: number
+      required: true
+      description: 'Nash equilibrium payoff value (0-100 scale)'
+  outputs:
+    tier:
+      type: string
+tree:
+  start: check_high
+  nodes:
+    check_high:
+      type: condition
+      variable: value
+      operator: gte
+      value: 70
+      true_next: high
+      false_next: check_medium
+    check_medium:
+      type: condition
+      variable: value
+      operator: gte
+      value: 40
+      true_next: medium
+      false_next: low
+    high:
+      type: return
+      value:
+        tier: high
+    medium:
+      type: return
+      value:
+        tier: medium
+    low:
+      type: return
+      value:
+        tier: low
+tests:
+# Zero payoff = low
+- input:
+    value: 0
+  expect:
+    tier: low
+# Below medium threshold
+- input:
+    value: 39
+  expect:
+    tier: low
+# At medium boundary
+- input:
+    value: 40
+  expect:
+    tier: medium
+# Mid medium range
+- input:
+    value: 55
+  expect:
+    tier: medium
+# Just below high
+- input:
+    value: 69
+  expect:
+    tier: medium
+# At high boundary
+- input:
+    value: 70
+  expect:
+    tier: high
+# Maximum payoff
+- input:
+    value: 100
+  expect:
+    tier: high
+- input: {}
+  expect:
+    tier: low

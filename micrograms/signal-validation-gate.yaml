@@ -1,0 +1,361 @@
+name: signal-validation-gate
+description: 'Signal validation gate: counts confirmed criteria (PRR threshold, case count, geographic spread, temporal pattern) to classify signal strength'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    prr0c1g1_check_temporal:
+      type: condition
+      variable: temporal_pattern
+      operator: eq
+      value: true
+      true_next: probable_signal
+      false_next: possible_signal
+    probable_signal:
+      type: return
+      value:
+        confidence: 75
+        next_action: Conduct targeted data query and expedited medical review within 30 days
+        classification: PROBABLE_SIGNAL
+    noise:
+      type: return
+      value:
+        confidence: 20
+        classification: NOISE
+        next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    prr1c1g0_check_temporal:
+      type: condition
+      variable: temporal_pattern
+      operator: eq
+      value: true
+      true_next: probable_signal
+      false_next: possible_signal
+    prr1c0_check_geo:
+      type: condition
+      variable: geographic_spread
+      operator: eq
+      value: true
+      true_next: prr1c0g1_check_temporal
+      false_next: prr1c0g0_check_temporal
+    prr1c0g1_check_temporal:
+      type: condition
+      variable: temporal_pattern
+      operator: eq
+      value: true
+      true_next: probable_signal
+      false_next: possible_signal
+    prr0c1_check_geo:
+      type: condition
+      variable: geographic_spread
+      operator: eq
+      value: true
+      true_next: prr0c1g1_check_temporal
+      false_next: prr0c1g0_check_temporal
+    prr1c1_check_geo:
+      type: condition
+      variable: geographic_spread
+      operator: eq
+      value: true
+      true_next: prr1c1g1_check_temporal
+      false_next: prr1c1g0_check_temporal
+    prr0c0g1_check_temporal:
+      type: condition
+      variable: temporal_pattern
+      operator: eq
+      value: true
+      true_next: possible_signal
+      false_next: noise
+    possible_signal:
+      type: return
+      value:
+        next_action: Add to signal monitoring list for continued surveillance
+        classification: POSSIBLE_SIGNAL
+        confidence: 50
+    check_prr:
+      type: condition
+      variable: prr_above_threshold
+      operator: eq
+      value: true
+      true_next: prr1_check_cases
+      false_next: prr0_check_cases
+    prr1_check_cases:
+      type: condition
+      variable: case_count_sufficient
+      operator: eq
+      value: true
+      true_next: prr1c1_check_geo
+      false_next: prr1c0_check_geo
+    prr1c1g1_check_temporal:
+      type: condition
+      variable: temporal_pattern
+      operator: eq
+      value: true
+      true_next: validated_signal
+      false_next: probable_signal
+    prr0c0_check_geo:
+      type: condition
+      variable: geographic_spread
+      operator: eq
+      value: true
+      true_next: prr0c0g1_check_temporal
+      false_next: prr0c0g0_check_temporal
+    prr0_check_cases:
+      type: condition
+      variable: case_count_sufficient
+      operator: eq
+      value: true
+      true_next: prr0c1_check_geo
+      false_next: prr0c0_check_geo
+    prr1c0g0_check_temporal:
+      type: condition
+      variable: temporal_pattern
+      operator: eq
+      value: true
+      true_next: possible_signal
+      false_next: noise
+    prr0c1g0_check_temporal:
+      type: condition
+      variable: temporal_pattern
+      operator: eq
+      value: true
+      true_next: possible_signal
+      false_next: noise
+    prr0c0g0_check_temporal:
+      type: condition
+      variable: temporal_pattern
+      operator: eq
+      value: true
+      true_next: noise
+      false_next: noise
+    validated_signal:
+      type: return
+      value:
+        next_action: Open formal signal investigation and convene safety review committee
+        classification: VALIDATED_SIGNAL
+        confidence: 95
+tests:
+- input:
+    geographic_spread: true
+    case_count_sufficient: true
+    prr_above_threshold: true
+    temporal_pattern: true
+  expect:
+    next_action: Open formal signal investigation and convene safety review committee
+    confidence: 95
+    classification: VALIDATED_SIGNAL
+- input:
+    temporal_pattern: false
+    case_count_sufficient: true
+    geographic_spread: true
+    prr_above_threshold: true
+  expect:
+    classification: PROBABLE_SIGNAL
+    confidence: 75
+    next_action: Conduct targeted data query and expedited medical review within 30 days
+- input:
+    geographic_spread: false
+    case_count_sufficient: true
+    prr_above_threshold: true
+    temporal_pattern: false
+  expect:
+    next_action: Add to signal monitoring list for continued surveillance
+    confidence: 50
+    classification: POSSIBLE_SIGNAL
+- input:
+    case_count_sufficient: false
+    temporal_pattern: false
+    prr_above_threshold: true
+    geographic_spread: false
+  expect:
+    classification: NOISE
+    confidence: 20
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+- input:
+    case_count_sufficient: false
+    geographic_spread: false
+    temporal_pattern: false
+    prr_above_threshold: false
+  expect:
+    classification: NOISE
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    confidence: 20
+- input: {}
+  expect:
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    confidence: 20
+    classification: NOISE
+- input: {}
+  expect:
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    confidence: 20
+    classification: NOISE
+- input: {}
+  expect:
+    confidence: 20
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    classification: NOISE
+- input: {}
+  expect:
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    confidence: 20
+    classification: NOISE
+- input: {}
+  expect:
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    classification: NOISE
+    confidence: 20
+- input: {}
+  expect:
+    confidence: 20
+    classification: NOISE
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+- input: {}
+  expect:
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    confidence: 20
+    classification: NOISE
+- input: {}
+  expect:
+    classification: NOISE
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    confidence: 20
+- input: {}
+  expect:
+    confidence: 20
+    classification: NOISE
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+- input: {}
+  expect:
+    classification: NOISE
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    confidence: 20
+- input: {}
+  expect:
+    classification: NOISE
+    confidence: 20
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+- input: {}
+  expect:
+    classification: NOISE
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    confidence: 20
+- input: {}
+  expect:
+    classification: NOISE
+    confidence: 20
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+- input: {}
+  expect:
+    confidence: 20
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    classification: NOISE
+- input: {}
+  expect:
+    classification: NOISE
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+    confidence: 20
+# -- covers prr1c0g1_check_temporal (true branch) --
+- input:
+    prr_above_threshold: true
+    case_count_sufficient: false
+    geographic_spread: true
+    temporal_pattern: true
+  expect:
+    classification: PROBABLE_SIGNAL
+    confidence: 75
+    next_action: Conduct targeted data query and expedited medical review within 30 days
+# -- covers prr1c0g1_check_temporal (false branch) --
+- input:
+    prr_above_threshold: true
+    case_count_sufficient: false
+    geographic_spread: true
+    temporal_pattern: false
+  expect:
+    classification: POSSIBLE_SIGNAL
+    confidence: 50
+    next_action: Add to signal monitoring list for continued surveillance
+# -- covers prr0c1_check_geo (true) + prr0c1g1_check_temporal (true branch) --
+- input:
+    prr_above_threshold: false
+    case_count_sufficient: true
+    geographic_spread: true
+    temporal_pattern: true
+  expect:
+    classification: PROBABLE_SIGNAL
+    confidence: 75
+    next_action: Conduct targeted data query and expedited medical review within 30 days
+# -- covers prr0c1_check_geo (true) + prr0c1g1_check_temporal (false branch) --
+- input:
+    prr_above_threshold: false
+    case_count_sufficient: true
+    geographic_spread: true
+    temporal_pattern: false
+  expect:
+    classification: POSSIBLE_SIGNAL
+    confidence: 50
+    next_action: Add to signal monitoring list for continued surveillance
+# -- covers prr0c1_check_geo (false) + prr0c1g0_check_temporal (true branch) --
+- input:
+    prr_above_threshold: false
+    case_count_sufficient: true
+    geographic_spread: false
+    temporal_pattern: true
+  expect:
+    classification: POSSIBLE_SIGNAL
+    confidence: 50
+    next_action: Add to signal monitoring list for continued surveillance
+# -- covers prr0c1_check_geo (false) + prr0c1g0_check_temporal (false branch) --
+- input:
+    prr_above_threshold: false
+    case_count_sufficient: true
+    geographic_spread: false
+    temporal_pattern: false
+  expect:
+    classification: NOISE
+    confidence: 20
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+# -- covers prr0c0g1_check_temporal (true branch) --
+- input:
+    prr_above_threshold: false
+    case_count_sufficient: false
+    geographic_spread: true
+    temporal_pattern: true
+  expect:
+    classification: POSSIBLE_SIGNAL
+    confidence: 50
+    next_action: Add to signal monitoring list for continued surveillance
+# -- covers prr0c0g1_check_temporal (false branch) --
+- input:
+    prr_above_threshold: false
+    case_count_sufficient: false
+    geographic_spread: true
+    temporal_pattern: false
+  expect:
+    classification: NOISE
+    confidence: 20
+    next_action: Continue routine pharmacovigilance monitoring - no signal action required
+interface:
+  inputs:
+    case_count_sufficient:
+      type: bool
+      required: false
+    prr_above_threshold:
+      type: bool
+      required: false
+    geographic_spread:
+      type: bool
+      required: false
+    temporal_pattern:
+      type: bool
+      required: false
+  outputs:
+    next_action:
+      type: string
+      required: false
+    confidence:
+      type: int
+      required: false
+    classification:
+      type: string
+      required: false
+  aliases: {}

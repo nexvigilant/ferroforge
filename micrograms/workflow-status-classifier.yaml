@@ -1,0 +1,108 @@
+name: workflow-status-classifier
+description: 'PVOS workflow status: classifies workflow execution status from step completion and failure flag - NOT_STARTED/IN_PROGRESS/COMPLETED/FAILED'
+version: 0.1.0
+interface:
+  inputs:
+    has_failure:
+      type: bool
+      required: false
+    is_complete:
+      type: bool
+      required: false
+    steps_completed:
+      type: int
+      required: false
+  outputs:
+    description:
+      type: string
+    status:
+      type: string
+tree:
+  start: check_failure
+  nodes:
+    check_failure:
+      type: condition
+      variable: has_failure
+      operator: eq
+      value: true
+      true_next: failed
+      false_next: check_started
+    check_started:
+      type: condition
+      variable: steps_completed
+      operator: gt
+      value: 0
+      true_next: check_complete
+      false_next: not_started
+    check_complete:
+      type: condition
+      variable: is_complete
+      operator: eq
+      value: true
+      true_next: completed
+      false_next: in_progress
+    failed:
+      type: return
+      value:
+        status: FAILED
+        description: Workflow has a failed step - requires investigation and remediation
+    not_started:
+      type: return
+      value:
+        status: NOT_STARTED
+        description: No steps completed - workflow has not begun execution
+    in_progress:
+      type: return
+      value:
+        status: IN_PROGRESS
+        description: Workflow is executing - some steps complete, more remaining
+    completed:
+      type: return
+      value:
+        status: COMPLETED
+        description: All steps completed successfully - workflow is done
+tests:
+- input:
+    steps_total: 5
+    steps_completed: 0
+    is_complete: false
+    has_failure: false
+  expect:
+    status: NOT_STARTED
+    description: No steps completed - workflow has not begun execution
+- input:
+    steps_total: 5
+    steps_completed: 3
+    is_complete: false
+    has_failure: false
+  expect:
+    status: IN_PROGRESS
+    description: Workflow is executing - some steps complete, more remaining
+- input:
+    steps_total: 5
+    steps_completed: 5
+    is_complete: true
+    has_failure: false
+  expect:
+    status: COMPLETED
+    description: All steps completed successfully - workflow is done
+- input:
+    steps_total: 5
+    steps_completed: 3
+    is_complete: false
+    has_failure: true
+  expect:
+    status: FAILED
+    description: Workflow has a failed step - requires investigation and remediation
+- input:
+    steps_total: 5
+    steps_completed: 0
+    is_complete: false
+    has_failure: true
+  expect:
+    status: FAILED
+    description: Workflow has a failed step - requires investigation and remediation
+- input: {}
+  expect:
+    description: No steps completed - workflow has not begun execution
+    status: NOT_STARTED

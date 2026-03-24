@@ -1,0 +1,187 @@
+name: risk-harm-classifier
+description: 'ToV harm taxonomy classifier: maps a 0-100 composite risk score to harm levels A through F with plain-English descriptions and traffic level'
+version: 0.1.0
+interface:
+  inputs:
+    composite_score:
+      type: number
+      required: true
+      description: 'Weighted composite risk score (0-100) from normalized signal metrics'
+  outputs:
+    harm_level:
+      type: string
+    harm_description:
+      type: string
+    traffic_level:
+      type: string
+tree:
+  start: check_critical
+  nodes:
+    check_critical:
+      type: condition
+      variable: composite_score
+      operator: gte
+      value: 85
+      true_next: f_critical
+      false_next: check_serious
+    check_serious:
+      type: condition
+      variable: composite_score
+      operator: gte
+      value: 70
+      true_next: e_serious
+      false_next: check_significant
+    check_significant:
+      type: condition
+      variable: composite_score
+      operator: gte
+      value: 55
+      true_next: d_significant
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: composite_score
+      operator: gte
+      value: 40
+      true_next: c_moderate
+      false_next: check_minor
+    check_minor:
+      type: condition
+      variable: composite_score
+      operator: gte
+      value: 20
+      true_next: b_minor
+      false_next: a_negligible
+    f_critical:
+      type: return
+      value:
+        harm_level: "F — Critical"
+        harm_description: "All metrics point to a very strong drug-event association. Immediate safety review warranted."
+        traffic_level: red
+    e_serious:
+      type: return
+      value:
+        harm_level: "E — Serious"
+        harm_description: "Strong signal across most metrics. Escalate to your safety team and consider regulatory action."
+        traffic_level: red
+    d_significant:
+      type: return
+      value:
+        harm_level: "D — Significant"
+        harm_description: "Multiple metrics cross concern thresholds. A formal signal evaluation is recommended."
+        traffic_level: yellow
+    c_moderate:
+      type: return
+      value:
+        harm_level: "C — Moderate"
+        harm_description: "Some metrics are elevated. This drug-event pair deserves periodic monitoring."
+        traffic_level: yellow
+    b_minor:
+      type: return
+      value:
+        harm_level: "B — Minor"
+        harm_description: "A faint signal exists but falls well below concern thresholds. Worth noting, not worth losing sleep over."
+        traffic_level: green
+    a_negligible:
+      type: return
+      value:
+        harm_level: "A — Negligible"
+        harm_description: "No meaningful risk signal detected. This drug-event pair looks unremarkable in the data."
+        traffic_level: green
+tests:
+# F — Critical (>=85)
+- input:
+    composite_score: 95
+  expect:
+    harm_level: "F — Critical"
+    harm_description: "All metrics point to a very strong drug-event association. Immediate safety review warranted."
+    traffic_level: red
+# E — Serious (>=70, <85)
+- input:
+    composite_score: 78
+  expect:
+    harm_level: "E — Serious"
+    harm_description: "Strong signal across most metrics. Escalate to your safety team and consider regulatory action."
+    traffic_level: red
+# D — Significant (>=55, <70)
+- input:
+    composite_score: 62
+  expect:
+    harm_level: "D — Significant"
+    harm_description: "Multiple metrics cross concern thresholds. A formal signal evaluation is recommended."
+    traffic_level: yellow
+# C — Moderate (>=40, <55)
+- input:
+    composite_score: 47
+  expect:
+    harm_level: "C — Moderate"
+    harm_description: "Some metrics are elevated. This drug-event pair deserves periodic monitoring."
+    traffic_level: yellow
+# B — Minor (>=20, <40)
+- input:
+    composite_score: 30
+  expect:
+    harm_level: "B — Minor"
+    harm_description: "A faint signal exists but falls well below concern thresholds. Worth noting, not worth losing sleep over."
+    traffic_level: green
+# A — Negligible (<20)
+- input:
+    composite_score: 10
+  expect:
+    harm_level: "A — Negligible"
+    harm_description: "No meaningful risk signal detected. This drug-event pair looks unremarkable in the data."
+    traffic_level: green
+# Boundary: exactly 85 = F
+- input:
+    composite_score: 85
+  expect:
+    harm_level: "F — Critical"
+    harm_description: "All metrics point to a very strong drug-event association. Immediate safety review warranted."
+    traffic_level: red
+# Boundary: exactly 70 = E
+- input:
+    composite_score: 70
+  expect:
+    harm_level: "E — Serious"
+    harm_description: "Strong signal across most metrics. Escalate to your safety team and consider regulatory action."
+    traffic_level: red
+# Boundary: exactly 55 = D
+- input:
+    composite_score: 55
+  expect:
+    harm_level: "D — Significant"
+    harm_description: "Multiple metrics cross concern thresholds. A formal signal evaluation is recommended."
+    traffic_level: yellow
+# Boundary: exactly 40 = C
+- input:
+    composite_score: 40
+  expect:
+    harm_level: "C — Moderate"
+    harm_description: "Some metrics are elevated. This drug-event pair deserves periodic monitoring."
+    traffic_level: yellow
+# Boundary: exactly 20 = B
+- input:
+    composite_score: 20
+  expect:
+    harm_level: "B — Minor"
+    harm_description: "A faint signal exists but falls well below concern thresholds. Worth noting, not worth losing sleep over."
+    traffic_level: green
+# Zero score = A
+- input:
+    composite_score: 0
+  expect:
+    harm_level: "A — Negligible"
+    harm_description: "No meaningful risk signal detected. This drug-event pair looks unremarkable in the data."
+    traffic_level: green
+# Max score = F
+- input:
+    composite_score: 100
+  expect:
+    harm_level: "F — Critical"
+    harm_description: "All metrics point to a very strong drug-event association. Immediate safety review warranted."
+    traffic_level: red
+- input: {}
+  expect:
+    harm_description: No meaningful risk signal detected. This drug-event pair looks unremarkable in the data.
+    harm_level: A — Negligible
+    traffic_level: green

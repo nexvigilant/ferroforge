@@ -1,0 +1,484 @@
+name: config-trial-sae-triage
+description: Triage clinical trial safety data from compare-trial-arms or get-serious-adverse-events output. Classifies safety concern by SAE rate differential.
+version: 0.1.0
+tree:
+  start: check_deaths
+  nodes:
+    check_low_saes:
+      type: condition
+      variable: total_saes
+      operator: eq
+      value: 0
+      true_next: favorable
+      false_next: standard_concern
+    critical_concern:
+      type: return
+      value:
+        safety_concern: critical
+        action: immediate_dsmb_review
+        signal_detected: true
+    no_data:
+      type: return
+      value:
+        safety_concern: standard
+        action: await_results
+        signal_detected: false
+    check_moderate_treatment:
+      type: condition
+      variable: treatment_sae_rate
+      operator: gte
+      value: 5
+      true_next: check_control_moderate
+      false_next: check_favorable
+    favorable:
+      type: return
+      value:
+        action: continue_monitoring
+        signal_detected: false
+        safety_concern: favorable
+    standard_concern:
+      type: return
+      value:
+        signal_detected: false
+        safety_concern: standard
+        action: routine_safety_review
+    check_treatment_rate_alone:
+      type: condition
+      variable: treatment_sae_rate
+      operator: gte
+      value: 10
+      true_next: elevated_concern
+      false_next: standard_concern
+    check_total_saes:
+      type: condition
+      variable: total_saes
+      operator: is_null
+      value: null
+      true_next: no_data
+      false_next: check_sae_volume
+    elevated_concern:
+      type: return
+      value:
+        action: enhanced_safety_monitoring
+        signal_detected: true
+        safety_concern: elevated
+    check_control_high_diff:
+      type: condition
+      variable: control_sae_rate
+      operator: lte
+      value: 5
+      true_next: elevated_concern
+      false_next: check_both_high
+    check_rate_differential:
+      type: condition
+      variable: control_sae_rate
+      operator: is_null
+      value: null
+      true_next: check_treatment_rate_alone
+      false_next: compute_differential
+    compute_differential:
+      type: condition
+      variable: treatment_sae_rate
+      operator: gte
+      value: 10
+      true_next: check_control_high_diff
+      false_next: check_moderate_treatment
+    check_both_high:
+      type: condition
+      variable: control_sae_rate
+      operator: gte
+      value: 8
+      true_next: standard_concern
+      false_next: elevated_concern
+    check_lower_than_control:
+      type: condition
+      variable: treatment_sae_rate
+      operator: lt
+      value: 2
+      true_next: favorable
+      false_next: standard_concern
+    check_sae_volume:
+      type: condition
+      variable: total_saes
+      operator: gte
+      value: 20
+      true_next: elevated_concern
+      false_next: check_low_saes
+    check_rates_available:
+      type: condition
+      variable: treatment_sae_rate
+      operator: is_null
+      value: null
+      true_next: check_total_saes
+      false_next: check_rate_differential
+    check_favorable:
+      type: condition
+      variable: control_sae_rate
+      operator: is_null
+      value: null
+      true_next: standard_concern
+      false_next: check_lower_than_control
+    check_deaths:
+      type: condition
+      variable: has_deaths
+      operator: eq
+      value: true
+      true_next: critical_concern
+      false_next: check_rates_available
+    check_control_moderate:
+      type: condition
+      variable: control_sae_rate
+      operator: lte
+      value: 2
+      true_next: elevated_concern
+      false_next: standard_concern
+tests:
+- input:
+    has_deaths: true
+    phase: '3'
+    control_sae_rate: 3.0
+    treatment_sae_rate: 8.5
+    total_saes: 25
+  expect:
+    safety_concern: critical
+    action: immediate_dsmb_review
+    signal_detected: true
+- input:
+    has_deaths: false
+    treatment_sae_rate: 12.0
+    phase: '3'
+    total_saes: 30
+    control_sae_rate: 4.0
+  expect:
+    action: enhanced_safety_monitoring
+    signal_detected: true
+    safety_concern: elevated
+- input:
+    control_sae_rate: 1.5
+    total_saes: 10
+    phase: '2'
+    treatment_sae_rate: 6.0
+    has_deaths: false
+  expect:
+    action: enhanced_safety_monitoring
+    signal_detected: true
+    safety_concern: elevated
+- input:
+    control_sae_rate: 9.0
+    total_saes: 40
+    treatment_sae_rate: 11.0
+    phase: '3'
+    has_deaths: false
+  expect:
+    action: routine_safety_review
+    signal_detected: false
+    safety_concern: standard
+- input:
+    phase: '3'
+    control_sae_rate: 3.0
+    treatment_sae_rate: 1.5
+    total_saes: 5
+    has_deaths: false
+  expect:
+    action: continue_monitoring
+    safety_concern: favorable
+    signal_detected: false
+- input:
+    has_deaths: false
+    total_saes: 25
+  expect:
+    action: enhanced_safety_monitoring
+    signal_detected: true
+    safety_concern: elevated
+- input:
+    total_saes: 0
+    has_deaths: false
+  expect:
+    action: continue_monitoring
+    safety_concern: favorable
+    signal_detected: false
+- input: {}
+  expect:
+    safety_concern: standard
+    action: await_results
+    signal_detected: false
+- input:
+    total_saes: -1
+  expect:
+    signal_detected: false
+    action: routine_safety_review
+    safety_concern: standard
+- input:
+    total_saes: -1
+  expect:
+    action: routine_safety_review
+    safety_concern: standard
+    signal_detected: false
+- input:
+    total_saes: 1
+  expect:
+    action: routine_safety_review
+    signal_detected: false
+    safety_concern: standard
+- input:
+    treatment_sae_rate: 0
+  expect:
+    safety_concern: standard
+    signal_detected: false
+    action: routine_safety_review
+- input:
+    treatment_sae_rate: -1
+  expect:
+    action: routine_safety_review
+    signal_detected: false
+    safety_concern: standard
+- input:
+    treatment_sae_rate: 4
+  expect:
+    action: routine_safety_review
+    signal_detected: false
+    safety_concern: standard
+- input:
+    treatment_sae_rate: 6
+  expect:
+    safety_concern: standard
+    signal_detected: false
+    action: routine_safety_review
+- input:
+    treatment_sae_rate: 500
+  expect:
+    signal_detected: true
+    action: enhanced_safety_monitoring
+    safety_concern: elevated
+- input:
+    treatment_sae_rate: 0
+  expect:
+    signal_detected: false
+    action: routine_safety_review
+    safety_concern: standard
+- input:
+    treatment_sae_rate: -1
+  expect:
+    safety_concern: standard
+    action: routine_safety_review
+    signal_detected: false
+- input:
+    treatment_sae_rate: 9
+  expect:
+    signal_detected: false
+    action: routine_safety_review
+    safety_concern: standard
+- input:
+    treatment_sae_rate: 11
+  expect:
+    signal_detected: true
+    safety_concern: elevated
+    action: enhanced_safety_monitoring
+- input:
+    treatment_sae_rate: 1000
+  expect:
+    safety_concern: elevated
+    signal_detected: true
+    action: enhanced_safety_monitoring
+- input:
+    control_sae_rate: 0
+  expect:
+    action: await_results
+    signal_detected: false
+    safety_concern: standard
+- input:
+    control_sae_rate: -1
+  expect:
+    signal_detected: false
+    action: await_results
+    safety_concern: standard
+- input:
+    control_sae_rate: 4
+  expect:
+    signal_detected: false
+    safety_concern: standard
+    action: await_results
+- input:
+    control_sae_rate: 6
+  expect:
+    signal_detected: false
+    action: await_results
+    safety_concern: standard
+- input:
+    control_sae_rate: 500
+  expect:
+    signal_detected: false
+    safety_concern: standard
+    action: await_results
+- input:
+    treatment_sae_rate: 0
+  expect:
+    action: routine_safety_review
+    safety_concern: standard
+    signal_detected: false
+- input:
+    treatment_sae_rate: -1
+  expect:
+    signal_detected: false
+    safety_concern: standard
+    action: routine_safety_review
+- input:
+    treatment_sae_rate: 9
+  expect:
+    action: routine_safety_review
+    signal_detected: false
+    safety_concern: standard
+- input:
+    treatment_sae_rate: 11
+  expect:
+    safety_concern: elevated
+    action: enhanced_safety_monitoring
+    signal_detected: true
+- input:
+    treatment_sae_rate: 1000
+  expect:
+    signal_detected: true
+    safety_concern: elevated
+    action: enhanced_safety_monitoring
+- input:
+    control_sae_rate: 0
+  expect:
+    action: await_results
+    safety_concern: standard
+    signal_detected: false
+- input:
+    control_sae_rate: -1
+  expect:
+    action: await_results
+    signal_detected: false
+    safety_concern: standard
+- input:
+    control_sae_rate: 7
+  expect:
+    signal_detected: false
+    safety_concern: standard
+    action: await_results
+- input:
+    control_sae_rate: 9
+  expect:
+    action: await_results
+    safety_concern: standard
+    signal_detected: false
+- input:
+    control_sae_rate: 800
+  expect:
+    signal_detected: false
+    safety_concern: standard
+    action: await_results
+- input:
+    treatment_sae_rate: 0
+  expect:
+    safety_concern: standard
+    action: routine_safety_review
+    signal_detected: false
+- input:
+    treatment_sae_rate: -1
+  expect:
+    signal_detected: false
+    action: routine_safety_review
+    safety_concern: standard
+- input:
+    treatment_sae_rate: 1
+  expect:
+    action: routine_safety_review
+    signal_detected: false
+    safety_concern: standard
+- input:
+    treatment_sae_rate: 3
+  expect:
+    safety_concern: standard
+    action: routine_safety_review
+    signal_detected: false
+- input:
+    treatment_sae_rate: 200
+  expect:
+    signal_detected: true
+    safety_concern: elevated
+    action: enhanced_safety_monitoring
+- input:
+    total_saes: -1
+  expect:
+    action: routine_safety_review
+    signal_detected: false
+    safety_concern: standard
+- input:
+    total_saes: 19
+  expect:
+    safety_concern: standard
+    signal_detected: false
+    action: routine_safety_review
+- input:
+    total_saes: 21
+  expect:
+    safety_concern: elevated
+    signal_detected: true
+    action: enhanced_safety_monitoring
+- input:
+    total_saes: 2000
+  expect:
+    action: enhanced_safety_monitoring
+    safety_concern: elevated
+    signal_detected: true
+- input:
+    control_sae_rate: 0
+  expect:
+    safety_concern: standard
+    action: await_results
+    signal_detected: false
+- input:
+    control_sae_rate: -1
+  expect:
+    signal_detected: false
+    safety_concern: standard
+    action: await_results
+- input:
+    control_sae_rate: 1
+  expect:
+    signal_detected: false
+    action: await_results
+    safety_concern: standard
+- input:
+    control_sae_rate: 3
+  expect:
+    signal_detected: false
+    safety_concern: standard
+    action: await_results
+- input:
+    control_sae_rate: 200
+  expect:
+    action: await_results
+    signal_detected: false
+    safety_concern: standard
+interface:
+  inputs:
+    treatment_sae_rate:
+      type: float
+      required: false
+    control_sae_rate:
+      type: float
+      required: false
+    total_saes:
+      type: int
+      required: false
+    has_deaths:
+      type: bool
+      required: false
+    phase:
+      type: string
+      required: false
+  outputs:
+    signal_detected:
+      type: bool
+      required: false
+    safety_concern:
+      type: string
+      required: false
+    action:
+      type: string
+      required: false
+  aliases: {}

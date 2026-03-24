@@ -1,0 +1,241 @@
+name: case-quality-gate
+description: Routes ICSR cases through quality assessment into triage. Bridges icsr-completeness-scorer output into intake-to-triage input format. Computes completeness_pct from quality_tier.
+version: 0.1.0
+tree:
+  start: check_minimum
+  nodes:
+    check_serious_high:
+      type: condition
+      variable: serious_suspected
+      operator: eq
+      value: true
+      true_next: fast_track_serious_high
+      false_next: standard_good_quality
+    standard_high_quality:
+      type: return
+      value:
+        completeness_pct: 100
+        valid: true
+        action: High-quality non-serious case — standard triage
+        route: STANDARD
+        duplicate_status: unknown
+    invalid_case:
+      type: return
+      value:
+        action: Return to reporter — minimum ICH E2B(R3) criteria not met
+        completeness_pct: 0
+        valid: false
+        serious_suspected: false
+        duplicate_status: unknown
+        route: REJECT
+    priority_incomplete:
+      type: return
+      value:
+        duplicate_status: unknown
+        completeness_pct: 75
+        route: PRIORITY_FOLLOWUP
+        action: Serious case with missing fields — request follow-up information while processing
+        valid: true
+    standard_minimum:
+      type: return
+      value:
+        duplicate_status: unknown
+        completeness_pct: 75
+        route: STANDARD
+        action: Meets minimum criteria — standard processing
+        valid: true
+    minimum_quality:
+      type: return
+      value:
+        completeness_pct: 50
+        valid: true
+        action: Minimum criteria met but quality low — request additional information
+        route: FOLLOWUP_REQUIRED
+        duplicate_status: unknown
+    check_serious_good:
+      type: condition
+      variable: serious_suspected
+      operator: eq
+      value: true
+      true_next: priority_incomplete
+      false_next: standard_minimum
+    check_quality_high:
+      type: condition
+      variable: quality_tier
+      operator: eq
+      value: HIGH
+      true_next: check_serious_high
+      false_next: check_quality_good
+    check_quality_good:
+      type: condition
+      variable: quality_tier
+      operator: eq
+      value: GOOD
+      true_next: check_serious_good
+      false_next: minimum_quality
+    check_quality_excellent:
+      type: condition
+      variable: quality_tier
+      operator: eq
+      value: EXCELLENT
+      true_next: check_serious_excellent
+      false_next: check_quality_high
+    fast_track_serious:
+      type: return
+      value:
+        action: High-quality serious case — fast-track to causality assessment
+        valid: true
+        route: FAST_TRACK
+        completeness_pct: 100
+        duplicate_status: unknown
+    fast_track_serious_high:
+      type: return
+      value:
+        action: Serious case with high completeness — fast-track to causality
+        completeness_pct: 87
+        valid: true
+        duplicate_status: unknown
+        route: FAST_TRACK
+    standard_good_quality:
+      type: return
+      value:
+        duplicate_status: unknown
+        valid: true
+        completeness_pct: 87
+        route: STANDARD
+        action: Good quality case — standard processing
+    check_minimum:
+      type: condition
+      variable: meets_minimum
+      operator: eq
+      value: true
+      true_next: check_quality_excellent
+      false_next: invalid_case
+    check_serious_excellent:
+      type: condition
+      variable: serious_suspected
+      operator: eq
+      value: true
+      true_next: fast_track_serious
+      false_next: standard_high_quality
+tests:
+- input:
+    meets_minimum: true
+    quality_tier: EXCELLENT
+    serious_suspected: true
+  expect:
+    completeness_pct: 100
+    valid: true
+    route: FAST_TRACK
+- input:
+    meets_minimum: true
+    quality_tier: EXCELLENT
+    serious_suspected: false
+  expect:
+    route: STANDARD
+    completeness_pct: 100
+    valid: true
+- input:
+    meets_minimum: true
+    quality_tier: HIGH
+    serious_suspected: true
+  expect:
+    route: FAST_TRACK
+    completeness_pct: 87
+    valid: true
+- input:
+    meets_minimum: true
+    serious_suspected: false
+    quality_tier: HIGH
+  expect:
+    valid: true
+    route: STANDARD
+- input:
+    serious_suspected: true
+    meets_minimum: true
+    quality_tier: GOOD
+  expect:
+    valid: true
+    route: PRIORITY_FOLLOWUP
+- input:
+    quality_tier: GOOD
+    serious_suspected: false
+    meets_minimum: true
+  expect:
+    valid: true
+    route: STANDARD
+- input:
+    meets_minimum: true
+    quality_tier: MINIMUM
+    serious_suspected: false
+  expect:
+    route: FOLLOWUP_REQUIRED
+    valid: true
+    completeness_pct: 50
+- input:
+    meets_minimum: false
+    quality_tier: INVALID
+  expect:
+    route: REJECT
+    completeness_pct: 0
+    valid: false
+- input: {}
+  expect:
+    completeness_pct: 0
+    valid: false
+    action: Return to reporter — minimum ICH E2B(R3) criteria not met
+    serious_suspected: false
+    route: REJECT
+    duplicate_status: unknown
+- input: {}
+  expect:
+    serious_suspected: false
+    duplicate_status: unknown
+    route: REJECT
+    action: Return to reporter — minimum ICH E2B(R3) criteria not met
+    completeness_pct: 0
+    valid: false
+- input: {}
+  expect:
+    action: Return to reporter — minimum ICH E2B(R3) criteria not met
+    duplicate_status: unknown
+    completeness_pct: 0
+    valid: false
+    route: REJECT
+    serious_suspected: false
+- input: {}
+  expect:
+    action: Return to reporter — minimum ICH E2B(R3) criteria not met
+    completeness_pct: 0
+    valid: false
+    duplicate_status: unknown
+    route: REJECT
+    serious_suspected: false
+interface:
+  inputs:
+    serious_suspected:
+      type: bool
+      required: false
+    meets_minimum:
+      type: bool
+      required: true
+    quality_tier:
+      type: string
+      required: true
+  outputs:
+    completeness_pct:
+      type: int
+      required: false
+    route:
+      type: string
+      required: false
+    duplicate_status:
+      type: string
+      required: false
+    valid:
+      type: bool
+      required: false
+    action:
+      type: string
+      required: false
+  aliases: {}

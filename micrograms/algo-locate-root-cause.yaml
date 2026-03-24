@@ -1,0 +1,180 @@
+name: algo-locate-root-cause
+description: "Algorithm 10 (LOCATE): Boundary contraction search. Takes a failure and systematically narrows the search space through successive comparisons (\u03ba) at each location (\u03bb), halving the boundary (\u2202) until root cause is located."
+version: 0.1.0
+interface:
+  inputs:
+    failure_layer:
+      type: string
+      required: true
+      description: "Which architectural layer failed"
+      enum: [transport, orchestration, domain, foundation, unknown]
+    error_reproducible:
+      type: boolean
+      required: true
+      description: "\u03ba(run1, run2) = same error? Reproducibility narrows \u2202"
+    error_in_tests:
+      type: boolean
+      required: true
+      description: "Does the error appear in unit tests? Narrows to code vs config"
+    recent_change:
+      type: boolean
+      required: true
+      description: "Was there a recent change to this area? \u03bb(recent_commit)"
+  outputs:
+    root_cause_location:
+      type: string
+    search_boundary:
+      type: string
+    contractions:
+      type: integer
+    algorithm:
+      type: string
+tree:
+  start: check_layer
+  nodes:
+    check_layer:
+      type: condition
+      variable: failure_layer
+      operator: eq
+      value: unknown
+      true_next: unknown_start_broad
+      false_next: check_reproducible
+    unknown_start_broad:
+      type: return
+      value:
+        root_cause_location: undetermined
+        search_boundary: full_system
+        contractions: 0
+        algorithm: "LOCATE: \u2202_search = full system \u2014 layer unknown, cannot contract. Run DECOMPOSE first."
+    check_reproducible:
+      type: condition
+      variable: error_reproducible
+      operator: eq
+      value: true
+      true_next: check_in_tests
+      false_next: flaky_path
+    flaky_path:
+      type: return
+      value:
+        root_cause_location: timing_or_environment
+        search_boundary: runtime_conditions
+        contractions: 1
+        algorithm: "LOCATE: \u03ba(run1, run2) \u2260 equal \u2192 non-deterministic \u2014 \u2202 contracts to runtime conditions (race, env, timing)"
+    check_in_tests:
+      type: condition
+      variable: error_in_tests
+      operator: eq
+      value: true
+      true_next: check_recent_change_code
+      false_next: check_recent_change_config
+    check_recent_change_code:
+      type: condition
+      variable: recent_change
+      operator: eq
+      value: true
+      true_next: located_recent_code
+      false_next: located_existing_code
+    check_recent_change_config:
+      type: condition
+      variable: recent_change
+      operator: eq
+      value: true
+      true_next: located_recent_config
+      false_next: located_existing_config
+    located_recent_code:
+      type: return
+      value:
+        root_cause_location: recent_code_change
+        search_boundary: last_commit_in_layer
+        contractions: 3
+        algorithm: "LOCATE: \u03c1(\u03ba \u2192 \u2202/N) converged \u2014 reproducible + in tests + recent change = check last commit in {failure_layer}"
+    located_existing_code:
+      type: return
+      value:
+        root_cause_location: existing_code_bug
+        search_boundary: layer_source_code
+        contractions: 3
+        algorithm: "LOCATE: \u03c1(\u03ba \u2192 \u2202/N) \u2014 reproducible + in tests + no recent change = latent bug in {failure_layer} source"
+    located_recent_config:
+      type: return
+      value:
+        root_cause_location: recent_config_change
+        search_boundary: recent_config_diff
+        contractions: 3
+        algorithm: "LOCATE: \u03c1(\u03ba \u2192 \u2202/N) \u2014 reproducible + NOT in tests + recent change = config/env change in {failure_layer}"
+    located_existing_config:
+      type: return
+      value:
+        root_cause_location: existing_config_or_env
+        search_boundary: layer_config_and_env
+        contractions: 3
+        algorithm: "LOCATE: \u03c1(\u03ba \u2192 \u2202/N) \u2014 reproducible + NOT in tests + no recent change = environment or config drift in {failure_layer}"
+tests:
+- name: recent_code_bug
+  input:
+    failure_layer: domain
+    error_reproducible: true
+    error_in_tests: true
+    recent_change: true
+  expect:
+    root_cause_location: recent_code_change
+    contractions: 3
+- name: latent_code_bug
+  input:
+    failure_layer: foundation
+    error_reproducible: true
+    error_in_tests: true
+    recent_change: false
+  expect:
+    root_cause_location: existing_code_bug
+    contractions: 3
+- name: config_drift
+  input:
+    failure_layer: transport
+    error_reproducible: true
+    error_in_tests: false
+    recent_change: false
+  expect:
+    root_cause_location: existing_config_or_env
+    contractions: 3
+- name: recent_config_change
+  input:
+    failure_layer: orchestration
+    error_reproducible: true
+    error_in_tests: false
+    recent_change: true
+  expect:
+    root_cause_location: recent_config_change
+    contractions: 3
+- name: flaky_test
+  input:
+    failure_layer: domain
+    error_reproducible: false
+    error_in_tests: true
+    recent_change: true
+  expect:
+    root_cause_location: timing_or_environment
+    contractions: 1
+- name: unknown_layer
+  input:
+    failure_layer: unknown
+    error_reproducible: true
+    error_in_tests: true
+    recent_change: true
+  expect:
+    root_cause_location: undetermined
+    contractions: 0
+- name: flaky_no_tests
+  input:
+    failure_layer: foundation
+    error_reproducible: false
+    error_in_tests: false
+    recent_change: false
+  expect:
+    root_cause_location: timing_or_environment
+    contractions: 1
+- name: null_safety
+  input: {}
+  expect:
+    root_cause_location: timing_or_environment
+    contractions: 1

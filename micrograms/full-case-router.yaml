@@ -1,0 +1,190 @@
+name: full-case-router
+description: 'Master case processor: routes new cases through the complete PV workflow based on seriousness criteria, signal status, and causality state.'
+version: 0.1.0
+interface:
+  inputs:
+    causality_assessed:
+      type: bool
+      required: false
+    has_death:
+      type: bool
+      required: false
+    has_disability:
+      type: bool
+      required: false
+    has_hospitalization:
+      type: bool
+      required: false
+    signal_detected:
+      type: bool
+      required: false
+  outputs:
+    next_action:
+      type: string
+    priority:
+      type: string
+    reason:
+      type: string
+    tool_path:
+      type: string
+tree:
+  start: check_death
+  nodes:
+    check_death:
+      type: condition
+      variable: has_death
+      operator: eq
+      value: true
+      true_next: serious_causality_check
+      false_next: check_hospitalization
+    check_hospitalization:
+      type: condition
+      variable: has_hospitalization
+      operator: eq
+      value: true
+      true_next: serious_causality_check
+      false_next: check_disability
+    check_disability:
+      type: condition
+      variable: has_disability
+      operator: eq
+      value: true
+      true_next: serious_causality_check
+      false_next: check_signal_non_serious
+    serious_causality_check:
+      type: condition
+      variable: causality_assessed
+      operator: eq
+      value: true
+      true_next: file_expedited
+      false_next: assess_urgent
+    assess_urgent:
+      type: return
+      value:
+        next_action: ASSESS_CAUSALITY_URGENT
+        priority: P0
+        tool_path: /vigilance/causality
+        reason: Serious case criteria met - immediate causality assessment required before expedited filing
+    file_expedited:
+      type: return
+      value:
+        next_action: FILE_EXPEDITED_REPORT
+        priority: P1
+        tool_path: /vigilance/reporting
+        reason: Serious case with causality assessed - proceed to expedited regulatory filing
+    check_signal_non_serious:
+      type: condition
+      variable: signal_detected
+      operator: eq
+      value: true
+      true_next: assess_routine
+      false_next: routine_monitoring
+    assess_routine:
+      type: return
+      value:
+        next_action: ASSESS_CAUSALITY_ROUTINE
+        priority: P2
+        tool_path: /vigilance/causality
+        reason: Signal detected in non-serious case - routine causality assessment recommended
+    routine_monitoring:
+      type: return
+      value:
+        next_action: ROUTINE_MONITORING
+        priority: P3
+        tool_path: /vigilance/signals
+        reason: No serious criteria and no signal - continue routine pharmacovigilance monitoring
+tests:
+- input:
+    has_death: true
+    has_hospitalization: false
+    has_disability: false
+    signal_detected: false
+    causality_assessed: false
+  expect:
+    next_action: ASSESS_CAUSALITY_URGENT
+    priority: P0
+    tool_path: /vigilance/causality
+    reason: Serious case criteria met - immediate causality assessment required before expedited filing
+- input:
+    has_death: true
+    has_hospitalization: false
+    has_disability: false
+    signal_detected: false
+    causality_assessed: true
+  expect:
+    next_action: FILE_EXPEDITED_REPORT
+    priority: P1
+    tool_path: /vigilance/reporting
+    reason: Serious case with causality assessed - proceed to expedited regulatory filing
+- input:
+    has_death: false
+    has_hospitalization: true
+    has_disability: false
+    signal_detected: false
+    causality_assessed: false
+  expect:
+    next_action: ASSESS_CAUSALITY_URGENT
+    priority: P0
+    tool_path: /vigilance/causality
+    reason: Serious case criteria met - immediate causality assessment required before expedited filing
+- input:
+    has_death: false
+    has_hospitalization: true
+    has_disability: false
+    signal_detected: true
+    causality_assessed: true
+  expect:
+    next_action: FILE_EXPEDITED_REPORT
+    priority: P1
+    tool_path: /vigilance/reporting
+    reason: Serious case with causality assessed - proceed to expedited regulatory filing
+- input:
+    has_death: false
+    has_hospitalization: false
+    has_disability: true
+    signal_detected: false
+    causality_assessed: false
+  expect:
+    next_action: ASSESS_CAUSALITY_URGENT
+    priority: P0
+    tool_path: /vigilance/causality
+    reason: Serious case criteria met - immediate causality assessment required before expedited filing
+- input:
+    has_death: false
+    has_hospitalization: false
+    has_disability: false
+    signal_detected: true
+    causality_assessed: false
+  expect:
+    next_action: ASSESS_CAUSALITY_ROUTINE
+    priority: P2
+    tool_path: /vigilance/causality
+    reason: Signal detected in non-serious case - routine causality assessment recommended
+- input:
+    has_death: false
+    has_hospitalization: false
+    has_disability: false
+    signal_detected: false
+    causality_assessed: false
+  expect:
+    next_action: ROUTINE_MONITORING
+    priority: P3
+    tool_path: /vigilance/signals
+    reason: No serious criteria and no signal - continue routine pharmacovigilance monitoring
+- input:
+    has_death: true
+    has_hospitalization: true
+    has_disability: true
+    signal_detected: true
+    causality_assessed: true
+  expect:
+    next_action: FILE_EXPEDITED_REPORT
+    priority: P1
+    tool_path: /vigilance/reporting
+    reason: Serious case with causality assessed - proceed to expedited regulatory filing
+- input: {}
+  expect:
+    next_action: ROUTINE_MONITORING
+    priority: P3
+    reason: No serious criteria and no signal - continue routine pharmacovigilance monitoring
+    tool_path: /vigilance/signals

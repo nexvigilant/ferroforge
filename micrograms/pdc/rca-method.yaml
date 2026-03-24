@@ -1,0 +1,164 @@
+name: rca-method
+description: "Domain 6: Route to appropriate root cause analysis method by error complexity and investigation scope."
+version: 0.1.0
+interface:
+  inputs:
+    error_severity:
+      type: string
+      required: false
+    involves_behavior_question:
+      type: bool
+      required: false
+    is_multi_factor:
+      type: bool
+      required: false
+    is_proactive:
+      type: bool
+      required: false
+  outputs:
+    ai_assist:
+      type: string
+    approach:
+      type: string
+    best_for:
+      type: string
+    categories:
+      type: string
+    method:
+      type: string
+    name:
+      type: string
+    steps:
+      type: string
+    type:
+      type: string
+tree:
+  start: check_proactive
+  nodes:
+    check_proactive:
+      type: condition
+      variable: is_proactive
+      operator: eq
+      value: true
+      true_next: fmea
+      false_next: check_severity
+    check_severity:
+      type: condition
+      variable: error_severity
+      operator: eq
+      value: fatal
+      true_next: full_rca
+      false_next: check_permanent
+    check_permanent:
+      type: condition
+      variable: error_severity
+      operator: eq
+      value: permanent
+      true_next: full_rca
+      false_next: check_complex
+    check_complex:
+      type: condition
+      variable: is_multi_factor
+      operator: eq
+      value: true
+      true_next: swiss_cheese
+      false_next: check_culture
+    check_culture:
+      type: condition
+      variable: involves_behavior_question
+      operator: eq
+      value: true
+      true_next: just_culture
+      false_next: basic_rca
+    fmea:
+      type: return
+      value:
+        method: FMEA
+        name: "Failure Mode and Effects Analysis"
+        type: proactive
+        approach: "identify potential failure points BEFORE errors occur"
+        steps: "list process steps -> identify failure modes -> assess severity/probability/detectability -> calculate RPN -> prioritize interventions"
+        best_for: "new process design, system redesign, technology implementation"
+        ai_assist: "process simulation, failure mode prediction, RPN optimization"
+    full_rca:
+      type: return
+      value:
+        method: FULL_RCA
+        name: "Comprehensive Root Cause Analysis"
+        type: reactive
+        approach: "systematic identification of all contributing factors to serious error"
+        steps: "timeline reconstruction -> stakeholder interviews -> document review -> contributing factor analysis -> root cause identification -> action plan"
+        best_for: "sentinel events, fatal errors, permanent harm, regulatory-required investigations"
+        ai_assist: "pattern matching across incidents, contributing factor clustering, solution effectiveness prediction"
+    swiss_cheese:
+      type: return
+      value:
+        method: SWISS_CHEESE
+        name: "Swiss Cheese Model (Reason's Model)"
+        type: reactive
+        approach: "analyze how multiple system defense failures aligned to permit error"
+        steps: "identify defense layers -> map holes in each layer -> determine alignment pattern -> strengthen weakest layers"
+        best_for: "multi-factor errors, system defense analysis, latent condition identification"
+        ai_assist: "defense layer mapping, hole pattern recognition, latent condition detection"
+    just_culture:
+      type: return
+      value:
+        method: JUST_CULTURE
+        name: "Just Culture Analysis (Marx)"
+        type: behavioral
+        approach: "distinguish human error from at-risk behavior from reckless conduct"
+        categories: "human_error (console), at_risk (coach), reckless (punish)"
+        steps: "assess intent -> evaluate choice -> determine knowledge -> classify behavior -> select response"
+        best_for: "behavior-related errors, disciplinary questions, culture building"
+        ai_assist: "behavioral pattern analysis, organizational culture assessment"
+    basic_rca:
+      type: return
+      value:
+        method: BASIC_RCA
+        name: "Simplified Root Cause Analysis"
+        type: reactive
+        approach: "focused investigation of straightforward errors with limited contributing factors"
+        steps: "event description -> 5 Whys -> contributing factor identification -> corrective action"
+        best_for: "temporary harm errors, single-factor errors, routine investigations"
+        ai_assist: "similar incident matching, corrective action effectiveness prediction"
+tests:
+- input:
+    is_proactive: true
+  expect:
+    method: FMEA
+    type: proactive
+- input:
+    error_severity: fatal
+    is_proactive: false
+  expect:
+    method: FULL_RCA
+    type: reactive
+- input:
+    error_severity: permanent
+    is_proactive: false
+  expect:
+    method: FULL_RCA
+- input:
+    error_severity: temporary
+    is_multi_factor: true
+    is_proactive: false
+  expect:
+    method: SWISS_CHEESE
+- input:
+    error_severity: temporary
+    involves_behavior_question: true
+    is_multi_factor: false
+    is_proactive: false
+  expect:
+    method: JUST_CULTURE
+    type: behavioral
+- input:
+    error_severity: temporary
+    is_multi_factor: false
+    involves_behavior_question: false
+    is_proactive: false
+  expect:
+    method: BASIC_RCA
+- input: {}
+  expect:
+    method: BASIC_RCA

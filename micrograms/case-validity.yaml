@@ -1,0 +1,507 @@
+name: case-validity
+description: 'ICSR validity checker: enforces 4 minimum criteria per ICH E2B(R3) — reporter, patient, suspect drug, adverse event'
+version: 1.0.0
+interface:
+  inputs:
+    has_adverse_event:
+      type: bool
+      required: false
+    has_patient:
+      type: bool
+      required: false
+    has_reporter:
+      type: bool
+      required: false
+    has_suspect_drug:
+      type: bool
+      required: false
+  outputs:
+    action:
+      type: string
+    missing_count:
+      type: int
+    missing_fields:
+      type: string
+    regulatory_reference:
+      type: string
+    status:
+      type: string
+    valid:
+      type: bool
+tree:
+  start: check_reporter
+  nodes:
+    # --- Primary validity chain: check all four criteria ---
+    check_reporter:
+      type: condition
+      variable: has_reporter
+      operator: eq
+      value: true
+      true_next: check_patient
+      false_next: missing_reporter
+
+    check_patient:
+      type: condition
+      variable: has_patient
+      operator: eq
+      value: true
+      true_next: check_drug
+      false_next: missing_patient_has_reporter
+
+    check_drug:
+      type: condition
+      variable: has_suspect_drug
+      operator: eq
+      value: true
+      true_next: check_event
+      false_next: missing_drug_has_both
+
+    check_event:
+      type: condition
+      variable: has_adverse_event
+      operator: eq
+      value: true
+      true_next: valid_complete
+      false_next: missing_event_has_three
+
+    # --- Valid: all 4 criteria present ---
+    valid_complete:
+      type: return
+      value:
+        valid: true
+        status: VALID_COMPLETE
+        missing_count: 0
+        action: process_normally
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    # --- Missing 1: event missing (reporter + patient + drug present) ---
+    missing_event_has_three:
+      type: return
+      value:
+        valid: false
+        status: INVALID_INCOMPLETE
+        missing_count: 1
+        missing_fields: [adverse_event]
+        action: request_followup
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    # --- Reporter missing: check remaining 3 to determine total missing count ---
+    missing_reporter:
+      type: condition
+      variable: has_patient
+      operator: eq
+      value: true
+      true_next: missing_reporter_has_patient
+      false_next: missing_reporter_no_patient
+
+    missing_reporter_has_patient:
+      type: condition
+      variable: has_suspect_drug
+      operator: eq
+      value: true
+      true_next: missing_reporter_has_drug
+      false_next: missing_reporter_patient_no_drug
+
+    missing_reporter_has_drug:
+      type: condition
+      variable: has_adverse_event
+      operator: eq
+      value: true
+      true_next: missing_1_reporter
+      false_next: missing_2_reporter_event
+
+    missing_1_reporter:
+      type: return
+      value:
+        valid: false
+        status: INVALID_INCOMPLETE
+        missing_count: 1
+        missing_fields: [reporter]
+        action: request_followup
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    missing_2_reporter_event:
+      type: return
+      value:
+        valid: false
+        status: INVALID_MINIMAL
+        missing_count: 2
+        missing_fields: [reporter, adverse_event]
+        action: request_followup_urgent
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    missing_reporter_patient_no_drug:
+      type: condition
+      variable: has_adverse_event
+      operator: eq
+      value: true
+      true_next: missing_2_reporter_drug
+      false_next: missing_3_reporter_drug_event
+
+    missing_2_reporter_drug:
+      type: return
+      value:
+        valid: false
+        status: INVALID_MINIMAL
+        missing_count: 2
+        missing_fields: [reporter, suspect_drug]
+        action: request_followup_urgent
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    missing_3_reporter_drug_event:
+      type: return
+      value:
+        valid: false
+        status: INVALID_INSUFFICIENT
+        missing_count: 3
+        missing_fields: [reporter, suspect_drug, adverse_event]
+        action: cannot_process
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    missing_reporter_no_patient:
+      type: condition
+      variable: has_suspect_drug
+      operator: eq
+      value: true
+      true_next: missing_reporter_no_patient_has_drug
+      false_next: missing_reporter_no_patient_no_drug
+
+    missing_reporter_no_patient_has_drug:
+      type: condition
+      variable: has_adverse_event
+      operator: eq
+      value: true
+      true_next: missing_2_reporter_patient
+      false_next: missing_3_reporter_patient_event
+
+    missing_2_reporter_patient:
+      type: return
+      value:
+        valid: false
+        status: INVALID_MINIMAL
+        missing_count: 2
+        missing_fields: [reporter, patient]
+        action: request_followup_urgent
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    missing_3_reporter_patient_event:
+      type: return
+      value:
+        valid: false
+        status: INVALID_INSUFFICIENT
+        missing_count: 3
+        missing_fields: [reporter, patient, adverse_event]
+        action: cannot_process
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    missing_reporter_no_patient_no_drug:
+      type: condition
+      variable: has_adverse_event
+      operator: eq
+      value: true
+      true_next: missing_3_reporter_patient_drug
+      false_next: missing_all_4
+
+    missing_3_reporter_patient_drug:
+      type: return
+      value:
+        valid: false
+        status: INVALID_INSUFFICIENT
+        missing_count: 3
+        missing_fields: [reporter, patient, suspect_drug]
+        action: cannot_process
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    missing_all_4:
+      type: return
+      value:
+        valid: false
+        status: INVALID_INSUFFICIENT
+        missing_count: 4
+        missing_fields: [reporter, patient, suspect_drug, adverse_event]
+        action: cannot_process
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    # --- Patient missing (reporter present): check remaining ---
+    missing_patient_has_reporter:
+      type: condition
+      variable: has_suspect_drug
+      operator: eq
+      value: true
+      true_next: missing_patient_has_reporter_has_drug
+      false_next: missing_patient_has_reporter_no_drug
+
+    missing_patient_has_reporter_has_drug:
+      type: condition
+      variable: has_adverse_event
+      operator: eq
+      value: true
+      true_next: missing_1_patient
+      false_next: missing_2_patient_event
+
+    missing_1_patient:
+      type: return
+      value:
+        valid: false
+        status: INVALID_INCOMPLETE
+        missing_count: 1
+        missing_fields: [patient]
+        action: request_followup
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    missing_2_patient_event:
+      type: return
+      value:
+        valid: false
+        status: INVALID_MINIMAL
+        missing_count: 2
+        missing_fields: [patient, adverse_event]
+        action: request_followup_urgent
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    missing_patient_has_reporter_no_drug:
+      type: condition
+      variable: has_adverse_event
+      operator: eq
+      value: true
+      true_next: missing_2_patient_drug
+      false_next: missing_3_patient_drug_event
+
+    missing_2_patient_drug:
+      type: return
+      value:
+        valid: false
+        status: INVALID_MINIMAL
+        missing_count: 2
+        missing_fields: [patient, suspect_drug]
+        action: request_followup_urgent
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    missing_3_patient_drug_event:
+      type: return
+      value:
+        valid: false
+        status: INVALID_INSUFFICIENT
+        missing_count: 3
+        missing_fields: [patient, suspect_drug, adverse_event]
+        action: cannot_process
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    # --- Drug missing (reporter + patient present): check remaining ---
+    missing_drug_has_both:
+      type: condition
+      variable: has_adverse_event
+      operator: eq
+      value: true
+      true_next: missing_1_drug
+      false_next: missing_2_drug_event
+
+    missing_1_drug:
+      type: return
+      value:
+        valid: false
+        status: INVALID_INCOMPLETE
+        missing_count: 1
+        missing_fields: [suspect_drug]
+        action: request_followup
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+    missing_2_drug_event:
+      type: return
+      value:
+        valid: false
+        status: INVALID_MINIMAL
+        missing_count: 2
+        missing_fields: [suspect_drug, adverse_event]
+        action: request_followup_urgent
+        regulatory_reference: ICH E2B(R3) Section II.A
+
+tests:
+- input:
+    has_reporter: true
+    has_patient: true
+    has_suspect_drug: true
+    has_adverse_event: true
+  expect:
+    valid: true
+    status: VALID_COMPLETE
+    missing_count: 0
+    action: process_normally
+
+- input:
+    has_reporter: false
+    has_patient: true
+    has_suspect_drug: true
+    has_adverse_event: true
+  expect:
+    valid: false
+    status: INVALID_INCOMPLETE
+    missing_count: 1
+    action: request_followup
+
+- input:
+    has_reporter: true
+    has_patient: false
+    has_suspect_drug: true
+    has_adverse_event: true
+  expect:
+    valid: false
+    status: INVALID_INCOMPLETE
+    missing_count: 1
+    action: request_followup
+
+- input:
+    has_reporter: true
+    has_patient: true
+    has_suspect_drug: false
+    has_adverse_event: true
+  expect:
+    valid: false
+    status: INVALID_INCOMPLETE
+    missing_count: 1
+    action: request_followup
+
+- input:
+    has_reporter: true
+    has_patient: true
+    has_suspect_drug: true
+    has_adverse_event: false
+  expect:
+    valid: false
+    status: INVALID_INCOMPLETE
+    missing_count: 1
+    action: request_followup
+
+- input:
+    has_reporter: false
+    has_patient: false
+    has_suspect_drug: true
+    has_adverse_event: true
+  expect:
+    valid: false
+    status: INVALID_MINIMAL
+    missing_count: 2
+    action: request_followup_urgent
+
+- input:
+    has_reporter: true
+    has_patient: false
+    has_suspect_drug: false
+    has_adverse_event: true
+  expect:
+    valid: false
+    status: INVALID_MINIMAL
+    missing_count: 2
+    action: request_followup_urgent
+
+- input:
+    has_reporter: false
+    has_patient: false
+    has_suspect_drug: false
+    has_adverse_event: true
+  expect:
+    valid: false
+    status: INVALID_INSUFFICIENT
+    missing_count: 3
+    action: cannot_process
+
+- input:
+    has_reporter: false
+    has_patient: false
+    has_suspect_drug: false
+    has_adverse_event: false
+  expect:
+    valid: false
+    status: INVALID_INSUFFICIENT
+    missing_count: 4
+    action: cannot_process
+
+- input: {}
+  expect:
+    valid: false
+    status: INVALID_INSUFFICIENT
+    missing_count: 4
+    action: cannot_process
+
+- input:
+    has_reporter: true
+    has_patient: true
+    has_suspect_drug: false
+    has_adverse_event: false
+  expect:
+    valid: false
+    status: INVALID_MINIMAL
+    missing_count: 2
+    action: request_followup_urgent
+
+# -- covers missing_reporter_patient_no_drug + missing_3_reporter_drug_event --
+- input:
+    has_reporter: false
+    has_patient: true
+    has_suspect_drug: false
+    has_adverse_event: false
+  expect:
+    valid: false
+    status: INVALID_INSUFFICIENT
+    missing_count: 3
+    action: cannot_process
+
+# -- covers missing_reporter_patient_no_drug + missing_2_reporter_drug --
+- input:
+    has_reporter: false
+    has_patient: true
+    has_suspect_drug: false
+    has_adverse_event: true
+  expect:
+    valid: false
+    status: INVALID_MINIMAL
+    missing_count: 2
+    action: request_followup_urgent
+
+# -- covers missing_3_reporter_patient_event --
+- input:
+    has_reporter: false
+    has_patient: false
+    has_suspect_drug: true
+    has_adverse_event: false
+  expect:
+    valid: false
+    status: INVALID_INSUFFICIENT
+    missing_count: 3
+    action: cannot_process
+
+# -- covers missing_2_patient_event --
+- input:
+    has_reporter: true
+    has_patient: false
+    has_suspect_drug: true
+    has_adverse_event: false
+  expect:
+    valid: false
+    status: INVALID_MINIMAL
+    missing_count: 2
+    action: request_followup_urgent
+
+# -- covers missing_3_patient_drug_event --
+- input:
+    has_reporter: true
+    has_patient: false
+    has_suspect_drug: false
+    has_adverse_event: false
+  expect:
+    valid: false
+    status: INVALID_INSUFFICIENT
+    missing_count: 3
+    action: cannot_process
+
+# -- covers missing_2_reporter_event --
+- input:
+    has_reporter: false
+    has_patient: true
+    has_suspect_drug: true
+    has_adverse_event: false
+  expect:
+    valid: false
+    status: INVALID_MINIMAL
+    missing_count: 2
+    action: request_followup_urgent

@@ -1,0 +1,200 @@
+name: case-lifecycle-router
+description: 'PVOS lifecycle router: advances cases through new->triage->assessment->reporting->closed based on state and completion conditions'
+version: 0.1.0
+interface:
+  inputs:
+    current_state:
+      type: string
+      required: false
+    deadline_met:
+      type: bool
+      required: false
+    has_causality:
+      type: bool
+      required: false
+    has_seriousness:
+      type: bool
+      required: false
+  outputs:
+    action:
+      type: string
+    description:
+      type: string
+tree:
+  start: check_new
+  nodes:
+    check_new:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: new
+      true_next: move_to_triage
+      false_next: check_triage
+    check_triage:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: triage
+      true_next: triage_seriousness
+      false_next: check_assessment
+    triage_seriousness:
+      type: condition
+      variable: has_seriousness
+      operator: eq
+      value: true
+      true_next: move_to_assessment
+      false_next: assess_seriousness
+    check_assessment:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: assessment
+      true_next: assessment_causality
+      false_next: check_reporting
+    assessment_causality:
+      type: condition
+      variable: has_causality
+      operator: eq
+      value: true
+      true_next: move_to_reporting
+      false_next: assess_causality
+    check_reporting:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: reporting
+      true_next: reporting_deadline
+      false_next: check_closed
+    reporting_deadline:
+      type: condition
+      variable: deadline_met
+      operator: eq
+      value: true
+      true_next: move_to_closed
+      false_next: file_report
+    check_closed:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: closed
+      true_next: already_closed
+      false_next: unknown_state
+    move_to_triage:
+      type: return
+      value:
+        action: MOVE_TO_TRIAGE
+        description: New case received - advance to triage for seriousness assessment
+    assess_seriousness:
+      type: return
+      value:
+        action: ASSESS_SERIOUSNESS
+        description: Case in triage requires seriousness classification before advancing
+    move_to_assessment:
+      type: return
+      value:
+        action: MOVE_TO_ASSESSMENT
+        description: Seriousness classified - advance to causality assessment
+    assess_causality:
+      type: return
+      value:
+        action: ASSESS_CAUSALITY
+        description: Case in assessment requires causality evaluation before advancing
+    move_to_reporting:
+      type: return
+      value:
+        action: MOVE_TO_REPORTING
+        description: Causality assessed - advance to regulatory reporting
+    file_report:
+      type: return
+      value:
+        action: FILE_REPORT
+        description: Report deadline not yet met - file regulatory report
+    move_to_closed:
+      type: return
+      value:
+        action: MOVE_TO_CLOSED
+        description: Reporting deadline met - close the case
+    already_closed:
+      type: return
+      value:
+        action: NO_ACTION
+        description: Case is already closed - no further action required
+    unknown_state:
+      type: return
+      value:
+        action: ERROR_UNKNOWN_STATE
+        description: Unrecognized case state - manual review required
+tests:
+- input:
+    current_state: new
+    has_seriousness: false
+    has_causality: false
+    deadline_met: false
+  expect:
+    action: MOVE_TO_TRIAGE
+    description: New case received - advance to triage for seriousness assessment
+- input:
+    current_state: triage
+    has_seriousness: false
+    has_causality: false
+    deadline_met: false
+  expect:
+    action: ASSESS_SERIOUSNESS
+    description: Case in triage requires seriousness classification before advancing
+- input:
+    current_state: triage
+    has_seriousness: true
+    has_causality: false
+    deadline_met: false
+  expect:
+    action: MOVE_TO_ASSESSMENT
+    description: Seriousness classified - advance to causality assessment
+- input:
+    current_state: assessment
+    has_seriousness: true
+    has_causality: false
+    deadline_met: false
+  expect:
+    action: ASSESS_CAUSALITY
+    description: Case in assessment requires causality evaluation before advancing
+- input:
+    current_state: assessment
+    has_seriousness: true
+    has_causality: true
+    deadline_met: false
+  expect:
+    action: MOVE_TO_REPORTING
+    description: Causality assessed - advance to regulatory reporting
+- input:
+    current_state: reporting
+    has_seriousness: true
+    has_causality: true
+    deadline_met: false
+  expect:
+    action: FILE_REPORT
+    description: Report deadline not yet met - file regulatory report
+- input:
+    current_state: reporting
+    has_seriousness: true
+    has_causality: true
+    deadline_met: true
+  expect:
+    action: MOVE_TO_CLOSED
+    description: Reporting deadline met - close the case
+- input:
+    current_state: closed
+    has_seriousness: true
+    has_causality: true
+    deadline_met: true
+  expect:
+    action: NO_ACTION
+    description: Case is already closed - no further action required
+- input:
+    current_state: invalid_state
+  expect:
+    action: ERROR_UNKNOWN_STATE
+    description: Unrecognized case state - manual review required
+- input: {}
+  expect:
+    action: ERROR_UNKNOWN_STATE
+    description: Unrecognized case state - manual review required

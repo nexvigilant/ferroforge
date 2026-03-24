@@ -1,0 +1,198 @@
+name: lesson-router
+description: 'Session lesson triage router. Classifies a lesson by root cause type and impact, routes to the appropriate permanent mechanism: new hook, new MCG, memory update, or skill update. Closes the learning flywheel by converting ephemeral observations into permanent behavior.'
+version: 0.1.0
+interface:
+  inputs:
+    root_cause_type:
+      type: string
+      required: true
+    recurrence_count:
+      type: int
+      required: true
+    impact:
+      type: string
+      required: true
+  outputs:
+    mechanism:
+      type: string
+    priority:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_impact
+  nodes:
+    check_impact:
+      type: condition
+      variable: impact
+      operator: eq
+      value: blocking
+      true_next: blocking_route
+      false_next: check_recurring
+    blocking_route:
+      type: condition
+      variable: root_cause_type
+      operator: eq
+      value: infrastructure
+      true_next: hook_urgent
+      false_next: check_blocking_arch
+    check_blocking_arch:
+      type: condition
+      variable: root_cause_type
+      operator: eq
+      value: architecture
+      true_next: mcg_urgent
+      false_next: check_blocking_process
+    check_blocking_process:
+      type: condition
+      variable: root_cause_type
+      operator: eq
+      value: process
+      true_next: skill_urgent
+      false_next: memory_urgent
+    check_recurring:
+      type: condition
+      variable: recurrence_count
+      operator: gte
+      value: 3
+      true_next: recurring_route
+      false_next: check_moderate
+    recurring_route:
+      type: condition
+      variable: root_cause_type
+      operator: eq
+      value: infrastructure
+      true_next: hook_standard
+      false_next: mcg_standard
+    check_moderate:
+      type: condition
+      variable: impact
+      operator: eq
+      value: degraded
+      true_next: moderate_route
+      false_next: memory_low
+    moderate_route:
+      type: condition
+      variable: recurrence_count
+      operator: gte
+      value: 2
+      true_next: mcg_standard
+      false_next: memory_standard
+    hook_urgent:
+      type: return
+      value:
+        mechanism: hook
+        priority: urgent
+        action: create_prevention_hook
+    mcg_urgent:
+      type: return
+      value:
+        mechanism: mcg
+        priority: urgent
+        action: create_decision_tree
+    skill_urgent:
+      type: return
+      value:
+        mechanism: skill
+        priority: urgent
+        action: update_skill_procedure
+    memory_urgent:
+      type: return
+      value:
+        mechanism: memory
+        priority: urgent
+        action: update_memory_and_claude_md
+    hook_standard:
+      type: return
+      value:
+        mechanism: hook
+        priority: standard
+        action: create_prevention_hook
+    mcg_standard:
+      type: return
+      value:
+        mechanism: mcg
+        priority: standard
+        action: create_decision_tree
+    memory_standard:
+      type: return
+      value:
+        mechanism: memory
+        priority: standard
+        action: update_memory
+    memory_low:
+      type: return
+      value:
+        mechanism: memory
+        priority: low
+        action: note_in_memory
+tests:
+- input:
+    root_cause_type: infrastructure
+    recurrence_count: 1
+    impact: blocking
+  expect:
+    mechanism: hook
+    priority: urgent
+    action: create_prevention_hook
+- input:
+    root_cause_type: architecture
+    recurrence_count: 1
+    impact: blocking
+  expect:
+    mechanism: mcg
+    priority: urgent
+    action: create_decision_tree
+- input:
+    root_cause_type: process
+    recurrence_count: 1
+    impact: blocking
+  expect:
+    mechanism: skill
+    priority: urgent
+    action: update_skill_procedure
+- input:
+    root_cause_type: infrastructure
+    recurrence_count: 5
+    impact: degraded
+  expect:
+    mechanism: hook
+    priority: standard
+    action: create_prevention_hook
+- input:
+    root_cause_type: architecture
+    recurrence_count: 3
+    impact: degraded
+  expect:
+    mechanism: mcg
+    priority: standard
+    action: create_decision_tree
+- input:
+    root_cause_type: process
+    recurrence_count: 1
+    impact: degraded
+  expect:
+    mechanism: memory
+    priority: standard
+    action: update_memory
+- input:
+    root_cause_type: knowledge
+    recurrence_count: 1
+    impact: minor
+  expect:
+    mechanism: memory
+    priority: low
+    action: note_in_memory
+- input:
+    root_cause_type: knowledge
+    recurrence_count: 1
+    impact: blocking
+  expect:
+    mechanism: memory
+    priority: urgent
+    action: update_memory_and_claude_md
+- input: {}
+  expect:
+    action: note_in_memory
+    mechanism: memory
+    priority: low

@@ -1,0 +1,197 @@
+name: evans-signal
+description: 'Evans criteria signal classifier: PRR >= 2.0 AND chi_square >= 3.841 AND N >= 3. Maps to GvpTranspiler Rule GVP-IX-02.'
+version: 0.1.0
+interface:
+  inputs:
+    chi_square:
+      type: float
+      required: false
+    n_cases:
+      type: int
+      required: false
+    prr:
+      type: float
+      required: false
+  outputs:
+    classification:
+      type: string
+    criteria_met:
+      type: string
+    evans_signal:
+      type: bool
+    guideline:
+      type: string
+tree:
+  start: check_prr
+  nodes:
+    no_signal:
+      type: return
+      value:
+        guideline: EMA GVP Module IX
+        classification: NO_SIGNAL
+        criteria_met: none
+        evans_signal: false
+    check_chi:
+      type: condition
+      variable: chi_square
+      operator: gte
+      value: 3.841
+      true_next: check_n
+      false_next: no_signal
+    check_n:
+      type: condition
+      variable: n_cases
+      operator: gte
+      value: 3
+      true_next: signal
+      false_next: insufficient
+    signal:
+      type: return
+      value:
+        classification: SIGNAL
+        guideline: EMA GVP Module IX
+        evans_signal: true
+        criteria_met: PRR>=2 AND chi2>=3.841 AND N>=3
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: check_chi
+      false_next: no_signal
+    insufficient:
+      type: return
+      value:
+        classification: INSUFFICIENT
+        guideline: EMA GVP Module IX
+        criteria_met: PRR and chi2 met but N<3
+        evans_signal: false
+tests:
+- input:
+    n_cases: 10
+    chi_square: 45.2
+    prr: 9.9
+  expect:
+    evans_signal: true
+    guideline: EMA GVP Module IX
+    criteria_met: PRR>=2 AND chi2>=3.841 AND N>=3
+    classification: SIGNAL
+- input:
+    chi_square: 2.0
+    prr: 1.5
+    n_cases: 10
+  expect:
+    guideline: EMA GVP Module IX
+    evans_signal: false
+    criteria_met: none
+    classification: NO_SIGNAL
+- input:
+    prr: 3.0
+    n_cases: 2
+    chi_square: 5.0
+  expect:
+    classification: INSUFFICIENT
+    guideline: EMA GVP Module IX
+    criteria_met: PRR and chi2 met but N<3
+    evans_signal: false
+- input:
+    chi_square: 3.841
+    prr: 2.0
+    n_cases: 3
+  expect:
+    classification: SIGNAL
+    criteria_met: PRR>=2 AND chi2>=3.841 AND N>=3
+    evans_signal: true
+    guideline: EMA GVP Module IX
+- input:
+    n_cases: 5
+    prr: 2.0
+    chi_square: 3.0
+  expect:
+    criteria_met: none
+    evans_signal: false
+    guideline: EMA GVP Module IX
+    classification: NO_SIGNAL
+- input:
+    prr: 0.5
+    chi_square: 10.0
+    n_cases: 20
+  expect:
+    guideline: EMA GVP Module IX
+    evans_signal: false
+    classification: NO_SIGNAL
+    criteria_met: none
+- input:
+    chi_square: 3.8400000000000003
+  expect:
+    criteria_met: none
+    guideline: EMA GVP Module IX
+    classification: NO_SIGNAL
+    evans_signal: false
+- input:
+    chi_square: 3.842
+  expect:
+    criteria_met: none
+    guideline: EMA GVP Module IX
+    evans_signal: false
+    classification: NO_SIGNAL
+- input: {}
+  expect:
+    classification: NO_SIGNAL
+    evans_signal: false
+    criteria_met: none
+    guideline: EMA GVP Module IX
+- input:
+    n_cases: 0
+  expect:
+    guideline: EMA GVP Module IX
+    classification: NO_SIGNAL
+    criteria_met: none
+    evans_signal: false
+- input:
+    n_cases: -1
+  expect:
+    guideline: EMA GVP Module IX
+    criteria_met: none
+    classification: NO_SIGNAL
+    evans_signal: false
+- input:
+    n_cases: 4
+  expect:
+    classification: NO_SIGNAL
+    criteria_met: none
+    evans_signal: false
+    guideline: EMA GVP Module IX
+- input:
+    n_cases: 300
+  expect:
+    criteria_met: none
+    evans_signal: false
+    guideline: EMA GVP Module IX
+    classification: NO_SIGNAL
+- input: {}
+  expect:
+    guideline: EMA GVP Module IX
+    evans_signal: false
+    classification: NO_SIGNAL
+    criteria_met: none
+- input:
+    prr: 1.999
+  expect:
+    evans_signal: false
+    guideline: EMA GVP Module IX
+    criteria_met: none
+    classification: NO_SIGNAL
+- input:
+    prr: 2.001
+  expect:
+    classification: NO_SIGNAL
+    guideline: EMA GVP Module IX
+    criteria_met: none
+    evans_signal: false
+- input: {}
+  expect:
+    guideline: EMA GVP Module IX
+    evans_signal: false
+    classification: NO_SIGNAL
+    criteria_met: none

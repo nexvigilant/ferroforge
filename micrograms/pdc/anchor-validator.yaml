@@ -1,0 +1,252 @@
+name: anchor-validator
+description: "PDC: Validate behavioral anchor verb against expected competency level (Bloom's taxonomy mapping)"
+version: 0.1.0
+interface:
+  inputs:
+    expected_level:
+      type: int
+      required: false
+    verb_tier:
+      type: int
+      required: false
+  outputs:
+    alignment:
+      type: bool
+    message:
+      type: string
+    reason:
+      type: string
+    verdict:
+      type: string
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: verb_tier
+      operator: is_null
+      value: null
+      true_next: unknown_return
+      false_next: check_verb_tier
+    unknown_return:
+      type: return
+      value:
+        verdict: INVALID
+        reason: Verb tier required for validation
+    check_verb_tier:
+      type: condition
+      variable: verb_tier
+      operator: lte
+      value: 1
+      true_next: check_level_recall
+      false_next: check_tier_2
+    check_tier_2:
+      type: condition
+      variable: verb_tier
+      operator: eq
+      value: 2
+      true_next: check_level_comprehension
+      false_next: check_tier_3
+    check_tier_3:
+      type: condition
+      variable: verb_tier
+      operator: eq
+      value: 3
+      true_next: check_level_application
+      false_next: check_tier_4
+    check_tier_4:
+      type: condition
+      variable: verb_tier
+      operator: eq
+      value: 4
+      true_next: check_level_creation
+      false_next: check_tier_5
+    check_tier_5:
+      type: condition
+      variable: verb_tier
+      operator: eq
+      value: 5
+      true_next: check_level_synthesis
+      false_next: check_tier_6
+    check_tier_6:
+      type: condition
+      variable: verb_tier
+      operator: eq
+      value: 6
+      true_next: check_level_institutional
+      false_next: global_tier
+    check_level_recall:
+      type: condition
+      variable: expected_level
+      operator: lte
+      value: 1
+      true_next: anchor_match
+      false_next: anchor_below
+    check_level_comprehension:
+      type: condition
+      variable: expected_level
+      operator: eq
+      value: 2
+      true_next: anchor_match
+      false_next: check_comp_above
+    check_comp_above:
+      type: condition
+      variable: expected_level
+      operator: lte
+      value: 1
+      true_next: anchor_above
+      false_next: anchor_below
+    check_level_application:
+      type: condition
+      variable: expected_level
+      operator: eq
+      value: 3
+      true_next: anchor_match
+      false_next: check_app_above
+    check_app_above:
+      type: condition
+      variable: expected_level
+      operator: lte
+      value: 2
+      true_next: anchor_above
+      false_next: anchor_below
+    check_level_creation:
+      type: condition
+      variable: expected_level
+      operator: eq
+      value: 4
+      true_next: anchor_match
+      false_next: check_create_above
+    check_create_above:
+      type: condition
+      variable: expected_level
+      operator: lte
+      value: 3
+      true_next: anchor_above
+      false_next: anchor_below
+    check_level_synthesis:
+      type: condition
+      variable: expected_level
+      operator: eq
+      value: 5
+      true_next: anchor_match
+      false_next: check_synth_above
+    check_synth_above:
+      type: condition
+      variable: expected_level
+      operator: lte
+      value: 4
+      true_next: anchor_above
+      false_next: anchor_below
+    check_level_institutional:
+      type: condition
+      variable: expected_level
+      operator: eq
+      value: 6
+      true_next: anchor_match
+      false_next: check_inst_above
+    check_inst_above:
+      type: condition
+      variable: expected_level
+      operator: lte
+      value: 5
+      true_next: anchor_above
+      false_next: anchor_below
+    global_tier:
+      type: condition
+      variable: expected_level
+      operator: gte
+      value: 7
+      true_next: anchor_match
+      false_next: anchor_above
+    anchor_match:
+      type: return
+      value:
+        verdict: MATCH
+        alignment: true
+        message: "Behavioral verb matches expected competency level"
+    anchor_above:
+      type: return
+      value:
+        verdict: ABOVE_LEVEL
+        alignment: false
+        message: "Behavioral verb exceeds expected level — evidence of advancement"
+    anchor_below:
+      type: return
+      value:
+        verdict: BELOW_LEVEL
+        alignment: false
+        message: "Behavioral verb below expected level — development gap identified"
+tests:
+- input:
+    verb_tier: 1
+    expected_level: 1
+  expect:
+    verdict: MATCH
+    alignment: true
+- input:
+    verb_tier: 3
+    expected_level: 3
+  expect:
+    verdict: MATCH
+    alignment: true
+- input:
+    verb_tier: 5
+    expected_level: 5
+  expect:
+    verdict: MATCH
+    alignment: true
+- input:
+    verb_tier: 7
+    expected_level: 7
+  expect:
+    verdict: MATCH
+    alignment: true
+- input:
+    verb_tier: 1
+    expected_level: 3
+  expect:
+    verdict: BELOW_LEVEL
+    alignment: false
+- input:
+    verb_tier: 4
+    expected_level: 2
+  expect:
+    verdict: ABOVE_LEVEL
+    alignment: false
+- input:
+    verb_tier: 6
+    expected_level: 6
+  expect:
+    verdict: MATCH
+    alignment: true
+- input:
+    verb_tier: 2
+    expected_level: 5
+  expect:
+    verdict: BELOW_LEVEL
+- input: {}
+  expect:
+    verdict: INVALID
+    reason: Verb tier required for validation
+# check_app_above: verb at application level, expected higher
+- input:
+    verb_tier: 3
+    expected_level: 5
+  expect:
+    verdict: BELOW_LEVEL
+    alignment: false
+# check_synth_above: verb at synthesis level, expected lower
+- input:
+    verb_tier: 5
+    expected_level: 3
+  expect:
+    verdict: ABOVE_LEVEL
+    alignment: false
+# check_inst_above: verb at institutional level, expected lower
+- input:
+    verb_tier: 6
+    expected_level: 4
+  expect:
+    verdict: ABOVE_LEVEL
+    alignment: false

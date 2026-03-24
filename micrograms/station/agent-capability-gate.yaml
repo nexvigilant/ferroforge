@@ -1,0 +1,126 @@
+name: agent-capability-gate
+description: "Determines whether the agent station can handle a query or needs external help"
+version: 0.1.0
+
+interface:
+  inputs:
+    domain_available:
+      type: bool
+      description: "Whether the required domain/tool is available in the station"
+    requires_computation:
+      type: bool
+      description: "Whether the query requires computational analysis beyond pattern matching"
+    requires_human_judgment:
+      type: bool
+      description: "Whether the decision requires human expert judgment"
+    data_volume:
+      type: string
+      description: "Scale of data to process: small, medium, large"
+  outputs:
+    can_handle:
+      type: bool
+      description: "Whether the station can fully handle the request"
+    limitation:
+      type: string
+      description: "Type of limitation: none, stub_only, needs_compute, needs_human"
+    fallback:
+      type: string
+      description: "Fallback action if unable to handle"
+
+tree:
+  start: check_domain_available
+  nodes:
+    check_domain_available:
+      type: condition
+      variable: domain_available
+      operator: eq
+      value: false
+      true_next: return_domain_unavailable
+      false_next: check_human_judgment
+
+    return_domain_unavailable:
+      type: return
+      value:
+        can_handle: false
+        limitation: "stub_only"
+        fallback: "Route to external domain specialist"
+
+    check_human_judgment:
+      type: condition
+      variable: requires_human_judgment
+      operator: eq
+      value: true
+      true_next: return_needs_human
+      false_next: check_computation
+
+    return_needs_human:
+      type: return
+      value:
+        can_handle: false
+        limitation: "needs_human"
+        fallback: "Escalate to pharmacovigilance officer for expert judgment"
+
+    check_computation:
+      type: condition
+      variable: requires_computation
+      operator: eq
+      value: true
+      true_next: check_data_volume
+      false_next: return_can_handle_full
+
+    check_data_volume:
+      type: condition
+      variable: data_volume
+      operator: eq
+      value: "large"
+      true_next: return_needs_compute
+      false_next: return_can_handle_compute
+
+    return_needs_compute:
+      type: return
+      value:
+        can_handle: false
+        limitation: "needs_compute"
+        fallback: "Route to compute cluster for signal strength analysis"
+
+    return_can_handle_compute:
+      type: return
+      value:
+        can_handle: true
+        limitation: "none"
+        fallback: "no fallback needed"
+
+    return_can_handle_full:
+      type: return
+      value:
+        can_handle: true
+        limitation: "none"
+        fallback: "no fallback needed"
+
+tests:
+  - input: { domain_available: false, requires_computation: false, requires_human_judgment: false, data_volume: "small" }
+    expect: { can_handle: false, limitation: "stub_only", fallback: "Route to external domain specialist" }
+
+  - input: { domain_available: true, requires_computation: false, requires_human_judgment: true, data_volume: "small" }
+    expect: { can_handle: false, limitation: "needs_human", fallback: "Escalate to pharmacovigilance officer for expert judgment" }
+
+  - input: { domain_available: true, requires_computation: true, requires_human_judgment: false, data_volume: "large" }
+    expect: { can_handle: false, limitation: "needs_compute", fallback: "Route to compute cluster for signal strength analysis" }
+
+  - input: { domain_available: true, requires_computation: true, requires_human_judgment: false, data_volume: "small" }
+    expect: { can_handle: true, limitation: "none", fallback: "no fallback needed" }
+
+  - input: { domain_available: true, requires_computation: true, requires_human_judgment: false, data_volume: "medium" }
+    expect: { can_handle: true, limitation: "none", fallback: "no fallback needed" }
+
+  - input: { domain_available: true, requires_computation: false, requires_human_judgment: false, data_volume: "large" }
+    expect: { can_handle: true, limitation: "none", fallback: "no fallback needed" }
+
+  - input: { domain_available: true, requires_computation: false, requires_human_judgment: false, data_volume: "small" }
+    expect: { can_handle: true, limitation: "none", fallback: "no fallback needed" }
+
+  - input: { domain_available: false, requires_computation: true, requires_human_judgment: true, data_volume: "large" }
+    expect: { can_handle: false, limitation: "stub_only", fallback: "Route to external domain specialist" }
+
+  - input: {}
+    expect: { can_handle: true, limitation: "none", fallback: "no fallback needed" }

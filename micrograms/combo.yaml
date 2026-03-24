@@ -1,0 +1,120 @@
+name: combo
+description: Positive or gate
+version: 0.1.0
+interface:
+  inputs:
+    n:
+      type: int
+      required: false
+    value:
+      type: int
+      required: false
+  outputs:
+    gate:
+      type: string
+    passed:
+      type: bool
+    positive:
+      type: bool
+tree:
+  start: dispatch
+  nodes:
+    dispatch:
+      type: condition
+      variable: n
+      operator: is_not_null
+      value: null
+      true_next: a_check
+      false_next: b_check
+    a_yes:
+      type: return
+      value:
+        positive: true
+    b_fail:
+      type: return
+      value:
+        passed: false
+        gate: FAIL
+    b_pass:
+      type: return
+      value:
+        gate: PASS
+        passed: true
+    a_check:
+      type: condition
+      variable: n
+      operator: gt
+      value: 0
+      true_next: a_yes
+      false_next: a_no
+    b_check:
+      type: condition
+      variable: value
+      operator: gte
+      value: 80
+      true_next: b_pass
+      false_next: b_fail
+    a_no:
+      type: return
+      value:
+        positive: false
+tests:
+- input:
+    n: 5
+  expect:
+    positive: true
+- input:
+    n: -3
+  expect:
+    positive: false
+- input:
+    n: 0
+  expect:
+    positive: false
+- input:
+    value: 95
+  expect:
+    passed: true
+    gate: PASS
+- input:
+    value: 80
+  expect:
+    passed: true
+    gate: PASS
+- input:
+    value: 79
+  expect:
+    gate: FAIL
+    passed: false
+- input:
+    value: 0
+  expect:
+    passed: false
+    gate: FAIL
+- input:
+    n: -1
+  expect:
+    positive: false
+- input:
+    n: 1
+  expect:
+    positive: true
+- input:
+    value: -1
+  expect:
+    passed: false
+    gate: FAIL
+- input:
+    value: 81
+  expect:
+    gate: PASS
+    passed: true
+- input:
+    value: 8000
+  expect:
+    gate: PASS
+    passed: true
+- input: {}
+  expect:
+    gate: FAIL
+    passed: false

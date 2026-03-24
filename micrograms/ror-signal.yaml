@@ -1,0 +1,153 @@
+name: ror-signal
+description: Reporting Odds Ratio (ROR) signal detection threshold gate. Input ror as pre-computed (a*d)/(b*c).
+version: 0.1.0
+interface:
+  inputs:
+    ror:
+      type: float
+      required: false
+  outputs:
+    action:
+      type: string
+    note:
+      type: string
+    signal:
+      type: string
+    signal_detected:
+      type: bool
+tree:
+  start: check_strong
+  nodes:
+    check_strong:
+      type: condition
+      variable: ror
+      operator: gte
+      value: 4.0
+      true_next: strong_signal
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: ror
+      operator: gte
+      value: 2.0
+      true_next: moderate_signal
+      false_next: check_weak
+    check_weak:
+      type: condition
+      variable: ror
+      operator: gte
+      value: 1.5
+      true_next: weak_signal
+      false_next: check_none
+    check_none:
+      type: condition
+      variable: ror
+      operator: gte
+      value: 1.0
+      true_next: no_signal
+      false_next: protective_signal
+    strong_signal:
+      type: return
+      value:
+        signal: STRONG
+        action: immediate_review
+        signal_detected: true
+    moderate_signal:
+      type: return
+      value:
+        signal: MODERATE
+        action: standard_review
+        signal_detected: true
+    weak_signal:
+      type: return
+      value:
+        signal: WEAK
+        action: monitor
+        signal_detected: true
+    no_signal:
+      type: return
+      value:
+        signal: NONE
+        action: no_action
+        signal_detected: false
+        note: ROR >= 1 but below threshold
+    protective_signal:
+      type: return
+      value:
+        signal: PROTECTIVE
+        action: investigate_protective
+        signal_detected: false
+tests:
+- input:
+    ror: 5.0
+  expect:
+    signal: STRONG
+    action: immediate_review
+    signal_detected: true
+- input:
+    ror: 4.0
+  expect:
+    signal: STRONG
+    action: immediate_review
+    signal_detected: true
+- input:
+    ror: 3.9
+  expect:
+    signal: MODERATE
+    action: standard_review
+    signal_detected: true
+- input:
+    ror: 2.0
+  expect:
+    signal: MODERATE
+    action: standard_review
+    signal_detected: true
+- input:
+    ror: 1.9
+  expect:
+    signal: WEAK
+    action: monitor
+    signal_detected: true
+- input:
+    ror: 1.5
+  expect:
+    signal: WEAK
+    action: monitor
+    signal_detected: true
+- input:
+    ror: 1.4
+  expect:
+    signal: NONE
+    action: no_action
+    signal_detected: false
+    note: ROR >= 1 but below threshold
+- input:
+    ror: 1.0
+  expect:
+    signal: NONE
+    action: no_action
+    signal_detected: false
+    note: ROR >= 1 but below threshold
+- input:
+    ror: 0.5
+  expect:
+    signal: PROTECTIVE
+    action: investigate_protective
+    signal_detected: false
+- input:
+    ror: 0.0
+  expect:
+    signal: PROTECTIVE
+    action: investigate_protective
+    signal_detected: false
+- input:
+    ror: 10.0
+  expect:
+    signal: STRONG
+    action: immediate_review
+    signal_detected: true
+- input: {}
+  expect:
+    signal: PROTECTIVE
+    action: investigate_protective
+    signal_detected: false

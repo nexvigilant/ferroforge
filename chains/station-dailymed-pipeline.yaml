@@ -1,0 +1,43 @@
+name: station-dailymed-pipeline
+description: "DailyMed ADR label data → risk tier → causality routing. From get-adverse-reactions output to monitoring decision."
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - config-dailymed-adr-risk
+  - adapt-risk-tier
+  - signal-to-causality
+tests:
+- name: boxed warning drug → urgent causality
+  input:
+    has_boxed_warning: true
+    has_rems: false
+    serious_reactions_count: 3
+    total_reactions_count: 25
+  expect:
+    risk_tier: critical
+    signal_detected: true
+    priority: URGENT
+    next_step: causality_assessment
+- name: REMS drug → urgent causality
+  input:
+    has_boxed_warning: false
+    has_rems: true
+    serious_reactions_count: 4
+    total_reactions_count: 20
+  expect:
+    risk_tier: high
+    signal_detected: true
+    priority: URGENT
+    next_step: causality_assessment
+- name: low risk drug → continue monitoring
+  input:
+    has_boxed_warning: false
+    has_rems: false
+    frequency_category: "rare"
+    total_reactions_count: 8
+  expect:
+    risk_tier: low
+    signal_detected: false
+    priority: LOW
+    next_step: continue_monitoring

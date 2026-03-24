@@ -1,0 +1,135 @@
+name: faers-query-router
+description: 'Routes FAERS queries to the appropriate endpoint strategy based on query type (drug, event, date_range, combination)'
+version: 0.1.0
+interface:
+  inputs:
+    query_type:
+      type: string
+      required: false
+    drug_name:
+      type: string
+      required: false
+    event_term:
+      type: string
+      required: false
+  outputs:
+    endpoint:
+      type: string
+    query_strategy:
+      type: string
+    requires_pagination:
+      type: bool
+    confidence:
+      type: string
+tree:
+  start: check_type
+  nodes:
+    check_type:
+      type: condition
+      variable: query_type
+      operator: eq
+      value: drug
+      true_next: drug_route
+      false_next: check_event
+    check_event:
+      type: condition
+      variable: query_type
+      operator: eq
+      value: event
+      true_next: event_route
+      false_next: check_date
+    check_date:
+      type: condition
+      variable: query_type
+      operator: eq
+      value: date_range
+      true_next: date_route
+      false_next: check_combo
+    check_combo:
+      type: condition
+      variable: query_type
+      operator: eq
+      value: combination
+      true_next: combo_route
+      false_next: unknown_route
+    drug_route:
+      type: return
+      value:
+        endpoint: /drug/event.json
+        query_strategy: search_by_drug_name
+        requires_pagination: true
+        confidence: high
+    event_route:
+      type: return
+      value:
+        endpoint: /drug/event.json
+        query_strategy: search_by_reaction_term
+        requires_pagination: true
+        confidence: high
+    date_route:
+      type: return
+      value:
+        endpoint: /drug/event.json
+        query_strategy: search_by_date_range
+        requires_pagination: true
+        confidence: medium
+    combo_route:
+      type: return
+      value:
+        endpoint: /drug/event.json
+        query_strategy: cross_query_drug_and_event
+        requires_pagination: true
+        confidence: high
+    unknown_route:
+      type: return
+      value:
+        endpoint: /drug/event.json
+        query_strategy: general_search
+        requires_pagination: false
+        confidence: low
+tests:
+- input:
+    query_type: drug
+    drug_name: metformin
+  expect:
+    endpoint: /drug/event.json
+    query_strategy: search_by_drug_name
+    requires_pagination: true
+    confidence: high
+- input:
+    query_type: event
+    event_term: rhabdomyolysis
+  expect:
+    endpoint: /drug/event.json
+    query_strategy: search_by_reaction_term
+    requires_pagination: true
+    confidence: high
+- input:
+    query_type: date_range
+  expect:
+    endpoint: /drug/event.json
+    query_strategy: search_by_date_range
+    requires_pagination: true
+    confidence: medium
+- input:
+    query_type: combination
+    drug_name: atorvastatin
+    event_term: myalgia
+  expect:
+    endpoint: /drug/event.json
+    query_strategy: cross_query_drug_and_event
+    requires_pagination: true
+    confidence: high
+- input:
+    query_type: unknown_value
+  expect:
+    endpoint: /drug/event.json
+    query_strategy: general_search
+    requires_pagination: false
+    confidence: low
+- input: {}
+  expect:
+    endpoint: /drug/event.json
+    query_strategy: general_search
+    requires_pagination: false
+    confidence: low

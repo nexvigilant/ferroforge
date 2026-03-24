@@ -1,0 +1,62 @@
+name: benefit-risk-assessment
+description: 'Benefit-risk assessment pipeline: ICH E2A seriousness classification → ICH E2C(R2) benefit-risk ratio evaluation → risk level classification. Composes case context with quantitative B/R scoring and risk banding for regulatory decision support.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - case-seriousness
+  - benefit-risk-ratio
+  - risk-score-classifier
+tests:
+- name: high benefit low risk serious case — favorable ratio with low risk band
+  input:
+    hospitalization: true
+    death: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+    benefit_score: 85
+    risk_score: 15
+  expect:
+    seriousness: SERIOUS
+    is_serious: true
+    br_ratio: FAVORABLE
+    classification: Benefits clearly outweigh risks
+    level: LOW
+    escalate: false
+- name: low benefit high risk fatal case — unfavorable ratio with critical risk band
+  input:
+    death: true
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+    benefit_score: 20
+    risk_score: 80
+  expect:
+    seriousness: SERIOUS
+    is_serious: true
+    is_fatal: true
+    br_ratio: UNFAVORABLE
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    level: CRITICAL
+    escalate: true
+- name: balanced scores non-serious case — uncertain ratio requires monitoring
+  input:
+    death: false
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+    benefit_score: 50
+    risk_score: 55
+  expect:
+    seriousness: NON-SERIOUS
+    is_serious: false
+    br_ratio: UNCERTAIN
+    reassessment_interval: 3 months pending data collection
+    level: MODERATE
+    action: scheduled_review

@@ -1,0 +1,199 @@
+name: smm-violation-classifier
+description: "NVG-SMM-001 Section 4: Classify epistemological violations by severity (F/C/M/m). Chemistry analog: activation energy tiers — Fatal is an insurmountable barrier, minor is thermal noise."
+version: 0.1.0
+interface:
+  inputs:
+    post_hoc_endpoint:
+      type: bool
+      required: true
+    suppressed_hypothesis:
+      type: bool
+      required: true
+    fabricated_data:
+      type: bool
+      required: true
+    undocumented_deviation:
+      type: bool
+      required: true
+    post_hoc_analysis_criteria:
+      type: bool
+      required: true
+    missing_negative_results:
+      type: bool
+      required: true
+    undisclosed_coi:
+      type: bool
+      required: true
+    criterion_drift:
+      type: bool
+      required: true
+    uses_proves_confirms:
+      type: bool
+      required: true
+    missing_power_calculation:
+      type: bool
+      required: true
+    imprecise_significant:
+      type: bool
+      required: true
+    has_minor_deficiency:
+      type: bool
+      required: true
+  outputs:
+    class:
+      type: string
+    label:
+      type: string
+    description:
+      type: string
+    cs_effect:
+      type: string
+    chemistry_analog:
+      type: string
+
+tree:
+  start: check_fatal
+  nodes:
+    check_fatal:
+      type: condition
+      variable: post_hoc_endpoint
+      operator: eq
+      value: true
+      true_next: fatal
+      false_next: check_suppressed
+    check_suppressed:
+      type: condition
+      variable: suppressed_hypothesis
+      operator: eq
+      value: true
+      true_next: fatal
+      false_next: check_fabricated
+    check_fabricated:
+      type: condition
+      variable: fabricated_data
+      operator: eq
+      value: true
+      true_next: fatal
+      false_next: check_undoc_deviation
+    check_undoc_deviation:
+      type: condition
+      variable: undocumented_deviation
+      operator: eq
+      value: true
+      true_next: fatal
+      false_next: check_post_hoc_criteria
+    check_post_hoc_criteria:
+      type: condition
+      variable: post_hoc_analysis_criteria
+      operator: eq
+      value: true
+      true_next: fatal
+      false_next: check_missing_negative
+    check_missing_negative:
+      type: condition
+      variable: missing_negative_results
+      operator: eq
+      value: true
+      true_next: critical
+      false_next: check_coi
+    check_coi:
+      type: condition
+      variable: undisclosed_coi
+      operator: eq
+      value: true
+      true_next: critical
+      false_next: check_criterion_drift
+    check_criterion_drift:
+      type: condition
+      variable: criterion_drift
+      operator: eq
+      value: true
+      true_next: critical
+      false_next: check_overclaim
+    check_overclaim:
+      type: condition
+      variable: uses_proves_confirms
+      operator: eq
+      value: true
+      true_next: major
+      false_next: check_no_power
+    check_no_power:
+      type: condition
+      variable: missing_power_calculation
+      operator: eq
+      value: true
+      true_next: major
+      false_next: check_imprecise_sig
+    check_imprecise_sig:
+      type: condition
+      variable: imprecise_significant
+      operator: eq
+      value: true
+      true_next: major
+      false_next: check_minor
+    check_minor:
+      type: condition
+      variable: has_minor_deficiency
+      operator: eq
+      value: true
+      true_next: minor
+      false_next: compliant
+    fatal:
+      type: return
+      value:
+        class: F
+        label: FATAL
+        description: "Integrity of knowledge state threatened. Evidence excluded pending review."
+        cs_effect: "CS suspended (0.00)"
+        chemistry_analog: "Activation energy infinite — reaction impossible"
+    critical:
+      type: return
+      value:
+        class: C
+        label: CRITICAL
+        description: "Significant structural deficiency introducing directional bias."
+        cs_effect: "CS reduced by 0.20 per violation (floor 0.10)"
+        chemistry_analog: "Inhibition — reaction rate reduced by competitive binding"
+    major:
+      type: return
+      value:
+        class: M
+        label: MAJOR
+        description: "Methodological or vocabulary violation impairing reproducibility."
+        cs_effect: "CS reduced by 0.07 per violation (floor 0.50)"
+        chemistry_analog: "Side reaction — product yield reduced"
+    minor:
+      type: return
+      value:
+        class: m
+        label: MINOR
+        description: "Presentational deficiency with limited epistemological impact."
+        cs_effect: "CS reduced by 0.02 per violation (floor 0.85)"
+        chemistry_analog: "Thermal noise — negligible perturbation"
+    compliant:
+      type: return
+      value:
+        class: none
+        label: COMPLIANT
+        description: "No violations detected."
+        cs_effect: "CS = 1.00"
+        chemistry_analog: "Clean reaction — full yield"
+
+tests:
+  - input: { post_hoc_endpoint: true, suppressed_hypothesis: false, fabricated_data: false, undocumented_deviation: false, post_hoc_analysis_criteria: false, missing_negative_results: false, undisclosed_coi: false, criterion_drift: false, uses_proves_confirms: false, missing_power_calculation: false, imprecise_significant: false, has_minor_deficiency: false }
+    expect: { class: F, label: FATAL }
+  - input: { post_hoc_endpoint: false, suppressed_hypothesis: false, fabricated_data: false, undocumented_deviation: false, post_hoc_analysis_criteria: false, missing_negative_results: true, undisclosed_coi: false, criterion_drift: false, uses_proves_confirms: false, missing_power_calculation: false, imprecise_significant: false, has_minor_deficiency: false }
+    expect: { class: C, label: CRITICAL }
+  - input: { post_hoc_endpoint: false, suppressed_hypothesis: false, fabricated_data: false, undocumented_deviation: false, post_hoc_analysis_criteria: false, missing_negative_results: false, undisclosed_coi: false, criterion_drift: false, uses_proves_confirms: true, missing_power_calculation: false, imprecise_significant: false, has_minor_deficiency: false }
+    expect: { class: M, label: MAJOR }
+  - input: { post_hoc_endpoint: false, suppressed_hypothesis: false, fabricated_data: false, undocumented_deviation: false, post_hoc_analysis_criteria: false, missing_negative_results: false, undisclosed_coi: false, criterion_drift: false, uses_proves_confirms: false, missing_power_calculation: false, imprecise_significant: false, has_minor_deficiency: true }
+    expect: { class: m, label: MINOR }
+  - input: { post_hoc_endpoint: false, suppressed_hypothesis: false, fabricated_data: false, undocumented_deviation: false, post_hoc_analysis_criteria: false, missing_negative_results: false, undisclosed_coi: false, criterion_drift: false, uses_proves_confirms: false, missing_power_calculation: false, imprecise_significant: false, has_minor_deficiency: false }
+    expect: { class: none, label: COMPLIANT }
+  - input: {}
+    expect:
+      chemistry_analog: Clean reaction — full yield
+      class: none
+      cs_effect: CS = 1.00
+      description: No violations detected.
+      label: COMPLIANT

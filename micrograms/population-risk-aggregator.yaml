@@ -1,0 +1,282 @@
+name: population-risk-aggregator
+description: Aggregates patient population risk factors from special-population, pediatric-flag, and polypharmacy-risk into unified risk profile. Determines if enhanced monitoring or dose adjustment needed.
+version: 0.1.0
+tree:
+  start: check_special_pop
+  nodes:
+    high_risk_pedi_poly:
+      type: return
+      value:
+        enhanced_monitoring_needed: true
+        affects_vulnerable_population: true
+        recommended_action: Pediatric pharmacist consult — reduce drug burden
+        dose_adjustment_needed: true
+        risk_factors: Pediatric patient with high polypharmacy risk
+        population_risk: HIGH
+    critical_risk:
+      type: return
+      value:
+        risk_factors: Special population with high polypharmacy risk
+        population_risk: CRITICAL
+        enhanced_monitoring_needed: true
+        affects_vulnerable_population: true
+        recommended_action: Immediate pharmacist review — reduce concomitant medications where possible
+        dose_adjustment_needed: true
+    check_special_pop:
+      type: condition
+      variable: enhanced_monitoring
+      operator: eq
+      value: true
+      true_next: check_polypharmacy_high
+      false_next: check_pediatric
+    elevated_special_only:
+      type: return
+      value:
+        risk_factors: Special population requiring enhanced monitoring
+        recommended_action: Apply population-specific dosing guidelines
+        affects_vulnerable_population: true
+        population_risk: ELEVATED
+        dose_adjustment_needed: true
+        enhanced_monitoring_needed: true
+    moderate_risk:
+      type: return
+      value:
+        affects_vulnerable_population: false
+        dose_adjustment_needed: false
+        enhanced_monitoring_needed: false
+        risk_factors: Moderate polypharmacy risk
+        recommended_action: Standard monitoring with periodic medication review
+        population_risk: MODERATE
+    check_polypharmacy_high:
+      type: condition
+      variable: risk_level
+      operator: eq
+      value: HIGH
+      true_next: critical_risk
+      false_next: check_pediatric_special
+    check_moderate_poly:
+      type: condition
+      variable: risk_level
+      operator: eq
+      value: MODERATE
+      true_next: moderate_risk
+      false_next: standard_risk
+    check_poly_with_pediatric:
+      type: condition
+      variable: risk_level
+      operator: eq
+      value: HIGH
+      true_next: high_risk_pedi_poly
+      false_next: elevated_pediatric
+    standard_risk:
+      type: return
+      value:
+        risk_factors: No significant population risk factors identified
+        dose_adjustment_needed: false
+        affects_vulnerable_population: false
+        enhanced_monitoring_needed: false
+        recommended_action: Standard monitoring protocol
+        population_risk: LOW
+    check_pediatric_special:
+      type: condition
+      variable: flag
+      operator: eq
+      value: MONITOR
+      true_next: high_risk_multi
+      false_next: elevated_special_only
+    check_pediatric:
+      type: condition
+      variable: flag
+      operator: eq
+      value: MONITOR
+      true_next: check_poly_with_pediatric
+      false_next: check_polypharmacy_only
+    high_risk_multi:
+      type: return
+      value:
+        dose_adjustment_needed: true
+        affects_vulnerable_population: true
+        enhanced_monitoring_needed: true
+        risk_factors: Special population + pediatric monitoring flag
+        population_risk: HIGH
+        recommended_action: Specialist review required — multiple vulnerability factors
+    elevated_pediatric:
+      type: return
+      value:
+        population_risk: ELEVATED
+        recommended_action: Weight-based dosing review and growth monitoring
+        enhanced_monitoring_needed: true
+        affects_vulnerable_population: true
+        dose_adjustment_needed: true
+        risk_factors: Pediatric patient requiring monitoring
+    elevated_polypharmacy:
+      type: return
+      value:
+        recommended_action: Medication review — assess for drug-drug interactions
+        enhanced_monitoring_needed: true
+        population_risk: ELEVATED
+        affects_vulnerable_population: false
+        dose_adjustment_needed: false
+        risk_factors: High polypharmacy risk
+    check_polypharmacy_only:
+      type: condition
+      variable: risk_level
+      operator: eq
+      value: HIGH
+      true_next: elevated_polypharmacy
+      false_next: check_moderate_poly
+tests:
+- input:
+    risk_level: HIGH
+    flag: NONE
+    enhanced_monitoring: true
+  expect:
+    population_risk: CRITICAL
+    dose_adjustment_needed: true
+    affects_vulnerable_population: true
+- input:
+    enhanced_monitoring: true
+    risk_level: MODERATE
+    flag: MONITOR
+  expect:
+    affects_vulnerable_population: true
+    population_risk: HIGH
+- input:
+    risk_level: LOW
+    flag: NONE
+    enhanced_monitoring: true
+  expect:
+    dose_adjustment_needed: true
+    population_risk: ELEVATED
+    affects_vulnerable_population: true
+- input:
+    risk_level: HIGH
+    enhanced_monitoring: false
+    flag: MONITOR
+  expect:
+    affects_vulnerable_population: true
+    population_risk: HIGH
+- input:
+    risk_level: LOW
+    enhanced_monitoring: false
+    flag: MONITOR
+  expect:
+    affects_vulnerable_population: true
+    population_risk: ELEVATED
+- input:
+    flag: NONE
+    risk_level: HIGH
+    enhanced_monitoring: false
+  expect:
+    affects_vulnerable_population: false
+    population_risk: ELEVATED
+    enhanced_monitoring_needed: true
+- input:
+    risk_level: MODERATE
+    flag: NONE
+    enhanced_monitoring: false
+  expect:
+    affects_vulnerable_population: false
+    population_risk: MODERATE
+- input:
+    flag: NONE
+    risk_level: LOW
+    enhanced_monitoring: false
+  expect:
+    affects_vulnerable_population: false
+    population_risk: LOW
+    enhanced_monitoring_needed: false
+- input:
+    flag: MONITOR
+    risk_level: HIGH
+    enhanced_monitoring: true
+  expect:
+    affects_vulnerable_population: true
+    population_risk: CRITICAL
+- input: {}
+  expect:
+    affects_vulnerable_population: false
+    recommended_action: Standard monitoring protocol
+    enhanced_monitoring_needed: false
+    risk_factors: No significant population risk factors identified
+    population_risk: LOW
+    dose_adjustment_needed: false
+- input: {}
+  expect:
+    population_risk: LOW
+    recommended_action: Standard monitoring protocol
+    dose_adjustment_needed: false
+    enhanced_monitoring_needed: false
+    affects_vulnerable_population: false
+    risk_factors: No significant population risk factors identified
+- input: {}
+  expect:
+    dose_adjustment_needed: false
+    population_risk: LOW
+    recommended_action: Standard monitoring protocol
+    enhanced_monitoring_needed: false
+    affects_vulnerable_population: false
+    risk_factors: No significant population risk factors identified
+- input: {}
+  expect:
+    affects_vulnerable_population: false
+    risk_factors: No significant population risk factors identified
+    dose_adjustment_needed: false
+    enhanced_monitoring_needed: false
+    population_risk: LOW
+    recommended_action: Standard monitoring protocol
+- input: {}
+  expect:
+    dose_adjustment_needed: false
+    risk_factors: No significant population risk factors identified
+    enhanced_monitoring_needed: false
+    recommended_action: Standard monitoring protocol
+    affects_vulnerable_population: false
+    population_risk: LOW
+- input: {}
+  expect:
+    dose_adjustment_needed: false
+    risk_factors: No significant population risk factors identified
+    enhanced_monitoring_needed: false
+    recommended_action: Standard monitoring protocol
+    population_risk: LOW
+    affects_vulnerable_population: false
+- input: {}
+  expect:
+    risk_factors: No significant population risk factors identified
+    recommended_action: Standard monitoring protocol
+    affects_vulnerable_population: false
+    dose_adjustment_needed: false
+    enhanced_monitoring_needed: false
+    population_risk: LOW
+interface:
+  inputs:
+    enhanced_monitoring:
+      type: bool
+      required: false
+    flag:
+      type: string
+      required: false
+    risk_level:
+      type: string
+      required: false
+  outputs:
+    risk_factors:
+      type: string
+      required: false
+    affects_vulnerable_population:
+      type: bool
+      required: false
+    enhanced_monitoring_needed:
+      type: bool
+      required: false
+    dose_adjustment_needed:
+      type: bool
+      required: false
+    population_risk:
+      type: string
+      required: false
+    recommended_action:
+      type: string
+      required: false
+  aliases: {}

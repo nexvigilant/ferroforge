@@ -1,0 +1,130 @@
+name: smm-maturation-gate
+description: "Maps severity bands to maturation levels for pre-empirical frameworks (SMM-002 path). Determines integration weight and advancement action."
+version: 0.1.0
+interface:
+  inputs:
+    severity_band:
+      type: string
+      required: false
+  outputs:
+    maturation_level:
+      type: string
+    integration_weight:
+      type: string
+    advancement_action:
+      type: string
+    ms_range:
+      type: string
+tree:
+  start: check_exemplary
+  nodes:
+    check_exemplary:
+      type: condition
+      variable: severity_band
+      operator: eq
+      value: EXEMPLARY
+      true_next: mature
+      false_next: check_high
+    check_high:
+      type: condition
+      variable: severity_band
+      operator: eq
+      value: HIGH
+      true_next: developing
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: severity_band
+      operator: eq
+      value: MODERATE
+      true_next: conditional_maturation
+      false_next: check_low
+    check_low:
+      type: condition
+      variable: severity_band
+      operator: eq
+      value: LOW
+      true_next: immature
+      false_next: premature
+    mature:
+      type: return
+      value:
+        maturation_level: MATURE
+        integration_weight: full
+        advancement_action: "Fully eligible for protocol development under SMM-001. Consider publishing maturation process."
+        ms_range: "0.90-1.00"
+    developing:
+      type: return
+      value:
+        maturation_level: DEVELOPING
+        integration_weight: high
+        advancement_action: "Eligible for protocol development. Minor maturation gaps to address during protocol design."
+        ms_range: "0.70-0.89"
+    conditional_maturation:
+      type: return
+      value:
+        maturation_level: CONDITIONAL
+        integration_weight: conditional
+        advancement_action: "Eligible for exploratory protocol development with additional maturation. Address critical gaps first."
+        ms_range: "0.50-0.69"
+    immature:
+      type: return
+      value:
+        maturation_level: IMMATURE
+        integration_weight: low
+        advancement_action: "Not eligible for protocol development. Significant maturation work needed. Integrate at 0.10x with scrutiny flag."
+        ms_range: "0.30-0.49"
+    premature:
+      type: return
+      value:
+        maturation_level: PREMATURE
+        integration_weight: exclude
+        advancement_action: "Framework structurally unprepared for testing. Return to workshop. Exclude from active K-state."
+        ms_range: "0.00-0.29"
+tests:
+- input:
+    severity_band: EXEMPLARY
+  expect:
+    maturation_level: MATURE
+    integration_weight: full
+    ms_range: "0.90-1.00"
+- input:
+    severity_band: HIGH
+  expect:
+    maturation_level: DEVELOPING
+    integration_weight: high
+    ms_range: "0.70-0.89"
+- input:
+    severity_band: MODERATE
+  expect:
+    maturation_level: CONDITIONAL
+    integration_weight: conditional
+    ms_range: "0.50-0.69"
+- input:
+    severity_band: LOW
+  expect:
+    maturation_level: IMMATURE
+    integration_weight: low
+    ms_range: "0.30-0.49"
+- input:
+    severity_band: VERY_LOW
+  expect:
+    maturation_level: PREMATURE
+    integration_weight: exclude
+    ms_range: "0.00-0.29"
+# Empty input = PREMATURE (conservative)
+- input: {}
+  expect:
+    maturation_level: PREMATURE
+    integration_weight: exclude
+# Unknown band = PREMATURE
+- input:
+    severity_band: UNKNOWN
+  expect:
+    maturation_level: PREMATURE
+    integration_weight: exclude
+# Advancement action assertion on different band
+- input:
+    severity_band: LOW
+  expect:
+    advancement_action: "Not eligible for protocol development. Significant maturation work needed. Integrate at 0.10x with scrutiny flag."

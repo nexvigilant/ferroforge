@@ -1,0 +1,221 @@
+name: naranjo-quick
+description: Quick Naranjo causality classification from total score
+version: 0.2.0
+primitive_signature:
+  dominant: '→'
+  expression: '→(κ + N(ς₁ < ς₂) + ∂) — restores causality from correlation by scoring temporal ordering and drug-event boundary'
+  primes: ['→', 'κ', 'N', 'ς', '∂']
+  arguments: ['naranjo_score']
+  chain_prediction: 'Restores → from κ. The Naranjo 10 questions collectively assess: (1) temporal ordering — Q3 "did the ADR appear after the drug?" restores N: ς₁ < ς₂, (2) boundary — Q8 dechallenge, Q9 rechallenge restore ∂ (this specific drug caused this specific event). Output: → with confidence level (DEFINITE/PROBABLE/POSSIBLE/DOUBTFUL).'
+interface:
+  inputs:
+    naranjo_score:
+      type: int
+      required: true
+  outputs:
+    causality:
+      type: string
+    confidence:
+      type: int
+    action:
+      type: string
+tree:
+  start: check_score_present
+  nodes:
+    check_score_present:
+      type: condition
+      variable: naranjo_score
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_upper_bound
+    reject_missing:
+      type: return
+      value:
+        causality: REJECTED
+        confidence: 0
+        action: "REJECTED: naranjo_score is required"
+    check_upper_bound:
+      type: condition
+      variable: naranjo_score
+      operator: gt
+      value: 13
+      true_next: reject_out_of_range
+      false_next: check_lower_bound
+    check_lower_bound:
+      type: condition
+      variable: naranjo_score
+      operator: lt
+      value: -4
+      true_next: reject_out_of_range
+      false_next: definite_check
+    reject_out_of_range:
+      type: return
+      value:
+        causality: REJECTED
+        confidence: 0
+        action: "REJECTED: naranjo_score must be in range [-4, 13]. Values outside this range indicate input error (possible PRR or other statistical value used instead of Naranjo score)."
+    probable_check:
+      type: condition
+      variable: naranjo_score
+      operator: gte
+      value: 5
+      true_next: probable
+      false_next: possible_check
+    definite:
+      type: return
+      value:
+        confidence: 95
+        causality: DEFINITE
+        action: withdraw_drug
+    doubtful:
+      type: return
+      value:
+        causality: DOUBTFUL
+        confidence: 20
+        action: document
+    possible:
+      type: return
+      value:
+        causality: POSSIBLE
+        confidence: 50
+        action: monitor
+    possible_check:
+      type: condition
+      variable: naranjo_score
+      operator: gte
+      value: 1
+      true_next: possible
+      false_next: doubtful
+    definite_check:
+      type: condition
+      variable: naranjo_score
+      operator: gte
+      value: 9
+      true_next: definite
+      false_next: probable_check
+    probable:
+      type: return
+      value:
+        confidence: 75
+        causality: PROBABLE
+        action: investigate
+tests:
+- input:
+    naranjo_score: 10
+  expect:
+    confidence: 95
+    action: withdraw_drug
+    causality: DEFINITE
+- input:
+    naranjo_score: 7
+  expect:
+    confidence: 75
+    causality: PROBABLE
+    action: investigate
+- input:
+    naranjo_score: 3
+  expect:
+    causality: POSSIBLE
+    confidence: 50
+    action: monitor
+- input:
+    naranjo_score: 0
+  expect:
+    causality: DOUBTFUL
+    confidence: 20
+    action: document
+- input:
+    naranjo_score: 9
+  expect:
+    confidence: 95
+    action: withdraw_drug
+    causality: DEFINITE
+- input:
+    naranjo_score: 5
+  expect:
+    confidence: 75
+    causality: PROBABLE
+    action: investigate
+- input:
+    naranjo_score: 1
+  expect:
+    action: monitor
+    causality: POSSIBLE
+    confidence: 50
+- input:
+    naranjo_score: -1
+  expect:
+    confidence: 20
+    causality: DOUBTFUL
+    action: document
+- input:
+    naranjo_score: 4
+  expect:
+    causality: POSSIBLE
+    action: monitor
+    confidence: 50
+- input:
+    naranjo_score: 6
+  expect:
+    action: investigate
+    causality: PROBABLE
+    confidence: 75
+- input:
+    naranjo_score: 500
+  expect:
+    confidence: 0
+    causality: REJECTED
+    action: "REJECTED: naranjo_score must be in range [-4, 13]. Values outside this range indicate input error (possible PRR or other statistical value used instead of Naranjo score)."
+- input: {}
+  expect:
+    causality: REJECTED
+    action: "REJECTED: naranjo_score is required"
+    confidence: 0
+- input:
+    naranjo_score: -1
+  expect:
+    causality: DOUBTFUL
+    confidence: 20
+    action: document
+- input:
+    naranjo_score: 2
+  expect:
+    action: monitor
+    causality: POSSIBLE
+    confidence: 50
+- input:
+    naranjo_score: 100
+  expect:
+    action: "REJECTED: naranjo_score must be in range [-4, 13]. Values outside this range indicate input error (possible PRR or other statistical value used instead of Naranjo score)."
+    causality: REJECTED
+    confidence: 0
+- input: {}
+  expect:
+    confidence: 0
+    action: "REJECTED: naranjo_score is required"
+    causality: REJECTED
+- input:
+    naranjo_score: -1
+  expect:
+    confidence: 20
+    causality: DOUBTFUL
+    action: document
+- input:
+    naranjo_score: 8
+  expect:
+    action: investigate
+    confidence: 75
+    causality: PROBABLE
+- input:
+    naranjo_score: 900
+  expect:
+    action: "REJECTED: naranjo_score must be in range [-4, 13]. Values outside this range indicate input error (possible PRR or other statistical value used instead of Naranjo score)."
+    causality: REJECTED
+    confidence: 0
+- input:
+    naranjo_score: -5
+  expect:
+    action: "REJECTED: naranjo_score must be in range [-4, 13]. Values outside this range indicate input error (possible PRR or other statistical value used instead of Naranjo score)."
+    causality: REJECTED
+    confidence: 0

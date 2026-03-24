@@ -1,0 +1,161 @@
+name: homeostasis-disruption-score
+description: 'Multi-organ homeostasis disruption scorer: aggregates organ system involvement count to detect multi-organ failure patterns'
+version: 0.1.0
+interface:
+  inputs:
+    cardiac_involved:
+      type: bool
+      required: false
+    hepatic_involved:
+      type: bool
+      required: false
+    renal_involved:
+      type: bool
+      required: false
+    respiratory_involved:
+      type: bool
+      required: false
+    neurological_involved:
+      type: bool
+      required: false
+    haematological_involved:
+      type: bool
+      required: false
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    organ_count:
+      type: int
+    action:
+      type: string
+    multi_organ_failure:
+      type: bool
+tree:
+  start: check_cardiac
+  nodes:
+    check_cardiac:
+      type: condition
+      variable: cardiac_involved
+      operator: eq
+      value: true
+      true_next: c1_hepatic
+      false_next: c0_hepatic
+    c1_hepatic:
+      type: condition
+      variable: hepatic_involved
+      operator: eq
+      value: true
+      true_next: c2_renal
+      false_next: c1_renal
+    c0_hepatic:
+      type: condition
+      variable: hepatic_involved
+      operator: eq
+      value: true
+      true_next: c1_renal
+      false_next: c0_renal
+    c2_renal:
+      type: condition
+      variable: renal_involved
+      operator: eq
+      value: true
+      true_next: critical_3plus
+      false_next: c2_respiratory
+    c1_renal:
+      type: condition
+      variable: renal_involved
+      operator: eq
+      value: true
+      true_next: c2_respiratory
+      false_next: c1_respiratory
+    c0_renal:
+      type: condition
+      variable: renal_involved
+      operator: eq
+      value: true
+      true_next: c1_respiratory
+      false_next: c0_respiratory
+    c2_respiratory:
+      type: condition
+      variable: respiratory_involved
+      operator: eq
+      value: true
+      true_next: critical_3plus
+      false_next: serious_2
+    c1_respiratory:
+      type: condition
+      variable: respiratory_involved
+      operator: eq
+      value: true
+      true_next: serious_2
+      false_next: moderate_1
+    c0_respiratory:
+      type: condition
+      variable: respiratory_involved
+      operator: eq
+      value: true
+      true_next: moderate_1
+      false_next: mild_0
+    critical_3plus:
+      type: return
+      value:
+        severity: critical
+        organ_count: 3
+        action: immediate_expedited_report
+        multi_organ_failure: true
+    serious_2:
+      type: return
+      value:
+        severity: serious
+        organ_count: 2
+        action: expedited_report
+        multi_organ_failure: false
+    moderate_1:
+      type: return
+      value:
+        severity: moderate
+        organ_count: 1
+        action: monitor_and_assess
+        multi_organ_failure: false
+    mild_0:
+      type: return
+      value:
+        severity: mild
+        organ_count: 0
+        action: routine_surveillance
+        multi_organ_failure: false
+tests:
+  - name: three_organs
+    input:
+      cardiac_involved: true
+      hepatic_involved: true
+      renal_involved: true
+    expect:
+      severity: critical
+      organ_count: 3
+      multi_organ_failure: true
+  - name: two_organs
+    input:
+      cardiac_involved: true
+      renal_involved: true
+    expect:
+      severity: serious
+      organ_count: 2
+  - name: one_organ
+    input:
+      hepatic_involved: true
+    expect:
+      severity: moderate
+      organ_count: 1
+  - name: no_organs
+    input:
+      cardiac_involved: false
+    expect:
+      severity: mild
+      organ_count: 0
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild
+      organ_count: 0

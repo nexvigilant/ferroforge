@@ -1,0 +1,182 @@
+name: pvos-detect-router
+description: 'PVOS signal detection: routes detection request to the appropriate algorithm (PRR/ROR/IC/EBGM/Chi2/Fisher) based on algorithm selection and contingency table availability'
+version: 0.1.0
+interface:
+  inputs:
+    algorithm:
+      type: string
+      required: false
+    has_contingency:
+      type: bool
+      required: false
+  outputs:
+    algorithm:
+      type: string
+    description:
+      type: string
+    method:
+      type: string
+tree:
+  start: check_contingency
+  nodes:
+    check_contingency:
+      type: condition
+      variable: has_contingency
+      operator: eq
+      value: true
+      true_next: check_prr
+      false_next: no_data
+    check_prr:
+      type: condition
+      variable: algorithm
+      operator: eq
+      value: PRR
+      true_next: route_prr
+      false_next: check_ror
+    check_ror:
+      type: condition
+      variable: algorithm
+      operator: eq
+      value: ROR
+      true_next: route_ror
+      false_next: check_ic
+    check_ic:
+      type: condition
+      variable: algorithm
+      operator: eq
+      value: IC
+      true_next: route_ic
+      false_next: check_ebgm
+    check_ebgm:
+      type: condition
+      variable: algorithm
+      operator: eq
+      value: EBGM
+      true_next: route_ebgm
+      false_next: check_chi2
+    check_chi2:
+      type: condition
+      variable: algorithm
+      operator: eq
+      value: Chi2
+      true_next: route_chi2
+      false_next: check_fisher
+    check_fisher:
+      type: condition
+      variable: algorithm
+      operator: eq
+      value: Fisher
+      true_next: route_fisher
+      false_next: unknown_algorithm
+    route_prr:
+      type: return
+      value:
+        algorithm: PRR
+        method: proportional_reporting_ratio
+        description: Route to PRR computation - requires 2x2 contingency table
+    route_ror:
+      type: return
+      value:
+        algorithm: ROR
+        method: reporting_odds_ratio
+        description: Route to ROR computation - requires 2x2 contingency table
+    route_ic:
+      type: return
+      value:
+        algorithm: IC
+        method: information_component
+        description: Route to IC computation - Bayesian information component
+    route_ebgm:
+      type: return
+      value:
+        algorithm: EBGM
+        method: empirical_bayes_geometric_mean
+        description: Route to EBGM computation - empirical Bayes geometric mean
+    route_chi2:
+      type: return
+      value:
+        algorithm: Chi2
+        method: chi_squared_test
+        description: Route to Chi-squared test - frequentist independence test
+    route_fisher:
+      type: return
+      value:
+        algorithm: Fisher
+        method: fishers_exact_test
+        description: Route to Fisher exact test - exact significance for small counts
+    no_data:
+      type: return
+      value:
+        algorithm: NONE
+        method: error
+        description: No contingency table available - cannot run signal detection
+    unknown_algorithm:
+      type: return
+      value:
+        algorithm: UNKNOWN
+        method: error
+        description: Unrecognized algorithm - choose PRR/ROR/IC/EBGM/Chi2/Fisher
+tests:
+- input:
+    algorithm: PRR
+    has_contingency: true
+  expect:
+    algorithm: PRR
+    method: proportional_reporting_ratio
+    description: Route to PRR computation - requires 2x2 contingency table
+- input:
+    algorithm: ROR
+    has_contingency: true
+  expect:
+    algorithm: ROR
+    method: reporting_odds_ratio
+    description: Route to ROR computation - requires 2x2 contingency table
+- input:
+    algorithm: IC
+    has_contingency: true
+  expect:
+    algorithm: IC
+    method: information_component
+    description: Route to IC computation - Bayesian information component
+- input:
+    algorithm: EBGM
+    has_contingency: true
+  expect:
+    algorithm: EBGM
+    method: empirical_bayes_geometric_mean
+    description: Route to EBGM computation - empirical Bayes geometric mean
+- input:
+    algorithm: Chi2
+    has_contingency: true
+  expect:
+    algorithm: Chi2
+    method: chi_squared_test
+    description: Route to Chi-squared test - frequentist independence test
+- input:
+    algorithm: Fisher
+    has_contingency: true
+  expect:
+    algorithm: Fisher
+    method: fishers_exact_test
+    description: Route to Fisher exact test - exact significance for small counts
+# no_data: no contingency table available
+- input:
+    algorithm: PRR
+    has_contingency: false
+  expect:
+    algorithm: NONE
+    method: error
+    description: No contingency table available - cannot run signal detection
+# unknown_algorithm: unrecognized algorithm name
+- input:
+    algorithm: BCPNN
+    has_contingency: true
+  expect:
+    algorithm: UNKNOWN
+    method: error
+    description: Unrecognized algorithm - choose PRR/ROR/IC/EBGM/Chi2/Fisher
+- input: {}
+  expect:
+    algorithm: NONE
+    description: No contingency table available - cannot run signal detection
+    method: error

@@ -1,0 +1,89 @@
+name: config-ich-applicability
+description: "Gate ICH guideline applicability by code series and step"
+version: 0.1.0
+interface:
+  inputs:
+    guideline_code:
+      type: string
+      required: false
+      description: "ICH code: E2A, E2B, E2C, E2D, E2E, M1, S series"
+    current_step:
+      type: int
+      required: false
+      description: "ICH step 1-5 (5 = implemented)"
+    is_pv_relevant:
+      type: bool
+      required: false
+  outputs:
+    applicability: { type: string }
+    action: { type: string }
+    binding: { type: bool }
+tree:
+  start: check_code
+  nodes:
+    check_code:
+      type: condition
+      variable: guideline_code
+      operator: is_null
+      true_next: not_applicable
+      false_next: check_pv
+    check_pv:
+      type: condition
+      variable: is_pv_relevant
+      operator: eq
+      value: true
+      true_next: check_step
+      false_next: reference_only
+    check_step:
+      type: condition
+      variable: current_step
+      operator: is_null
+      true_next: applicable_unknown
+      false_next: check_implemented
+    check_implemented:
+      type: condition
+      variable: current_step
+      operator: gte
+      value: 4
+      true_next: binding_guideline
+      false_next: check_draft
+    check_draft:
+      type: condition
+      variable: current_step
+      operator: gte
+      value: 2
+      true_next: emerging_guideline
+      false_next: early_stage
+    binding_guideline:
+      type: return
+      value: { applicability: binding, action: comply, binding: true }
+    emerging_guideline:
+      type: return
+      value: { applicability: emerging, action: prepare, binding: false }
+    early_stage:
+      type: return
+      value: { applicability: early, action: monitor, binding: false }
+    applicable_unknown:
+      type: return
+      value: { applicability: unknown_step, action: verify, binding: false }
+    reference_only:
+      type: return
+      value: { applicability: reference, action: note, binding: false }
+    not_applicable:
+      type: return
+      value: { applicability: none, action: skip, binding: false }
+tests:
+  - input: { guideline_code: "E2B", is_pv_relevant: true, current_step: 5 }
+    expect: { applicability: binding, action: comply, binding: true }
+  - input: { guideline_code: "E2E", is_pv_relevant: true, current_step: 4 }
+    expect: { applicability: binding, action: comply, binding: true }
+  - input: { guideline_code: "E2C", is_pv_relevant: true, current_step: 3 }
+    expect: { applicability: emerging, action: prepare, binding: false }
+  - input: { guideline_code: "S7A", is_pv_relevant: true, current_step: 1 }
+    expect: { applicability: early, action: monitor, binding: false }
+  - input: { guideline_code: "Q3D", is_pv_relevant: false, current_step: 5 }
+    expect: { applicability: reference, action: note, binding: false }
+  - input: { guideline_code: "E2A", is_pv_relevant: true }
+    expect: { applicability: unknown_step, action: verify, binding: false }
+  - input: {}
+    expect: { applicability: none, action: skip, binding: false }

@@ -1,0 +1,184 @@
+name: literature-to-signal
+description: Routes literature findings into signal hypothesis and recommended actions
+version: 0.1.0
+tree:
+  start: check_study_type
+  nodes:
+    check_study_type:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: meta_analysis
+      true_next: meta_finding
+      false_next: check_rct
+    check_rct:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: rct
+      true_next: check_rct_finding
+      false_next: check_cohort
+    cc_signal:
+      type: return
+      value:
+        priority: medium
+        recommended_action: confirm_with_cohort_data
+        signal_hypothesis: true
+    meta_finding:
+      type: return
+      value:
+        priority: high
+        recommended_action: initiate_signal_assessment
+        signal_hypothesis: true
+    rct_other:
+      type: return
+      value:
+        priority: medium
+        signal_hypothesis: true
+        recommended_action: evaluate_mechanism
+    cohort_other:
+      type: return
+      value:
+        recommended_action: literature_monitoring
+        signal_hypothesis: true
+        priority: medium
+    cr_new_adr:
+      type: return
+      value:
+        recommended_action: literature_search
+        priority: medium
+        signal_hypothesis: true
+    case_report_path:
+      type: condition
+      variable: finding_type
+      operator: eq
+      value: new_adr
+      true_next: cr_new_adr
+      false_next: cr_other
+    rct_new_adr:
+      type: return
+      value:
+        recommended_action: comparative_safety_analysis
+        signal_hypothesis: true
+        priority: high
+    cr_other:
+      type: return
+      value:
+        priority: low
+        recommended_action: monitor
+        signal_hypothesis: false
+    check_cohort:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: cohort
+      true_next: check_cohort_finding
+      false_next: case_control_path
+    check_rct_finding:
+      type: condition
+      variable: finding_type
+      operator: eq
+      value: new_adr
+      true_next: rct_new_adr
+      false_next: rct_other
+    check_cohort_finding:
+      type: condition
+      variable: finding_type
+      operator: eq
+      value: increased_frequency
+      true_next: cohort_increased
+      false_next: cohort_other
+    cohort_increased:
+      type: return
+      value:
+        recommended_action: signal_assessment
+        signal_hypothesis: true
+        priority: high
+    case_control_path:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: case_control
+      true_next: cc_signal
+      false_next: case_report_path
+tests:
+- input:
+    finding_type: ''
+    study_type: ''
+  expect:
+    priority: low
+    recommended_action: monitor
+    signal_hypothesis: false
+- input:
+    finding_type: ''
+    study_type: case_control
+  expect:
+    priority: medium
+    recommended_action: confirm_with_cohort_data
+    signal_hypothesis: true
+- input:
+    finding_type: ''
+    study_type: cohort
+  expect:
+    recommended_action: literature_monitoring
+    signal_hypothesis: true
+    priority: medium
+- input:
+    finding_type: ''
+    study_type: meta_analysis
+  expect:
+    priority: high
+    recommended_action: initiate_signal_assessment
+    signal_hypothesis: true
+- input:
+    finding_type: ''
+    study_type: rct
+  expect:
+    priority: medium
+    signal_hypothesis: true
+    recommended_action: evaluate_mechanism
+- input:
+    finding_type: increased_frequency
+    study_type: cohort
+  expect:
+    recommended_action: signal_assessment
+    signal_hypothesis: true
+    priority: high
+- input:
+    finding_type: new_adr
+    study_type: ''
+  expect:
+    recommended_action: literature_search
+    priority: medium
+    signal_hypothesis: true
+- input:
+    finding_type: new_adr
+    study_type: rct
+  expect:
+    recommended_action: comparative_safety_analysis
+    signal_hypothesis: true
+    priority: high
+- input: {}
+  expect:
+    priority: low
+    recommended_action: monitor
+    signal_hypothesis: false
+interface:
+  inputs:
+    finding_type:
+      type: string
+      required: true
+    study_type:
+      type: string
+      required: true
+  outputs:
+    signal_hypothesis:
+      type: boolean
+      required: false
+    priority:
+      type: string
+      required: false
+    recommended_action:
+      type: string
+      required: false
+  aliases: {}

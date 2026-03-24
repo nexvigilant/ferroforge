@@ -1,0 +1,68 @@
+name: adr-severity-escalation
+description: 'ADR grading → escalation routing. Uses CTCAE-style grading inputs (is_fatal, is_life_threatening, requires_hospitalization, requires_medical_intervention) flowing through escalation decision.'
+version: 0.3.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - adr-severity
+  - escalation-router
+tests:
+- name: fatal ADR — immediate escalation
+  input:
+    is_fatal: true
+  expect:
+    grade: 5
+    severity: FATAL
+    reporting: EXPEDITED_FATAL
+    route: IMMEDIATE
+    channel: pager
+    sla_minutes: 15
+- name: life-threatening ADR — immediate escalation
+  input:
+    is_fatal: false
+    is_life_threatening: true
+  expect:
+    grade: 4
+    severity: LIFE_THREATENING
+    reporting: EXPEDITED_SERIOUS
+    route: IMMEDIATE
+    channel: pager
+    sla_minutes: 15
+- name: severe ADR — urgent escalation
+  input:
+    is_fatal: false
+    is_life_threatening: false
+    requires_hospitalization: true
+  expect:
+    grade: 3
+    severity: SEVERE
+    reporting: EXPEDITED_SERIOUS
+    route: URGENT
+    channel: slack
+    sla_minutes: 60
+- name: moderate ADR — standard queue
+  input:
+    is_fatal: false
+    is_life_threatening: false
+    requires_hospitalization: false
+    requires_medical_intervention: true
+  expect:
+    grade: 2
+    severity: MODERATE
+    reporting: STANDARD
+    route: QUEUE
+    channel: backlog
+    sla_minutes: 1440
+- name: mild ADR — standard queue
+  input:
+    is_fatal: false
+    is_life_threatening: false
+    requires_hospitalization: false
+    requires_medical_intervention: false
+  expect:
+    grade: 1
+    severity: MILD
+    reporting: STANDARD
+    route: QUEUE
+    channel: backlog
+    sla_minutes: 1440

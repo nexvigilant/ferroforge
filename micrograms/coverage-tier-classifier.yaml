@@ -1,0 +1,117 @@
+name: coverage-tier-classifier
+description: 'Data coverage tier classifier: maps a 0-100 coverage percentage to quality tiers for PV data source assessment'
+version: 0.1.0
+interface:
+  inputs:
+    coverage_pct:
+      type: number
+      required: true
+      description: 'Data coverage percentage (0-100)'
+  outputs:
+    tier:
+      type: string
+    color:
+      type: string
+tree:
+  start: check_high
+  nodes:
+    check_high:
+      type: condition
+      variable: coverage_pct
+      operator: gte
+      value: 75
+      true_next: high_coverage
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: coverage_pct
+      operator: gte
+      value: 50
+      true_next: moderate_coverage
+      false_next: check_low
+    check_low:
+      type: condition
+      variable: coverage_pct
+      operator: gte
+      value: 25
+      true_next: low_coverage
+      false_next: critical_gap
+    high_coverage:
+      type: return
+      value:
+        tier: HIGH
+        color: emerald
+    moderate_coverage:
+      type: return
+      value:
+        tier: MODERATE
+        color: amber
+    low_coverage:
+      type: return
+      value:
+        tier: LOW
+        color: orange
+    critical_gap:
+      type: return
+      value:
+        tier: CRITICAL_GAP
+        color: red
+tests:
+# Full coverage
+- input:
+    coverage_pct: 100
+  expect:
+    tier: HIGH
+    color: emerald
+# High
+- input:
+    coverage_pct: 80
+  expect:
+    tier: HIGH
+    color: emerald
+# Boundary: exactly 75 = HIGH
+- input:
+    coverage_pct: 75
+  expect:
+    tier: HIGH
+    color: emerald
+# Moderate
+- input:
+    coverage_pct: 60
+  expect:
+    tier: MODERATE
+    color: amber
+# Boundary: exactly 50 = MODERATE
+- input:
+    coverage_pct: 50
+  expect:
+    tier: MODERATE
+    color: amber
+# Low
+- input:
+    coverage_pct: 30
+  expect:
+    tier: LOW
+    color: orange
+# Boundary: exactly 25 = LOW
+- input:
+    coverage_pct: 25
+  expect:
+    tier: LOW
+    color: orange
+# Critical gap
+- input:
+    coverage_pct: 10
+  expect:
+    tier: CRITICAL_GAP
+    color: red
+# Zero coverage
+- input:
+    coverage_pct: 0
+  expect:
+    tier: CRITICAL_GAP
+    color: red
+- input: {}
+  expect:
+    color: red
+    tier: CRITICAL_GAP

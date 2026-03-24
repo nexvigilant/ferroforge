@@ -1,0 +1,102 @@
+name: smm-score-rating
+description: "NVG-SMM-001 Section 5.2: Map Credibility Score to rating and integration disposition. Chemistry analog: Arrhenius threshold gating — score must exceed activation energy to achieve each integration tier."
+version: 0.1.0
+interface:
+  inputs:
+    cs:
+      type: float
+      required: true
+    suspended:
+      type: bool
+      required: true
+  outputs:
+    rating:
+      type: string
+    disposition:
+      type: string
+    weight:
+      type: float
+    action:
+      type: string
+    chemistry_analog:
+      type: string
+
+tree:
+  start: check_suspended
+  nodes:
+    check_suspended:
+      type: condition
+      variable: suspended
+      operator: eq
+      value: true
+      true_next: fatal_rating
+      false_next: check_red
+    check_red:
+      type: condition
+      variable: cs
+      operator: lt
+      value: 0.60
+      true_next: red_rating
+      false_next: check_amber
+    check_amber:
+      type: condition
+      variable: cs
+      operator: lt
+      value: 0.80
+      true_next: amber_rating
+      false_next: green_rating
+    fatal_rating:
+      type: return
+      value:
+        rating: SUSPENDED
+        disposition: "Excluded pending qualified review"
+        weight: 0.00
+        action: "Mandatory PV scientist review; CAPA initiated"
+        chemistry_analog: "Ea = infinity; k = 0; no reaction proceeds"
+    red_rating:
+      type: return
+      value:
+        rating: RED
+        disposition: "Integrated at 0.25x weight; high-scrutiny flag"
+        weight: 0.25
+        action: "Signal assessments require supporting corroboration"
+        chemistry_analog: "Below activation threshold; trace product only"
+    amber_rating:
+      type: return
+      value:
+        rating: AMBER
+        disposition: "Integrated at 0.60x weight; advisory flag"
+        weight: 0.60
+        action: "Violation summary appended to evidence record"
+        chemistry_analog: "Partial activation; reduced yield"
+    green_rating:
+      type: return
+      value:
+        rating: GREEN
+        disposition: "Integrated at full weight"
+        weight: 1.00
+        action: "Minor violations annotated; no workflow impact"
+        chemistry_analog: "Full activation; quantitative yield"
+
+tests:
+  - input: { cs: 0.00, suspended: true }
+    expect: { rating: SUSPENDED, weight: 0.00 }
+  - input: { cs: 0.45, suspended: false }
+    expect: { rating: RED, weight: 0.25 }
+  - input: { cs: 0.70, suspended: false }
+    expect: { rating: AMBER, weight: 0.60 }
+  - input: { cs: 0.95, suspended: false }
+    expect: { rating: GREEN, weight: 1.00 }
+  - input: { cs: 0.80, suspended: false }
+    expect: { rating: GREEN, weight: 1.00 }
+  - input: { cs: 0.59, suspended: false }
+    expect: { rating: RED, weight: 0.25 }
+  - input: { cs: 0.60, suspended: false }
+    expect: { rating: AMBER, weight: 0.60 }
+  - input: {}
+    expect:
+      action: Minor violations annotated; no workflow impact
+      chemistry_analog: Full activation; quantitative yield
+      disposition: Integrated at full weight
+      rating: GREEN
+      weight: 1.0

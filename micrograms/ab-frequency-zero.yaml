@@ -1,0 +1,44 @@
+name: ab-frequency-zero
+description: 'Antibody: detects zero/negative frequency (stem-phys Frequency — period becomes infinity). Division-by-zero sentinel.'
+version: 0.1.0
+interface:
+  inputs:
+    frequency:
+      type: number
+      required: true
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: frequency
+      operator: lte
+      value: 0
+      true_next: violation
+      false_next: clean
+    violation:
+      type: return
+      value:
+        threat: true
+        response: 'BLOCK: zero/negative frequency — period is infinity, oscillation undefined'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { frequency: 2.0 }
+  expect: { threat: false }
+- input: { frequency: 0 }
+  expect: { threat: true }
+- input: { frequency: -1.0 }
+  expect: { threat: true }
+- input: {}
+  expect:
+    response: PASS
+    threat: false

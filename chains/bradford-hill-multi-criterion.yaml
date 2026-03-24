@@ -1,0 +1,86 @@
+name: bradford-hill-multi-criterion
+description: 'Crown chain: composes 5 Bradford Hill criteria micrograms into a single causality assessment. Temporal association → signal comparison → dose-response → rechallenge → Naranjo causality. Each criterion adds its assessment to the accumulated context. Exercises all cross-variable comparison patterns in one chain.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - temporal-association
+  - signal-comparator
+  - dose-response-classifier
+  - rechallenge-evaluator
+  - naranjo-quick
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(temporal) → κ(signal) → κ(dose-response) → κ(rechallenge) → μ(naranjo) — five Bradford Hill criteria converge'
+  primes: ['κ', '∂', 'N', 'μ', '→']
+
+tests:
+# Strong evidence across all criteria → probable causality
+- name: strong multi-criterion evidence
+  input:
+    drug_start_to_event_days: 3
+    event_before_drug: false
+    signal_a: 5.0
+    signal_b: 4.5
+    threshold: 2.0
+    low_dose_rate: 10
+    mid_dose_rate: 25
+    high_dose_rate: 50
+    baseline_rate: 5
+    first_exposure_rate: 20
+    rechallenge_rate: 20
+    naranjo_score: 7
+  expect:
+    temporal_plausibility: STRONG
+    agreement: CONCORDANT
+    dose_response_met: 'yes'
+    pattern: CLASSIC_RECHALLENGE
+    experiment_criterion_met: 'yes'
+    causality: PROBABLE
+
+# Weak evidence — late onset, discordant signals, flat dose-response
+- name: weak multi-criterion evidence
+  input:
+    drug_start_to_event_days: 120
+    event_before_drug: false
+    signal_a: 3.0
+    signal_b: 1.5
+    threshold: 2.0
+    low_dose_rate: 15
+    mid_dose_rate: 15
+    high_dose_rate: 15
+    baseline_rate: 10
+    first_exposure_rate: 8
+    rechallenge_rate: 9
+    naranjo_score: 2
+  expect:
+    temporal_plausibility: WEAK
+    agreement: DISCORDANT
+    dose_response_met: 'no'
+    pattern: NO_EFFECT
+    experiment_criterion_met: 'no'
+    causality: POSSIBLE
+
+# Mixed evidence — strong temporality + rechallenge, weak signals
+- name: mixed evidence with rechallenge
+  input:
+    drug_start_to_event_days: 5
+    event_before_drug: false
+    signal_a: 1.0
+    signal_b: 0.8
+    threshold: 2.0
+    low_dose_rate: 20
+    mid_dose_rate: 15
+    high_dose_rate: 10
+    baseline_rate: 5
+    first_exposure_rate: 15
+    rechallenge_rate: 30
+    naranjo_score: 5
+  expect:
+    temporal_plausibility: STRONG
+    agreement: BOTH_NULL
+    dose_response_met: 'no'
+    pattern: SENSITIZATION
+    experiment_criterion_met: 'yes'
+    causality: PROBABLE

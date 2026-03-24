@@ -1,0 +1,330 @@
+name: signal-recurrence-detector
+description: Detects recurring patterns to fill the ρ (Recursion) primitive gap. Distinguishes novel occurrences from recurring signals, recurring signals despite prior action, and systemic failures.
+version: 0.1.0
+tree:
+  start: count_check
+  nodes:
+    prior_action_check_two:
+      type: condition
+      variable: prior_action_taken
+      operator: eq
+      value: true
+      true_next: recurrence_despite_action_return
+      false_next: recurring_return
+    prior_action_check_three_plus:
+      type: condition
+      variable: prior_action_taken
+      operator: eq
+      value: true
+      true_next: systemic_failure_return
+      false_next: window_check
+    window_check:
+      type: condition
+      variable: window_days
+      operator: lte
+      value: 30
+      true_next: acute_cluster_return
+      false_next: chronic_pattern_return
+    fallback_return:
+      type: return
+      value:
+        action: Unexpected input state. Verify occurrence_count and window_days are valid.
+        recurrence_class: UNKNOWN
+        recursion_primitive: ρ — does it contain itself; self-reference
+        chemistry_analog: Unknown reaction
+        escalation_required: false
+    count_three_plus_check:
+      type: condition
+      variable: occurrence_count
+      operator: gte
+      value: 3
+      true_next: prior_action_check_three_plus
+      false_next: fallback_return
+    novel_return:
+      type: return
+      value:
+        action: Monitor for recurrence. No prior context.
+        chemistry_analog: Isolated reaction (no feedback)
+        recursion_primitive: ρ — does it contain itself; self-reference
+        recurrence_class: NOVEL
+        escalation_required: false
+    recurrence_despite_action_return:
+      type: return
+      value:
+        recurrence_class: RECURRENCE_DESPITE_ACTION
+        escalation_required: true
+        chemistry_analog: Chain reaction — each step triggers the next
+        recursion_primitive: ρ — does it contain itself; self-reference
+        action: Pattern recurred despite prior action. Action was insufficient. Escalate for deeper root cause analysis.
+    systemic_failure_return:
+      type: return
+      value:
+        action: Pattern persists despite corrective action taken previously. Root cause not addressed. Requires structural intervention.
+        recurrence_class: SYSTEMIC_FAILURE
+        chemistry_analog: Oscillating reaction — feedback loop sustaining the cycle
+        recursion_primitive: ρ — does it contain itself; self-reference
+        escalation_required: true
+    acute_cluster_return:
+      type: return
+      value:
+        recurrence_class: ACUTE_CLUSTER
+        recursion_primitive: ρ — does it contain itself; self-reference
+        chemistry_analog: Explosive chain reaction — rapid self-propagation
+        escalation_required: true
+        action: 3+ occurrences within 30 days indicates rapid recurrence. Immediate intervention required.
+    count_check:
+      type: condition
+      variable: occurrence_count
+      operator: eq
+      value: 1
+      true_next: novel_return
+      false_next: count_two_check
+    recurring_return:
+      type: return
+      value:
+        chemistry_analog: Autocatalysis — reaction feeds itself
+        escalation_required: false
+        recursion_primitive: ρ — does it contain itself; self-reference
+        recurrence_class: RECURRING
+        action: Pattern appeared a second time without prior corrective action. Implement preventive measure.
+    chronic_pattern_return:
+      type: return
+      value:
+        recursion_primitive: ρ — does it contain itself; self-reference
+        recurrence_class: CHRONIC_PATTERN
+        chemistry_analog: Sustained autocatalysis — persistent but not acute
+        escalation_required: true
+        action: 3+ occurrences over extended period. Systemic issue requiring long-term management strategy.
+    count_two_check:
+      type: condition
+      variable: occurrence_count
+      operator: eq
+      value: 2
+      true_next: prior_action_check_two
+      false_next: count_three_plus_check
+tests:
+- input:
+    prior_action_taken: false
+    occurrence_count: 1
+    window_days: 90
+  expect:
+    recurrence_class: NOVEL
+    escalation_required: false
+- input:
+    window_days: 30
+    occurrence_count: 1
+    prior_action_taken: true
+  expect:
+    escalation_required: false
+    recurrence_class: NOVEL
+- input:
+    prior_action_taken: false
+    window_days: 60
+    occurrence_count: 2
+  expect:
+    escalation_required: false
+    recurrence_class: RECURRING
+- input:
+    occurrence_count: 2
+    prior_action_taken: true
+    window_days: 60
+  expect:
+    escalation_required: true
+    recurrence_class: RECURRENCE_DESPITE_ACTION
+- input:
+    occurrence_count: 3
+    window_days: 90
+    prior_action_taken: true
+  expect:
+    escalation_required: true
+    recurrence_class: SYSTEMIC_FAILURE
+- input:
+    window_days: 30
+    prior_action_taken: true
+    occurrence_count: 5
+  expect:
+    recurrence_class: SYSTEMIC_FAILURE
+    escalation_required: true
+- input:
+    window_days: 30
+    occurrence_count: 3
+    prior_action_taken: false
+  expect:
+    escalation_required: true
+    recurrence_class: ACUTE_CLUSTER
+- input:
+    occurrence_count: 3
+    window_days: 90
+    prior_action_taken: false
+  expect:
+    recurrence_class: CHRONIC_PATTERN
+    escalation_required: true
+- input:
+    window_days: 7
+    occurrence_count: 10
+    prior_action_taken: false
+  expect:
+    recurrence_class: ACUTE_CLUSTER
+    escalation_required: true
+- input:
+    occurrence_count: 4
+    prior_action_taken: false
+    window_days: 365
+  expect:
+    escalation_required: true
+    recurrence_class: CHRONIC_PATTERN
+- input: {}
+  expect:
+    recurrence_class: UNKNOWN
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    recursion_primitive: ρ — does it contain itself; self-reference
+    chemistry_analog: Unknown reaction
+    escalation_required: false
+- input: {}
+  expect:
+    recursion_primitive: ρ — does it contain itself; self-reference
+    recurrence_class: UNKNOWN
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    chemistry_analog: Unknown reaction
+    escalation_required: false
+- input:
+    window_days: 0
+  expect:
+    escalation_required: false
+    recurrence_class: UNKNOWN
+    recursion_primitive: ρ — does it contain itself; self-reference
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    chemistry_analog: Unknown reaction
+- input:
+    window_days: -1
+  expect:
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    recursion_primitive: ρ — does it contain itself; self-reference
+    recurrence_class: UNKNOWN
+    escalation_required: false
+    chemistry_analog: Unknown reaction
+- input:
+    window_days: 29
+  expect:
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    chemistry_analog: Unknown reaction
+    recurrence_class: UNKNOWN
+    recursion_primitive: ρ — does it contain itself; self-reference
+    escalation_required: false
+- input:
+    window_days: 31
+  expect:
+    chemistry_analog: Unknown reaction
+    recurrence_class: UNKNOWN
+    recursion_primitive: ρ — does it contain itself; self-reference
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    escalation_required: false
+- input: {}
+  expect:
+    escalation_required: false
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    recurrence_class: UNKNOWN
+    chemistry_analog: Unknown reaction
+    recursion_primitive: ρ — does it contain itself; self-reference
+- input:
+    occurrence_count: 0
+  expect:
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    chemistry_analog: Unknown reaction
+    escalation_required: false
+    recursion_primitive: ρ — does it contain itself; self-reference
+    recurrence_class: UNKNOWN
+- input:
+    occurrence_count: -1
+  expect:
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    escalation_required: false
+    recurrence_class: UNKNOWN
+    recursion_primitive: ρ — does it contain itself; self-reference
+    chemistry_analog: Unknown reaction
+- input:
+    occurrence_count: 300
+  expect:
+    escalation_required: true
+    action: 3+ occurrences over extended period. Systemic issue requiring long-term management strategy.
+    chemistry_analog: Sustained autocatalysis — persistent but not acute
+    recurrence_class: CHRONIC_PATTERN
+    recursion_primitive: ρ — does it contain itself; self-reference
+- input: {}
+  expect:
+    recurrence_class: UNKNOWN
+    recursion_primitive: ρ — does it contain itself; self-reference
+    escalation_required: false
+    chemistry_analog: Unknown reaction
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+- input:
+    occurrence_count: 0
+  expect:
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    recurrence_class: UNKNOWN
+    escalation_required: false
+    chemistry_analog: Unknown reaction
+    recursion_primitive: ρ — does it contain itself; self-reference
+- input:
+    occurrence_count: -1
+  expect:
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    escalation_required: false
+    chemistry_analog: Unknown reaction
+    recurrence_class: UNKNOWN
+    recursion_primitive: ρ — does it contain itself; self-reference
+- input:
+    occurrence_count: 0
+  expect:
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    recursion_primitive: ρ — does it contain itself; self-reference
+    recurrence_class: UNKNOWN
+    chemistry_analog: Unknown reaction
+    escalation_required: false
+- input:
+    occurrence_count: 100
+  expect:
+    action: 3+ occurrences over extended period. Systemic issue requiring long-term management strategy.
+    recurrence_class: CHRONIC_PATTERN
+    recursion_primitive: ρ — does it contain itself; self-reference
+    chemistry_analog: Sustained autocatalysis — persistent but not acute
+    escalation_required: true
+- input: {}
+  expect:
+    recurrence_class: UNKNOWN
+    chemistry_analog: Unknown reaction
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    recursion_primitive: ρ — does it contain itself; self-reference
+    escalation_required: false
+- input:
+    occurrence_count: 0
+  expect:
+    recurrence_class: UNKNOWN
+    chemistry_analog: Unknown reaction
+    recursion_primitive: ρ — does it contain itself; self-reference
+    escalation_required: false
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+- input:
+    occurrence_count: -1
+  expect:
+    recurrence_class: UNKNOWN
+    recursion_primitive: ρ — does it contain itself; self-reference
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    chemistry_analog: Unknown reaction
+    escalation_required: false
+- input:
+    occurrence_count: 200
+  expect:
+    recurrence_class: CHRONIC_PATTERN
+    escalation_required: true
+    recursion_primitive: ρ — does it contain itself; self-reference
+    action: 3+ occurrences over extended period. Systemic issue requiring long-term management strategy.
+    chemistry_analog: Sustained autocatalysis — persistent but not acute
+- input: {}
+  expect:
+    recurrence_class: UNKNOWN
+    chemistry_analog: Unknown reaction
+    action: Unexpected input state. Verify occurrence_count and window_days are valid.
+    recursion_primitive: ρ — does it contain itself; self-reference
+    escalation_required: false
+interface: null

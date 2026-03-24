@@ -1,0 +1,161 @@
+name: reporting-priority
+description: 'Master priority calculator combining seriousness + expectedness + causality per ICH E2A. P0 through P3 priority tiers.'
+version: 0.1.0
+interface:
+  inputs:
+    causality_category:
+      type: string
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+  outputs:
+    deadline_days:
+      type: int
+    priority:
+      type: string
+    rationale:
+      type: string
+    report_type:
+      type: string
+tree:
+  start: check_serious
+  nodes:
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_unexpected_serious
+      false_next: p3_routine
+    check_unexpected_serious:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: check_causality_strong
+      false_next: p2_periodic
+    check_causality_strong:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: DEFINITE
+      true_next: p0_immediate
+      false_next: check_causality_probable
+    check_causality_probable:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: PROBABLE
+      true_next: p0_immediate
+      false_next: p1_expedited
+    p0_immediate:
+      type: return
+      value:
+        priority: P0_IMMEDIATE
+        deadline_days: 7
+        report_type: 7-day_expedited
+        rationale: Serious unexpected ADR with definite or probable causality requires 7-day expedited reporting per ICH E2A
+    p1_expedited:
+      type: return
+      value:
+        priority: P1_EXPEDITED
+        deadline_days: 15
+        report_type: 15-day_expedited
+        rationale: Serious unexpected ADR with possible or doubtful causality requires 15-day expedited reporting per ICH E2A
+    p2_periodic:
+      type: return
+      value:
+        priority: P2_PERIODIC
+        deadline_days: 90
+        report_type: PSUR_PBRER
+        rationale: Serious expected ADR included in periodic safety update report
+    p3_routine:
+      type: return
+      value:
+        priority: P3_ROUTINE
+        deadline_days: 90
+        report_type: PSUR_PBRER
+        rationale: Non-serious ADR included in routine periodic safety reporting
+tests:
+- input:
+    is_serious: true
+    is_unexpected: true
+    causality_category: DEFINITE
+  expect:
+    priority: P0_IMMEDIATE
+    deadline_days: 7
+    report_type: 7-day_expedited
+    rationale: Serious unexpected ADR with definite or probable causality requires 7-day expedited reporting per ICH E2A
+- input:
+    is_serious: true
+    is_unexpected: true
+    causality_category: PROBABLE
+  expect:
+    priority: P0_IMMEDIATE
+    deadline_days: 7
+    report_type: 7-day_expedited
+    rationale: Serious unexpected ADR with definite or probable causality requires 7-day expedited reporting per ICH E2A
+- input:
+    is_serious: true
+    is_unexpected: true
+    causality_category: POSSIBLE
+  expect:
+    priority: P1_EXPEDITED
+    deadline_days: 15
+    report_type: 15-day_expedited
+    rationale: Serious unexpected ADR with possible or doubtful causality requires 15-day expedited reporting per ICH E2A
+- input:
+    is_serious: true
+    is_unexpected: true
+    causality_category: DOUBTFUL
+  expect:
+    priority: P1_EXPEDITED
+    deadline_days: 15
+    report_type: 15-day_expedited
+    rationale: Serious unexpected ADR with possible or doubtful causality requires 15-day expedited reporting per ICH E2A
+- input:
+    is_serious: true
+    is_unexpected: false
+    causality_category: DEFINITE
+  expect:
+    priority: P2_PERIODIC
+    deadline_days: 90
+    report_type: PSUR_PBRER
+    rationale: Serious expected ADR included in periodic safety update report
+- input:
+    is_serious: true
+    is_unexpected: false
+    causality_category: PROBABLE
+  expect:
+    priority: P2_PERIODIC
+    deadline_days: 90
+    report_type: PSUR_PBRER
+    rationale: Serious expected ADR included in periodic safety update report
+- input:
+    is_serious: false
+    is_unexpected: true
+    causality_category: DEFINITE
+  expect:
+    priority: P3_ROUTINE
+    deadline_days: 90
+    report_type: PSUR_PBRER
+    rationale: Non-serious ADR included in routine periodic safety reporting
+- input:
+    is_serious: false
+    is_unexpected: false
+    causality_category: DOUBTFUL
+  expect:
+    priority: P3_ROUTINE
+    deadline_days: 90
+    report_type: PSUR_PBRER
+    rationale: Non-serious ADR included in routine periodic safety reporting
+- input: {}
+  expect:
+    deadline_days: 90
+    priority: P3_ROUTINE
+    rationale: Non-serious ADR included in routine periodic safety reporting
+    report_type: PSUR_PBRER

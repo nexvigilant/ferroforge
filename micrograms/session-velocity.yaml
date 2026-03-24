@@ -1,0 +1,169 @@
+name: session-velocity
+version: "1.0"
+description: "Session productivity velocity classifier. Bands: EXCEPTIONAL (mcp_ratio>=0.3 AND density>=0.5), TARGET (mcp_ratio>=0.15 AND density>=0.25), ACCEPTABLE (mcp_ratio>=0.05 OR density>=0.1), SLOW (else). Inputs are pre-computed ratios. chains_to: momentum-tracker."
+
+input:
+  - name: mcp_ratio
+    type: number
+    description: "MCP calls / total tool calls (pre-computed by caller from session metrics)"
+  - name: density
+    type: number
+    description: "(files_modified + commits) / duration_minutes (pre-computed by caller)"
+
+interface:
+  inputs:
+    density:
+      type: float
+      required: false
+    mcp_ratio:
+      type: float
+      required: false
+  outputs:
+    feeds_momentum:
+      type: bool
+    velocity_class:
+      type: string
+tree:
+  start: check_exceptional_mcp
+  nodes:
+    check_exceptional_mcp:
+      type: condition
+      variable: mcp_ratio
+      operator: gte
+      value: 0.3
+      true_next: check_exceptional_density
+      false_next: check_target_mcp
+
+    check_exceptional_density:
+      type: condition
+      variable: density
+      operator: gte
+      value: 0.5
+      true_next: exceptional
+      false_next: check_target_mcp
+
+    check_target_mcp:
+      type: condition
+      variable: mcp_ratio
+      operator: gte
+      value: 0.15
+      true_next: check_target_density
+      false_next: check_acceptable_mcp
+
+    check_target_density:
+      type: condition
+      variable: density
+      operator: gte
+      value: 0.25
+      true_next: target
+      false_next: check_acceptable_mcp
+
+    check_acceptable_mcp:
+      type: condition
+      variable: mcp_ratio
+      operator: gte
+      value: 0.05
+      true_next: acceptable
+      false_next: check_acceptable_density
+
+    check_acceptable_density:
+      type: condition
+      variable: density
+      operator: gte
+      value: 0.1
+      true_next: acceptable
+      false_next: slow
+
+    exceptional:
+      type: return
+      value:
+        velocity_class: EXCEPTIONAL
+        feeds_momentum: true
+
+    target:
+      type: return
+      value:
+        velocity_class: TARGET
+        feeds_momentum: true
+
+    acceptable:
+      type: return
+      value:
+        velocity_class: ACCEPTABLE
+        feeds_momentum: true
+
+    slow:
+      type: return
+      value:
+        velocity_class: SLOW
+        feeds_momentum: true
+
+tests:
+  - name: "exceptional - both thresholds exceeded"
+    input:
+      mcp_ratio: 0.4
+      density: 0.6
+    expect:
+      velocity_class: EXCEPTIONAL
+      feeds_momentum: true
+
+  - name: "exceptional - exact boundary values"
+    input:
+      mcp_ratio: 0.3
+      density: 0.5
+    expect:
+      velocity_class: EXCEPTIONAL
+      feeds_momentum: true
+
+  - name: "target - meets mcp and density thresholds"
+    input:
+      mcp_ratio: 0.2
+      density: 0.3
+    expect:
+      velocity_class: TARGET
+      feeds_momentum: true
+
+  - name: "target - high mcp but insufficient density for exceptional"
+    input:
+      mcp_ratio: 0.35
+      density: 0.3
+    expect:
+      velocity_class: TARGET
+      feeds_momentum: true
+
+  - name: "acceptable - via mcp_ratio only, low density"
+    input:
+      mcp_ratio: 0.1
+      density: 0.05
+    expect:
+      velocity_class: ACCEPTABLE
+      feeds_momentum: true
+
+  - name: "acceptable - via density only, low mcp_ratio"
+    input:
+      mcp_ratio: 0.02
+      density: 0.15
+    expect:
+      velocity_class: ACCEPTABLE
+      feeds_momentum: true
+
+  - name: "slow - below all thresholds"
+    input:
+      mcp_ratio: 0.02
+      density: 0.05
+    expect:
+      velocity_class: SLOW
+      feeds_momentum: true
+
+  - name: "edge case - zero mcp_ratio and zero density"
+    input:
+      mcp_ratio: 0.0
+      density: 0.0
+    expect:
+      velocity_class: SLOW
+      feeds_momentum: true
+  - name: null_input_safety
+    input: {}
+    expect:
+      feeds_momentum: true
+      velocity_class: SLOW

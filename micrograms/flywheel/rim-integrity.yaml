@@ -1,0 +1,92 @@
+name: rim-integrity
+description: 'Flywheel rim structural integrity classifier. THRIVING (tensile >= 110% of centrifugal force), CRITICAL (90-110%), DISINTEGRATED (< 90%). Requires pre-computed force_ratio = tensile/centrifugal (1.0 if both zero).'
+version: 0.1.0
+interface:
+  inputs:
+    tensile_strength:
+      type: float
+      required: false
+    centrifugal_force:
+      type: float
+      required: false
+    force_ratio:
+      type: float
+      required: false
+  outputs:
+    state:
+      type: string
+tree:
+  start: check_thriving
+  nodes:
+    check_thriving:
+      type: condition
+      variable: force_ratio
+      operator: gte
+      value: 1.1
+      true_next: thriving
+      false_next: check_critical
+    check_critical:
+      type: condition
+      variable: force_ratio
+      operator: gte
+      value: 0.9
+      true_next: critical
+      false_next: disintegrated
+    thriving:
+      type: return
+      value:
+        state: thriving
+    critical:
+      type: return
+      value:
+        state: critical
+    disintegrated:
+      type: return
+      value:
+        state: disintegrated
+tests:
+- input:
+    tensile_strength: 100.0
+    centrifugal_force: 50.0
+    force_ratio: 2.0
+  expect:
+    state: thriving
+- input:
+    tensile_strength: 100.0
+    centrifugal_force: 100.0
+    force_ratio: 1.0
+  expect:
+    state: critical
+- input:
+    tensile_strength: 40.0
+    centrifugal_force: 100.0
+    force_ratio: 0.4
+  expect:
+    state: disintegrated
+- input:
+    tensile_strength: 0.0
+    centrifugal_force: 0.0
+    force_ratio: 1.0
+  expect:
+    state: critical
+- input:
+    tensile_strength: 110.0
+    centrifugal_force: 100.0
+    force_ratio: 1.1
+  expect:
+    state: thriving
+- input:
+    tensile_strength: 89.0
+    centrifugal_force: 100.0
+    force_ratio: 0.89
+  expect:
+    state: disintegrated
+- input:
+    tensile_strength: 50.0
+    centrifugal_force: 100.0
+    force_ratio: 0.5
+  expect:
+    state: disintegrated
+- input: {}
+  expect:
+    state: disintegrated

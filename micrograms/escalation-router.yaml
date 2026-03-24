@@ -1,0 +1,123 @@
+name: escalation-router
+description: 'Route by escalation flag and priority: IMMEDIATE (escalate+P1), URGENT (escalate+P2), QUEUE (no escalate)'
+version: 0.1.0
+interface:
+  inputs:
+    escalate:
+      type: bool
+      required: false
+    priority:
+      type: string
+      required: false
+  outputs:
+    channel:
+      type: string
+    route:
+      type: string
+    sla_minutes:
+      type: int
+tree:
+  start: escalate_check
+  nodes:
+    queue:
+      type: return
+      value:
+        channel: backlog
+        route: QUEUE
+        sla_minutes: 1440
+    priority_check:
+      type: condition
+      variable: priority
+      operator: lte
+      value: 1
+      true_next: immediate
+      false_next: urgent
+    urgent:
+      type: return
+      value:
+        sla_minutes: 60
+        route: URGENT
+        channel: slack
+    immediate:
+      type: return
+      value:
+        channel: pager
+        route: IMMEDIATE
+        sla_minutes: 15
+    escalate_check:
+      type: condition
+      variable: escalate
+      operator: eq
+      value: true
+      true_next: priority_check
+      false_next: queue
+tests:
+- input:
+    escalate: true
+    priority: 1
+  expect:
+    sla_minutes: 15
+    route: IMMEDIATE
+    channel: pager
+- input:
+    escalate: true
+    priority: 2
+  expect:
+    channel: slack
+    sla_minutes: 60
+    route: URGENT
+- input:
+    escalate: false
+    priority: 1
+  expect:
+    route: QUEUE
+    channel: backlog
+    sla_minutes: 1440
+- input:
+    priority: 4
+    escalate: false
+  expect:
+    sla_minutes: 1440
+    channel: backlog
+    route: QUEUE
+- input:
+    escalate: true
+    priority: 3
+  expect:
+    channel: slack
+    sla_minutes: 60
+    route: URGENT
+- input:
+    priority: 0
+  expect:
+    sla_minutes: 1440
+    channel: backlog
+    route: QUEUE
+- input:
+    priority: -1
+  expect:
+    route: QUEUE
+    channel: backlog
+    sla_minutes: 1440
+- input:
+    priority: 0
+  expect:
+    route: QUEUE
+    channel: backlog
+    sla_minutes: 1440
+- input:
+    priority: 100
+  expect:
+    sla_minutes: 1440
+    channel: backlog
+    route: QUEUE
+- input: {}
+  expect:
+    sla_minutes: 1440
+    channel: backlog
+    route: QUEUE
+- input: {}
+  expect:
+    channel: backlog
+    route: QUEUE
+    sla_minutes: 1440

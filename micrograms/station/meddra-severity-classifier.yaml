@@ -1,0 +1,145 @@
+name: meddra-severity-classifier
+description: Classifies adverse event severity based on MedDRA SOC, fatality status,
+  seriousness criteria (hospitalization, fatality). Assigns both clinical severity
+  and regulatory priority.
+version: 0.1.0
+interface:
+  inputs:
+    soc:
+      type: string
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    is_fatal:
+      type: bool
+      required: false
+    is_hospitalization:
+      type: bool
+      required: false
+  outputs:
+    severity:
+      type: string
+    priority:
+      type: string
+tree:
+  start: check_fatal
+  nodes:
+    check_fatal:
+      type: condition
+      variable: is_fatal
+      operator: eq
+      value: true
+      true_next: fatal_severity
+      false_next: check_hospitalization
+    fatal_severity:
+      type: return
+      value:
+        severity: fatal
+        priority: P0
+    check_hospitalization:
+      type: condition
+      variable: is_hospitalization
+      operator: eq
+      value: true
+      true_next: check_soc_severe
+      false_next: check_serious
+    check_soc_severe:
+      type: condition
+      variable: soc
+      operator: matches
+      value: Cardiac|Neoplasms|Immune|Nervous|Respiratory|Blood
+      true_next: severe_with_hospitalization
+      false_next: moderate_with_hospitalization
+    severe_with_hospitalization:
+      type: return
+      value:
+        severity: severe
+        priority: P1
+    moderate_with_hospitalization:
+      type: return
+      value:
+        severity: moderate
+        priority: P2
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_soc_serious
+      false_next: mild_severity
+    check_soc_serious:
+      type: condition
+      variable: soc
+      operator: matches
+      value: Cardiac|Neoplasms|Immune|Nervous|Respiratory|Blood
+      true_next: severe_non_hospitalized
+      false_next: moderate_non_hospitalized
+    severe_non_hospitalized:
+      type: return
+      value:
+        severity: severe
+        priority: P1
+    moderate_non_hospitalized:
+      type: return
+      value:
+        severity: moderate
+        priority: P2
+    mild_severity:
+      type: return
+      value:
+        severity: mild
+        priority: P3
+tests:
+- input:
+    is_fatal: false
+    is_hospitalization: false
+    is_serious: false
+    soc: Cardiac
+  expect:
+    severity: mild
+    priority: P3
+- input:
+    is_fatal: false
+    is_hospitalization: false
+    is_serious: true
+    soc: Cardiac
+  expect:
+    severity: severe
+    priority: P1
+- input:
+    is_fatal: false
+    is_hospitalization: false
+    is_serious: true
+    soc: ZZZZZ_NO_MATCH
+  expect:
+    severity: moderate
+    priority: P2
+- input:
+    is_fatal: false
+    is_hospitalization: true
+    is_serious: false
+    soc: Cardiac
+  expect:
+    severity: severe
+    priority: P1
+- input:
+    is_fatal: false
+    is_hospitalization: true
+    is_serious: false
+    soc: ZZZZZ_NO_MATCH
+  expect:
+    severity: moderate
+    priority: P2
+- input:
+    is_fatal: true
+    is_hospitalization: false
+    is_serious: false
+    soc: Cardiac
+  expect:
+    severity: fatal
+    priority: P0
+- input: {}
+  expect:
+    severity: mild
+    priority: P3

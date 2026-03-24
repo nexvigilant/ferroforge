@@ -1,0 +1,234 @@
+name: executive-impact
+description: "PDC: Validate L5+/L5++ executive impact metrics against quantitative thresholds"
+version: 0.1.0
+interface:
+  inputs:
+    countries_active:
+      type: int
+      required: false
+    mentees_count:
+      type: int
+      required: false
+    org_improvement_pct:
+      type: int
+      required: false
+    orgs_adopting:
+      type: int
+      required: false
+    orgs_leading_change:
+      type: int
+      required: false
+    regulatory_advisory_roles:
+      type: int
+      required: false
+    regulatory_guidances:
+      type: int
+      required: false
+    target_level:
+      type: int
+      required: false
+    value_created_millions:
+      type: int
+      required: false
+  outputs:
+    impact_class:
+      type: string
+    level:
+      type: string
+    message:
+      type: string
+    qualified:
+      type: bool
+    thresholds:
+      type: string
+    tier:
+      type: string
+tree:
+  start: check_target_level
+  nodes:
+    check_target_level:
+      type: condition
+      variable: target_level
+      operator: gte
+      value: 7
+      true_next: check_l5pp_orgs
+      false_next: check_l5p
+    check_l5p:
+      type: condition
+      variable: target_level
+      operator: eq
+      value: 6
+      true_next: check_l5p_improvement
+      false_next: not_executive
+    check_l5p_improvement:
+      type: condition
+      variable: org_improvement_pct
+      operator: gte
+      value: 20
+      true_next: check_l5p_adoption
+      false_next: l5p_gap
+    check_l5p_adoption:
+      type: condition
+      variable: orgs_adopting
+      operator: gte
+      value: 3
+      true_next: check_l5p_mentees
+      false_next: l5p_gap
+    check_l5p_mentees:
+      type: condition
+      variable: mentees_count
+      operator: gte
+      value: 50
+      true_next: check_l5p_value
+      false_next: l5p_gap
+    check_l5p_value:
+      type: condition
+      variable: value_created_millions
+      operator: gte
+      value: 10
+      true_next: check_l5p_countries
+      false_next: l5p_gap
+    check_l5p_countries:
+      type: condition
+      variable: countries_active
+      operator: gte
+      value: 3
+      true_next: l5p_qualified
+      false_next: l5p_gap
+    l5p_qualified:
+      type: return
+      value:
+        level: "L5+"
+        qualified: true
+        tier: SENIOR_EXPERT
+        impact_class: organizational_transformation
+    l5p_gap:
+      type: return
+      value:
+        level: "L5+"
+        qualified: false
+        tier: SENIOR_EXPERT
+        thresholds: "org_improvement>=20%, orgs_adopting>=3, mentees>=50, value>=$10M, countries>=3"
+    check_l5pp_orgs:
+      type: condition
+      variable: orgs_leading_change
+      operator: gte
+      value: 5
+      true_next: check_l5pp_regulatory
+      false_next: l5pp_gap
+    check_l5pp_regulatory:
+      type: condition
+      variable: regulatory_advisory_roles
+      operator: gte
+      value: 2
+      true_next: check_l5pp_value
+      false_next: l5pp_gap
+    check_l5pp_value:
+      type: condition
+      variable: value_created_millions
+      operator: gte
+      value: 100
+      true_next: check_l5pp_mentees
+      false_next: l5pp_gap
+    check_l5pp_mentees:
+      type: condition
+      variable: mentees_count
+      operator: gte
+      value: 200
+      true_next: check_l5pp_guidance
+      false_next: l5pp_gap
+    check_l5pp_guidance:
+      type: condition
+      variable: regulatory_guidances
+      operator: gte
+      value: 5
+      true_next: l5pp_qualified
+      false_next: l5pp_gap
+    l5pp_qualified:
+      type: return
+      value:
+        level: "L5++"
+        qualified: true
+        tier: EXECUTIVE_EXPERT
+        impact_class: industry_leadership
+    l5pp_gap:
+      type: return
+      value:
+        level: "L5++"
+        qualified: false
+        tier: EXECUTIVE_EXPERT
+        thresholds: "orgs_leading>=5, regulatory_roles>=2, value>=$100M, mentees>=200, guidances>=5"
+    not_executive:
+      type: return
+      value:
+        level: "below_executive"
+        qualified: false
+        message: "Executive impact metrics apply only to L5+ (6) and L5++ (7)"
+tests:
+- input:
+    target_level: 6
+    org_improvement_pct: 25
+    orgs_adopting: 4
+    mentees_count: 60
+    value_created_millions: 15
+    countries_active: 5
+  expect:
+    level: "L5+"
+    qualified: true
+    impact_class: organizational_transformation
+- input:
+    target_level: 6
+    org_improvement_pct: 15
+    orgs_adopting: 4
+    mentees_count: 60
+    value_created_millions: 15
+    countries_active: 5
+  expect:
+    level: "L5+"
+    qualified: false
+- input:
+    target_level: 6
+    org_improvement_pct: 25
+    orgs_adopting: 2
+    mentees_count: 60
+    value_created_millions: 15
+    countries_active: 5
+  expect:
+    qualified: false
+- input:
+    target_level: 7
+    orgs_leading_change: 6
+    regulatory_advisory_roles: 3
+    value_created_millions: 150
+    mentees_count: 250
+    regulatory_guidances: 8
+  expect:
+    level: "L5++"
+    qualified: true
+    impact_class: industry_leadership
+- input:
+    target_level: 7
+    orgs_leading_change: 4
+    regulatory_advisory_roles: 3
+    value_created_millions: 150
+    mentees_count: 250
+    regulatory_guidances: 8
+  expect:
+    qualified: false
+- input:
+    target_level: 7
+    orgs_leading_change: 6
+    regulatory_advisory_roles: 3
+    value_created_millions: 80
+    mentees_count: 250
+    regulatory_guidances: 8
+  expect:
+    qualified: false
+- input:
+    target_level: 5
+  expect:
+    qualified: false
+    level: below_executive
+- input: {}
+  expect:
+    qualified: false

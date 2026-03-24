@@ -1,0 +1,118 @@
+name: epa10-ai-validate
+description: "EPA 10: AI tool validation — routes by validation stage, risk level, and regulatory requirement."
+version: 0.1.0
+interface:
+  inputs:
+    ai_risk_level:
+      type: string
+      required: false
+    has_regulatory_submission:
+      type: bool
+      required: false
+  outputs:
+    approval_required:
+      type: string
+    documentation:
+      type: string
+    hitl:
+      type: string
+    human_oversight:
+      type: string
+    review_frequency:
+      type: string
+    steps:
+      type: string
+    validation_level:
+      type: string
+tree:
+  start: check_risk
+  nodes:
+    check_risk:
+      type: condition
+      variable: ai_risk_level
+      operator: eq
+      value: high
+      true_next: high_risk_validation
+      false_next: check_medium
+    check_medium:
+      type: condition
+      variable: ai_risk_level
+      operator: eq
+      value: medium
+      true_next: medium_risk_validation
+      false_next: low_risk_validation
+    high_risk_validation:
+      type: condition
+      variable: has_regulatory_submission
+      operator: eq
+      value: true
+      true_next: regulatory_validation
+      false_next: comprehensive_validation
+    regulatory_validation:
+      type: return
+      value:
+        validation_level: REGULATORY
+        steps: "protocol -> IQ -> OQ -> PQ -> UAT -> regulatory_submission -> ongoing_monitoring"
+        documentation: "full validation report, regulatory submission package"
+        human_oversight: mandatory
+        review_frequency: "continuous monitoring, quarterly review"
+        approval_required: "QA, regulatory, medical, executive"
+        hitl: APPROVE
+    comprehensive_validation:
+      type: return
+      value:
+        validation_level: COMPREHENSIVE
+        steps: "protocol -> IQ -> OQ -> PQ -> UAT -> deployment -> monitoring"
+        documentation: "full validation report, change control documentation"
+        human_oversight: mandatory
+        review_frequency: "monthly performance review"
+        approval_required: "QA, medical"
+        hitl: APPROVE
+    medium_risk_validation:
+      type: return
+      value:
+        validation_level: STANDARD
+        steps: "requirements -> testing -> UAT -> deployment -> monitoring"
+        documentation: "test report, user acceptance documentation"
+        human_oversight: required
+        review_frequency: "quarterly review"
+        approval_required: "QA"
+        hitl: REVIEW
+    low_risk_validation:
+      type: return
+      value:
+        validation_level: BASIC
+        steps: "requirements -> testing -> deployment -> monitoring"
+        documentation: "test summary, deployment record"
+        human_oversight: recommended
+        review_frequency: "semi-annual review"
+        approval_required: "team lead"
+        hitl: AUTO
+tests:
+- input:
+    ai_risk_level: high
+    has_regulatory_submission: true
+  expect:
+    validation_level: REGULATORY
+    hitl: APPROVE
+    human_oversight: mandatory
+- input:
+    ai_risk_level: high
+    has_regulatory_submission: false
+  expect:
+    validation_level: COMPREHENSIVE
+    hitl: APPROVE
+- input:
+    ai_risk_level: medium
+  expect:
+    validation_level: STANDARD
+    hitl: REVIEW
+- input:
+    ai_risk_level: low
+  expect:
+    validation_level: BASIC
+    hitl: AUTO
+- input: {}
+  expect:
+    validation_level: BASIC
+    hitl: AUTO

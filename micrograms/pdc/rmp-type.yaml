@@ -1,0 +1,130 @@
+name: rmp-type
+description: "Domain 11: Route to risk minimization measure type by risk severity, population scope, and regulatory requirement."
+version: 0.1.0
+interface:
+  inputs:
+    labeling_adequate:
+      type: bool
+      required: false
+    requires_rems:
+      type: bool
+      required: false
+    risk_severity:
+      type: int
+      required: false
+  outputs:
+    ai_assist:
+      type: string
+    behavioral:
+      type: string
+    components:
+      type: string
+    examples:
+      type: string
+    monitoring:
+      type: string
+    name:
+      type: string
+    regulatory:
+      type: string
+    type:
+      type: string
+tree:
+  start: check_rems
+  nodes:
+    check_rems:
+      type: condition
+      variable: requires_rems
+      operator: eq
+      value: true
+      true_next: rems
+      false_next: check_additional
+    check_additional:
+      type: condition
+      variable: risk_severity
+      operator: gte
+      value: 4
+      true_next: additional_measures
+      false_next: check_enhanced
+    check_enhanced:
+      type: condition
+      variable: risk_severity
+      operator: gte
+      value: 2
+      true_next: check_labeling_adequate
+      false_next: routine_only
+    check_labeling_adequate:
+      type: condition
+      variable: labeling_adequate
+      operator: eq
+      value: true
+      true_next: routine_only
+      false_next: enhanced_routine
+    rems:
+      type: return
+      value:
+        type: REMS
+        name: "Risk Evaluation and Mitigation Strategy (FDA)"
+        components: "medication guide, communication plan, ETASU (restricted distribution, prescriber certification, patient registry)"
+        regulatory: "FDA 21 USC 355-1"
+        monitoring: "REMS assessment at 18mo, 3yr, 7yr"
+        ai_assist: "adherence tracking, prescriber certification monitoring, patient outcome prediction"
+        examples: "iPLEDGE (isotretinoin), Clozapine REMS, opioid REMS"
+    additional_measures:
+      type: return
+      value:
+        type: ADDITIONAL_RMM
+        name: "Additional Risk Minimization Measures (EU RMP)"
+        components: "DHPC, educational materials, controlled access, patient card, HCP training"
+        regulatory: "EU GVP Module V, Module XVI"
+        monitoring: "effectiveness evaluation per PRAC requirements"
+        ai_assist: "distribution tracking, HCP engagement analytics, patient awareness measurement"
+        behavioral: "targets prescriber behavior, patient awareness, system safeguards"
+    enhanced_routine:
+      type: return
+      value:
+        type: ENHANCED_ROUTINE
+        name: "Enhanced Routine Risk Minimization"
+        components: "targeted SmPC/PIL updates, boxed warning, contraindication strengthening, dose guidance"
+        regulatory: "safety variation Type II"
+        monitoring: "PSUR/PBRER effectiveness section"
+        ai_assist: "labeling impact analysis, prescribing pattern monitoring"
+    routine_only:
+      type: return
+      value:
+        type: ROUTINE
+        name: "Routine Risk Minimization"
+        components: "SmPC, PIL, labeling, pack size optimization"
+        regulatory: "standard labeling requirements"
+        monitoring: "routine pharmacovigilance, PSUR review"
+        ai_assist: "automated signal monitoring, prescribing trend analysis"
+tests:
+- input:
+    requires_rems: true
+  expect:
+    type: REMS
+    regulatory: "FDA 21 USC 355-1"
+- input:
+    risk_severity: 5
+    requires_rems: false
+  expect:
+    type: ADDITIONAL_RMM
+- input:
+    risk_severity: 3
+    labeling_adequate: false
+    requires_rems: false
+  expect:
+    type: ENHANCED_ROUTINE
+- input:
+    risk_severity: 3
+    labeling_adequate: true
+    requires_rems: false
+  expect:
+    type: ROUTINE
+- input:
+    risk_severity: 1
+  expect:
+    type: ROUTINE
+- input: {}
+  expect:
+    type: ROUTINE

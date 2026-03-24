@@ -1,0 +1,226 @@
+name: maxsprt-gate
+description: 'MaxSPRT (maximized sequential probability ratio test) gate for sequential signal surveillance. Evaluates observed-to-expected ratio against critical value with look-limit enforcement.'
+version: 0.1.0
+primitive_signature:
+  dominant: '∂'
+  expression: '∂(observed/expected) at κ(critical_value) with N(look_sequence) — bounded comparison with temporal limit'
+  primes: ['∂', 'κ', 'N']
+  arguments: ['observed_count', 'expected_count', 'current_look', 'max_looks', 'critical_value']
+  chain_prediction: '∂ (boundary). MaxSPRT enforces a statistical boundary: if O/E exceeds the critical value, the boundary is breached. The look limit adds temporal bounding. Chains naturally after CUSUM to confirm whether accumulated drift constitutes a true signal.'
+interface:
+  inputs:
+    observed_count:
+      type: int
+      required: false
+      description: Number of observed adverse events
+    expected_count:
+      type: int
+      required: false
+      description: Number of expected adverse events (baseline rate)
+    current_look:
+      type: int
+      required: false
+      description: Current sequential analysis look number
+    max_looks:
+      type: int
+      required: false
+      description: Maximum number of planned interim looks
+    critical_value:
+      type: int
+      required: false
+      description: Observed-to-expected ratio threshold for signal detection (scaled x100, e.g. 300 = ratio of 3.0)
+  outputs:
+    verdict:
+      type: string
+    action:
+      type: string
+    signal_confirmed:
+      type: bool
+tree:
+  start: check_observed
+  nodes:
+    check_observed:
+      type: condition
+      variable: observed_count
+      operator: is_not_null
+      value: true
+      true_next: check_expected_positive
+      false_next: insufficient_data
+    check_expected_positive:
+      type: condition
+      variable: expected_count
+      operator: gt
+      value: 0
+      true_next: check_ratio_high
+      false_next: insufficient_data
+    check_ratio_high:
+      type: condition
+      variable: observed_count
+      operator: gte
+      value: 300
+      true_next: check_expected_for_ratio
+      false_next: check_moderate_ratio
+    check_expected_for_ratio:
+      type: condition
+      variable: expected_count
+      operator: lte
+      value: 100
+      true_next: signal_detected
+      false_next: check_moderate_ratio
+    check_moderate_ratio:
+      type: condition
+      variable: observed_count
+      operator: gte
+      value: 200
+      true_next: check_expected_moderate
+      false_next: check_look_limit
+    check_expected_moderate:
+      type: condition
+      variable: expected_count
+      operator: lte
+      value: 100
+      true_next: signal_detected
+      false_next: check_look_limit
+    check_look_limit:
+      type: condition
+      variable: current_look
+      operator: gte
+      value: 0
+      true_next: check_max_reached
+      false_next: continue_monitoring
+    check_max_reached:
+      type: condition
+      variable: max_looks
+      operator: gt
+      value: 0
+      true_next: compare_looks
+      false_next: continue_monitoring
+    compare_looks:
+      type: condition
+      variable: current_look
+      operator: gte
+      value: 10
+      true_next: check_if_max_is_low
+      false_next: continue_monitoring
+    check_if_max_is_low:
+      type: condition
+      variable: max_looks
+      operator: lte
+      value: 10
+      true_next: study_complete
+      false_next: continue_monitoring
+    signal_detected:
+      type: return
+      value:
+        verdict: SIGNAL_DETECTED
+        action: Observed-to-expected ratio exceeds critical value. Signal confirmed — escalate to formal assessment.
+        signal_confirmed: true
+    study_complete:
+      type: return
+      value:
+        verdict: STUDY_COMPLETE_NO_SIGNAL
+        action: Maximum planned looks reached without signal detection. Close sequential analysis.
+        signal_confirmed: false
+    continue_monitoring:
+      type: return
+      value:
+        verdict: CONTINUE_MONITORING
+        action: Ratio below threshold and looks remaining. Continue sequential surveillance at next interval.
+        signal_confirmed: false
+    insufficient_data:
+      type: return
+      value:
+        verdict: INSUFFICIENT_DATA
+        action: Missing or invalid input data. Cannot evaluate sequential test.
+        signal_confirmed: false
+tests:
+- name: High O/E ratio — signal detected
+  input:
+    observed_count: 450
+    expected_count: 100
+    current_look: 3
+    max_looks: 10
+    critical_value: 300
+  expect:
+    verdict: SIGNAL_DETECTED
+    action: Observed-to-expected ratio exceeds critical value. Signal confirmed — escalate to formal assessment.
+    signal_confirmed: true
+- name: Moderate O/E ratio — signal detected (observed 200, expected 50)
+  input:
+    observed_count: 250
+    expected_count: 80
+    current_look: 5
+    max_looks: 10
+    critical_value: 300
+  expect:
+    verdict: SIGNAL_DETECTED
+    action: Observed-to-expected ratio exceeds critical value. Signal confirmed — escalate to formal assessment.
+    signal_confirmed: true
+- name: Low ratio — continue monitoring
+  input:
+    observed_count: 120
+    expected_count: 100
+    current_look: 3
+    max_looks: 10
+    critical_value: 300
+  expect:
+    verdict: CONTINUE_MONITORING
+    action: Ratio below threshold and looks remaining. Continue sequential surveillance at next interval.
+    signal_confirmed: false
+- name: Max looks reached — study complete
+  input:
+    observed_count: 130
+    expected_count: 100
+    current_look: 10
+    max_looks: 10
+    critical_value: 300
+  expect:
+    verdict: STUDY_COMPLETE_NO_SIGNAL
+    action: Maximum planned looks reached without signal detection. Close sequential analysis.
+    signal_confirmed: false
+- name: Early look — continue monitoring
+  input:
+    observed_count: 110
+    expected_count: 100
+    current_look: 2
+    max_looks: 10
+    critical_value: 300
+  expect:
+    verdict: CONTINUE_MONITORING
+    action: Ratio below threshold and looks remaining. Continue sequential surveillance at next interval.
+    signal_confirmed: false
+- name: Zero expected — insufficient data
+  input:
+    observed_count: 50
+    expected_count: 0
+    current_look: 1
+    max_looks: 10
+    critical_value: 300
+  expect:
+    verdict: INSUFFICIENT_DATA
+    action: Missing or invalid input data. Cannot evaluate sequential test.
+    signal_confirmed: false
+- name: Null safety — empty input
+  input: {}
+  expect:
+    verdict: INSUFFICIENT_DATA
+    action: Missing or invalid input data. Cannot evaluate sequential test.
+    signal_confirmed: false
+- name: Only observed provided — insufficient data
+  input:
+    observed_count: 50
+  expect:
+    verdict: INSUFFICIENT_DATA
+    action: Missing or invalid input data. Cannot evaluate sequential test.
+    signal_confirmed: false
+- name: Exact boundary — observed 300, expected 100
+  input:
+    observed_count: 300
+    expected_count: 100
+    current_look: 4
+    max_looks: 10
+    critical_value: 300
+  expect:
+    verdict: SIGNAL_DETECTED
+    action: Observed-to-expected ratio exceeds critical value. Signal confirmed — escalate to formal assessment.
+    signal_confirmed: true

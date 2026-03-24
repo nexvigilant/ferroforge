@@ -1,0 +1,130 @@
+name: gyroscopic-stability
+description: 'Flywheel gyroscopic stability classifier. STABLE (ratio > 2.0), PRECESSING (ratio 1.0-2.0), GIMBAL_LOCK (ratio <= 1.0), NO_STABILITY (|L| < critical). Requires pre-computed momentum_below_critical (1=below, 0=at-or-above) and stability_ratio = |L|/|perturbation| (use 999.0 for zero perturbation).'
+version: 0.1.0
+interface:
+  inputs:
+    momentum_L:
+      type: float
+      required: false
+    perturbation_torque:
+      type: float
+      required: false
+    critical_momentum:
+      type: float
+      required: false
+    momentum_below_critical:
+      type: int
+      required: false
+    stability_ratio:
+      type: float
+      required: false
+  outputs:
+    state:
+      type: string
+    score:
+      type: float
+tree:
+  start: check_below_critical
+  nodes:
+    check_below_critical:
+      type: condition
+      variable: momentum_below_critical
+      operator: gte
+      value: 1
+      true_next: no_stability
+      false_next: check_stable
+    check_stable:
+      type: condition
+      variable: stability_ratio
+      operator: gt
+      value: 2.0
+      true_next: stable
+      false_next: check_precessing
+    check_precessing:
+      type: condition
+      variable: stability_ratio
+      operator: gt
+      value: 1.0
+      true_next: precessing
+      false_next: gimbal_lock
+    no_stability:
+      type: return
+      value:
+        state: no_stability
+        score: 0.0
+    stable:
+      type: return
+      value:
+        state: stable
+        score: 0.9
+    precessing:
+      type: return
+      value:
+        state: precessing
+        score: 0.5
+    gimbal_lock:
+      type: return
+      value:
+        state: gimbal_lock
+        score: 0.0
+tests:
+- input:
+    momentum_L: 100.0
+    perturbation_torque: 10.0
+    critical_momentum: 50.0
+    momentum_below_critical: 0
+    stability_ratio: 10.0
+  expect:
+    state: stable
+- input:
+    momentum_L: 10.0
+    perturbation_torque: 5.0
+    critical_momentum: 50.0
+    momentum_below_critical: 1
+    stability_ratio: 2.0
+  expect:
+    state: no_stability
+- input:
+    momentum_L: 50.0
+    perturbation_torque: 100.0
+    critical_momentum: 20.0
+    momentum_below_critical: 0
+    stability_ratio: 0.5
+  expect:
+    state: gimbal_lock
+- input:
+    momentum_L: 100.0
+    perturbation_torque: 0.0
+    critical_momentum: 50.0
+    momentum_below_critical: 0
+    stability_ratio: 999.0
+  expect:
+    state: stable
+- input:
+    momentum_L: 100.0
+    perturbation_torque: 60.0
+    critical_momentum: 50.0
+    momentum_below_critical: 0
+    stability_ratio: 1.67
+  expect:
+    state: precessing
+- input:
+    momentum_L: 50.0
+    perturbation_torque: 20.0
+    critical_momentum: 50.0
+    momentum_below_critical: 0
+    stability_ratio: 2.5
+  expect:
+    state: stable
+- input:
+    momentum_L: 30.0
+    perturbation_torque: 25.0
+    critical_momentum: 20.0
+    momentum_below_critical: 0
+    stability_ratio: 1.2
+  expect:
+    state: precessing
+- input: {}
+  expect:
+    score: 0.0
+    state: gimbal_lock

@@ -1,0 +1,223 @@
+name: harm-to-signal-priority
+description: Translates harm classification and event traffic levels into signal priority dimensions. Bridges risk-harm-classifier, event-aggregate-classifier, signal-count-classifier, and drift-direction-classifier outputs into signal-priority inputs.
+version: 0.1.0
+tree:
+  start: check_harm_lethal
+  nodes:
+    severe_low_traffic:
+      type: return
+      value:
+        frequency: LOW
+        mortality_risk: false
+        priority_rationale: Severe harm but low frequency — monitor for trend changes
+        severity: HIGH
+        affects_vulnerable_population: true
+    moderate_low_traffic:
+      type: return
+      value:
+        priority_rationale: Moderate harm, low frequency — standard monitoring
+        severity: MODERATE
+        mortality_risk: false
+        frequency: LOW
+        affects_vulnerable_population: false
+    mild_high_traffic:
+      type: return
+      value:
+        mortality_risk: false
+        severity: LOW
+        priority_rationale: Mild harm but high volume — review for quality-of-life impact
+        affects_vulnerable_population: false
+        frequency: HIGH
+    check_harm_severe:
+      type: condition
+      variable: harm_level
+      operator: eq
+      value: SEVERE
+      true_next: check_severe_traffic
+      false_next: check_harm_moderate
+    check_harm_moderate:
+      type: condition
+      variable: harm_level
+      operator: eq
+      value: MODERATE
+      true_next: check_moderate_traffic
+      false_next: check_mild_traffic
+    severe_high_traffic:
+      type: return
+      value:
+        severity: HIGH
+        mortality_risk: false
+        affects_vulnerable_population: true
+        priority_rationale: Severe harm with high event frequency — urgent signal evaluation
+        frequency: HIGH
+    lethal_harm:
+      type: return
+      value:
+        severity: CRITICAL
+        frequency: HIGH
+        affects_vulnerable_population: true
+        priority_rationale: Lethal harm — immediate signal priority regardless of frequency
+        mortality_risk: true
+    mild_low_traffic:
+      type: return
+      value:
+        affects_vulnerable_population: false
+        mortality_risk: false
+        frequency: LOW
+        severity: LOW
+        priority_rationale: Low severity and frequency — routine monitoring
+    moderate_high_traffic:
+      type: return
+      value:
+        affects_vulnerable_population: false
+        priority_rationale: Moderate harm with high volume — aggregate risk warrants attention
+        mortality_risk: false
+        severity: MODERATE
+        frequency: HIGH
+    check_mild_traffic:
+      type: condition
+      variable: traffic_level
+      operator: eq
+      value: HIGH
+      true_next: mild_high_traffic
+      false_next: mild_low_traffic
+    check_harm_lethal:
+      type: condition
+      variable: harm_level
+      operator: eq
+      value: LETHAL
+      true_next: lethal_harm
+      false_next: check_harm_severe
+    check_severe_traffic:
+      type: condition
+      variable: traffic_level
+      operator: eq
+      value: HIGH
+      true_next: severe_high_traffic
+      false_next: severe_low_traffic
+    check_moderate_traffic:
+      type: condition
+      variable: traffic_level
+      operator: eq
+      value: HIGH
+      true_next: moderate_high_traffic
+      false_next: moderate_low_traffic
+tests:
+- input:
+    traffic_level: HIGH
+    harm_level: LETHAL
+  expect:
+    frequency: HIGH
+    severity: CRITICAL
+    mortality_risk: true
+- input:
+    harm_level: LETHAL
+    traffic_level: LOW
+  expect:
+    mortality_risk: true
+    severity: CRITICAL
+- input:
+    traffic_level: HIGH
+    harm_level: SEVERE
+  expect:
+    severity: HIGH
+    mortality_risk: false
+    frequency: HIGH
+- input:
+    harm_level: SEVERE
+    traffic_level: LOW
+  expect:
+    frequency: LOW
+    severity: HIGH
+- input:
+    traffic_level: HIGH
+    harm_level: MODERATE
+  expect:
+    severity: MODERATE
+    frequency: HIGH
+- input:
+    harm_level: MODERATE
+    traffic_level: LOW
+  expect:
+    severity: MODERATE
+    frequency: LOW
+- input:
+    harm_level: MILD
+    traffic_level: HIGH
+  expect:
+    severity: LOW
+    frequency: HIGH
+- input:
+    traffic_level: LOW
+    harm_level: MILD
+  expect:
+    severity: LOW
+    mortality_risk: false
+    frequency: LOW
+- input: {}
+  expect:
+    frequency: LOW
+    affects_vulnerable_population: false
+    severity: LOW
+    priority_rationale: Low severity and frequency — routine monitoring
+    mortality_risk: false
+- input: {}
+  expect:
+    frequency: LOW
+    priority_rationale: Low severity and frequency — routine monitoring
+    severity: LOW
+    affects_vulnerable_population: false
+    mortality_risk: false
+- input: {}
+  expect:
+    mortality_risk: false
+    severity: LOW
+    priority_rationale: Low severity and frequency — routine monitoring
+    frequency: LOW
+    affects_vulnerable_population: false
+- input: {}
+  expect:
+    affects_vulnerable_population: false
+    mortality_risk: false
+    severity: LOW
+    priority_rationale: Low severity and frequency — routine monitoring
+    frequency: LOW
+- input: {}
+  expect:
+    affects_vulnerable_population: false
+    mortality_risk: false
+    severity: LOW
+    frequency: LOW
+    priority_rationale: Low severity and frequency — routine monitoring
+- input: {}
+  expect:
+    priority_rationale: Low severity and frequency — routine monitoring
+    frequency: LOW
+    mortality_risk: false
+    affects_vulnerable_population: false
+    severity: LOW
+interface:
+  inputs:
+    traffic_level:
+      type: string
+      required: false
+    harm_level:
+      type: string
+      required: true
+  outputs:
+    affects_vulnerable_population:
+      type: bool
+      required: true
+    severity:
+      type: string
+      required: true
+    priority_rationale:
+      type: string
+      required: true
+    mortality_risk:
+      type: bool
+      required: true
+    frequency:
+      type: string
+      required: true
+  aliases: {}

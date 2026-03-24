@@ -1,0 +1,70 @@
+name: velocity-check
+description: 'Flywheel velocity classifier: ACCELERATING (nodes_wired_this_session>=2), STEADY (=1), STALLED (=0)'
+version: 0.1.0
+interface:
+  inputs:
+    nodes_wired:
+      type: int
+      required: false
+  outputs:
+    momentum:
+      type: string
+    velocity:
+      type: string
+tree:
+  start: check_accelerating
+  nodes:
+    check_accelerating:
+      type: condition
+      variable: nodes_wired
+      operator: gte
+      value: 2
+      true_next: accelerating
+      false_next: check_steady
+    check_steady:
+      type: condition
+      variable: nodes_wired
+      operator: gte
+      value: 1
+      true_next: steady
+      false_next: stalled
+    accelerating:
+      type: return
+      value:
+        velocity: ACCELERATING
+        momentum: high
+    steady:
+      type: return
+      value:
+        velocity: STEADY
+        momentum: normal
+    stalled:
+      type: return
+      value:
+        velocity: STALLED
+        momentum: zero
+tests:
+- input:
+    nodes_wired: 5
+  expect:
+    velocity: ACCELERATING
+    momentum: high
+- input:
+    nodes_wired: 2
+  expect:
+    velocity: ACCELERATING
+    momentum: high
+- input:
+    nodes_wired: 1
+  expect:
+    velocity: STEADY
+    momentum: normal
+- input:
+    nodes_wired: 0
+  expect:
+    velocity: STALLED
+    momentum: zero
+- input: {}
+  expect:
+    momentum: zero
+    velocity: STALLED

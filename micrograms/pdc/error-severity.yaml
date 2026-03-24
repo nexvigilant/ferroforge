@@ -1,0 +1,158 @@
+name: error-severity
+description: "Domain 6: Grade medication error outcome severity — near miss through fatal. Returns NCC MERP category, action, and investigation level."
+version: 0.1.0
+interface:
+  inputs:
+    caused_harm:
+      type: bool
+      required: false
+    is_fatal:
+      type: bool
+      required: false
+    is_permanent:
+      type: bool
+      required: false
+    reached_patient:
+      type: bool
+      required: false
+  outputs:
+    action:
+      type: string
+    harm_level:
+      type: string
+    investigation:
+      type: string
+    just_culture:
+      type: string
+    ncc_merp:
+      type: string
+    rca_required:
+      type: bool
+    reporting:
+      type: string
+    severity:
+      type: string
+tree:
+  start: check_reached_patient
+  nodes:
+    check_reached_patient:
+      type: condition
+      variable: reached_patient
+      operator: eq
+      value: false
+      true_next: near_miss
+      false_next: check_harm
+    check_harm:
+      type: condition
+      variable: caused_harm
+      operator: eq
+      value: false
+      true_next: no_harm
+      false_next: check_permanent
+    check_permanent:
+      type: condition
+      variable: is_permanent
+      operator: eq
+      value: true
+      true_next: check_fatal
+      false_next: temporary_harm
+    check_fatal:
+      type: condition
+      variable: is_fatal
+      operator: eq
+      value: true
+      true_next: fatal
+      false_next: permanent_harm
+    near_miss:
+      type: return
+      value:
+        severity: NEAR_MISS
+        ncc_merp: "Category A-B"
+        harm_level: none
+        investigation: TRENDING
+        action: "document, analyze for system learning, track trends"
+        rca_required: false
+        reporting: "internal voluntary, aggregate analysis"
+        just_culture: "celebrate the catch — system worked"
+    no_harm:
+      type: return
+      value:
+        severity: NO_HARM
+        ncc_merp: "Category C-D"
+        harm_level: none
+        investigation: BASIC
+        action: "document, brief analysis, consider system factors"
+        rca_required: false
+        reporting: "internal mandatory, consider external reporting"
+        just_culture: "learning opportunity — what let the error through?"
+    temporary_harm:
+      type: return
+      value:
+        severity: TEMPORARY_HARM
+        ncc_merp: "Category E-F"
+        harm_level: reversible
+        investigation: COMPREHENSIVE
+        action: "patient care intervention, RCA, corrective action plan"
+        rca_required: true
+        reporting: "internal mandatory, external regulatory reporting"
+        just_culture: "system investigation — identify root causes, not blame"
+    permanent_harm:
+      type: return
+      value:
+        severity: PERMANENT_HARM
+        ncc_merp: "Category G-H"
+        harm_level: irreversible
+        investigation: FULL_RCA
+        action: "immediate patient care, comprehensive RCA, CAPA, leadership review"
+        rca_required: true
+        reporting: "internal mandatory, regulatory reporting, sentinel event notification"
+        just_culture: "full system analysis — human error vs at-risk vs reckless"
+    fatal:
+      type: return
+      value:
+        severity: FATAL
+        ncc_merp: "Category I"
+        harm_level: death
+        investigation: SENTINEL_EVENT
+        action: "immediate leadership notification, comprehensive RCA, regulatory report, family disclosure"
+        rca_required: true
+        reporting: "internal mandatory, regulatory expedited, sentinel event, accreditation body"
+        just_culture: "comprehensive review — protect staff, fix system, honor patient"
+tests:
+- input:
+    reached_patient: false
+  expect:
+    severity: NEAR_MISS
+    rca_required: false
+- input:
+    reached_patient: true
+    caused_harm: false
+  expect:
+    severity: NO_HARM
+    ncc_merp: "Category C-D"
+- input:
+    reached_patient: true
+    caused_harm: true
+    is_permanent: false
+  expect:
+    severity: TEMPORARY_HARM
+    rca_required: true
+- input:
+    reached_patient: true
+    caused_harm: true
+    is_permanent: true
+    is_fatal: false
+  expect:
+    severity: PERMANENT_HARM
+    investigation: FULL_RCA
+- input:
+    reached_patient: true
+    caused_harm: true
+    is_permanent: true
+    is_fatal: true
+  expect:
+    severity: FATAL
+    investigation: SENTINEL_EVENT
+- input: {}
+  expect:
+    severity: TEMPORARY_HARM

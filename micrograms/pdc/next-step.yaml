@@ -1,0 +1,179 @@
+name: next-step
+description: "Management: given current level and career goal, recommend the single next development action."
+version: 0.1.0
+interface:
+  inputs:
+    ai_interested:
+      type: bool
+      required: false
+    current_level:
+      type: int
+      required: false
+    has_mentees:
+      type: bool
+      required: false
+  outputs:
+    epa_focus:
+      type: string
+    next_action:
+      type: string
+    program:
+      type: string
+    timeline:
+      type: string
+    tip:
+      type: string
+    why:
+      type: string
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: current_level
+      operator: is_null
+      value: null
+      true_next: start_foundations
+      false_next: check_level
+    check_level:
+      type: condition
+      variable: current_level
+      operator: lte
+      value: 1
+      true_next: start_foundations
+      false_next: check_l2
+    check_l2:
+      type: condition
+      variable: current_level
+      operator: eq
+      value: 2
+      true_next: build_independence
+      false_next: check_l3
+    check_l3:
+      type: condition
+      variable: current_level
+      operator: eq
+      value: 3
+      true_next: check_ai_interest
+      false_next: check_l4
+    check_l4:
+      type: condition
+      variable: current_level
+      operator: eq
+      value: 4
+      true_next: check_leadership_ready
+      false_next: expert_path
+    check_ai_interest:
+      type: condition
+      variable: ai_interested
+      operator: eq
+      value: true
+      true_next: start_ai_gateway
+      false_next: deepen_expertise
+    check_leadership_ready:
+      type: condition
+      variable: has_mentees
+      operator: eq
+      value: true
+      true_next: pursue_expert
+      false_next: start_mentoring
+    start_foundations:
+      type: return
+      value:
+        next_action: "Complete foundational domains (D1-D3) to L2"
+        why: "You need the basics before anything else. Focus on terminology, concepts, and observation."
+        program: APPE_ROTATION
+        epa_focus: "EPA 1 (observe case processing)"
+        timeline: "6 weeks"
+        tip: "Watch experienced professionals work. Ask questions. Write down what you learn."
+    build_independence:
+      type: return
+      value:
+        next_action: "Achieve L3 in your primary CPA domains"
+        why: "You can handle routine work. Now push for independent practice on complex cases."
+        program: FELLOWSHIP_12
+        epa_focus: "EPA 1-3 (case processing, literature, communication)"
+        timeline: "6-12 months"
+        tip: "Take on progressively harder cases. When you feel uncomfortable, that is where growth happens."
+    start_ai_gateway:
+      type: return
+      value:
+        next_action: "Enter EPA 10 AI Gateway — Phase 2 (Application)"
+        why: "You are independent in your domains. AI skills will multiply your impact."
+        program: "EPA10 development pathway"
+        epa_focus: "EPA 10 (AI tools implementation)"
+        timeline: "6 months"
+        tip: "Start using AI tools in your daily work. Validate every output. Learn the limitations."
+    deepen_expertise:
+      type: return
+      value:
+        next_action: "Achieve L4 in your primary CPA domains"
+        why: "Independent is good. Innovative is better. Lead a process improvement project."
+        program: FELLOWSHIP_18
+        epa_focus: "EPA 5-8 (signal detection, regulatory, risk, investigations)"
+        timeline: "6-12 months"
+        tip: "Find something that bothers you about the current process. Fix it. Document the improvement."
+    start_mentoring:
+      type: return
+      value:
+        next_action: "Begin mentoring junior professionals"
+        why: "Teaching is the fastest path to mastery. You will learn what you actually know."
+        program: "Mentoring program"
+        epa_focus: "EPA 8-9 (cross-functional leadership, quality systems)"
+        timeline: "ongoing"
+        tip: "Pick one person. Meet weekly. Help them through their current challenge."
+    pursue_expert:
+      type: return
+      value:
+        next_action: "Publish or present your innovations externally"
+        why: "You innovate and you mentor. Now share with the field. That is L5."
+        program: SMP
+        epa_focus: "EPA 11-15 (executive EPAs)"
+        timeline: "1-2 years"
+        tip: "Submit an abstract to a PV conference. Write up your best process improvement as a paper."
+    expert_path:
+      type: return
+      value:
+        next_action: "Lead organizational transformation"
+        why: "You are recognized as expert. Now transform your organization and influence the industry."
+        program: "Executive development"
+        epa_focus: "EPA 16-20 (crisis, leadership, partnerships, public perception, transformation)"
+        timeline: "ongoing"
+        tip: "What would PV look like if you could redesign it? Start building that vision."
+tests:
+- input:
+    current_level: 1
+  expect:
+    program: APPE_ROTATION
+    timeline: "6 weeks"
+- input:
+    current_level: 2
+  expect:
+    program: FELLOWSHIP_12
+- input:
+    current_level: 3
+    ai_interested: true
+  expect:
+    epa_focus: "EPA 10 (AI tools implementation)"
+- input:
+    current_level: 3
+    ai_interested: false
+  expect:
+    program: FELLOWSHIP_18
+- input:
+    current_level: 4
+    has_mentees: false
+  expect:
+    next_action: "Begin mentoring junior professionals"
+- input:
+    current_level: 4
+    has_mentees: true
+  expect:
+    program: SMP
+- input:
+    current_level: 5
+  expect:
+    program: "Executive development"
+- input: {}
+  expect:
+    program: APPE_ROTATION

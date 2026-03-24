@@ -1,0 +1,128 @@
+name: momentum-tracker
+description: 'Detect flywheel momentum from current vs previous velocity (ms). ACCELERATING (current < previous * 0.9), MAINTAINING (within 10%), DECELERATING (current > previous * 1.1). Velocity is inverse: lower ms = faster.'
+version: 0.1.0
+interface:
+  inputs:
+    previous_velocity_ms:
+      type: int
+      required: false
+    velocity_ratio_pct:
+      type: int
+      required: false
+  outputs:
+    action:
+      type: string
+    momentum:
+      type: string
+    trend:
+      type: string
+tree:
+  start: check_first_reading
+  nodes:
+    check_first_reading:
+      type: condition
+      variable: previous_velocity_ms
+      operator: eq
+      value: 0
+      true_next: baseline
+      false_next: compute_ratio
+    compute_ratio:
+      type: condition
+      variable: velocity_ratio_pct
+      operator: lt
+      value: 90
+      true_next: accelerating
+      false_next: check_maintaining
+    check_maintaining:
+      type: condition
+      variable: velocity_ratio_pct
+      operator: lte
+      value: 110
+      true_next: maintaining
+      false_next: decelerating
+    baseline:
+      type: return
+      value:
+        momentum: BASELINE
+        trend: establishing
+        action: collect_data
+    accelerating:
+      type: return
+      value:
+        momentum: ACCELERATING
+        trend: improving
+        action: sustain
+    maintaining:
+      type: return
+      value:
+        momentum: MAINTAINING
+        trend: stable
+        action: none
+    decelerating:
+      type: return
+      value:
+        momentum: DECELERATING
+        trend: degrading
+        action: diagnose
+tests:
+- input:
+    previous_velocity_ms: 0
+    velocity_ratio_pct: 100
+  expect:
+    momentum: BASELINE
+    trend: establishing
+    action: collect_data
+- input:
+    previous_velocity_ms: 86400000
+    velocity_ratio_pct: 50
+  expect:
+    momentum: ACCELERATING
+    trend: improving
+    action: sustain
+- input:
+    previous_velocity_ms: 86400000
+    velocity_ratio_pct: 89
+  expect:
+    momentum: ACCELERATING
+    trend: improving
+    action: sustain
+- input:
+    previous_velocity_ms: 86400000
+    velocity_ratio_pct: 90
+  expect:
+    momentum: MAINTAINING
+    trend: stable
+    action: none
+- input:
+    previous_velocity_ms: 86400000
+    velocity_ratio_pct: 100
+  expect:
+    momentum: MAINTAINING
+    trend: stable
+    action: none
+- input:
+    previous_velocity_ms: 86400000
+    velocity_ratio_pct: 110
+  expect:
+    momentum: MAINTAINING
+    trend: stable
+    action: none
+- input:
+    previous_velocity_ms: 86400000
+    velocity_ratio_pct: 111
+  expect:
+    momentum: DECELERATING
+    trend: degrading
+    action: diagnose
+- input:
+    previous_velocity_ms: 86400000
+    velocity_ratio_pct: 200
+  expect:
+    momentum: DECELERATING
+    trend: degrading
+    action: diagnose
+- input: {}
+  expect:
+    action: diagnose
+    momentum: DECELERATING
+    trend: degrading

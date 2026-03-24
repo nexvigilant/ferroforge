@@ -1,0 +1,183 @@
+name: program-gate
+description: "PDC: Route program type by entry level and duration to exit level range"
+version: 0.1.0
+interface:
+  inputs:
+    duration_months:
+      type: int
+      required: false
+    entry_level:
+      type: int
+      required: false
+  outputs:
+    domains_focus:
+      type: string
+    duration_months:
+      type: string
+    duration_weeks:
+      type: int
+    exit_level_max:
+      type: int
+    exit_level_min:
+      type: int
+    focus:
+      type: string
+    program:
+      type: string
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: entry_level
+      operator: is_null
+      value: null
+      true_next: appe_rotation
+      false_next: check_entry
+    check_entry:
+      type: condition
+      variable: entry_level
+      operator: lte
+      value: 2
+      true_next: check_duration_early
+      false_next: check_entry_mid
+    check_entry_mid:
+      type: condition
+      variable: entry_level
+      operator: lte
+      value: 3
+      true_next: fellowship_18
+      false_next: check_entry_advanced
+    check_entry_advanced:
+      type: condition
+      variable: entry_level
+      operator: eq
+      value: 4
+      true_next: smp_program
+      false_next: executive_track
+    check_duration_early:
+      type: condition
+      variable: duration_months
+      operator: lte
+      value: 2
+      true_next: appe_rotation
+      false_next: check_duration_12
+    check_duration_12:
+      type: condition
+      variable: duration_months
+      operator: lte
+      value: 12
+      true_next: fellowship_12
+      false_next: check_duration_18
+    check_duration_18:
+      type: condition
+      variable: duration_months
+      operator: lte
+      value: 18
+      true_next: fellowship_18
+      false_next: fellowship_24
+    appe_rotation:
+      type: return
+      value:
+        program: APPE_ROTATION
+        duration_weeks: 6
+        exit_level_min: 1
+        exit_level_max: 2
+        domains_focus: "1-3"
+        focus: "foundational_exposure"
+    fellowship_12:
+      type: return
+      value:
+        program: FELLOWSHIP_12
+        duration_months: 12
+        exit_level_min: 2
+        exit_level_max: 3
+        domains_focus: "1-15"
+        focus: "core_competency"
+    fellowship_18:
+      type: return
+      value:
+        program: FELLOWSHIP_18
+        duration_months: 18
+        exit_level_min: 3
+        exit_level_max: 4
+        domains_focus: "1-15"
+        focus: "advanced_competency"
+    fellowship_24:
+      type: return
+      value:
+        program: FELLOWSHIP_24
+        duration_months: 24
+        exit_level_min: 4
+        exit_level_max: 5
+        domains_focus: "1-15"
+        focus: "mastery_preparation"
+    smp_program:
+      type: return
+      value:
+        program: SMP
+        duration_months: 0
+        exit_level_min: 5
+        exit_level_max: 6
+        domains_focus: "1-15"
+        focus: "executive_leadership"
+    executive_track:
+      type: return
+      value:
+        program: EXECUTIVE
+        duration_months: 0
+        exit_level_min: 6
+        exit_level_max: 7
+        domains_focus: "1-15"
+        focus: "organizational_transformation"
+tests:
+- input:
+    entry_level: 0
+    duration_months: 1
+  expect:
+    program: APPE_ROTATION
+    exit_level_min: 1
+    exit_level_max: 2
+- input:
+    entry_level: 1
+    duration_months: 1
+  expect:
+    program: APPE_ROTATION
+    duration_weeks: 6
+- input:
+    entry_level: 2
+    duration_months: 12
+  expect:
+    program: FELLOWSHIP_12
+    exit_level_min: 2
+    exit_level_max: 3
+- input:
+    entry_level: 2
+    duration_months: 18
+  expect:
+    program: FELLOWSHIP_18
+    exit_level_min: 3
+    exit_level_max: 4
+- input:
+    entry_level: 1
+    duration_months: 24
+  expect:
+    program: FELLOWSHIP_24
+    exit_level_min: 4
+    exit_level_max: 5
+- input:
+    entry_level: 4
+    duration_months: 0
+  expect:
+    program: SMP
+    exit_level_min: 5
+    exit_level_max: 6
+- input:
+    entry_level: 5
+    duration_months: 0
+  expect:
+    program: EXECUTIVE
+    focus: organizational_transformation
+- input: {}
+  expect:
+    program: APPE_ROTATION

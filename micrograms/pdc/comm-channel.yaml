@@ -1,0 +1,147 @@
+name: comm-channel
+description: "Domain 14: Route to communication channel and approach by stakeholder type — regulatory, HCP, patient, internal, partner."
+version: 0.1.0
+interface:
+  inputs:
+    stakeholder:
+      type: string
+      required: false
+  outputs:
+    ai_assist:
+      type: string
+    approach:
+      type: string
+    channel:
+      type: string
+    format:
+      type: string
+    key_principle:
+      type: string
+    literacy:
+      type: string
+    primary:
+      type: string
+    tone:
+      type: string
+tree:
+  start: check_stakeholder
+  nodes:
+    check_stakeholder:
+      type: condition
+      variable: stakeholder
+      operator: eq
+      value: regulatory
+      true_next: regulatory
+      false_next: check_hcp
+    check_hcp:
+      type: condition
+      variable: stakeholder
+      operator: eq
+      value: hcp
+      true_next: hcp
+      false_next: check_patient
+    check_patient:
+      type: condition
+      variable: stakeholder
+      operator: eq
+      value: patient
+      true_next: patient
+      false_next: check_internal
+    check_internal:
+      type: condition
+      variable: stakeholder
+      operator: eq
+      value: internal
+      true_next: internal
+      false_next: check_media
+    check_media:
+      type: condition
+      variable: stakeholder
+      operator: eq
+      value: media
+      true_next: media
+      false_next: general
+    regulatory:
+      type: return
+      value:
+        channel: REGULATORY
+        primary: "formal submission, scientific advice meeting, regulatory correspondence"
+        tone: "scientific, precise, evidence-based, regulatory language"
+        format: "structured regulatory documents (PSUR/PBRER, DSUR, safety variations)"
+        literacy: expert
+        ai_assist: "NLP document preparation, consistency checking, submission optimization"
+        key_principle: "accuracy and completeness above all — regulators need full picture"
+    hcp:
+      type: return
+      value:
+        channel: HEALTHCARE_PROVIDER
+        primary: "DHPC, medical letter, continuing education, clinical decision support"
+        tone: "clinical, actionable, evidence-based, peer-to-peer"
+        format: "clinical summaries, prescribing guidance, safety alerts"
+        literacy: expert
+        ai_assist: "personalized alerts, CDS integration, prescriber behavior analytics"
+        key_principle: "actionable — tell them exactly what to do differently"
+    patient:
+      type: return
+      value:
+        channel: PATIENT
+        primary: "PIL, patient guide, website, patient portal, helpline"
+        tone: "empathetic, clear, reassuring without minimizing, empowering"
+        format: "plain language (6th-8th grade reading level), visual aids, FAQs"
+        literacy: "variable — assume low health literacy, test comprehension"
+        ai_assist: "NLG for plain language, readability scoring, translation, chatbot"
+        key_principle: "clarity and empathy — patients need to understand AND feel supported"
+    internal:
+      type: return
+      value:
+        channel: INTERNAL
+        primary: "executive briefing, cross-functional update, training, intranet"
+        tone: "business-focused, concise, action-oriented"
+        format: "executive summary, dashboard, decision brief, training materials"
+        literacy: "mixed — adapt to audience level"
+        ai_assist: "automated dashboards, sentiment analysis, training optimization"
+        key_principle: "so what? — every internal comm must answer why it matters to THEM"
+    media:
+      type: return
+      value:
+        channel: MEDIA
+        primary: "press release, media statement, spokesperson briefing"
+        tone: "transparent, measured, factual, prepared for follow-up"
+        format: "short statements, Q&A preparation, background briefing"
+        literacy: general_public
+        ai_assist: "media monitoring, sentiment tracking, crisis detection"
+        key_principle: "never speculate — stick to facts, prepare for worst-case questions"
+    general:
+      type: return
+      value:
+        channel: GENERAL
+        approach: "identify stakeholder type first, then select appropriate channel and tone"
+        key_principle: "know your audience before you write a single word"
+tests:
+- input:
+    stakeholder: regulatory
+  expect:
+    channel: REGULATORY
+    tone: "scientific, precise, evidence-based, regulatory language"
+- input:
+    stakeholder: hcp
+  expect:
+    channel: HEALTHCARE_PROVIDER
+    key_principle: "actionable — tell them exactly what to do differently"
+- input:
+    stakeholder: patient
+  expect:
+    channel: PATIENT
+    key_principle: "clarity and empathy — patients need to understand AND feel supported"
+- input:
+    stakeholder: internal
+  expect:
+    channel: INTERNAL
+- input:
+    stakeholder: media
+  expect:
+    channel: MEDIA
+    key_principle: "never speculate — stick to facts, prepare for worst-case questions"
+- input: {}
+  expect:
+    channel: GENERAL

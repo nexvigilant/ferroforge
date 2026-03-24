@@ -1,0 +1,67 @@
+name: signal-deep-validation
+description: "Deep signal validation: combine 4 disproportionality measures → validate criteria → detect trend → check recurrence. Produces a multi-dimensional signal quality assessment."
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - multi-signal-combiner        # Combine PRR/ROR/IC/EBGM into overall verdict
+  - signal-validation-gate       # Count confirmed criteria (PRR, case count, spread, temporal)
+  - signal-trend-detector        # Detect trend direction from pre-computed change
+  - signal-recurrence-detector   # Detect if this is novel, recurring, or systemic
+tests:
+- name: strong_multi_signal_semaglutide
+  input:
+    prr_signal: STRONG
+    ror_signal: STRONG
+    ic_signal: STRONG
+    ebgm_signal: STRONG
+    prr_above_threshold: true
+    case_count_sufficient: true
+    geographic_spread: true
+    temporal_pattern: true
+    prr_current: 6.93
+    pct_change: -2.1
+    occurrence_count: 2068
+    prior_action_taken: true
+    same_signal_persists: true
+  expect:
+    overall: CONFIRMED
+    classification: VALIDATED_SIGNAL
+    trend: STABLE
+
+- name: weak_single_measure
+  input:
+    prr_signal: WEAK
+    ror_signal: WEAK
+    ic_signal: MODERATE
+    ebgm_signal: WEAK
+    prr_above_threshold: false
+    case_count_sufficient: true
+    geographic_spread: false
+    temporal_pattern: false
+    prr_current: 1.3
+    pct_change: 15.0
+    occurrence_count: 5
+    prior_action_taken: false
+    same_signal_persists: false
+  expect:
+    overall: SUGGESTIVE
+
+- name: emerging_signal_rising_trend
+  input:
+    prr_signal: STRONG
+    ror_signal: MODERATE
+    ic_signal: MODERATE
+    ebgm_signal: MODERATE
+    prr_above_threshold: true
+    case_count_sufficient: true
+    geographic_spread: false
+    temporal_pattern: true
+    prr_current: 3.5
+    pct_change: 45.0
+    occurrence_count: 50
+    prior_action_taken: false
+    same_signal_persists: false
+  expect:
+    overall: PROBABLE
+    trend: RISING

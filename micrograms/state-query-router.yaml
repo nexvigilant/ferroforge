@@ -1,0 +1,99 @@
+name: state-query-router
+description: 'PVOS state queries: routes FSM state queries to the correct entity repository (case/signal/workflow/alert)'
+version: 0.1.0
+interface:
+  inputs:
+    entity_type:
+      type: string
+      required: false
+  outputs:
+    description:
+      type: string
+    repository:
+      type: string
+tree:
+  start: check_case
+  nodes:
+    check_case:
+      type: condition
+      variable: entity_type
+      operator: eq
+      value: case
+      true_next: route_case
+      false_next: check_signal
+    check_signal:
+      type: condition
+      variable: entity_type
+      operator: eq
+      value: signal
+      true_next: route_signal
+      false_next: check_workflow
+    check_workflow:
+      type: condition
+      variable: entity_type
+      operator: eq
+      value: workflow
+      true_next: route_workflow
+      false_next: check_alert
+    check_alert:
+      type: condition
+      variable: entity_type
+      operator: eq
+      value: alert
+      true_next: route_alert
+      false_next: unknown_entity
+    route_case:
+      type: return
+      value:
+        repository: case_fsm
+        description: Route to case state machine repository - tracks case lifecycle states
+    route_signal:
+      type: return
+      value:
+        repository: signal_fsm
+        description: Route to signal state machine repository - tracks signal triage states
+    route_workflow:
+      type: return
+      value:
+        repository: workflow_fsm
+        description: Route to workflow state machine repository - tracks workflow execution states
+    route_alert:
+      type: return
+      value:
+        repository: alert_fsm
+        description: Route to alert state machine repository - tracks alert acknowledgment states
+    unknown_entity:
+      type: return
+      value:
+        repository: error
+        description: Unknown entity type - choose case/signal/workflow/alert
+tests:
+- input:
+    entity_type: case
+  expect:
+    repository: case_fsm
+    description: Route to case state machine repository - tracks case lifecycle states
+- input:
+    entity_type: signal
+  expect:
+    repository: signal_fsm
+    description: Route to signal state machine repository - tracks signal triage states
+- input:
+    entity_type: workflow
+  expect:
+    repository: workflow_fsm
+    description: Route to workflow state machine repository - tracks workflow execution states
+- input:
+    entity_type: alert
+  expect:
+    repository: alert_fsm
+    description: Route to alert state machine repository - tracks alert acknowledgment states
+- input:
+    entity_type: unknown
+  expect:
+    repository: error
+    description: Unknown entity type - choose case/signal/workflow/alert
+- input: {}
+  expect:
+    description: Unknown entity type - choose case/signal/workflow/alert
+    repository: error

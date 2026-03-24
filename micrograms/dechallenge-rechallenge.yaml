@@ -1,0 +1,139 @@
+name: dechallenge-rechallenge
+description: "Assess dechallenge/rechallenge evidence for drug-event causality. Positive dechallenge + positive rechallenge = STRONG evidence. ICH E2A/Naranjo criteria alignment."
+version: 0.1.0
+interface:
+  inputs:
+    dechallenge_performed:
+      type: bool
+      required: false
+    dechallenge_positive:
+      type: bool
+      required: false
+    rechallenge_performed:
+      type: bool
+      required: false
+    rechallenge_positive:
+      type: bool
+      required: false
+  outputs:
+    evidence_strength:
+      type: string
+    naranjo_points:
+      type: int
+    causality_support:
+      type: string
+    recommendation:
+      type: string
+tree:
+  start: check_dechallenge_done
+  nodes:
+    check_dechallenge_done:
+      type: condition
+      variable: dechallenge_performed
+      operator: eq
+      value: true
+      true_next: check_dechallenge_result
+      false_next: no_dechallenge
+    check_dechallenge_result:
+      type: condition
+      variable: dechallenge_positive
+      operator: eq
+      value: true
+      true_next: check_rechallenge_done
+      false_next: negative_dechallenge
+    check_rechallenge_done:
+      type: condition
+      variable: rechallenge_performed
+      operator: eq
+      value: true
+      true_next: check_rechallenge_result
+      false_next: positive_dechallenge_only
+    check_rechallenge_result:
+      type: condition
+      variable: rechallenge_positive
+      operator: eq
+      value: true
+      true_next: both_positive
+      false_next: mixed_evidence
+    both_positive:
+      type: return
+      value:
+        evidence_strength: STRONG
+        naranjo_points: 5
+        causality_support: "Strongly supports causal relationship"
+        recommendation: "Classify as probable or definite causality"
+    positive_dechallenge_only:
+      type: return
+      value:
+        evidence_strength: MODERATE
+        naranjo_points: 2
+        causality_support: "Supports causal relationship — rechallenge data would strengthen"
+        recommendation: "Classify as possible or probable causality"
+    negative_dechallenge:
+      type: return
+      value:
+        evidence_strength: WEAK
+        naranjo_points: 0
+        causality_support: "Does not support causal relationship via dechallenge"
+        recommendation: "Evaluate alternative causes and temporal relationship"
+    mixed_evidence:
+      type: return
+      value:
+        evidence_strength: CONFLICTING
+        naranjo_points: 1
+        causality_support: "Positive dechallenge but negative rechallenge — conflicting evidence"
+        recommendation: "Expert review needed — consider confounding factors"
+    no_dechallenge:
+      type: return
+      value:
+        evidence_strength: INSUFFICIENT
+        naranjo_points: 0
+        causality_support: "No dechallenge data available"
+        recommendation: "Rely on temporal relationship and alternative cause assessment"
+tests:
+- input:
+    dechallenge_performed: true
+    dechallenge_positive: true
+    rechallenge_performed: true
+    rechallenge_positive: true
+  expect:
+    evidence_strength: STRONG
+    naranjo_points: 5
+- input:
+    dechallenge_performed: true
+    dechallenge_positive: true
+    rechallenge_performed: false
+  expect:
+    evidence_strength: MODERATE
+    naranjo_points: 2
+- input:
+    dechallenge_performed: true
+    dechallenge_positive: false
+  expect:
+    evidence_strength: WEAK
+    naranjo_points: 0
+- input:
+    dechallenge_performed: true
+    dechallenge_positive: true
+    rechallenge_performed: true
+    rechallenge_positive: false
+  expect:
+    evidence_strength: CONFLICTING
+    naranjo_points: 1
+- input:
+    dechallenge_performed: false
+  expect:
+    evidence_strength: INSUFFICIENT
+    naranjo_points: 0
+- input: {}
+  expect:
+    evidence_strength: INSUFFICIENT
+    recommendation: "Rely on temporal relationship and alternative cause assessment"
+- input:
+    dechallenge_performed: true
+    dechallenge_positive: true
+    rechallenge_performed: true
+    rechallenge_positive: true
+  expect:
+    causality_support: "Strongly supports causal relationship"
+    recommendation: "Classify as probable or definite causality"

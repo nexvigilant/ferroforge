@@ -1,0 +1,37 @@
+name: null-check
+description: "Verify a required field is present"
+version: 0.1.0
+interface:
+  inputs:
+    field:
+      type: string
+      required: false
+  outputs:
+    message:
+      type: string
+    valid:
+      type: bool
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: field
+      operator: is_not_null
+      true_next: present
+      false_next: missing
+    present:
+      type: return
+      value:
+        valid: true
+        message: "Field is present"
+    missing:
+      type: return
+      value:
+        valid: false
+        message: "Required field is missing"
+tests:
+  - input: { field: "hello" }
+    expect: { valid: true }
+  - input: {}
+    expect: { valid: false }

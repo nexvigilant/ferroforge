@@ -1,0 +1,144 @@
+name: evidence-quality
+description: "Domain 10: Grade evidence quality using GRADE-style hierarchy — from RCT meta-analysis down to expert opinion."
+version: 0.1.0
+interface:
+  inputs:
+    evidence_type:
+      type: string
+      required: false
+    has_limitations:
+      type: bool
+      required: false
+    large_effect:
+      type: bool
+      required: false
+  outputs:
+    ai_assist:
+      type: string
+    confidence:
+      type: string
+    decision_impact:
+      type: string
+    downgrade_factors:
+      type: string
+    grade:
+      type: string
+    typical_sources:
+      type: string
+    upgrade_factors:
+      type: string
+tree:
+  start: check_type
+  nodes:
+    check_type:
+      type: condition
+      variable: evidence_type
+      operator: eq
+      value: meta_analysis_rct
+      true_next: high_quality
+      false_next: check_rct
+    check_rct:
+      type: condition
+      variable: evidence_type
+      operator: eq
+      value: rct
+      true_next: check_rct_quality
+      false_next: check_observational
+    check_rct_quality:
+      type: condition
+      variable: has_limitations
+      operator: eq
+      value: true
+      true_next: moderate_quality
+      false_next: high_quality
+    check_observational:
+      type: condition
+      variable: evidence_type
+      operator: eq
+      value: observational
+      true_next: check_obs_strength
+      false_next: check_case_series
+    check_obs_strength:
+      type: condition
+      variable: large_effect
+      operator: eq
+      value: true
+      true_next: moderate_quality
+      false_next: low_quality
+    check_case_series:
+      type: condition
+      variable: evidence_type
+      operator: eq
+      value: case_series
+      true_next: low_quality
+      false_next: very_low_quality
+    high_quality:
+      type: return
+      value:
+        grade: HIGH
+        confidence: "high confidence the true effect is close to estimated effect"
+        typical_sources: "SR of RCTs, well-conducted RCTs without limitations"
+        decision_impact: "strong recommendation possible"
+        upgrade_factors: "large effect size, dose-response, all plausible confounders reduce effect"
+        ai_assist: "automated quality scoring, bias detection, heterogeneity assessment"
+    moderate_quality:
+      type: return
+      value:
+        grade: MODERATE
+        confidence: "moderate confidence — true effect likely close but may differ substantially"
+        typical_sources: "RCTs with limitations, strong observational studies"
+        decision_impact: "conditional recommendation, consider additional evidence"
+        downgrade_factors: "risk of bias, inconsistency, indirectness, imprecision, publication bias"
+        ai_assist: "sensitivity analysis, bias quantification, certainty visualization"
+    low_quality:
+      type: return
+      value:
+        grade: LOW
+        confidence: "low confidence — true effect may differ substantially from estimate"
+        typical_sources: "observational studies, case-control studies, case series"
+        decision_impact: "weak recommendation, additional research likely to change estimate"
+        ai_assist: "evidence gap analysis, research prioritization, uncertainty modeling"
+    very_low_quality:
+      type: return
+      value:
+        grade: VERY_LOW
+        confidence: "very low confidence — estimate is very uncertain"
+        typical_sources: "expert opinion, case reports, mechanistic reasoning"
+        decision_impact: "very weak recommendation, substantial uncertainty in all estimates"
+        ai_assist: "expert opinion synthesis, Delphi facilitation, uncertainty communication"
+tests:
+- input:
+    evidence_type: meta_analysis_rct
+  expect:
+    grade: HIGH
+- input:
+    evidence_type: rct
+    has_limitations: false
+  expect:
+    grade: HIGH
+- input:
+    evidence_type: rct
+    has_limitations: true
+  expect:
+    grade: MODERATE
+- input:
+    evidence_type: observational
+    large_effect: true
+  expect:
+    grade: MODERATE
+- input:
+    evidence_type: observational
+    large_effect: false
+  expect:
+    grade: LOW
+- input:
+    evidence_type: case_series
+  expect:
+    grade: LOW
+- input:
+    evidence_type: expert_opinion
+  expect:
+    grade: VERY_LOW
+- input: {}
+  expect:
+    grade: VERY_LOW

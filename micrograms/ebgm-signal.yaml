@@ -1,0 +1,162 @@
+name: ebgm-signal
+description: Empirical Bayes Geometric Mean (EBGM) signal detection gate. Uses EB05 (lower 5th percentile) as the conservative threshold; falls back to EBGM point estimate for borderline classification.
+version: 0.1.0
+interface:
+  inputs:
+    eb05:
+      type: float
+      required: false
+    ebgm:
+      type: float
+      required: false
+  outputs:
+    action:
+      type: string
+    signal:
+      type: string
+    signal_detected:
+      type: bool
+tree:
+  start: check_strong
+  nodes:
+    check_strong:
+      type: condition
+      variable: eb05
+      operator: gte
+      value: 5.0
+      true_next: strong_signal
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: eb05
+      operator: gte
+      value: 2.0
+      true_next: moderate_signal
+      false_next: check_weak
+    check_weak:
+      type: condition
+      variable: eb05
+      operator: gte
+      value: 1.0
+      true_next: weak_signal
+      false_next: check_borderline
+    check_borderline:
+      type: condition
+      variable: ebgm
+      operator: gte
+      value: 2.0
+      true_next: borderline_signal
+      false_next: no_signal
+    strong_signal:
+      type: return
+      value:
+        signal: STRONG
+        action: expedited_review
+        signal_detected: true
+    moderate_signal:
+      type: return
+      value:
+        signal: MODERATE
+        action: standard_review
+        signal_detected: true
+    weak_signal:
+      type: return
+      value:
+        signal: WEAK
+        action: monitor
+        signal_detected: true
+    borderline_signal:
+      type: return
+      value:
+        signal: BORDERLINE
+        action: increase_sample
+        signal_detected: false
+    no_signal:
+      type: return
+      value:
+        signal: NONE
+        action: no_action
+        signal_detected: false
+tests:
+- input:
+    eb05: 6.0
+    ebgm: 8.0
+  expect:
+    signal: STRONG
+    action: expedited_review
+    signal_detected: true
+- input:
+    eb05: 5.0
+    ebgm: 7.0
+  expect:
+    signal: STRONG
+    action: expedited_review
+    signal_detected: true
+- input:
+    eb05: 4.9
+    ebgm: 6.0
+  expect:
+    signal: MODERATE
+    action: standard_review
+    signal_detected: true
+- input:
+    eb05: 2.0
+    ebgm: 3.0
+  expect:
+    signal: MODERATE
+    action: standard_review
+    signal_detected: true
+- input:
+    eb05: 1.9
+    ebgm: 2.5
+  expect:
+    signal: WEAK
+    action: monitor
+    signal_detected: true
+- input:
+    eb05: 1.0
+    ebgm: 1.5
+  expect:
+    signal: WEAK
+    action: monitor
+    signal_detected: true
+- input:
+    eb05: 0.8
+    ebgm: 2.5
+  expect:
+    signal: BORDERLINE
+    action: increase_sample
+    signal_detected: false
+- input:
+    eb05: 0.5
+    ebgm: 2.0
+  expect:
+    signal: BORDERLINE
+    action: increase_sample
+    signal_detected: false
+- input:
+    eb05: 0.8
+    ebgm: 1.9
+  expect:
+    signal: NONE
+    action: no_action
+    signal_detected: false
+- input:
+    eb05: 0.3
+    ebgm: 0.5
+  expect:
+    signal: NONE
+    action: no_action
+    signal_detected: false
+- input:
+    eb05: 10.0
+    ebgm: 12.0
+  expect:
+    signal: STRONG
+    action: expedited_review
+    signal_detected: true
+- input: {}
+  expect:
+    signal: NONE
+    action: no_action
+    signal_detected: false

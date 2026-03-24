@@ -1,0 +1,285 @@
+name: narrative-completeness-gate
+description: "Gate 5 of narrative safe-extract: verify redacted narrative retains sufficient clinical content for regulatory value per ICH E2B(R3) minimum data elements"
+version: 0.1.0
+interface:
+  inputs:
+    has_adverse_event_term:
+      type: bool
+      required: false
+    has_suspect_drug:
+      type: bool
+      required: false
+    has_temporal_relationship:
+      type: bool
+      required: false
+    has_outcome:
+      type: bool
+      required: false
+    has_dechallenge_rechallenge:
+      type: bool
+      required: false
+    has_concomitant_meds:
+      type: bool
+      required: false
+    has_medical_history:
+      type: bool
+      required: false
+    word_count:
+      type: int
+      required: false
+  outputs:
+    regulatory_value:
+      type: string
+    completeness_score:
+      type: int
+    gate_pass:
+      type: bool
+    action:
+      type: string
+    missing_elements:
+      type: string
+tree:
+  start: check_event_term
+  nodes:
+    check_event_term:
+      type: condition
+      variable: has_adverse_event_term
+      operator: eq
+      value: true
+      true_next: check_drug
+      false_next: fail_no_event
+    check_drug:
+      type: condition
+      variable: has_suspect_drug
+      operator: eq
+      value: true
+      true_next: check_temporal
+      false_next: fail_no_drug
+    check_temporal:
+      type: condition
+      variable: has_temporal_relationship
+      operator: eq
+      value: true
+      true_next: check_outcome
+      false_next: check_word_count_minimal
+    check_outcome:
+      type: condition
+      variable: has_outcome
+      operator: eq
+      value: true
+      true_next: check_dechallenge
+      false_next: adequate_no_outcome
+    check_dechallenge:
+      type: condition
+      variable: has_dechallenge_rechallenge
+      operator: eq
+      value: true
+      true_next: check_concomitant
+      false_next: good_no_dechallenge
+    check_concomitant:
+      type: condition
+      variable: has_concomitant_meds
+      operator: eq
+      value: true
+      true_next: check_history
+      false_next: good_no_concomitant
+    check_history:
+      type: condition
+      variable: has_medical_history
+      operator: eq
+      value: true
+      true_next: check_word_count_full
+      false_next: good_no_history
+    check_word_count_full:
+      type: condition
+      variable: word_count
+      operator: gte
+      value: 50
+      true_next: excellent_complete
+      false_next: good_but_brief
+    check_word_count_minimal:
+      type: condition
+      variable: word_count
+      operator: gte
+      value: 20
+      true_next: minimal_viable
+      false_next: fail_too_sparse
+    fail_no_event:
+      type: return
+      value:
+        regulatory_value: NONE
+        completeness_score: 0
+        gate_pass: false
+        action: "BLOCK — redaction removed adverse event term, narrative has no regulatory value"
+        missing_elements: "adverse_event_term"
+    fail_no_drug:
+      type: return
+      value:
+        regulatory_value: NONE
+        completeness_score: 10
+        gate_pass: false
+        action: "BLOCK — redaction removed suspect drug, narrative has no regulatory value"
+        missing_elements: "suspect_drug"
+    fail_too_sparse:
+      type: return
+      value:
+        regulatory_value: INSUFFICIENT
+        completeness_score: 20
+        gate_pass: false
+        action: "BLOCK — narrative too sparse after redaction (<20 words), insufficient clinical detail"
+        missing_elements: "temporal_relationship,clinical_detail"
+    minimal_viable:
+      type: return
+      value:
+        regulatory_value: MINIMAL
+        completeness_score: 40
+        gate_pass: true
+        action: "PASS with caveat — minimal viable narrative (drug + event + some context)"
+        missing_elements: "temporal_relationship,outcome"
+    adequate_no_outcome:
+      type: return
+      value:
+        regulatory_value: ADEQUATE
+        completeness_score: 60
+        gate_pass: true
+        action: "PASS — drug + event + temporal relationship preserved, outcome missing"
+        missing_elements: "outcome"
+    good_no_dechallenge:
+      type: return
+      value:
+        regulatory_value: GOOD
+        completeness_score: 70
+        gate_pass: true
+        action: "PASS — core clinical narrative intact (drug, event, temporal, outcome)"
+        missing_elements: "dechallenge_rechallenge"
+    good_no_concomitant:
+      type: return
+      value:
+        regulatory_value: GOOD
+        completeness_score: 80
+        gate_pass: true
+        action: "PASS — strong clinical narrative with causality evidence"
+        missing_elements: "concomitant_medications"
+    good_no_history:
+      type: return
+      value:
+        regulatory_value: GOOD
+        completeness_score: 85
+        gate_pass: true
+        action: "PASS — comprehensive narrative, medical history would complete the picture"
+        missing_elements: "medical_history"
+    good_but_brief:
+      type: return
+      value:
+        regulatory_value: GOOD
+        completeness_score: 90
+        gate_pass: true
+        action: "PASS — all elements present but narrative is brief (<50 words)"
+        missing_elements: "none"
+    excellent_complete:
+      type: return
+      value:
+        regulatory_value: EXCELLENT
+        completeness_score: 100
+        gate_pass: true
+        action: "PASS — fully complete regulatory narrative with all clinical elements preserved"
+        missing_elements: "none"
+tests:
+- input:
+    has_adverse_event_term: true
+    has_suspect_drug: true
+    has_temporal_relationship: true
+    has_outcome: true
+    has_dechallenge_rechallenge: true
+    has_concomitant_meds: true
+    has_medical_history: true
+    word_count: 150
+  expect:
+    regulatory_value: EXCELLENT
+    completeness_score: 100
+    gate_pass: true
+- input:
+    has_adverse_event_term: true
+    has_suspect_drug: true
+    has_temporal_relationship: true
+    has_outcome: true
+    has_dechallenge_rechallenge: true
+    has_concomitant_meds: true
+    has_medical_history: true
+    word_count: 30
+  expect:
+    regulatory_value: GOOD
+    completeness_score: 90
+    gate_pass: true
+- input:
+    has_adverse_event_term: true
+    has_suspect_drug: true
+    has_temporal_relationship: true
+    has_outcome: true
+  expect:
+    regulatory_value: GOOD
+    completeness_score: 70
+    gate_pass: true
+- input:
+    has_adverse_event_term: true
+    has_suspect_drug: true
+    has_temporal_relationship: true
+  expect:
+    regulatory_value: ADEQUATE
+    completeness_score: 60
+    gate_pass: true
+- input:
+    has_adverse_event_term: true
+    has_suspect_drug: true
+    word_count: 25
+  expect:
+    regulatory_value: MINIMAL
+    completeness_score: 40
+    gate_pass: true
+- input:
+    has_adverse_event_term: true
+    has_suspect_drug: true
+    word_count: 10
+  expect:
+    regulatory_value: INSUFFICIENT
+    completeness_score: 20
+    gate_pass: false
+- input:
+    has_adverse_event_term: false
+  expect:
+    regulatory_value: NONE
+    completeness_score: 0
+    gate_pass: false
+- input:
+    has_adverse_event_term: true
+    has_suspect_drug: false
+  expect:
+    regulatory_value: NONE
+    completeness_score: 10
+    gate_pass: false
+- input: {}
+  expect:
+    regulatory_value: NONE
+    completeness_score: 0
+    gate_pass: false
+- input:
+    has_adverse_event_term: true
+    has_suspect_drug: true
+    has_temporal_relationship: true
+    has_outcome: true
+    has_dechallenge_rechallenge: true
+    has_concomitant_meds: true
+  expect:
+    regulatory_value: GOOD
+    completeness_score: 85
+    gate_pass: true
+- input:
+    has_adverse_event_term: true
+    has_suspect_drug: true
+    has_temporal_relationship: true
+    has_outcome: true
+    has_dechallenge_rechallenge: true
+  expect:
+    regulatory_value: GOOD
+    completeness_score: 80
+    gate_pass: true

@@ -1,0 +1,163 @@
+name: srs-database
+description: "Domain 7: Route to spontaneous reporting system by jurisdiction — FAERS, EudraVigilance, VigiBase, JADER, Canada Vigilance. Returns structure, format, access."
+version: 0.1.0
+interface:
+  inputs:
+    system:
+      type: string
+      required: false
+  outputs:
+    ai_tools:
+      type: string
+    authority:
+      type: string
+    format:
+      type: string
+    full_name:
+      type: string
+    note:
+      type: string
+    public_access:
+      type: bool
+    public_url:
+      type: string
+    records:
+      type: string
+    signal_methods:
+      type: string
+    submission:
+      type: string
+    system:
+      type: string
+tree:
+  start: check_fda
+  nodes:
+    check_fda:
+      type: condition
+      variable: system
+      operator: eq
+      value: faers
+      true_next: faers
+      false_next: check_ev
+    check_ev:
+      type: condition
+      variable: system
+      operator: eq
+      value: eudravigilance
+      true_next: eudravigilance
+      false_next: check_vigibase
+    check_vigibase:
+      type: condition
+      variable: system
+      operator: eq
+      value: vigibase
+      true_next: vigibase
+      false_next: check_jader
+    check_jader:
+      type: condition
+      variable: system
+      operator: eq
+      value: jader
+      true_next: jader
+      false_next: check_cv
+    check_cv:
+      type: condition
+      variable: system
+      operator: eq
+      value: canada_vigilance
+      true_next: canada_vigilance
+      false_next: generic
+    faers:
+      type: return
+      value:
+        system: FAERS
+        full_name: "FDA Adverse Event Reporting System"
+        authority: FDA
+        format: "E2B(R3)"
+        submission: "FDA ESG (Electronic Submissions Gateway)"
+        public_access: true
+        public_url: "openFDA API, quarterly data files"
+        records: ">20M reports"
+        signal_methods: "PRR, EBGM (Multi-item Gamma Poisson Shrinker)"
+        ai_tools: "openFDA NLP, FAERS mining algorithms"
+    eudravigilance:
+      type: return
+      value:
+        system: EUDRAVIGILANCE
+        full_name: "European Union Drug Regulatory Authorities Pharmacovigilance"
+        authority: EMA
+        format: "E2B(R3) via EVWEB or gateway"
+        submission: "EudraVigilance system (EVWEB/EVCTM)"
+        public_access: true
+        public_url: "adrreports.eu"
+        signal_methods: "PRR, ROR, IC (Information Component)"
+        ai_tools: "EV signal detection, EPITT tracking"
+    vigibase:
+      type: return
+      value:
+        system: VIGIBASE
+        full_name: "WHO Global Individual Case Safety Report Database"
+        authority: WHO_UMC
+        format: "E2B, national format conversion"
+        submission: "through national centres to Uppsala Monitoring Centre"
+        public_access: false
+        public_url: "VigiAccess (limited public view)"
+        records: ">30M reports from 170+ countries"
+        signal_methods: "IC (Bayesian), vigiRank, disproportionality"
+        ai_tools: "vigiMatch (duplicate detection), vigiGrade (quality scoring)"
+    jader:
+      type: return
+      value:
+        system: JADER
+        full_name: "Japanese Adverse Drug Event Report"
+        authority: PMDA
+        format: "E2B(R3) Japanese adaptation"
+        submission: "J-PRISM gateway"
+        public_access: true
+        signal_methods: "PRR, ROR adapted for Japanese population"
+    canada_vigilance:
+      type: return
+      value:
+        system: CANADA_VIGILANCE
+        full_name: "Canada Vigilance Adverse Reaction Online Database"
+        authority: HEALTH_CANADA
+        format: "E2B(R3)"
+        submission: "MedEffect Canada"
+        public_access: true
+        signal_methods: "PRR, ROR"
+    generic:
+      type: return
+      value:
+        system: GENERIC
+        note: "check ICH E2B(R3) for transmission standard, contact local NRA for system access"
+        format: "E2B(R3) recommended"
+tests:
+- input:
+    system: faers
+  expect:
+    system: FAERS
+    authority: FDA
+    public_access: true
+- input:
+    system: eudravigilance
+  expect:
+    system: EUDRAVIGILANCE
+    authority: EMA
+- input:
+    system: vigibase
+  expect:
+    system: VIGIBASE
+    authority: WHO_UMC
+    public_access: false
+- input:
+    system: jader
+  expect:
+    system: JADER
+    authority: PMDA
+- input:
+    system: canada_vigilance
+  expect:
+    system: CANADA_VIGILANCE
+- input: {}
+  expect:
+    system: GENERIC

@@ -1,0 +1,120 @@
+name: module-complexity-gate
+description: 'Code hygiene gate: classifies Rust modules by public function count. Modules with 10+ pub fns are doing too much.'
+version: 0.1.0
+interface:
+  inputs:
+    pub_fn_count:
+      type: int
+      required: true
+    struct_count:
+      type: int
+      required: false
+  outputs:
+    complexity_class:
+      type: string
+    needs_decomposition:
+      type: bool
+    reason:
+      type: string
+tree:
+  start: check_excessive
+  nodes:
+    check_excessive:
+      type: condition
+      variable: pub_fn_count
+      operator: gte
+      value: 20
+      true_next: excessive
+      false_next: check_high
+    check_high:
+      type: condition
+      variable: pub_fn_count
+      operator: gte
+      value: 10
+      true_next: high
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: pub_fn_count
+      operator: gte
+      value: 5
+      true_next: moderate
+      false_next: focused
+    excessive:
+      type: return
+      value:
+        complexity_class: EXCESSIVE
+        needs_decomposition: true
+        reason: Module has 20+ public functions — violates single responsibility, split into submodules
+    high:
+      type: return
+      value:
+        complexity_class: HIGH
+        needs_decomposition: true
+        reason: Module has 10-19 public functions — approaching complexity limit, plan decomposition
+    moderate:
+      type: return
+      value:
+        complexity_class: MODERATE
+        needs_decomposition: false
+        reason: Module has 5-9 public functions — acceptable complexity
+    focused:
+      type: return
+      value:
+        complexity_class: FOCUSED
+        needs_decomposition: false
+        reason: Module has fewer than 5 public functions — well-focused
+tests:
+- input:
+    pub_fn_count: 25
+  expect:
+    complexity_class: EXCESSIVE
+    needs_decomposition: true
+    reason: Module has 20+ public functions — violates single responsibility, split into submodules
+- input:
+    pub_fn_count: 20
+  expect:
+    complexity_class: EXCESSIVE
+    needs_decomposition: true
+    reason: Module has 20+ public functions — violates single responsibility, split into submodules
+- input:
+    pub_fn_count: 15
+  expect:
+    complexity_class: HIGH
+    needs_decomposition: true
+    reason: Module has 10-19 public functions — approaching complexity limit, plan decomposition
+- input:
+    pub_fn_count: 10
+  expect:
+    complexity_class: HIGH
+    needs_decomposition: true
+    reason: Module has 10-19 public functions — approaching complexity limit, plan decomposition
+- input:
+    pub_fn_count: 7
+  expect:
+    complexity_class: MODERATE
+    needs_decomposition: false
+    reason: Module has 5-9 public functions — acceptable complexity
+- input:
+    pub_fn_count: 5
+  expect:
+    complexity_class: MODERATE
+    needs_decomposition: false
+    reason: Module has 5-9 public functions — acceptable complexity
+- input:
+    pub_fn_count: 3
+  expect:
+    complexity_class: FOCUSED
+    needs_decomposition: false
+    reason: Module has fewer than 5 public functions — well-focused
+- input:
+    pub_fn_count: 0
+  expect:
+    complexity_class: FOCUSED
+    needs_decomposition: false
+    reason: Module has fewer than 5 public functions — well-focused
+- input: {}
+  expect:
+    complexity_class: FOCUSED
+    needs_decomposition: false
+    reason: Module has fewer than 5 public functions — well-focused

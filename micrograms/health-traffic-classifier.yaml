@@ -1,0 +1,70 @@
+name: health-traffic-classifier
+description: 'System health to traffic level mapper: converts health status string to traffic level for PV operations dashboard'
+version: 0.1.0
+interface:
+  inputs:
+    status:
+      type: string
+      required: true
+      description: 'System health status (healthy, degraded, or other)'
+  outputs:
+    traffic_level:
+      type: string
+tree:
+  start: check_healthy
+  nodes:
+    check_healthy:
+      type: condition
+      variable: status
+      operator: eq
+      value: healthy
+      true_next: green
+      false_next: check_degraded
+    check_degraded:
+      type: condition
+      variable: status
+      operator: eq
+      value: degraded
+      true_next: yellow
+      false_next: red
+    green:
+      type: return
+      value:
+        traffic_level: green
+    yellow:
+      type: return
+      value:
+        traffic_level: yellow
+    red:
+      type: return
+      value:
+        traffic_level: red
+tests:
+# Healthy = green
+- input:
+    status: healthy
+  expect:
+    traffic_level: green
+# Degraded = yellow
+- input:
+    status: degraded
+  expect:
+    traffic_level: yellow
+# Down = red
+- input:
+    status: down
+  expect:
+    traffic_level: red
+# Unknown status = red (safe default)
+- input:
+    status: error
+  expect:
+    traffic_level: red
+# Empty string = red
+- input:
+    status: ""
+  expect:
+    traffic_level: red
+- input: {}
+  expect:
+    traffic_level: red

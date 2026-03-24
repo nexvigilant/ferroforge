@@ -1,0 +1,79 @@
+name: adapt-safety-concern
+description: "Adapter: convert safety_concern from trial SAE triage to seriousness boolean for causality pipeline"
+version: 0.1.0
+
+interface:
+  inputs:
+    safety_concern:
+      type: string
+      required: false
+      description: "From config-trial-sae-triage: critical, elevated, standard, favorable"
+    signal_detected:
+      type: bool
+      required: false
+  outputs:
+    is_serious:
+      type: bool
+    signal_detected:
+      type: bool
+    prr:
+      type: float
+
+tree:
+  start: check_concern
+  nodes:
+    check_concern:
+      type: condition
+      variable: safety_concern
+      operator: is_null
+      true_next: not_serious
+      false_next: check_critical
+
+    check_critical:
+      type: condition
+      variable: safety_concern
+      operator: eq
+      value: "critical"
+      true_next: serious_urgent
+      false_next: check_elevated
+
+    check_elevated:
+      type: condition
+      variable: safety_concern
+      operator: eq
+      value: "elevated"
+      true_next: serious_standard
+      false_next: not_serious
+
+    serious_urgent:
+      type: return
+      value:
+        is_serious: true
+        signal_detected: true
+        prr: 8.0
+
+    serious_standard:
+      type: return
+      value:
+        is_serious: true
+        signal_detected: true
+        prr: 4.0
+
+    not_serious:
+      type: return
+      value:
+        is_serious: false
+        signal_detected: false
+        prr: 1.0
+
+tests:
+  - input: { safety_concern: "critical" }
+    expect: { is_serious: true, signal_detected: true, prr: 8.0 }
+  - input: { safety_concern: "elevated" }
+    expect: { is_serious: true, signal_detected: true, prr: 4.0 }
+  - input: { safety_concern: "standard" }
+    expect: { is_serious: false, signal_detected: false, prr: 1.0 }
+  - input: { safety_concern: "favorable" }
+    expect: { is_serious: false, signal_detected: false, prr: 1.0 }
+  - input: {}
+    expect: { is_serious: false, signal_detected: false, prr: 1.0 }

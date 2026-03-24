@@ -1,0 +1,181 @@
+name: study-design
+description: "Domain 9: Route to appropriate study design by safety question type, data availability, and evidence needs."
+version: 0.1.0
+interface:
+  inputs:
+    is_interventional:
+      type: bool
+      required: false
+    is_pragmatic:
+      type: bool
+      required: false
+    question_type:
+      type: string
+      required: false
+  outputs:
+    ai_enhance:
+      type: string
+    bias_control:
+      type: string
+    design:
+      type: string
+    limitation:
+      type: string
+    name:
+      type: string
+    regulatory:
+      type: string
+    strength:
+      type: string
+tree:
+  start: check_interventional
+  nodes:
+    check_interventional:
+      type: condition
+      variable: is_interventional
+      operator: eq
+      value: true
+      true_next: check_pragmatic
+      false_next: check_temporal
+    check_pragmatic:
+      type: condition
+      variable: is_pragmatic
+      operator: eq
+      value: true
+      true_next: pragmatic_trial
+      false_next: rct_design
+    check_temporal:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: incidence
+      true_next: cohort
+      false_next: check_rare
+    check_rare:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: rare_outcome
+      true_next: case_control
+      false_next: check_transient
+    check_transient:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: transient_exposure
+      true_next: self_controlled
+      false_next: check_prevalence
+    check_prevalence:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: prevalence
+      true_next: cross_sectional
+      false_next: check_utilization
+    check_utilization:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: drug_utilization
+      true_next: drug_utilization
+      false_next: cohort
+    rct_design:
+      type: return
+      value:
+        design: RCT
+        name: "Randomized Controlled Trial"
+        strength: "gold standard for causal inference, minimizes confounding"
+        limitation: "costly, slow, limited generalizability, ethical constraints"
+        bias_control: "randomization eliminates measured and unmeasured confounding"
+        ai_enhance: "adaptive randomization, predictive enrichment, digital endpoint monitoring"
+        regulatory: "ICH E9, ICH E10"
+    pragmatic_trial:
+      type: return
+      value:
+        design: PRAGMATIC_TRIAL
+        name: "Pragmatic Clinical Trial"
+        strength: "real-world generalizability, large sample sizes, diverse populations"
+        limitation: "less control, adherence variation, outcome ascertainment challenges"
+        bias_control: "randomization in real-world setting, ITT analysis"
+        ai_enhance: "EHR integration, digital outcome assessment, adaptive designs"
+        regulatory: "FDA RWE Framework, EMA guidance"
+    cohort:
+      type: return
+      value:
+        design: COHORT
+        name: "Cohort Study (prospective or retrospective)"
+        strength: "incidence estimation, temporal sequence, multiple outcomes"
+        limitation: "confounding, loss to follow-up, exposure misclassification"
+        bias_control: "propensity scores, multivariable adjustment, active comparator"
+        ai_enhance: "ML cohort identification, automated outcome phenotyping, predictive modeling"
+        regulatory: "EU PASS, FDA post-marketing commitments"
+    case_control:
+      type: return
+      value:
+        design: CASE_CONTROL
+        name: "Case-Control Study (nested or population-based)"
+        strength: "efficient for rare outcomes, multiple exposures, odds ratio estimation"
+        limitation: "recall bias, selection bias, temporal sequence uncertain"
+        bias_control: "matching, multivariate analysis, nested within cohort"
+        ai_enhance: "automated case identification, NLP phenotyping, confounder selection"
+    self_controlled:
+      type: return
+      value:
+        design: SELF_CONTROLLED
+        name: "Self-Controlled Case Series / Case-Crossover"
+        strength: "eliminates between-person confounding, efficient, within-person comparison"
+        limitation: "requires transient exposure, event-dependent observation, time-varying confounding"
+        bias_control: "each patient is own control, eliminates time-invariant confounders"
+        ai_enhance: "automated risk window optimization, temporal pattern analysis"
+    cross_sectional:
+      type: return
+      value:
+        design: CROSS_SECTIONAL
+        name: "Cross-Sectional Study"
+        strength: "prevalence estimation, hypothesis generation, rapid execution"
+        limitation: "no temporal sequence, prevalence not incidence, survivor bias"
+        ai_enhance: "automated survey analysis, population stratification"
+    drug_utilization:
+      type: return
+      value:
+        design: DRUG_UTILIZATION
+        name: "Drug Utilization Research"
+        strength: "prescribing patterns, off-label use, adherence assessment"
+        limitation: "descriptive only, no causal inference"
+        ai_enhance: "prescription pattern mining, adherence prediction, trend detection"
+        regulatory: "EMA DUS guidelines"
+tests:
+- input:
+    is_interventional: true
+    is_pragmatic: false
+  expect:
+    design: RCT
+    name: "Randomized Controlled Trial"
+- input:
+    is_interventional: true
+    is_pragmatic: true
+  expect:
+    design: PRAGMATIC_TRIAL
+- input:
+    question_type: incidence
+  expect:
+    design: COHORT
+- input:
+    question_type: rare_outcome
+  expect:
+    design: CASE_CONTROL
+- input:
+    question_type: transient_exposure
+  expect:
+    design: SELF_CONTROLLED
+- input:
+    question_type: prevalence
+  expect:
+    design: CROSS_SECTIONAL
+- input:
+    question_type: drug_utilization
+  expect:
+    design: DRUG_UTILIZATION
+- input: {}
+  expect:
+    design: COHORT

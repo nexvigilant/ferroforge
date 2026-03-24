@@ -1,0 +1,122 @@
+name: algo-energy-measure
+description: "Algorithm 7 (ENERGY): Measures N(→(Δς)) — capacity for change. Scores by downstream consumers (→), state change magnitude (Δς), quantifies impact potential (N)."
+version: 0.1.0
+interface:
+  inputs:
+    downstream_consumers:
+      type: integer
+      required: true
+    state_change_magnitude:
+      type: string
+      required: true
+      enum: [none, minor, moderate, major, breaking]
+    component_persistence:
+      type: string
+      required: true
+      enum: [volatile, recent, established, foundational]
+  outputs:
+    energy_score:
+      type: float
+    energy_class:
+      type: string
+    algorithm:
+      type: string
+tree:
+  start: check_state_change
+  nodes:
+    check_state_change:
+      type: condition
+      variable: state_change_magnitude
+      operator: eq
+      value: none
+      true_next: zero_energy
+      false_next: check_consumers_high
+    check_consumers_high:
+      type: condition
+      variable: downstream_consumers
+      operator: gte
+      value: 10
+      true_next: check_mag_major_high
+      false_next: check_consumers_medium
+    check_consumers_medium:
+      type: condition
+      variable: downstream_consumers
+      operator: gte
+      value: 3
+      true_next: check_mag_major_med
+      false_next: low_energy
+    check_mag_major_high:
+      type: condition
+      variable: state_change_magnitude
+      operator: eq
+      value: major
+      true_next: critical_energy
+      false_next: check_mag_breaking_high
+    check_mag_breaking_high:
+      type: condition
+      variable: state_change_magnitude
+      operator: eq
+      value: breaking
+      true_next: critical_energy
+      false_next: high_energy
+    check_mag_major_med:
+      type: condition
+      variable: state_change_magnitude
+      operator: eq
+      value: major
+      true_next: high_energy
+      false_next: check_mag_breaking_med
+    check_mag_breaking_med:
+      type: condition
+      variable: state_change_magnitude
+      operator: eq
+      value: breaking
+      true_next: high_energy
+      false_next: moderate_energy
+    critical_energy:
+      type: return
+      value:
+        energy_score: 1.0
+        energy_class: critical
+        algorithm: "ENERGY: N(→(Δς)) = high consumers × breaking change = maximum cascade potential"
+    high_energy:
+      type: return
+      value:
+        energy_score: 0.75
+        energy_class: high
+        algorithm: "ENERGY: N(→(Δς)) = significant cascade potential"
+    moderate_energy:
+      type: return
+      value:
+        energy_score: 0.5
+        energy_class: moderate
+        algorithm: "ENERGY: N(→(Δς)) = contained change capacity"
+    low_energy:
+      type: return
+      value:
+        energy_score: 0.25
+        energy_class: low
+        algorithm: "ENERGY: N(→(Δς)) = minimal cascade potential"
+    zero_energy:
+      type: return
+      value:
+        energy_score: 0.0
+        energy_class: inert
+        algorithm: "ENERGY: N(→(Δς)) = 0 — no state change capacity"
+tests:
+- input: { downstream_consumers: 40, state_change_magnitude: breaking, component_persistence: foundational }
+  expect: { energy_score: 1.0, energy_class: critical }
+- input: { downstream_consumers: 15, state_change_magnitude: moderate, component_persistence: established }
+  expect: { energy_score: 0.75, energy_class: high }
+- input: { downstream_consumers: 5, state_change_magnitude: major, component_persistence: recent }
+  expect: { energy_score: 0.75, energy_class: high }
+- input: { downstream_consumers: 1, state_change_magnitude: minor, component_persistence: volatile }
+  expect: { energy_score: 0.25, energy_class: low }
+- input: { downstream_consumers: 100, state_change_magnitude: none, component_persistence: foundational }
+  expect: { energy_score: 0.0, energy_class: inert }
+- input: { downstream_consumers: 5, state_change_magnitude: breaking, component_persistence: established }
+  expect: { energy_score: 0.75, energy_class: high }
+- input: { downstream_consumers: 4, state_change_magnitude: minor, component_persistence: recent }
+  expect: { energy_score: 0.5, energy_class: moderate }
+- input: {}
+  expect: { energy_score: 0.25, energy_class: low }

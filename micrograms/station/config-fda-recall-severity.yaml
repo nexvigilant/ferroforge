@@ -1,0 +1,205 @@
+name: config-fda-recall-severity
+description: "Classify FDA recall severity from accessdata search-recalls output. Routes by recall class and voluntary/mandatory status."
+version: 0.1.0
+
+interface:
+  inputs:
+    recall_class:
+      type: string
+      required: false
+      description: "FDA recall classification: I, II, III"
+    is_ongoing:
+      type: bool
+      required: false
+      description: "Recall is currently active"
+    distribution_scope:
+      type: string
+      required: false
+      description: "nationwide, statewide, local, international"
+    product_quantity:
+      type: int
+      required: false
+      description: "Quantity of product affected"
+  outputs:
+    urgency:
+      type: string
+      description: "critical, high, moderate, low, informational"
+    patient_impact:
+      type: string
+    requires_notification:
+      type: bool
+
+tree:
+  start: check_class
+  nodes:
+    check_class:
+      type: condition
+      variable: recall_class
+      operator: is_null
+      true_next: informational
+      false_next: check_class_i
+
+    check_class_i:
+      type: condition
+      variable: recall_class
+      operator: eq
+      value: "I"
+      true_next: check_class_i_scope
+      false_next: check_class_ii
+
+    check_class_i_scope:
+      type: condition
+      variable: distribution_scope
+      operator: is_null
+      true_next: critical_default
+      false_next: check_international
+
+    check_international:
+      type: condition
+      variable: distribution_scope
+      operator: eq
+      value: "international"
+      true_next: critical_international
+      false_next: check_nationwide
+
+    check_nationwide:
+      type: condition
+      variable: distribution_scope
+      operator: eq
+      value: "nationwide"
+      true_next: critical_nationwide
+      false_next: critical_default
+
+    check_class_ii:
+      type: condition
+      variable: recall_class
+      operator: eq
+      value: "II"
+      true_next: check_class_ii_ongoing
+      false_next: check_class_iii
+
+    check_class_ii_ongoing:
+      type: condition
+      variable: is_ongoing
+      operator: eq
+      value: true
+      true_next: high_ongoing
+      false_next: moderate_resolved
+
+    check_class_iii:
+      type: condition
+      variable: recall_class
+      operator: eq
+      value: "III"
+      true_next: low_class_iii
+      false_next: informational
+
+    critical_international:
+      type: return
+      value:
+        urgency: critical
+        patient_impact: serious_harm_or_death
+        requires_notification: true
+
+    critical_nationwide:
+      type: return
+      value:
+        urgency: critical
+        patient_impact: serious_harm_or_death
+        requires_notification: true
+
+    critical_default:
+      type: return
+      value:
+        urgency: critical
+        patient_impact: serious_harm_or_death
+        requires_notification: true
+
+    high_ongoing:
+      type: return
+      value:
+        urgency: high
+        patient_impact: temporary_or_reversible
+        requires_notification: true
+
+    moderate_resolved:
+      type: return
+      value:
+        urgency: moderate
+        patient_impact: temporary_or_reversible
+        requires_notification: false
+
+    low_class_iii:
+      type: return
+      value:
+        urgency: low
+        patient_impact: unlikely_adverse_health
+        requires_notification: false
+
+    informational:
+      type: return
+      value:
+        urgency: informational
+        patient_impact: unknown
+        requires_notification: false
+
+tests:
+  - input:
+      recall_class: "I"
+      is_ongoing: true
+      distribution_scope: "international"
+      product_quantity: 50000
+    expect:
+      urgency: critical
+      patient_impact: serious_harm_or_death
+      requires_notification: true
+
+  - input:
+      recall_class: "I"
+      is_ongoing: true
+      distribution_scope: "nationwide"
+    expect:
+      urgency: critical
+      patient_impact: serious_harm_or_death
+      requires_notification: true
+
+  - input:
+      recall_class: "I"
+      is_ongoing: true
+      distribution_scope: "local"
+    expect:
+      urgency: critical
+      patient_impact: serious_harm_or_death
+      requires_notification: true
+
+  - input:
+      recall_class: "II"
+      is_ongoing: true
+      distribution_scope: "nationwide"
+    expect:
+      urgency: high
+      patient_impact: temporary_or_reversible
+      requires_notification: true
+
+  - input:
+      recall_class: "II"
+      is_ongoing: false
+      distribution_scope: "statewide"
+    expect:
+      urgency: moderate
+      patient_impact: temporary_or_reversible
+      requires_notification: false
+
+  - input:
+      recall_class: "III"
+      is_ongoing: false
+    expect:
+      urgency: low
+      patient_impact: unlikely_adverse_health
+      requires_notification: false
+
+  - input: {}
+    expect:
+      urgency: informational
+      patient_impact: unknown
+      requires_notification: false

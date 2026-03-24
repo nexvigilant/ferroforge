@@ -1,0 +1,185 @@
+name: governance-gate
+description: "PDC: Gate governance authority by tier — validates decision-maker competency level meets tier requirements"
+version: 0.1.0
+interface:
+  inputs:
+    actor_level:
+      type: int
+      required: false
+    governance_tier:
+      type: string
+      required: false
+  outputs:
+    authorized:
+      type: bool
+    decision_scope:
+      type: string
+    error:
+      type: string
+    gap:
+      type: string
+    responsibilities:
+      type: string
+    tier_name:
+      type: string
+tree:
+  start: check_tier
+  nodes:
+    check_tier:
+      type: condition
+      variable: governance_tier
+      operator: eq
+      value: 1
+      true_next: check_exec_level
+      false_next: check_tier_2
+    check_tier_2:
+      type: condition
+      variable: governance_tier
+      operator: eq
+      value: 2
+      true_next: check_ops_level
+      false_next: check_tier_3
+    check_tier_3:
+      type: condition
+      variable: governance_tier
+      operator: eq
+      value: 3
+      true_next: check_tech_level
+      false_next: invalid_tier
+    check_exec_level:
+      type: condition
+      variable: actor_level
+      operator: gte
+      value: 6
+      true_next: exec_authorized
+      false_next: exec_denied
+    check_ops_level:
+      type: condition
+      variable: actor_level
+      operator: gte
+      value: 4
+      true_next: ops_authorized
+      false_next: ops_denied
+    check_tech_level:
+      type: condition
+      variable: actor_level
+      operator: gte
+      value: 3
+      true_next: tech_authorized
+      false_next: tech_denied
+    exec_authorized:
+      type: return
+      value:
+        authorized: true
+        tier_name: EXECUTIVE_OVERSIGHT
+        decision_scope: strategic
+        responsibilities: "vision, resource authorization, global standardization, EPA10-CPA8 oversight"
+    exec_denied:
+      type: return
+      value:
+        authorized: false
+        tier_name: EXECUTIVE_OVERSIGHT
+        decision_scope: strategic
+        gap: "Requires L5+ (6) or L5++ (7) behavioral anchors"
+    ops_authorized:
+      type: return
+      value:
+        authorized: true
+        tier_name: PROGRAM_MANAGEMENT
+        decision_scope: operational
+        responsibilities: "framework coordination, quality standards, EPA10 gateway management, performance monitoring"
+    ops_denied:
+      type: return
+      value:
+        authorized: false
+        tier_name: PROGRAM_MANAGEMENT
+        decision_scope: operational
+        gap: "Requires L4 (4) or L5 (5) behavioral anchors"
+    tech_authorized:
+      type: return
+      value:
+        authorized: true
+        tier_name: FUNCTIONAL_EXCELLENCE
+        decision_scope: technical
+        responsibilities: "behavioral anchor refinements, EPA assessment tools, AI integration, regional adaptation"
+    tech_denied:
+      type: return
+      value:
+        authorized: false
+        tier_name: FUNCTIONAL_EXCELLENCE
+        decision_scope: technical
+        gap: "Requires L3 (3) or L4 (4) behavioral anchors"
+    invalid_tier:
+      type: return
+      value:
+        authorized: false
+        tier_name: INVALID
+        error: "Governance tier must be 1 (Executive), 2 (Program), or 3 (Functional)"
+tests:
+- input:
+    governance_tier: 1
+    actor_level: 7
+  expect:
+    authorized: true
+    tier_name: EXECUTIVE_OVERSIGHT
+    decision_scope: strategic
+- input:
+    governance_tier: 1
+    actor_level: 6
+  expect:
+    authorized: true
+    tier_name: EXECUTIVE_OVERSIGHT
+- input:
+    governance_tier: 1
+    actor_level: 5
+  expect:
+    authorized: false
+    tier_name: EXECUTIVE_OVERSIGHT
+- input:
+    governance_tier: 2
+    actor_level: 5
+  expect:
+    authorized: true
+    tier_name: PROGRAM_MANAGEMENT
+    decision_scope: operational
+- input:
+    governance_tier: 2
+    actor_level: 4
+  expect:
+    authorized: true
+    tier_name: PROGRAM_MANAGEMENT
+- input:
+    governance_tier: 2
+    actor_level: 3
+  expect:
+    authorized: false
+    tier_name: PROGRAM_MANAGEMENT
+- input:
+    governance_tier: 3
+    actor_level: 3
+  expect:
+    authorized: true
+    tier_name: FUNCTIONAL_EXCELLENCE
+    decision_scope: technical
+- input:
+    governance_tier: 3
+    actor_level: 4
+  expect:
+    authorized: true
+    tier_name: FUNCTIONAL_EXCELLENCE
+- input:
+    governance_tier: 3
+    actor_level: 2
+  expect:
+    authorized: false
+    tier_name: FUNCTIONAL_EXCELLENCE
+- input:
+    governance_tier: 4
+    actor_level: 7
+  expect:
+    authorized: false
+    tier_name: INVALID
+- input: {}
+  expect:
+    authorized: false
+    tier_name: INVALID

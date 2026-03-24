@@ -1,0 +1,119 @@
+name: soc-classifier
+description: Classify MedDRA event terms into System Organ Classes and assess seriousness
+version: 0.1.0
+tree:
+  start: validate_term
+  nodes:
+    classify_soc:
+      type: condition
+      variable: event_term
+      operator: matches
+      value: (?i)(cardiac|heart|arrhythmia|infarction|angina|heart failure)
+      true_next: soc_cardiac
+      false_next: check_hepatic
+    soc_hepatic:
+      type: return
+      value:
+        is_serious_soc: true
+        likely_soc: hepatobiliary_disorders
+        hlgt_guess: liver_injuries
+    check_renal:
+      type: condition
+      variable: event_term
+      operator: matches
+      value: (?i)(kidney|renal|glomerulonephritis|nephrotic|dialysis)
+      true_next: soc_renal
+      false_next: check_neuro
+    soc_general:
+      type: return
+      value:
+        likely_soc: general_disorders
+        hlgt_guess: general_physical_condition
+        is_serious_soc: false
+    missing_input:
+      type: return
+      value:
+        is_serious_soc: false
+        likely_soc: null
+        hlgt_guess: null
+    soc_renal:
+      type: return
+      value:
+        likely_soc: renal_urinary_disorders
+        hlgt_guess: renal_failure_disorders
+        is_serious_soc: true
+    check_hepatic:
+      type: condition
+      variable: event_term
+      operator: matches
+      value: (?i)(liver|hepatic|cirrhosis|hepatitis|jaundice)
+      true_next: soc_hepatic
+      false_next: check_renal
+    soc_neuro:
+      type: return
+      value:
+        likely_soc: nervous_system_disorders
+        hlgt_guess: central_nervous_system_injuries
+        is_serious_soc: true
+    check_neuro:
+      type: condition
+      variable: event_term
+      operator: matches
+      value: (?i)(seizure|stroke|hemorrhage|encephalopathy|coma)
+      true_next: soc_neuro
+      false_next: soc_general
+    soc_cardiac:
+      type: return
+      value:
+        hlgt_guess: cardiac_valve_disorders
+        is_serious_soc: true
+        likely_soc: cardiac_disorders
+    validate_term:
+      type: condition
+      variable: event_term
+      operator: is_not_null
+      value: null
+      true_next: classify_soc
+      false_next: missing_input
+tests:
+- input:
+    event_term: ZZZZZ_NO_MATCH
+  expect:
+    likely_soc: general_disorders
+    hlgt_guess: general_physical_condition
+    is_serious_soc: false
+- input:
+    event_term: cardiac
+  expect:
+    hlgt_guess: cardiac_valve_disorders
+    is_serious_soc: true
+    likely_soc: cardiac_disorders
+- input:
+    event_term: kidney
+  expect:
+    likely_soc: renal_urinary_disorders
+    hlgt_guess: renal_failure_disorders
+    is_serious_soc: true
+- input:
+    event_term: liver
+  expect:
+    is_serious_soc: true
+    likely_soc: hepatobiliary_disorders
+    hlgt_guess: liver_injuries
+- input:
+    event_term: seizure
+  expect:
+    likely_soc: nervous_system_disorders
+    hlgt_guess: central_nervous_system_injuries
+    is_serious_soc: true
+- input: {}
+  expect:
+    is_serious_soc: false
+    likely_soc: null
+    hlgt_guess: null
+- input: {}
+  expect:
+    is_serious_soc: false
+    likely_soc: null
+    hlgt_guess: null
+interface: null

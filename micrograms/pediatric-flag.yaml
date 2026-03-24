@@ -1,0 +1,173 @@
+name: pediatric-flag
+description: 'Pediatric PV flag: NEONATAL_FLAG for age <2, PEDIATRIC_URGENT for age <12 with developmental impact, PEDIATRIC_REVIEW for unlabeled pediatric use, STANDARD otherwise'
+version: 0.1.0
+interface:
+  inputs:
+    drug_has_pediatric_label:
+      type: bool
+      required: false
+    has_developmental_impact:
+      type: bool
+      required: false
+    has_growth_impact:
+      type: bool
+      required: false
+    patient_age:
+      type: int
+      required: false
+  outputs:
+    age_group:
+      type: string
+    flag:
+      type: string
+    rationale:
+      type: string
+    special_monitoring:
+      type: string
+tree:
+  start: check_neonatal
+  nodes:
+    check_neonatal:
+      type: condition
+      variable: patient_age
+      operator: lt
+      value: 2
+      true_next: neonatal_flag
+      false_next: check_pediatric_age
+    check_pediatric_age:
+      type: condition
+      variable: patient_age
+      operator: lt
+      value: 12
+      true_next: check_developmental_impact
+      false_next: check_adolescent_age
+    check_developmental_impact:
+      type: condition
+      variable: has_growth_impact
+      operator: eq
+      value: true
+      true_next: pediatric_urgent
+      false_next: check_dev_impact_only
+    check_dev_impact_only:
+      type: condition
+      variable: has_developmental_impact
+      operator: eq
+      value: true
+      true_next: pediatric_urgent
+      false_next: check_pediatric_label_child
+    check_pediatric_label_child:
+      type: condition
+      variable: drug_has_pediatric_label
+      operator: eq
+      value: true
+      true_next: standard
+      false_next: pediatric_review
+    check_adolescent_age:
+      type: condition
+      variable: patient_age
+      operator: lt
+      value: 18
+      true_next: check_pediatric_label_teen
+      false_next: standard
+    check_pediatric_label_teen:
+      type: condition
+      variable: drug_has_pediatric_label
+      operator: eq
+      value: true
+      true_next: standard
+      false_next: pediatric_review
+    neonatal_flag:
+      type: return
+      value:
+        flag: NEONATAL_FLAG
+        age_group: Neonate (0-23 months)
+        special_monitoring: Mandatory neonatal specialist review and weight-based dosing verification
+        rationale: Neonates have immature organ systems requiring specialist PV oversight per ICH E11
+    pediatric_urgent:
+      type: return
+      value:
+        flag: PEDIATRIC_URGENT
+        age_group: Child (2-11 years)
+        special_monitoring: Urgent pediatric endocrinology or developmental specialist review within 48 hours
+        rationale: Growth or developmental impact in pediatric patient requires urgent specialist evaluation
+    pediatric_review:
+      type: return
+      value:
+        flag: PEDIATRIC_REVIEW
+        age_group: Pediatric (under 18 years)
+        special_monitoring: Pediatric PV review required - off-label use in population without approved labeling
+        rationale: Drug lacks pediatric labeling - off-label safety monitoring required per ICH E11
+    standard:
+      type: return
+      value:
+        flag: STANDARD
+        age_group: Standard assessment applicable
+        special_monitoring: Routine pharmacovigilance monitoring per standard protocols
+        rationale: No pediatric-specific risk factors identified requiring special monitoring
+tests:
+- input:
+    patient_age: 1
+    has_growth_impact: false
+    has_developmental_impact: false
+    drug_has_pediatric_label: true
+  expect:
+    flag: NEONATAL_FLAG
+    age_group: Neonate (0-23 months)
+    special_monitoring: Mandatory neonatal specialist review and weight-based dosing verification
+    rationale: Neonates have immature organ systems requiring specialist PV oversight per ICH E11
+- input:
+    patient_age: 8
+    has_growth_impact: true
+    has_developmental_impact: false
+    drug_has_pediatric_label: false
+  expect:
+    flag: PEDIATRIC_URGENT
+    age_group: Child (2-11 years)
+    special_monitoring: Urgent pediatric endocrinology or developmental specialist review within 48 hours
+    rationale: Growth or developmental impact in pediatric patient requires urgent specialist evaluation
+- input:
+    patient_age: 6
+    has_growth_impact: false
+    has_developmental_impact: true
+    drug_has_pediatric_label: true
+  expect:
+    flag: PEDIATRIC_URGENT
+    age_group: Child (2-11 years)
+    special_monitoring: Urgent pediatric endocrinology or developmental specialist review within 48 hours
+    rationale: Growth or developmental impact in pediatric patient requires urgent specialist evaluation
+- input:
+    patient_age: 10
+    has_growth_impact: false
+    has_developmental_impact: false
+    drug_has_pediatric_label: false
+  expect:
+    flag: PEDIATRIC_REVIEW
+    age_group: Pediatric (under 18 years)
+    special_monitoring: Pediatric PV review required - off-label use in population without approved labeling
+    rationale: Drug lacks pediatric labeling - off-label safety monitoring required per ICH E11
+- input:
+    patient_age: 15
+    has_growth_impact: false
+    has_developmental_impact: false
+    drug_has_pediatric_label: false
+  expect:
+    flag: PEDIATRIC_REVIEW
+    age_group: Pediatric (under 18 years)
+    special_monitoring: Pediatric PV review required - off-label use in population without approved labeling
+    rationale: Drug lacks pediatric labeling - off-label safety monitoring required per ICH E11
+- input:
+    patient_age: 45
+    has_growth_impact: false
+    has_developmental_impact: false
+    drug_has_pediatric_label: false
+  expect:
+    flag: STANDARD
+    age_group: Standard assessment applicable
+    special_monitoring: Routine pharmacovigilance monitoring per standard protocols
+    rationale: No pediatric-specific risk factors identified requiring special monitoring
+- input: {}
+  expect:
+    age_group: Standard assessment applicable
+    flag: STANDARD
+    rationale: No pediatric-specific risk factors identified requiring special monitoring
+    special_monitoring: Routine pharmacovigilance monitoring per standard protocols

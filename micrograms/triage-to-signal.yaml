@@ -1,0 +1,237 @@
+name: triage-to-signal
+description: 'Router: routes triaged cases to signal detection, causality assessment, or periodic reporting based on seriousness and expectedness'
+version: 1.0.0
+interface:
+  inputs:
+    case_count:
+      type: int
+      required: false
+    causality_needed:
+      type: bool
+      required: false
+    expected:
+      type: bool
+      required: false
+    serious:
+      type: bool
+      required: false
+    signal_review_eligible:
+      type: bool
+      required: false
+  outputs:
+    escalation_needed:
+      type: bool
+    next_chain:
+      type: string
+    priority:
+      type: string
+    route:
+      type: string
+tree:
+  start: check_susar
+  nodes:
+    check_susar:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: check_unexpected
+      false_next: check_signal_eligible
+    check_unexpected:
+      type: condition
+      variable: expected
+      operator: eq
+      value: false
+      true_next: susar_pathway
+      false_next: check_signal_eligible
+    susar_pathway:
+      type: return
+      value:
+        route: SUSAR_PATHWAY
+        next_chain: susar-classifier -> expedited-reporting
+        priority: CRITICAL
+        escalation_needed: true
+    check_signal_eligible:
+      type: condition
+      variable: signal_review_eligible
+      operator: eq
+      value: true
+      true_next: check_case_count
+      false_next: check_causality_needed
+    check_case_count:
+      type: condition
+      variable: case_count
+      operator: gte
+      value: 3
+      true_next: signal_detection
+      false_next: check_causality_needed
+    signal_detection:
+      type: return
+      value:
+        route: SIGNAL_DETECTION
+        next_chain: prr-signal -> ror-signal -> multi-signal-combiner
+        priority: HIGH
+        escalation_needed: false
+    check_causality_needed:
+      type: condition
+      variable: causality_needed
+      operator: eq
+      value: true
+      true_next: causality_assessment
+      false_next: check_serious_for_periodic
+    causality_assessment:
+      type: return
+      value:
+        route: CAUSALITY_ASSESSMENT
+        next_chain: naranjo-quick -> causality-to-action
+        priority: STANDARD
+        escalation_needed: false
+    check_serious_for_periodic:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: periodic_reporting
+      false_next: routine_monitoring
+    periodic_reporting:
+      type: return
+      value:
+        route: PERIODIC_REPORTING
+        next_chain: report-deadline
+        priority: STANDARD
+        escalation_needed: false
+    routine_monitoring:
+      type: return
+      value:
+        route: ROUTINE_MONITORING
+        next_chain: quality-score
+        priority: LOW
+        escalation_needed: false
+tests:
+- name: serious unexpected case triggers SUSAR pathway
+  input:
+    serious: true
+    expected: false
+    causality_needed: false
+    signal_review_eligible: false
+    case_count: 1
+  expect:
+    route: SUSAR_PATHWAY
+    next_chain: susar-classifier -> expedited-reporting
+    priority: CRITICAL
+    escalation_needed: true
+- name: serious expected case does not trigger SUSAR
+  input:
+    serious: true
+    expected: true
+    causality_needed: false
+    signal_review_eligible: true
+    case_count: 5
+  expect:
+    route: SIGNAL_DETECTION
+    next_chain: prr-signal -> ror-signal -> multi-signal-combiner
+    priority: HIGH
+    escalation_needed: false
+- name: signal eligible with sufficient case count goes to signal detection
+  input:
+    serious: false
+    expected: true
+    causality_needed: false
+    signal_review_eligible: true
+    case_count: 10
+  expect:
+    route: SIGNAL_DETECTION
+    next_chain: prr-signal -> ror-signal -> multi-signal-combiner
+    priority: HIGH
+    escalation_needed: false
+- name: signal eligible but insufficient case count falls through to causality
+  input:
+    serious: false
+    expected: true
+    causality_needed: true
+    signal_review_eligible: true
+    case_count: 2
+  expect:
+    route: CAUSALITY_ASSESSMENT
+    next_chain: naranjo-quick -> causality-to-action
+    priority: STANDARD
+    escalation_needed: false
+- name: case count exactly 3 meets threshold for signal detection
+  input:
+    serious: false
+    expected: true
+    causality_needed: false
+    signal_review_eligible: true
+    case_count: 3
+  expect:
+    route: SIGNAL_DETECTION
+    next_chain: prr-signal -> ror-signal -> multi-signal-combiner
+    priority: HIGH
+    escalation_needed: false
+- name: causality needed without signal eligibility goes to causality assessment
+  input:
+    serious: false
+    expected: true
+    causality_needed: true
+    signal_review_eligible: false
+    case_count: 1
+  expect:
+    route: CAUSALITY_ASSESSMENT
+    next_chain: naranjo-quick -> causality-to-action
+    priority: STANDARD
+    escalation_needed: false
+- name: serious expected without signal or causality goes to periodic reporting
+  input:
+    serious: true
+    expected: true
+    causality_needed: false
+    signal_review_eligible: false
+    case_count: 0
+  expect:
+    route: PERIODIC_REPORTING
+    next_chain: report-deadline
+    priority: STANDARD
+    escalation_needed: false
+- name: non-serious non-signal non-causality goes to routine monitoring
+  input:
+    serious: false
+    expected: true
+    causality_needed: false
+    signal_review_eligible: false
+    case_count: 1
+  expect:
+    route: ROUTINE_MONITORING
+    next_chain: quality-score
+    priority: LOW
+    escalation_needed: false
+- name: empty input defaults to routine monitoring
+  input: {}
+  expect:
+    route: ROUTINE_MONITORING
+    next_chain: quality-score
+    priority: LOW
+    escalation_needed: false
+- name: serious unexpected with high case count still routes to SUSAR first
+  input:
+    serious: true
+    expected: false
+    causality_needed: true
+    signal_review_eligible: true
+    case_count: 15
+  expect:
+    route: SUSAR_PATHWAY
+    next_chain: susar-classifier -> expedited-reporting
+    priority: CRITICAL
+    escalation_needed: true
+- name: signal eligible with zero cases falls to causality check
+  input:
+    serious: false
+    expected: true
+    causality_needed: false
+    signal_review_eligible: true
+    case_count: 0
+  expect:
+    route: ROUTINE_MONITORING
+    next_chain: quality-score
+    priority: LOW
+    escalation_needed: false

@@ -1,0 +1,96 @@
+name: bone-safety-classifier
+description: 'Bone safety classifier: maps skeletal adverse reactions to severity grades for osteonecrosis, fractures, and bone mineral density loss'
+version: 0.1.0
+interface:
+  inputs:
+    reaction_pt:
+      type: string
+      required: true
+      description: MedDRA preferred term for the skeletal reaction
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    soc:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_osteonecrosis
+  nodes:
+    check_osteonecrosis:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: OSTEONECROSIS
+      true_next: serious
+      false_next: check_fracture
+    check_fracture:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: FRACTURE
+      true_next: serious
+      false_next: check_osteoporosis
+    check_osteoporosis:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: OSTEOPOROSIS
+      true_next: moderate
+      false_next: check_bmd
+    check_bmd:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: BONE DENSITY
+      true_next: moderate
+      false_next: mild
+    serious:
+      type: return
+      value:
+        severity: serious
+        soc: Musculoskeletal and connective tissue disorders
+        action: expedited_report
+    moderate:
+      type: return
+      value:
+        severity: moderate
+        soc: Musculoskeletal and connective tissue disorders
+        action: monitor_and_assess
+    mild:
+      type: return
+      value:
+        severity: mild
+        soc: Musculoskeletal and connective tissue disorders
+        action: routine_surveillance
+tests:
+  - name: osteonecrosis_jaw
+    input:
+      reaction_pt: OSTEONECROSIS OF JAW
+    expect:
+      severity: serious
+  - name: femoral_fracture
+    input:
+      reaction_pt: FEMORAL NECK FRACTURE
+    expect:
+      severity: serious
+  - name: osteoporosis
+    input:
+      reaction_pt: OSTEOPOROSIS
+    expect:
+      severity: moderate
+  - name: bmd_decreased
+    input:
+      reaction_pt: BONE DENSITY DECREASED
+    expect:
+      severity: moderate
+  - name: arthralgia
+    input:
+      reaction_pt: ARTHRALGIA
+    expect:
+      severity: mild
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild

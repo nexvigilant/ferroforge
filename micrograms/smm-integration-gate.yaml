@@ -1,0 +1,167 @@
+name: smm-integration-gate
+description: "NVG-SMM-001 Sections 5-6: Final integration gate — applies evidence weight, K-bias checks, and uncertainty propagation. Chemistry analog: equilibrium constant — determines product/substrate ratio at steady state."
+version: 0.1.0
+interface:
+  inputs:
+    rating:
+      type: string
+      required: true
+    has_independent_replication:
+      type: bool
+      required: true
+    positive_citation_pct:
+      type: int
+      required: true
+  outputs:
+    integrated:
+      type: bool
+    weight:
+      type: float
+    effective_rating:
+      type: string
+    k_bias_flag:
+      type: string
+    action:
+      type: string
+    chemistry_analog:
+      type: string
+
+tree:
+  start: check_suspended
+  nodes:
+    check_suspended:
+      type: condition
+      variable: rating
+      operator: eq
+      value: SUSPENDED
+      true_next: exclude
+      false_next: check_replication
+    check_replication:
+      type: condition
+      variable: has_independent_replication
+      operator: eq
+      value: false
+      true_next: apply_replication_floor
+      false_next: check_citation_asymmetry
+    apply_replication_floor:
+      type: condition
+      variable: rating
+      operator: eq
+      value: GREEN
+      true_next: replication_downgrade
+      false_next: check_citation_asymmetry
+    replication_downgrade:
+      type: return
+      value:
+        integrated: true
+        weight: 0.60
+        effective_rating: AMBER
+        k_bias_flag: "Replication gap — AMBER floor applied per Section 6.2"
+        action: "Integrated at 0.60x regardless of CS; replication needed"
+        chemistry_analog: "K_eq downgraded — insufficient equilibrium data for confident K"
+    check_citation_asymmetry:
+      type: condition
+      variable: positive_citation_pct
+      operator: gt
+      value: 80
+      true_next: citation_flag
+      false_next: integrate_normal
+    citation_flag:
+      type: condition
+      variable: rating
+      operator: eq
+      value: RED
+      true_next: citation_red
+      false_next: citation_elevated
+    citation_red:
+      type: return
+      value:
+        integrated: true
+        weight: 0.25
+        effective_rating: RED
+        k_bias_flag: "Citation asymmetry (>80% positive) + RED score — high K-bias risk"
+        action: "Corroboration required; K-bias surveillance triggered"
+        chemistry_analog: "Catalyst poisoning suspected — reaction selectivity compromised"
+    citation_elevated:
+      type: return
+      value:
+        integrated: true
+        weight: 0.60
+        effective_rating: AMBER
+        k_bias_flag: "Citation asymmetry (>80% positive) — elevated scrutiny"
+        action: "Violation summary + citation asymmetry flag appended"
+        chemistry_analog: "Le Chatelier shift — equilibrium pushed by one-sided input"
+    integrate_normal:
+      type: condition
+      variable: rating
+      operator: eq
+      value: GREEN
+      true_next: green_integrate
+      false_next: check_amber
+    check_amber:
+      type: condition
+      variable: rating
+      operator: eq
+      value: AMBER
+      true_next: amber_integrate
+      false_next: red_integrate
+    green_integrate:
+      type: return
+      value:
+        integrated: true
+        weight: 1.00
+        effective_rating: GREEN
+        k_bias_flag: none
+        action: "Full weight integration. Minor violations annotated."
+        chemistry_analog: "Equilibrium favors product — full yield integration"
+    amber_integrate:
+      type: return
+      value:
+        integrated: true
+        weight: 0.60
+        effective_rating: AMBER
+        k_bias_flag: none
+        action: "Reduced weight integration. Violation summary appended."
+        chemistry_analog: "Mixed equilibrium — partial yield"
+    red_integrate:
+      type: return
+      value:
+        integrated: true
+        weight: 0.25
+        effective_rating: RED
+        k_bias_flag: none
+        action: "High-scrutiny integration. Corroboration required."
+        chemistry_analog: "Equilibrium favors substrate — trace product only"
+    exclude:
+      type: return
+      value:
+        integrated: false
+        weight: 0.00
+        effective_rating: SUSPENDED
+        k_bias_flag: "FATAL violation — excluded from K"
+        action: "Mandatory PV scientist review. CAPA initiated."
+        chemistry_analog: "No reaction — activation energy not met"
+
+tests:
+  - input: { rating: SUSPENDED, has_independent_replication: false, positive_citation_pct: 50 }
+    expect: { integrated: false, weight: 0.00, effective_rating: SUSPENDED }
+  - input: { rating: GREEN, has_independent_replication: true, positive_citation_pct: 50 }
+    expect: { integrated: true, weight: 1.00, effective_rating: GREEN }
+  - input: { rating: GREEN, has_independent_replication: false, positive_citation_pct: 50 }
+    expect: { integrated: true, weight: 0.60, effective_rating: AMBER }
+  - input: { rating: AMBER, has_independent_replication: true, positive_citation_pct: 90 }
+    expect: { integrated: true, weight: 0.60, effective_rating: AMBER }
+  - input: { rating: RED, has_independent_replication: true, positive_citation_pct: 90 }
+    expect: { integrated: true, weight: 0.25, effective_rating: RED }
+  - input: { rating: RED, has_independent_replication: true, positive_citation_pct: 50 }
+    expect: { integrated: true, weight: 0.25, effective_rating: RED }
+  - input: { rating: AMBER, has_independent_replication: true, positive_citation_pct: 50 }
+    expect: { integrated: true, weight: 0.60, effective_rating: AMBER }
+  - input: {}
+    expect:
+      action: High-scrutiny integration. Corroboration required.
+      chemistry_analog: Equilibrium favors substrate — trace product only
+      effective_rating: RED
+      integrated: true
+      k_bias_flag: none
+      weight: 0.25

@@ -1,0 +1,61 @@
+name: ab-force-without-mass
+description: 'Antibody: detects force applied to zero mass (stem-phys F=ma — infinite acceleration). Physics singularity guard.'
+version: 0.1.0
+interface:
+  inputs:
+    force:
+      type: number
+      required: true
+    mass:
+      type: number
+      required: true
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check_force
+  nodes:
+    check_force:
+      type: condition
+      variable: force
+      operator: eq
+      value: 0
+      true_next: clean_no_force
+      false_next: check_mass
+    check_mass:
+      type: condition
+      variable: mass
+      operator: lte
+      value: 0
+      true_next: violation
+      false_next: clean
+    violation:
+      type: return
+      value:
+        threat: true
+        response: 'BLOCK: force applied to zero mass — acceleration is infinite'
+    clean_no_force:
+      type: return
+      value:
+        threat: false
+        response: 'PASS: zero force, no acceleration regardless of mass'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { force: 10, mass: 2 }
+  expect: { threat: false }
+- input: { force: 0, mass: 0 }
+  expect: { threat: false }
+- input: { force: 10, mass: 0 }
+  expect: { threat: true }
+- input: { force: -5, mass: -1 }
+  expect: { threat: true }
+- input: {}
+  expect:
+    response: PASS
+    threat: false

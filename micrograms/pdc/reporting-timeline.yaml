@@ -1,0 +1,255 @@
+name: reporting-timeline
+description: "Domain 4: Regulatory reporting timeline by jurisdiction and event type — FDA, EMA, PMDA, Health Canada deadlines."
+version: 0.1.0
+interface:
+  inputs:
+    is_fatal_or_life_threatening:
+      type: bool
+      required: false
+    is_serious_unexpected:
+      type: bool
+      required: false
+    region:
+      type: string
+      required: false
+  outputs:
+    database:
+      type: string
+    deadline_calendar_days:
+      type: int
+    followup:
+      type: string
+    format:
+      type: string
+    note:
+      type: string
+    reference:
+      type: string
+    region:
+      type: string
+    report_type:
+      type: string
+    submission:
+      type: string
+tree:
+  start: check_region
+  nodes:
+    check_region:
+      type: condition
+      variable: region
+      operator: eq
+      value: fda
+      true_next: fda_check
+      false_next: check_ema
+    check_ema:
+      type: condition
+      variable: region
+      operator: eq
+      value: ema
+      true_next: ema_check
+      false_next: check_pmda
+    check_pmda:
+      type: condition
+      variable: region
+      operator: eq
+      value: pmda
+      true_next: pmda_check
+      false_next: check_hc
+    check_hc:
+      type: condition
+      variable: region
+      operator: eq
+      value: health_canada
+      true_next: hc_check
+      false_next: ich_default
+    fda_check:
+      type: condition
+      variable: is_fatal_or_life_threatening
+      operator: eq
+      value: true
+      true_next: fda_7day
+      false_next: fda_15day_check
+    fda_7day:
+      type: return
+      value:
+        region: FDA
+        deadline_calendar_days: 7
+        report_type: "IND Safety Report / 15-day Alert (expedited)"
+        database: FAERS
+        format: "E2B(R3)"
+        submission: "FDA ESG or FAERS"
+        followup: "within 15 calendar days of initial report"
+    fda_15day_check:
+      type: condition
+      variable: is_serious_unexpected
+      operator: eq
+      value: true
+      true_next: fda_15day
+      false_next: fda_periodic
+    fda_15day:
+      type: return
+      value:
+        region: FDA
+        deadline_calendar_days: 15
+        report_type: "15-day Alert Report"
+        database: FAERS
+        format: "E2B(R3)"
+        submission: "FDA ESG"
+    fda_periodic:
+      type: return
+      value:
+        region: FDA
+        deadline_calendar_days: 90
+        report_type: "Periodic (PSUR/PBRER equivalent)"
+        database: FAERS
+        format: "E2B(R3)"
+    ema_check:
+      type: condition
+      variable: is_serious_unexpected
+      operator: eq
+      value: true
+      true_next: ema_15day
+      false_next: ema_90day
+    ema_15day:
+      type: return
+      value:
+        region: EMA
+        deadline_calendar_days: 15
+        report_type: "Expedited ICSR"
+        database: EudraVigilance
+        format: "E2B(R3) via EVWEB or gateway"
+        reference: "EU GVP Module VI"
+    ema_90day:
+      type: return
+      value:
+        region: EMA
+        deadline_calendar_days: 90
+        report_type: "Non-expedited ICSR"
+        database: EudraVigilance
+        format: "E2B(R3)"
+    pmda_check:
+      type: condition
+      variable: is_serious_unexpected
+      operator: eq
+      value: true
+      true_next: pmda_15day
+      false_next: pmda_periodic
+    pmda_15day:
+      type: return
+      value:
+        region: PMDA
+        deadline_calendar_days: 15
+        report_type: "Expedited Safety Report"
+        database: "J-PRISM (Japanese Pharmaceutical Regulatory Information System of Medicine)"
+        format: "E2B(R3) Japanese adaptation"
+    pmda_periodic:
+      type: return
+      value:
+        region: PMDA
+        deadline_calendar_days: 90
+        report_type: "Periodic Safety Report"
+        database: "J-PRISM"
+    hc_check:
+      type: condition
+      variable: is_serious_unexpected
+      operator: eq
+      value: true
+      true_next: hc_15day
+      false_next: hc_periodic
+    hc_15day:
+      type: return
+      value:
+        region: HEALTH_CANADA
+        deadline_calendar_days: 15
+        report_type: "Expedited ADR Report"
+        database: "Canada Vigilance"
+        format: "E2B(R3)"
+    hc_periodic:
+      type: return
+      value:
+        region: HEALTH_CANADA
+        deadline_calendar_days: 90
+        report_type: "Annual Drug Safety Report"
+        database: "Canada Vigilance"
+    ich_default:
+      type: return
+      value:
+        region: ICH_DEFAULT
+        deadline_calendar_days: 15
+        report_type: "ICH E2D default — serious unexpected"
+        reference: "ICH E2A, E2B(R3), E2D"
+        note: "check specific country requirements"
+tests:
+- input:
+    region: fda
+    is_fatal_or_life_threatening: true
+  expect:
+    region: FDA
+    deadline_calendar_days: 7
+- input:
+    region: fda
+    is_serious_unexpected: true
+    is_fatal_or_life_threatening: false
+  expect:
+    region: FDA
+    deadline_calendar_days: 15
+- input:
+    region: fda
+    is_serious_unexpected: false
+    is_fatal_or_life_threatening: false
+  expect:
+    deadline_calendar_days: 90
+- input:
+    region: ema
+    is_serious_unexpected: true
+  expect:
+    region: EMA
+    deadline_calendar_days: 15
+    database: EudraVigilance
+- input:
+    region: pmda
+    is_serious_unexpected: true
+  expect:
+    region: PMDA
+    deadline_calendar_days: 15
+- input:
+    region: health_canada
+    is_serious_unexpected: false
+  expect:
+    region: HEALTH_CANADA
+    deadline_calendar_days: 90
+- input:
+    region: unknown
+  expect:
+    region: ICH_DEFAULT
+    deadline_calendar_days: 15
+- input: {}
+  expect:
+    region: ICH_DEFAULT
+# -- covers ema_90day --
+- input:
+    region: ema
+    is_serious_unexpected: false
+  expect:
+    region: EMA
+    deadline_calendar_days: 90
+    report_type: "Non-expedited ICSR"
+    database: EudraVigilance
+# -- covers hc_15day --
+- input:
+    region: health_canada
+    is_serious_unexpected: true
+  expect:
+    region: HEALTH_CANADA
+    deadline_calendar_days: 15
+    report_type: "Expedited ADR Report"
+    database: "Canada Vigilance"
+# -- covers pmda_periodic --
+- input:
+    region: pmda
+    is_serious_unexpected: false
+  expect:
+    region: PMDA
+    deadline_calendar_days: 90
+    report_type: "Periodic Safety Report"
+    database: "J-PRISM"

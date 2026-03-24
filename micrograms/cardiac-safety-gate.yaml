@@ -1,0 +1,146 @@
+name: cardiac-safety-gate
+description: 'Cardiac safety classifier: maps cardiac adverse reactions to severity grades using ICH E14 QT prolongation thresholds and known cardiotoxicity signals'
+version: 0.1.0
+interface:
+  inputs:
+    reaction_pt:
+      type: string
+      required: true
+      description: MedDRA preferred term for the cardiac reaction
+    qtc_prolongation_ms:
+      type: float
+      required: false
+      description: QTc prolongation in milliseconds (if available)
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    soc:
+      type: string
+    action:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_reaction
+  nodes:
+    check_reaction:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: TORSADE
+      true_next: critical
+      false_next: check_mi
+    check_mi:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: MYOCARDIAL INFARCTION
+      true_next: critical
+      false_next: check_arrest
+    check_arrest:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: CARDIAC ARREST
+      true_next: critical
+      false_next: check_failure
+    check_failure:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: CARDIAC FAILURE
+      true_next: serious
+      false_next: check_qt
+    check_qt:
+      type: condition
+      variable: qtc_prolongation_ms
+      operator: gte
+      value: 60
+      true_next: serious
+      false_next: check_qt_moderate
+    check_qt_moderate:
+      type: condition
+      variable: qtc_prolongation_ms
+      operator: gte
+      value: 30
+      true_next: moderate
+      false_next: check_arrhythmia
+    check_arrhythmia:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: ARRHYTHMIA
+      true_next: moderate
+      false_next: mild
+    critical:
+      type: return
+      value:
+        severity: critical
+        soc: Cardiac disorders
+        action: immediate_expedited_report
+        regulatory_reference: ICH E14
+    serious:
+      type: return
+      value:
+        severity: serious
+        soc: Cardiac disorders
+        action: expedited_report
+        regulatory_reference: ICH E14
+    moderate:
+      type: return
+      value:
+        severity: moderate
+        soc: Cardiac disorders
+        action: monitor_and_assess
+        regulatory_reference: ICH E14
+    mild:
+      type: return
+      value:
+        severity: mild
+        soc: Cardiac disorders
+        action: routine_surveillance
+        regulatory_reference: ICH E2B
+tests:
+  - name: torsade_de_pointes
+    input:
+      reaction_pt: TORSADE DE POINTES
+    expect:
+      severity: critical
+      soc: Cardiac disorders
+  - name: myocardial_infarction
+    input:
+      reaction_pt: MYOCARDIAL INFARCTION
+    expect:
+      severity: critical
+  - name: cardiac_failure
+    input:
+      reaction_pt: CARDIAC FAILURE ACUTE
+    expect:
+      severity: serious
+  - name: qt_prolongation_high
+    input:
+      reaction_pt: QT PROLONGATION
+      qtc_prolongation_ms: 65
+    expect:
+      severity: serious
+  - name: qt_moderate
+    input:
+      reaction_pt: QT PROLONGATION
+      qtc_prolongation_ms: 35
+    expect:
+      severity: moderate
+  - name: arrhythmia
+    input:
+      reaction_pt: ARRHYTHMIA SUPRAVENTRICULAR
+    expect:
+      severity: moderate
+  - name: mild_palpitations
+    input:
+      reaction_pt: PALPITATIONS
+    expect:
+      severity: mild
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild

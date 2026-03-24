@@ -1,0 +1,307 @@
+name: case-seriousness
+description: 'ICH E2A seriousness classification: SERIOUS if any of 6 criteria met (death, hospitalization, disability, life-threatening, congenital anomaly, medically important)'
+version: 0.2.0
+interface:
+  inputs:
+    death:
+      type: bool
+      required: false
+    hospitalization:
+      type: bool
+      required: false
+    disability:
+      type: bool
+      required: false
+    life_threatening:
+      type: bool
+      required: false
+    congenital_anomaly:
+      type: bool
+      required: false
+    medically_important:
+      type: bool
+      required: false
+  outputs:
+    seriousness:
+      type: string
+    criterion:
+      type: string
+    reportable:
+      type: bool
+    expedited:
+      type: bool
+    regulatory_reference:
+      type: string
+    is_serious:
+      type: bool
+    is_fatal:
+      type: bool
+    is_life_threatening:
+      type: bool
+tree:
+  start: death_check
+  nodes:
+    death_check:
+      type: condition
+      variable: death
+      operator: eq
+      value: true
+      true_next: serious_death
+      false_next: hosp_check
+    hosp_check:
+      type: condition
+      variable: hospitalization
+      operator: eq
+      value: true
+      true_next: serious_hosp
+      false_next: disability_check
+    disability_check:
+      type: condition
+      variable: disability
+      operator: eq
+      value: true
+      true_next: serious_disability
+      false_next: life_threatening_check
+    life_threatening_check:
+      type: condition
+      variable: life_threatening
+      operator: eq
+      value: true
+      true_next: serious_life_threatening
+      false_next: congenital_anomaly_check
+    congenital_anomaly_check:
+      type: condition
+      variable: congenital_anomaly
+      operator: eq
+      value: true
+      true_next: serious_congenital
+      false_next: medically_important_check
+    medically_important_check:
+      type: condition
+      variable: medically_important
+      operator: eq
+      value: true
+      true_next: serious_medically_important
+      false_next: not_serious
+    serious_death:
+      type: return
+      value:
+        seriousness: SERIOUS
+        criterion: DEATH
+        reportable: true
+        expedited: true
+        regulatory_reference: ICH E2A Section II.B
+        is_serious: true
+        is_fatal: true
+        is_life_threatening: false
+    serious_hosp:
+      type: return
+      value:
+        seriousness: SERIOUS
+        criterion: HOSPITALIZATION
+        reportable: true
+        expedited: true
+        regulatory_reference: ICH E2A Section II.B
+        is_serious: true
+        is_fatal: false
+        is_life_threatening: false
+    serious_disability:
+      type: return
+      value:
+        seriousness: SERIOUS
+        criterion: DISABILITY
+        reportable: true
+        expedited: true
+        regulatory_reference: ICH E2A Section II.B
+        is_serious: true
+        is_fatal: false
+        is_life_threatening: false
+    serious_life_threatening:
+      type: return
+      value:
+        seriousness: SERIOUS
+        criterion: LIFE_THREATENING
+        reportable: true
+        expedited: true
+        regulatory_reference: ICH E2A Section II.B
+        is_serious: true
+        is_fatal: false
+        is_life_threatening: true
+    serious_congenital:
+      type: return
+      value:
+        seriousness: SERIOUS
+        criterion: CONGENITAL_ANOMALY
+        reportable: true
+        expedited: true
+        regulatory_reference: ICH E2A Section II.B
+        is_serious: true
+        is_fatal: false
+        is_life_threatening: false
+    serious_medically_important:
+      type: return
+      value:
+        seriousness: SERIOUS
+        criterion: MEDICALLY_IMPORTANT
+        reportable: true
+        expedited: true
+        regulatory_reference: ICH E2A Section II.A.4
+        is_serious: true
+        is_fatal: false
+        is_life_threatening: false
+    not_serious:
+      type: return
+      value:
+        seriousness: NON-SERIOUS
+        reportable: false
+        expedited: false
+        regulatory_reference: ICH E2A Section II.B
+        is_serious: false
+        is_fatal: false
+        is_life_threatening: false
+tests:
+# Original 3 criteria - death
+- input:
+    death: true
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+  expect:
+    seriousness: SERIOUS
+    criterion: DEATH
+    reportable: true
+    expedited: true
+    regulatory_reference: ICH E2A Section II.B
+    is_serious: true
+    is_fatal: true
+    is_life_threatening: false
+# Original 3 criteria - hospitalization
+- input:
+    death: false
+    hospitalization: true
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+  expect:
+    seriousness: SERIOUS
+    criterion: HOSPITALIZATION
+    reportable: true
+    expedited: true
+    regulatory_reference: ICH E2A Section II.B
+    is_serious: true
+    is_fatal: false
+    is_life_threatening: false
+# Original 3 criteria - disability
+- input:
+    death: false
+    hospitalization: false
+    disability: true
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+  expect:
+    seriousness: SERIOUS
+    criterion: DISABILITY
+    reportable: true
+    expedited: true
+    regulatory_reference: ICH E2A Section II.B
+    is_serious: true
+    is_fatal: false
+    is_life_threatening: false
+# New criterion - life-threatening
+- input:
+    death: false
+    hospitalization: false
+    disability: false
+    life_threatening: true
+    congenital_anomaly: false
+    medically_important: false
+  expect:
+    seriousness: SERIOUS
+    criterion: LIFE_THREATENING
+    reportable: true
+    expedited: true
+    regulatory_reference: ICH E2A Section II.B
+    is_serious: true
+    is_fatal: false
+    is_life_threatening: true
+# New criterion - congenital anomaly
+- input:
+    death: false
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: true
+    medically_important: false
+  expect:
+    seriousness: SERIOUS
+    criterion: CONGENITAL_ANOMALY
+    reportable: true
+    expedited: true
+    regulatory_reference: ICH E2A Section II.B
+    is_serious: true
+    is_fatal: false
+    is_life_threatening: false
+# New criterion - medically important
+- input:
+    death: false
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: true
+  expect:
+    seriousness: SERIOUS
+    criterion: MEDICALLY_IMPORTANT
+    reportable: true
+    expedited: true
+    regulatory_reference: ICH E2A Section II.A.4
+    is_serious: true
+    is_fatal: false
+    is_life_threatening: false
+# All criteria false - not serious
+- input:
+    death: false
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+  expect:
+    seriousness: NON-SERIOUS
+    reportable: false
+    expedited: false
+    regulatory_reference: ICH E2A Section II.B
+    is_serious: false
+    is_fatal: false
+    is_life_threatening: false
+# All criteria true - death takes priority
+- input:
+    death: true
+    hospitalization: true
+    disability: true
+    life_threatening: true
+    congenital_anomaly: true
+    medically_important: true
+  expect:
+    seriousness: SERIOUS
+    criterion: DEATH
+    reportable: true
+    expedited: true
+    regulatory_reference: ICH E2A Section II.B
+    is_serious: true
+    is_fatal: true
+    is_life_threatening: false
+# Empty input - defaults to not serious
+- input: {}
+  expect:
+    seriousness: NON-SERIOUS
+    reportable: false
+    expedited: false
+    regulatory_reference: ICH E2A Section II.B
+    is_serious: false
+    is_fatal: false
+    is_life_threatening: false

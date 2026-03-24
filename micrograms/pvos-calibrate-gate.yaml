@@ -1,0 +1,77 @@
+name: pvos-calibrate-gate
+description: 'PVOS threshold calibration: gates algorithm threshold calibration on minimum sample size (>=100) and feedback count (>=10) - prevents calibration on sparse data'
+version: 0.1.0
+interface:
+  inputs:
+    feedback_count:
+      type: int
+      required: false
+    sample_size:
+      type: int
+      required: false
+  outputs:
+    decision:
+      type: string
+    description:
+      type: string
+tree:
+  start: check_sample
+  nodes:
+    check_sample:
+      type: condition
+      variable: sample_size
+      operator: gte
+      value: 100
+      true_next: check_feedback
+      false_next: insufficient_data
+    check_feedback:
+      type: condition
+      variable: feedback_count
+      operator: gte
+      value: 10
+      true_next: calibrate
+      false_next: insufficient_feedback
+    calibrate:
+      type: return
+      value:
+        decision: CALIBRATE
+        description: Sufficient data and feedback - proceed with threshold calibration
+    insufficient_data:
+      type: return
+      value:
+        decision: INSUFFICIENT_DATA
+        description: Sample size below 100 - collect more cases before calibrating thresholds
+    insufficient_feedback:
+      type: return
+      value:
+        decision: INSUFFICIENT_DATA
+        description: Feedback count below 10 - collect more signal review feedback before calibrating
+tests:
+- input:
+    sample_size: 250
+    feedback_count: 25
+  expect:
+    decision: CALIBRATE
+    description: Sufficient data and feedback - proceed with threshold calibration
+- input:
+    sample_size: 50
+    feedback_count: 25
+  expect:
+    decision: INSUFFICIENT_DATA
+    description: Sample size below 100 - collect more cases before calibrating thresholds
+- input:
+    sample_size: 200
+    feedback_count: 5
+  expect:
+    decision: INSUFFICIENT_DATA
+    description: Feedback count below 10 - collect more signal review feedback before calibrating
+- input:
+    sample_size: 100
+    feedback_count: 10
+  expect:
+    decision: CALIBRATE
+    description: Sufficient data and feedback - proceed with threshold calibration
+- input: {}
+  expect:
+    decision: INSUFFICIENT_DATA
+    description: Sample size below 100 - collect more cases before calibrating thresholds

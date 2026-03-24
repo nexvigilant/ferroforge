@@ -1,0 +1,144 @@
+name: workflow-completion-gate
+description: "Determines whether the PV investigation workflow is complete and ready for closure"
+version: 0.1.0
+
+interface:
+  inputs:
+    signal_assessed:
+      type: bool
+      description: "Whether the signal has been formally assessed"
+    causality_determined:
+      type: bool
+      description: "Whether causality assessment has been completed"
+    action_recommended:
+      type: bool
+      description: "Whether an action/recommendation has been formulated"
+    report_filed:
+      type: bool
+      description: "Whether the investigation report has been filed"
+    review_complete:
+      type: bool
+      description: "Whether the investigation has been reviewed by a QA person"
+  outputs:
+    complete:
+      type: bool
+      description: "Whether the workflow is complete"
+    remaining_steps:
+      type: string
+      description: "Description of remaining steps if not complete"
+    completion_pct:
+      type: int
+      description: "Percentage completion (0-100)"
+
+tree:
+  start: check_signal_assessed
+  nodes:
+    check_signal_assessed:
+      type: condition
+      variable: signal_assessed
+      operator: eq
+      value: true
+      true_next: check_causality
+      false_next: return_incomplete_1_step
+
+    return_incomplete_1_step:
+      type: return
+      value:
+        complete: false
+        remaining_steps: "Signal assessment, causality determination, action recommendation, report filing, QA review"
+        completion_pct: 0
+
+    check_causality:
+      type: condition
+      variable: causality_determined
+      operator: eq
+      value: true
+      true_next: check_action_recommended
+      false_next: return_incomplete_2_steps
+
+    return_incomplete_2_steps:
+      type: return
+      value:
+        complete: false
+        remaining_steps: "Causality determination, action recommendation, report filing, QA review"
+        completion_pct: 20
+
+    check_action_recommended:
+      type: condition
+      variable: action_recommended
+      operator: eq
+      value: true
+      true_next: check_report_filed
+      false_next: return_incomplete_3_steps
+
+    return_incomplete_3_steps:
+      type: return
+      value:
+        complete: false
+        remaining_steps: "Action recommendation, report filing, QA review"
+        completion_pct: 40
+
+    check_report_filed:
+      type: condition
+      variable: report_filed
+      operator: eq
+      value: true
+      true_next: check_review_complete
+      false_next: return_incomplete_4_steps
+
+    return_incomplete_4_steps:
+      type: return
+      value:
+        complete: false
+        remaining_steps: "Report filing, QA review"
+        completion_pct: 60
+
+    check_review_complete:
+      type: condition
+      variable: review_complete
+      operator: eq
+      value: true
+      true_next: return_complete
+      false_next: return_incomplete_5_steps
+
+    return_incomplete_5_steps:
+      type: return
+      value:
+        complete: false
+        remaining_steps: "QA review"
+        completion_pct: 80
+
+    return_complete:
+      type: return
+      value:
+        complete: true
+        remaining_steps: "none"
+        completion_pct: 100
+
+tests:
+  - input: { signal_assessed: false, causality_determined: false, action_recommended: false, report_filed: false, review_complete: false }
+    expect: { complete: false, remaining_steps: "Signal assessment, causality determination, action recommendation, report filing, QA review", completion_pct: 0 }
+
+  - input: { signal_assessed: true, causality_determined: false, action_recommended: false, report_filed: false, review_complete: false }
+    expect: { complete: false, remaining_steps: "Causality determination, action recommendation, report filing, QA review", completion_pct: 20 }
+
+  - input: { signal_assessed: true, causality_determined: true, action_recommended: false, report_filed: false, review_complete: false }
+    expect: { complete: false, remaining_steps: "Action recommendation, report filing, QA review", completion_pct: 40 }
+
+  - input: { signal_assessed: true, causality_determined: true, action_recommended: true, report_filed: false, review_complete: false }
+    expect: { complete: false, remaining_steps: "Report filing, QA review", completion_pct: 60 }
+
+  - input: { signal_assessed: true, causality_determined: true, action_recommended: true, report_filed: true, review_complete: false }
+    expect: { complete: false, remaining_steps: "QA review", completion_pct: 80 }
+
+  - input: { signal_assessed: true, causality_determined: true, action_recommended: true, report_filed: true, review_complete: true }
+    expect: { complete: true, remaining_steps: "none", completion_pct: 100 }
+
+  - input: { signal_assessed: true, causality_determined: true, action_recommended: true, report_filed: false, review_complete: true }
+    expect: { complete: false, remaining_steps: "Report filing, QA review", completion_pct: 60 }
+
+  - input: { signal_assessed: false, causality_determined: true, action_recommended: true, report_filed: true, review_complete: true }
+    expect: { complete: false, remaining_steps: "Signal assessment, causality determination, action recommendation, report filing, QA review", completion_pct: 0 }
+
+  - input: {}
+    expect: { complete: false, remaining_steps: "Signal assessment, causality determination, action recommendation, report filing, QA review", completion_pct: 0 }

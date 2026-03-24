@@ -1,0 +1,78 @@
+name: dashboard-metric-classifier
+description: 'PVOS dashboard: classifies metric health as HEALTHY/WARNING/CRITICAL using standard PV operational thresholds (warn>=70, critical>=90)'
+version: 0.1.0
+interface:
+  inputs:
+    metric_value:
+      type: int
+      required: false
+  outputs:
+    description:
+      type: string
+    health:
+      type: string
+tree:
+  start: check_critical
+  nodes:
+    check_critical:
+      type: condition
+      variable: metric_value
+      operator: gte
+      value: 90
+      true_next: critical
+      false_next: check_warn
+    check_warn:
+      type: condition
+      variable: metric_value
+      operator: gte
+      value: 70
+      true_next: warning
+      false_next: healthy
+    critical:
+      type: return
+      value:
+        health: CRITICAL
+        description: Metric exceeds critical threshold - immediate action required
+    warning:
+      type: return
+      value:
+        health: WARNING
+        description: Metric exceeds warning threshold - monitor and investigate
+    healthy:
+      type: return
+      value:
+        health: HEALTHY
+        description: Metric within normal range - no action required
+tests:
+- input:
+    metric_value: 95
+    threshold_warn: 70
+    threshold_critical: 90
+  expect:
+    health: CRITICAL
+    description: Metric exceeds critical threshold - immediate action required
+- input:
+    metric_value: 75
+    threshold_warn: 70
+    threshold_critical: 90
+  expect:
+    health: WARNING
+    description: Metric exceeds warning threshold - monitor and investigate
+- input:
+    metric_value: 50
+    threshold_warn: 70
+    threshold_critical: 90
+  expect:
+    health: HEALTHY
+    description: Metric within normal range - no action required
+- input:
+    metric_value: 90
+    threshold_warn: 70
+    threshold_critical: 90
+  expect:
+    health: CRITICAL
+    description: Metric exceeds critical threshold - immediate action required
+- input: {}
+  expect:
+    description: Metric within normal range - no action required
+    health: HEALTHY

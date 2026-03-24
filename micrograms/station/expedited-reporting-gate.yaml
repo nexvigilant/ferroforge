@@ -1,0 +1,149 @@
+name: expedited-reporting-gate
+description: Determines if an adverse event requires expedited reporting (ICH E2A). Evaluates seriousness, unexpectedness, relatedness, and fatality to classify reporting timeline and type.
+version: 0.1.0
+interface:
+  inputs:
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+    is_related:
+      type: bool
+      required: false
+    is_fatal:
+      type: bool
+      required: false
+  outputs:
+    expedited:
+      type: bool
+    timeline_days:
+      type: int
+    report_type:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_fatal
+  nodes:
+    check_fatal:
+      type: condition
+      variable: is_fatal
+      operator: eq
+      value: true
+      true_next: fatal_case
+      false_next: check_serious
+    fatal_case:
+      type: return
+      value:
+        expedited: true
+        timeline_days: 7
+        report_type: 15day_urgent
+        regulatory_reference: ICH_E2A_fatal
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: serious_check_unexpected
+      false_next: non_serious
+    serious_check_unexpected:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: serious_unexpected_check_related
+      false_next: serious_expected
+    serious_unexpected_check_related:
+      type: condition
+      variable: is_related
+      operator: eq
+      value: true
+      true_next: serious_unexpected_related
+      false_next: serious_unexpected_unrelated
+    serious_unexpected_related:
+      type: return
+      value:
+        expedited: true
+        timeline_days: 15
+        report_type: 15day
+        regulatory_reference: ICH_E2A_serious_unexpected_related
+    serious_unexpected_unrelated:
+      type: return
+      value:
+        expedited: false
+        timeline_days: 30
+        report_type: periodic
+        regulatory_reference: ICH_E2A_serious_unexpected_unrelated
+    serious_expected:
+      type: return
+      value:
+        expedited: false
+        timeline_days: 30
+        report_type: periodic
+        regulatory_reference: ICH_E2A_serious_expected
+    non_serious:
+      type: return
+      value:
+        expedited: false
+        timeline_days: 0
+        report_type: none
+        regulatory_reference: ICH_E2A_non_serious
+tests:
+  - input:
+      is_fatal: true
+      is_serious: true
+      is_unexpected: true
+      is_related: true
+    expect:
+      expedited: true
+      timeline_days: 7
+      report_type: 15day_urgent
+      regulatory_reference: ICH_E2A_fatal
+  - input:
+      is_fatal: false
+      is_serious: true
+      is_unexpected: true
+      is_related: true
+    expect:
+      expedited: true
+      timeline_days: 15
+      report_type: 15day
+      regulatory_reference: ICH_E2A_serious_unexpected_related
+  - input:
+      is_fatal: false
+      is_serious: true
+      is_unexpected: true
+      is_related: false
+    expect:
+      expedited: false
+      timeline_days: 30
+      report_type: periodic
+      regulatory_reference: ICH_E2A_serious_unexpected_unrelated
+  - input:
+      is_fatal: false
+      is_serious: true
+      is_unexpected: false
+      is_related: true
+    expect:
+      expedited: false
+      timeline_days: 30
+      report_type: periodic
+      regulatory_reference: ICH_E2A_serious_expected
+  - input:
+      is_fatal: false
+      is_serious: false
+      is_unexpected: true
+      is_related: true
+    expect:
+      expedited: false
+      timeline_days: 0
+      report_type: none
+      regulatory_reference: ICH_E2A_non_serious
+  - input: {}
+    expect:
+      expedited: false
+      timeline_days: 0
+      report_type: none
+      regulatory_reference: ICH_E2A_non_serious

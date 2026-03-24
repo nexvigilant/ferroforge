@@ -1,0 +1,392 @@
+name: primitive-recognizer
+description: 'NER-PIM: Classifies system behaviors by T1 primitive composition. Maps observable system dynamics to primitive spans using BIO-inspired tagging.'
+version: 0.1.0
+interface:
+  inputs:
+    behavior_type:
+      type: string
+      required: true
+      # One of: measurement, comparison, transformation, persistence, oscillation,
+      #         boundary_crossing, state_change, accumulation, decay, convergence
+    has_boundary:
+      type: bool
+      required: false
+    has_state_change:
+      type: bool
+      required: false
+    is_reversible:
+      type: bool
+      required: false
+    frequency:
+      type: string
+      required: false
+      # One of: once, periodic, continuous, burst
+    produces_output:
+      type: bool
+      required: false
+  outputs:
+    primary_primitive:
+      type: string
+    secondary_primitive:
+      type: string
+    composition:
+      type: string
+    confidence:
+      type: int
+    ner_tag:
+      type: string
+    action:
+      type: string
+
+tree:
+  start: classify_behavior
+  nodes:
+    # ─── ENTRY: Route by behavior type ───
+    classify_behavior:
+      type: condition
+      variable: behavior_type
+      operator: eq
+      value: measurement
+      true_next: measurement_span
+      false_next: check_comparison
+
+    check_comparison:
+      type: condition
+      variable: behavior_type
+      operator: eq
+      value: comparison
+      true_next: comparison_span
+      false_next: check_transformation
+
+    check_transformation:
+      type: condition
+      variable: behavior_type
+      operator: eq
+      value: transformation
+      true_next: transformation_span
+      false_next: check_persistence
+
+    check_persistence:
+      type: condition
+      variable: behavior_type
+      operator: eq
+      value: persistence
+      true_next: persistence_span
+      false_next: check_boundary
+
+    check_boundary:
+      type: condition
+      variable: behavior_type
+      operator: eq
+      value: boundary_crossing
+      true_next: boundary_span
+      false_next: check_oscillation
+
+    check_oscillation:
+      type: condition
+      variable: behavior_type
+      operator: eq
+      value: oscillation
+      true_next: oscillation_span
+      false_next: check_state_change
+
+    check_state_change:
+      type: condition
+      variable: behavior_type
+      operator: eq
+      value: state_change
+      true_next: state_change_span
+      false_next: check_accumulation
+
+    check_accumulation:
+      type: condition
+      variable: behavior_type
+      operator: eq
+      value: accumulation
+      true_next: accumulation_span
+      false_next: check_decay
+
+    check_decay:
+      type: condition
+      variable: behavior_type
+      operator: eq
+      value: decay
+      true_next: decay_span
+      false_next: check_convergence
+
+    check_convergence:
+      type: condition
+      variable: behavior_type
+      operator: eq
+      value: convergence
+      true_next: convergence_span
+      false_next: unknown_behavior
+
+    # ─── PRIMITIVE SPANS (BIO-tagged) ───
+
+    measurement_span:
+      type: return
+      value:
+        primary_primitive: "State (varsigma)"
+        secondary_primitive: "Boundary (partial)"
+        composition: "varsigma(partial(x))"
+        confidence: 90
+        ner_tag: "B-STATE"
+        action: "observe"
+
+    comparison_span:
+      type: return
+      value:
+        primary_primitive: "Comparison (kappa)"
+        secondary_primitive: "State (varsigma)"
+        composition: "kappa(varsigma_a, varsigma_b)"
+        confidence: 85
+        ner_tag: "B-COMPARISON"
+        action: "evaluate_delta"
+
+    transformation_span:
+      type: condition
+      variable: is_reversible
+      operator: eq
+      value: true
+      true_next: reversible_transform
+      false_next: irreversible_transform
+
+    reversible_transform:
+      type: return
+      value:
+        primary_primitive: "Causality (arrow)"
+        secondary_primitive: "State (varsigma)"
+        composition: "arrow(varsigma) [reversible]"
+        confidence: 80
+        ner_tag: "B-TRANSFORM"
+        action: "apply_and_verify"
+
+    irreversible_transform:
+      type: return
+      value:
+        primary_primitive: "Irreversibility (proportional)"
+        secondary_primitive: "Causality (arrow)"
+        composition: "proportional(arrow(varsigma))"
+        confidence: 90
+        ner_tag: "B-IRREVERSIBLE"
+        action: "gate_before_applying"
+
+    persistence_span:
+      type: return
+      value:
+        primary_primitive: "Persistence (pi)"
+        secondary_primitive: "State (varsigma)"
+        composition: "pi(varsigma)"
+        confidence: 95
+        ner_tag: "B-PERSIST"
+        action: "commit_and_verify"
+
+    boundary_span:
+      type: condition
+      variable: has_state_change
+      operator: eq
+      value: true
+      true_next: boundary_with_transition
+      false_next: boundary_without_transition
+
+    boundary_with_transition:
+      type: return
+      value:
+        primary_primitive: "Boundary (partial)"
+        secondary_primitive: "Existence (exists)"
+        composition: "partial(times(varsigma, emptyset)) = exists"
+        confidence: 90
+        ner_tag: "B-BOUNDARY"
+        action: "validate_at_consumer"
+
+    boundary_without_transition:
+      type: return
+      value:
+        primary_primitive: "Boundary (partial)"
+        secondary_primitive: "Void (emptyset)"
+        composition: "partial(emptyset)"
+        confidence: 75
+        ner_tag: "B-BOUNDARY"
+        action: "check_measurement_point"
+
+    oscillation_span:
+      type: return
+      value:
+        primary_primitive: "Frequency (nu)"
+        secondary_primitive: "State (varsigma)"
+        composition: "nu(varsigma) [periodic]"
+        confidence: 85
+        ner_tag: "B-FREQUENCY"
+        action: "measure_period"
+
+    state_change_span:
+      type: return
+      value:
+        primary_primitive: "State (varsigma)"
+        secondary_primitive: "Causality (arrow)"
+        composition: "arrow(varsigma_old, varsigma_new)"
+        confidence: 85
+        ner_tag: "B-STATE"
+        action: "record_transition"
+
+    accumulation_span:
+      type: return
+      value:
+        primary_primitive: "Quantity (N)"
+        secondary_primitive: "Persistence (pi)"
+        composition: "N(pi(varsigma)) [growing]"
+        confidence: 80
+        ner_tag: "B-ACCUMULATE"
+        action: "monitor_growth_rate"
+
+    decay_span:
+      type: return
+      value:
+        primary_primitive: "Quantity (N)"
+        secondary_primitive: "Frequency (nu)"
+        composition: "N(varsigma) * e^(-nu*t)"
+        confidence: 80
+        ner_tag: "B-DECAY"
+        action: "check_half_life"
+
+    convergence_span:
+      type: condition
+      variable: produces_output
+      operator: eq
+      value: true
+      true_next: productive_convergence
+      false_next: false_convergence
+
+    productive_convergence:
+      type: return
+      value:
+        primary_primitive: "Self-reference (rho)"
+        secondary_primitive: "Persistence (pi)"
+        composition: "rho(pi(output))"
+        confidence: 85
+        ner_tag: "B-CONVERGE"
+        action: "ship_result"
+
+    false_convergence:
+      type: return
+      value:
+        primary_primitive: "Self-reference (rho)"
+        secondary_primitive: "Void (emptyset)"
+        composition: "rho(emptyset) [false convergence]"
+        confidence: 70
+        ner_tag: "B-CONVERGE"
+        action: "apply_convergence_guard"
+
+    unknown_behavior:
+      type: return
+      value:
+        primary_primitive: "Void (emptyset)"
+        secondary_primitive: "Void (emptyset)"
+        composition: "emptyset"
+        confidence: 30
+        ner_tag: "O"
+        action: "investigate"
+
+tests:
+  # ─── Core behavior tests ───
+  - input:
+      behavior_type: measurement
+    expect:
+      primary_primitive: "State (varsigma)"
+      ner_tag: "B-STATE"
+      action: "observe"
+
+  - input:
+      behavior_type: comparison
+    expect:
+      primary_primitive: "Comparison (kappa)"
+      ner_tag: "B-COMPARISON"
+
+  - input:
+      behavior_type: transformation
+      is_reversible: true
+    expect:
+      primary_primitive: "Causality (arrow)"
+      ner_tag: "B-TRANSFORM"
+
+  - input:
+      behavior_type: transformation
+      is_reversible: false
+    expect:
+      primary_primitive: "Irreversibility (proportional)"
+      ner_tag: "B-IRREVERSIBLE"
+      action: "gate_before_applying"
+
+  - input:
+      behavior_type: persistence
+    expect:
+      primary_primitive: "Persistence (pi)"
+      confidence: 95
+      action: "commit_and_verify"
+
+  - input:
+      behavior_type: boundary_crossing
+      has_state_change: true
+    expect:
+      primary_primitive: "Boundary (partial)"
+      composition: "partial(times(varsigma, emptyset)) = exists"
+
+  - input:
+      behavior_type: boundary_crossing
+      has_state_change: false
+    expect:
+      primary_primitive: "Boundary (partial)"
+      secondary_primitive: "Void (emptyset)"
+
+  - input:
+      behavior_type: oscillation
+    expect:
+      primary_primitive: "Frequency (nu)"
+      ner_tag: "B-FREQUENCY"
+
+  - input:
+      behavior_type: convergence
+      produces_output: true
+    expect:
+      primary_primitive: "Self-reference (rho)"
+      action: "ship_result"
+
+  - input:
+      behavior_type: convergence
+      produces_output: false
+    expect:
+      primary_primitive: "Self-reference (rho)"
+      composition: "rho(emptyset) [false convergence]"
+      action: "apply_convergence_guard"
+
+  # ─── Self-vigilance case mapping ───
+  - input:
+      behavior_type: accumulation
+    expect:
+      primary_primitive: "Quantity (N)"
+      ner_tag: "B-ACCUMULATE"
+      action: "monitor_growth_rate"
+
+  - input:
+      behavior_type: decay
+    expect:
+      primary_primitive: "Quantity (N)"
+      action: "check_half_life"
+
+  # ─── Edge case: unknown ───
+  - input:
+      behavior_type: something_novel
+    expect:
+      primary_primitive: "Void (emptyset)"
+      confidence: 30
+      ner_tag: "O"
+      action: "investigate"
+  - input: {}
+    expect:
+      action: investigate
+      composition: emptyset
+      confidence: 30
+      ner_tag: O
+      primary_primitive: Void (emptyset)
+      secondary_primitive: Void (emptyset)

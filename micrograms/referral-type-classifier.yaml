@@ -1,0 +1,93 @@
+name: referral-type-classifier
+description: "Classify EMA referral procedures by reason and determine article type and timeline"
+version: 0.1.0
+
+tree:
+  start: validate_reason
+  nodes:
+    validate_reason:
+      type: condition
+      variable: reason
+      operator: is_not_null
+      true_next: classify_reason
+      false_next: missing_input
+
+    classify_reason:
+      type: condition
+      variable: reason
+      operator: matches
+      value: "(?i)^safety$"
+      true_next: referral_safety
+      false_next: check_efficacy
+
+    check_efficacy:
+      type: condition
+      variable: reason
+      operator: matches
+      value: "(?i)^efficacy$"
+      true_next: referral_efficacy
+      false_next: check_pv
+
+    check_pv:
+      type: condition
+      variable: reason
+      operator: matches
+      value: "(?i)^pharmacovigilance$"
+      true_next: referral_pv
+      false_next: referral_other
+
+    referral_safety:
+      type: return
+      value:
+        article_type: "art31"
+        procedure_type: "safety_signal_assessment"
+        typical_timeline_months: 6
+
+    referral_efficacy:
+      type: return
+      value:
+        article_type: "art20"
+        procedure_type: "efficacy_reassessment"
+        typical_timeline_months: 12
+
+    referral_pv:
+      type: return
+      value:
+        article_type: "art107i"
+        procedure_type: "pharmacovigilance_procedure"
+        typical_timeline_months: 4
+
+    referral_other:
+      type: return
+      value:
+        article_type: "other"
+        procedure_type: "special_procedure"
+        typical_timeline_months: 9
+
+    missing_input:
+      type: return
+      value:
+        article_type: null
+        procedure_type: null
+        typical_timeline_months: null
+
+tests:
+  - input: { reason: "safety" }
+    expect: { article_type: "art31", procedure_type: "safety_signal_assessment", typical_timeline_months: 6 }
+
+  - input: { reason: "efficacy" }
+    expect: { article_type: "art20", procedure_type: "efficacy_reassessment", typical_timeline_months: 12 }
+
+  - input: { reason: "pharmacovigilance" }
+    expect: { article_type: "art107i", procedure_type: "pharmacovigilance_procedure", typical_timeline_months: 4 }
+
+  - input: { reason: "quality" }
+    expect: { article_type: "other", procedure_type: "special_procedure", typical_timeline_months: 9 }
+
+  - input: { reason: null }
+    expect: { article_type: null, procedure_type: null, typical_timeline_months: null }
+  - input: {}
+    expect:
+      article_type: null
+      procedure_type: null
+      typical_timeline_months: null

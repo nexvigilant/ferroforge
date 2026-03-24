@@ -1,0 +1,46 @@
+name: ab-lipinski-mw
+description: 'Antibody: Lipinski Rule of 5 molecular weight gate (prima-chem). MW > 500 = oral bioavailability threat.'
+version: 0.1.0
+interface:
+  inputs:
+    molecular_weight:
+      type: number
+      required: true
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: molecular_weight
+      operator: gt
+      value: 500
+      true_next: violation
+      false_next: clean
+    violation:
+      type: return
+      value:
+        threat: true
+        response: 'WARN: MW > 500 violates Lipinski Rule of 5 — poor oral bioavailability'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { molecular_weight: 300 }
+  expect: { threat: false }
+- input: { molecular_weight: 500 }
+  expect: { threat: false }
+- input: { molecular_weight: 501 }
+  expect: { threat: true }
+- input: { molecular_weight: 1200 }
+  expect: { threat: true }
+- input: {}
+  expect:
+    response: PASS
+    threat: false

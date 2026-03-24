@@ -1,0 +1,41 @@
+name: case-assessment-pipeline
+description: 'Full case assessment: seriousness classification → boolean decomposition → expectedness classification → boolean transform. The core ICSR workflow using accumulate mode to carry seriousness flags through expectedness assessment.'
+version: 0.2.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - case-seriousness
+  - transform-seriousness-to-bool
+  - expectedness-check
+  - transform-expectedness-to-bool
+tests:
+- name: fatal unexpected case — serious with unexpected nature
+  input:
+    death: true
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+    event_in_label: false
+    event_class_in_label: false
+  expect:
+    serious: true
+    fatal: true
+    unexpected: true
+    expectedness: UNEXPECTED_NATURE
+- name: non-serious expected case — expected and listed
+  input:
+    death: false
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+    event_in_label: true
+    severity_in_label: true
+  expect:
+    serious: false
+    fatal: false
+    unexpected: false
+    expectedness: EXPECTED_LISTED

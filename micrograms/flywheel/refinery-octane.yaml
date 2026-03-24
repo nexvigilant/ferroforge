@@ -1,0 +1,65 @@
+name: refinery-octane
+description: "Compute octane rating (confidence x coverage) for product quality. High octane = high-quality decision. Low octane = unreliable output."
+version: 0.1.0
+tree:
+  start: classify_octane
+  nodes:
+    classify_octane:
+      type: condition
+      variable: octane_rating
+      operator: gte
+      value: 87
+      true_next: return_premium
+      false_next: check_regular
+    check_regular:
+      type: condition
+      variable: octane_rating
+      operator: gte
+      value: 70
+      true_next: return_regular
+      false_next: check_substandard
+    check_substandard:
+      type: condition
+      variable: octane_rating
+      operator: gte
+      value: 40
+      true_next: return_substandard
+      false_next: return_off_spec
+    return_premium:
+      type: return
+      value:
+        octane_class: PREMIUM
+        action: "High-quality decision output; ship with confidence"
+        refinery_analog: "Premium grade (91+); high anti-knock index, suitable for high-compression engines"
+    return_regular:
+      type: return
+      value:
+        octane_class: REGULAR
+        action: "Acceptable quality; adequate for most decisions"
+        refinery_analog: "Regular grade (87); standard performance, no knock risk"
+    return_substandard:
+      type: return
+      value:
+        octane_class: SUBSTANDARD
+        action: "Low quality; supplement with additional validation before acting"
+        refinery_analog: "Below specification; risk of engine knock under load"
+    return_off_spec:
+      type: return
+      value:
+        octane_class: OFF_SPEC
+        action: "Product fails spec; do not ship — reprocess or discard"
+        refinery_analog: "Off-specification; must be reblended or downgraded"
+tests:
+  - input: { octane_rating: 92 }
+    expect: { octane_class: PREMIUM }
+  - input: { octane_rating: 75 }
+    expect: { octane_class: REGULAR }
+  - input: { octane_rating: 50 }
+    expect: { octane_class: SUBSTANDARD }
+  - input: { octane_rating: 20 }
+    expect: { octane_class: OFF_SPEC }
+  - input: {}
+    expect:
+      action: Product fails spec; do not ship — reprocess or discard
+      octane_class: OFF_SPEC
+      refinery_analog: Off-specification; must be reblended or downgraded

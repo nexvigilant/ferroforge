@@ -1,0 +1,132 @@
+name: bias-control
+description: "Domain 9: Identify bias type and route to appropriate control strategy — selection, information, confounding."
+version: 0.1.0
+interface:
+  inputs:
+    bias_type:
+      type: string
+      required: false
+  outputs:
+    ai_assist:
+      type: string
+    approach:
+      type: string
+    bias:
+      type: string
+    control_methods:
+      type: string
+    description:
+      type: string
+    framework:
+      type: string
+    subtypes:
+      type: string
+tree:
+  start: check_type
+  nodes:
+    check_type:
+      type: condition
+      variable: bias_type
+      operator: eq
+      value: selection
+      true_next: selection_bias
+      false_next: check_information
+    check_information:
+      type: condition
+      variable: bias_type
+      operator: eq
+      value: information
+      true_next: information_bias
+      false_next: check_confounding
+    check_confounding:
+      type: condition
+      variable: bias_type
+      operator: eq
+      value: confounding
+      true_next: confounding
+      false_next: check_immortal
+    check_immortal:
+      type: condition
+      variable: bias_type
+      operator: eq
+      value: immortal_time
+      true_next: immortal_time
+      false_next: check_protopathic
+    check_protopathic:
+      type: condition
+      variable: bias_type
+      operator: eq
+      value: protopathic
+      true_next: protopathic
+      false_next: general_bias
+    selection_bias:
+      type: return
+      value:
+        bias: SELECTION
+        description: "systematic difference between study population and target population"
+        subtypes: "participation bias, loss to follow-up, volunteer bias, healthy worker effect"
+        control_methods: "active comparator design, sensitivity analysis, IPW for censoring"
+        ai_assist: "automated attrition analysis, pattern detection in loss to follow-up"
+    information_bias:
+      type: return
+      value:
+        bias: INFORMATION
+        description: "systematic error in exposure or outcome measurement"
+        subtypes: "recall bias, misclassification, interviewer bias, surveillance bias"
+        control_methods: "validated outcome definitions, blinded assessment, sensitivity analysis for misclassification"
+        ai_assist: "NLP for outcome phenotyping validation, automated coding verification"
+    confounding:
+      type: return
+      value:
+        bias: CONFOUNDING
+        description: "third variable associated with both exposure and outcome distorting the association"
+        subtypes: "measured confounding, unmeasured confounding, time-varying confounding, confounding by indication"
+        control_methods: "propensity scores, multivariable regression, instrumental variables, IPTW, restriction, matching"
+        ai_assist: "ML confounder identification, high-dimensional propensity scores, causal graph construction"
+    immortal_time:
+      type: return
+      value:
+        bias: IMMORTAL_TIME
+        description: "period during which outcome cannot occur, misattributed to exposure group"
+        subtypes: "misclassified person-time, time-related selection"
+        control_methods: "landmark analysis, time-dependent exposure classification, proper person-time alignment"
+        ai_assist: "automated person-time validation, temporal alignment checking"
+    protopathic:
+      type: return
+      value:
+        bias: PROTOPATHIC
+        description: "early symptoms of outcome lead to exposure, reversing causal direction"
+        subtypes: "reverse causation, indication bias"
+        control_methods: "exposure lag windows, sensitivity analysis with varying lag periods, new-user design"
+        ai_assist: "temporal sequence analysis, symptom-exposure pattern detection"
+    general_bias:
+      type: return
+      value:
+        bias: GENERAL
+        approach: "systematic bias assessment using directed acyclic graphs (DAGs)"
+        framework: "identify all potential biases, quantify direction and magnitude, apply appropriate controls"
+        ai_assist: "automated DAG construction, probabilistic bias analysis, Monte Carlo sensitivity analysis"
+tests:
+- input:
+    bias_type: selection
+  expect:
+    bias: SELECTION
+- input:
+    bias_type: information
+  expect:
+    bias: INFORMATION
+- input:
+    bias_type: confounding
+  expect:
+    bias: CONFOUNDING
+- input:
+    bias_type: immortal_time
+  expect:
+    bias: IMMORTAL_TIME
+- input:
+    bias_type: protopathic
+  expect:
+    bias: PROTOPATHIC
+- input: {}
+  expect:
+    bias: GENERAL

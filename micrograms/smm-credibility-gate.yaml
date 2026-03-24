@@ -1,0 +1,130 @@
+name: smm-credibility-gate
+description: "Maps severity bands to credibility levels for empirical works (SMM-001 path). Determines integration weight and review action for K-state."
+version: 0.1.0
+interface:
+  inputs:
+    severity_band:
+      type: string
+      required: false
+  outputs:
+    credibility_level:
+      type: string
+    integration_weight:
+      type: string
+    review_action:
+      type: string
+    cs_range:
+      type: string
+tree:
+  start: check_exemplary
+  nodes:
+    check_exemplary:
+      type: condition
+      variable: severity_band
+      operator: eq
+      value: EXEMPLARY
+      true_next: authoritative
+      false_next: check_high
+    check_high:
+      type: condition
+      variable: severity_band
+      operator: eq
+      value: HIGH
+      true_next: credible
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: severity_band
+      operator: eq
+      value: MODERATE
+      true_next: conditional
+      false_next: check_low
+    check_low:
+      type: condition
+      variable: severity_band
+      operator: eq
+      value: LOW
+      true_next: weak
+      false_next: not_credible
+    authoritative:
+      type: return
+      value:
+        credibility_level: AUTHORITATIVE
+        integration_weight: full
+        review_action: "Integrate at full weight. Minor violations annotated."
+        cs_range: "0.90-1.00"
+    credible:
+      type: return
+      value:
+        credibility_level: CREDIBLE
+        integration_weight: high
+        review_action: "Integrate at high weight. Advisory flags for minor gaps."
+        cs_range: "0.80-0.89"
+    conditional:
+      type: return
+      value:
+        credibility_level: CONDITIONAL
+        integration_weight: conditional
+        review_action: "Integrate at 0.60x weight. Violation summary appended. Remediation recommended."
+        cs_range: "0.60-0.79"
+    weak:
+      type: return
+      value:
+        credibility_level: WEAK
+        integration_weight: low
+        review_action: "Integrate at 0.25x weight. Requires supporting corroboration from independent sources."
+        cs_range: "0.30-0.59"
+    not_credible:
+      type: return
+      value:
+        credibility_level: NOT_CREDIBLE
+        integration_weight: exclude
+        review_action: "Exclude from K-state. Structural integrity insufficient for evidence integration."
+        cs_range: "0.00-0.29"
+tests:
+- input:
+    severity_band: EXEMPLARY
+  expect:
+    credibility_level: AUTHORITATIVE
+    integration_weight: full
+    cs_range: "0.90-1.00"
+- input:
+    severity_band: HIGH
+  expect:
+    credibility_level: CREDIBLE
+    integration_weight: high
+    cs_range: "0.80-0.89"
+- input:
+    severity_band: MODERATE
+  expect:
+    credibility_level: CONDITIONAL
+    integration_weight: conditional
+    cs_range: "0.60-0.79"
+- input:
+    severity_band: LOW
+  expect:
+    credibility_level: WEAK
+    integration_weight: low
+    cs_range: "0.30-0.59"
+- input:
+    severity_band: VERY_LOW
+  expect:
+    credibility_level: NOT_CREDIBLE
+    integration_weight: exclude
+    cs_range: "0.00-0.29"
+# Empty input = NOT_CREDIBLE (conservative)
+- input: {}
+  expect:
+    credibility_level: NOT_CREDIBLE
+    integration_weight: exclude
+# Unknown band = NOT_CREDIBLE
+- input:
+    severity_band: UNKNOWN
+  expect:
+    credibility_level: NOT_CREDIBLE
+    integration_weight: exclude
+# Review action assertion on different band
+- input:
+    severity_band: LOW
+  expect:
+    review_action: "Integrate at 0.25x weight. Requires supporting corroboration from independent sources."

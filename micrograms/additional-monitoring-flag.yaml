@@ -1,0 +1,176 @@
+name: additional-monitoring-flag
+description: 'Determine if drug requires additional monitoring (black triangle symbol) based on regulatory status, market tenure, and conditions. EMA Additional Monitoring Guidance.'
+version: 0.1.0
+interface:
+  inputs:
+    is_new_substance:
+      type: bool
+      required: false
+    years_on_market:
+      type: int
+      required: false
+    has_conditional_approval:
+      type: bool
+      required: false
+    has_rmp_condition:
+      type: bool
+      required: false
+  outputs:
+    requires_monitoring:
+      type: bool
+    symbol:
+      type: string
+    rationale:
+      type: string
+tree:
+  start: new_substance_check
+  nodes:
+    new_substance_check:
+      type: condition
+      variable: is_new_substance
+      operator: eq
+      value: true
+      true_next: new_substance_tenure_check
+      false_next: conditional_approval_check
+    new_substance_tenure_check:
+      type: condition
+      variable: years_on_market
+      operator: lt
+      value: 5
+      true_next: monitoring_required_new
+      false_next: conditional_approval_check
+    conditional_approval_check:
+      type: condition
+      variable: has_conditional_approval
+      operator: eq
+      value: true
+      true_next: monitoring_required_conditional
+      false_next: rmp_condition_check
+    rmp_condition_check:
+      type: condition
+      variable: has_rmp_condition
+      operator: eq
+      value: true
+      true_next: monitoring_required_rmp
+      false_next: no_monitoring_required
+    monitoring_required_new:
+      type: return
+      value:
+        requires_monitoring: true
+        symbol: black_triangle
+        rationale: New active substance within 5 years of approval - Enhanced pharmacovigilance required
+    monitoring_required_conditional:
+      type: return
+      value:
+        requires_monitoring: true
+        symbol: black_triangle
+        rationale: Conditional approval - Additional monitoring a condition of marketing authorization
+    monitoring_required_rmp:
+      type: return
+      value:
+        requires_monitoring: true
+        symbol: black_triangle
+        rationale: Risk Minimization Plan condition - Additional monitoring required to support RMP objectives
+    no_monitoring_required:
+      type: return
+      value:
+        requires_monitoring: false
+        symbol: none
+        rationale: Established safety profile - Standard pharmacovigilance sufficient
+tests:
+  # New substance < 5 years → requires monitoring
+  - input:
+      is_new_substance: true
+      years_on_market: 2
+      has_conditional_approval: false
+      has_rmp_condition: false
+    expect:
+      requires_monitoring: true
+      symbol: black_triangle
+      rationale: New active substance within 5 years of approval - Enhanced pharmacovigilance required
+  # New substance >= 5 years → check conditions
+  - input:
+      is_new_substance: true
+      years_on_market: 7
+      has_conditional_approval: false
+      has_rmp_condition: false
+    expect:
+      requires_monitoring: false
+      symbol: none
+      rationale: Established safety profile - Standard pharmacovigilance sufficient
+  # Conditional approval → requires monitoring
+  - input:
+      is_new_substance: false
+      years_on_market: 10
+      has_conditional_approval: true
+      has_rmp_condition: false
+    expect:
+      requires_monitoring: true
+      symbol: black_triangle
+      rationale: Conditional approval - Additional monitoring a condition of marketing authorization
+  # RMP condition → requires monitoring
+  - input:
+      is_new_substance: false
+      years_on_market: 15
+      has_conditional_approval: false
+      has_rmp_condition: true
+    expect:
+      requires_monitoring: true
+      symbol: black_triangle
+      rationale: Risk Minimization Plan condition - Additional monitoring required to support RMP objectives
+  # No conditions → no monitoring
+  - input:
+      is_new_substance: false
+      years_on_market: 20
+      has_conditional_approval: false
+      has_rmp_condition: false
+    expect:
+      requires_monitoring: false
+      symbol: none
+      rationale: Established safety profile - Standard pharmacovigilance sufficient
+  # New substance boundary: exactly 5 years → no monitoring
+  - input:
+      is_new_substance: true
+      years_on_market: 5
+      has_conditional_approval: false
+      has_rmp_condition: false
+    expect:
+      requires_monitoring: false
+      symbol: none
+      rationale: Established safety profile - Standard pharmacovigilance sufficient
+  # New substance boundary: exactly 4 years 11 months → monitoring
+  - input:
+      is_new_substance: true
+      years_on_market: 4
+      has_conditional_approval: false
+      has_rmp_condition: false
+    expect:
+      requires_monitoring: true
+      symbol: black_triangle
+      rationale: New active substance within 5 years of approval - Enhanced pharmacovigilance required
+  # Multiple conditions: new AND conditional → monitoring (new triggers first)
+  - input:
+      is_new_substance: true
+      years_on_market: 2
+      has_conditional_approval: true
+      has_rmp_condition: false
+    expect:
+      requires_monitoring: true
+      symbol: black_triangle
+      rationale: New active substance within 5 years of approval - Enhanced pharmacovigilance required
+  # Multiple conditions: conditional AND rmp → monitoring (conditional triggers)
+  - input:
+      is_new_substance: false
+      years_on_market: 10
+      has_conditional_approval: true
+      has_rmp_condition: true
+    expect:
+      requires_monitoring: true
+      symbol: black_triangle
+      rationale: Conditional approval - Additional monitoring a condition of marketing authorization
+  # Empty input defaults to no monitoring
+  - input: {}
+    expect:
+      requires_monitoring: false
+      symbol: none
+      rationale: Established safety profile - Standard pharmacovigilance sufficient

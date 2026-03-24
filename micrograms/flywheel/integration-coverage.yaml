@@ -1,0 +1,196 @@
+name: integration-coverage
+description: 'Doctrine integration coverage classifier. Checks whether a domain crate has all 3 layers wired: Anatomy (nucleus page), Physiology (microgram), Nervous System (MCP tool). COMPLETE (3/3), PARTIAL (1-2/3), GAP (0/3). Prevents capability gaps from accumulating.'
+version: 0.1.0
+interface:
+  inputs:
+    has_mcp_tool:
+      type: bool
+      required: true
+    has_microgram:
+      type: bool
+      required: true
+    has_nucleus_page:
+      type: bool
+      required: true
+    has_pv_compute:
+      type: bool
+      required: false
+  outputs:
+    coverage:
+      type: string
+    layers_wired:
+      type: int
+    missing:
+      type: string
+tree:
+  start: check_mcp
+  nodes:
+    check_mcp:
+      type: condition
+      variable: has_mcp_tool
+      operator: eq
+      value: true
+      true_next: check_mcg_with_mcp
+      false_next: check_mcg_no_mcp
+    check_mcg_with_mcp:
+      type: condition
+      variable: has_microgram
+      operator: eq
+      value: true
+      true_next: check_page_with_both
+      false_next: check_page_mcp_only
+    check_mcg_no_mcp:
+      type: condition
+      variable: has_microgram
+      operator: eq
+      value: true
+      true_next: check_page_mcg_only
+      false_next: check_page_none
+    check_page_with_both:
+      type: condition
+      variable: has_nucleus_page
+      operator: eq
+      value: true
+      true_next: complete
+      false_next: partial_two_no_page
+    check_page_mcp_only:
+      type: condition
+      variable: has_nucleus_page
+      operator: eq
+      value: true
+      true_next: partial_two_no_mcg
+      false_next: partial_one_mcp
+    check_page_mcg_only:
+      type: condition
+      variable: has_nucleus_page
+      operator: eq
+      value: true
+      true_next: partial_two_no_mcp
+      false_next: partial_one_mcg
+    check_page_none:
+      type: condition
+      variable: has_nucleus_page
+      operator: eq
+      value: true
+      true_next: partial_one_page
+      false_next: gap
+    complete:
+      type: return
+      value:
+        coverage: complete
+        layers_wired: 3
+        missing: none
+    partial_two_no_page:
+      type: return
+      value:
+        coverage: partial
+        layers_wired: 2
+        missing: nucleus_page
+    partial_two_no_mcg:
+      type: return
+      value:
+        coverage: partial
+        layers_wired: 2
+        missing: microgram
+    partial_two_no_mcp:
+      type: return
+      value:
+        coverage: partial
+        layers_wired: 2
+        missing: mcp_tool
+    partial_one_mcp:
+      type: return
+      value:
+        coverage: partial
+        layers_wired: 1
+        missing: microgram+nucleus_page
+    partial_one_mcg:
+      type: return
+      value:
+        coverage: partial
+        layers_wired: 1
+        missing: mcp_tool+nucleus_page
+    partial_one_page:
+      type: return
+      value:
+        coverage: partial
+        layers_wired: 1
+        missing: mcp_tool+microgram
+    gap:
+      type: return
+      value:
+        coverage: gap
+        layers_wired: 0
+        missing: all
+tests:
+- input:
+    has_mcp_tool: true
+    has_microgram: true
+    has_nucleus_page: true
+  expect:
+    coverage: complete
+    layers_wired: 3
+    missing: none
+- input:
+    has_mcp_tool: true
+    has_microgram: true
+    has_nucleus_page: false
+  expect:
+    coverage: partial
+    layers_wired: 2
+    missing: nucleus_page
+- input:
+    has_mcp_tool: true
+    has_microgram: false
+    has_nucleus_page: false
+  expect:
+    coverage: partial
+    layers_wired: 1
+    missing: microgram+nucleus_page
+- input:
+    has_mcp_tool: false
+    has_microgram: false
+    has_nucleus_page: false
+  expect:
+    coverage: gap
+    layers_wired: 0
+    missing: all
+- input:
+    has_mcp_tool: false
+    has_microgram: true
+    has_nucleus_page: true
+  expect:
+    coverage: partial
+    layers_wired: 2
+    missing: mcp_tool
+- input:
+    has_mcp_tool: false
+    has_microgram: false
+    has_nucleus_page: true
+  expect:
+    coverage: partial
+    layers_wired: 1
+    missing: mcp_tool+microgram
+# partial_two_no_mcg: MCP + page but no microgram
+- input:
+    has_mcp_tool: true
+    has_microgram: false
+    has_nucleus_page: true
+  expect:
+    coverage: partial
+    layers_wired: 2
+    missing: microgram
+# partial_one_mcg: microgram only, no MCP or page
+- input:
+    has_mcp_tool: false
+    has_microgram: true
+    has_nucleus_page: false
+  expect:
+    coverage: partial
+    layers_wired: 1
+    missing: mcp_tool+nucleus_page
+- input: {}
+  expect:
+    coverage: gap
+    layers_wired: 0
+    missing: all

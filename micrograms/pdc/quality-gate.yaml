@@ -1,0 +1,159 @@
+name: quality-gate
+description: "PDC: Classify framework element as CORE (globally immutable) or FLEXIBLE (culturally adaptable)"
+version: 0.1.0
+interface:
+  inputs:
+    element_type:
+      type: string
+      required: false
+  outputs:
+    adaptation_allowed:
+      type: bool
+    classification:
+      type: string
+    mutability:
+      type: string
+    quality_check:
+      type: string
+    scope:
+      type: string
+tree:
+  start: check_domain_def
+  nodes:
+    check_domain_def:
+      type: condition
+      variable: element_type
+      operator: eq
+      value: domain_definition
+      true_next: core_element
+      false_next: check_epa_criteria
+    check_epa_criteria:
+      type: condition
+      variable: element_type
+      operator: eq
+      value: epa_criteria
+      true_next: core_element
+      false_next: check_anchor_spec
+    check_anchor_spec:
+      type: condition
+      variable: element_type
+      operator: eq
+      value: behavioral_anchor
+      true_next: core_element
+      false_next: check_gateway
+    check_gateway:
+      type: condition
+      variable: element_type
+      operator: eq
+      value: ai_gateway_standard
+      true_next: core_element
+      false_next: check_cpa_req
+    check_cpa_req:
+      type: condition
+      variable: element_type
+      operator: eq
+      value: cpa_requirement
+      true_next: core_element
+      false_next: check_comm_style
+    check_comm_style:
+      type: condition
+      variable: element_type
+      operator: eq
+      value: communication_style
+      true_next: flexible_element
+      false_next: check_case_study
+    check_case_study:
+      type: condition
+      variable: element_type
+      operator: eq
+      value: case_study
+      true_next: flexible_element
+      false_next: check_assess_method
+    check_assess_method:
+      type: condition
+      variable: element_type
+      operator: eq
+      value: assessment_method
+      true_next: flexible_element
+      false_next: check_delivery
+    check_delivery:
+      type: condition
+      variable: element_type
+      operator: eq
+      value: delivery_approach
+      true_next: flexible_element
+      false_next: unknown_element
+    core_element:
+      type: return
+      value:
+        classification: CORE
+        mutability: immutable
+        scope: global
+        adaptation_allowed: false
+        quality_check: "exact_match_across_regions"
+    flexible_element:
+      type: return
+      value:
+        classification: FLEXIBLE
+        mutability: adaptable
+        scope: regional
+        adaptation_allowed: true
+        quality_check: "outcome_equivalence_across_regions"
+    unknown_element:
+      type: return
+      value:
+        classification: UNKNOWN
+        mutability: requires_review
+        scope: pending
+        adaptation_allowed: false
+        quality_check: "governance_review_required"
+tests:
+- input:
+    element_type: domain_definition
+  expect:
+    classification: CORE
+    adaptation_allowed: false
+- input:
+    element_type: epa_criteria
+  expect:
+    classification: CORE
+    mutability: immutable
+- input:
+    element_type: behavioral_anchor
+  expect:
+    classification: CORE
+    scope: global
+- input:
+    element_type: ai_gateway_standard
+  expect:
+    classification: CORE
+- input:
+    element_type: cpa_requirement
+  expect:
+    classification: CORE
+- input:
+    element_type: communication_style
+  expect:
+    classification: FLEXIBLE
+    adaptation_allowed: true
+- input:
+    element_type: case_study
+  expect:
+    classification: FLEXIBLE
+    scope: regional
+- input:
+    element_type: assessment_method
+  expect:
+    classification: FLEXIBLE
+- input:
+    element_type: delivery_approach
+  expect:
+    classification: FLEXIBLE
+- input:
+    element_type: something_new
+  expect:
+    classification: UNKNOWN
+    quality_check: governance_review_required
+- input: {}
+  expect:
+    classification: UNKNOWN

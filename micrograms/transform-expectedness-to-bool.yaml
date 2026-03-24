@@ -1,0 +1,65 @@
+name: transform-expectedness-to-bool
+description: 'Transform: converts expectedness-check enum (UNEXPECTED_NATURE/SEVERITY) to boolean for susar-classifier'
+version: 0.1.0
+interface:
+  inputs:
+    expectedness:
+      type: string
+      required: true
+  outputs:
+    unexpected:
+      type: bool
+    source:
+      type: string
+tree:
+  start: check_unexpected_nature
+  nodes:
+    check_unexpected_nature:
+      type: condition
+      variable: expectedness
+      operator: eq
+      value: UNEXPECTED_NATURE
+      true_next: unexpected
+      false_next: check_unexpected_severity
+    check_unexpected_severity:
+      type: condition
+      variable: expectedness
+      operator: eq
+      value: UNEXPECTED_SEVERITY
+      true_next: unexpected
+      false_next: expected
+    unexpected:
+      type: return
+      value:
+        unexpected: true
+        source: expectedness-check
+    expected:
+      type: return
+      value:
+        unexpected: false
+        source: expectedness-check
+tests:
+- input:
+    expectedness: UNEXPECTED_NATURE
+  expect:
+    unexpected: true
+    source: expectedness-check
+- input:
+    expectedness: UNEXPECTED_SEVERITY
+  expect:
+    unexpected: true
+    source: expectedness-check
+- input:
+    expectedness: EXPECTED_LISTED
+  expect:
+    unexpected: false
+    source: expectedness-check
+- input:
+    expectedness: EXPECTED_CLASS
+  expect:
+    unexpected: false
+    source: expectedness-check
+- input: {}
+  expect:
+    unexpected: false
+    source: expectedness-check

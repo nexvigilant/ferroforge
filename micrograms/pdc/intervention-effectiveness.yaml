@@ -1,0 +1,132 @@
+name: intervention-effectiveness
+description: "Domain 11: Evaluate risk management intervention effectiveness — process indicators, outcome indicators, and optimization actions."
+version: 0.1.0
+interface:
+  inputs:
+    outcome_achieved:
+      type: bool
+      required: false
+    process_adherence_pct:
+      type: int
+      required: false
+  outputs:
+    action:
+      type: string
+    ai_role:
+      type: string
+    next_review:
+      type: string
+    optimization:
+      type: string
+    root_cause:
+      type: string
+    verdict:
+      type: string
+tree:
+  start: check_outcome
+  nodes:
+    check_outcome:
+      type: condition
+      variable: outcome_achieved
+      operator: eq
+      value: true
+      true_next: check_process
+      false_next: check_process_only
+    check_process:
+      type: condition
+      variable: process_adherence_pct
+      operator: gte
+      value: 80
+      true_next: effective
+      false_next: partially_effective
+    check_process_only:
+      type: condition
+      variable: process_adherence_pct
+      operator: gte
+      value: 80
+      true_next: process_ok_outcome_gap
+      false_next: check_low_process
+    check_low_process:
+      type: condition
+      variable: process_adherence_pct
+      operator: gte
+      value: 50
+      true_next: implementation_gap
+      false_next: ineffective
+    effective:
+      type: return
+      value:
+        verdict: EFFECTIVE
+        action: "maintain current program, document success, share best practices"
+        next_review: "annual review in PSUR/PBRER"
+        optimization: "consider efficiency improvements while maintaining effectiveness"
+        ai_role: "trend monitoring, early deviation detection, continuous optimization"
+    partially_effective:
+      type: return
+      value:
+        verdict: PARTIALLY_EFFECTIVE
+        action: "investigate process adherence barriers, enhance implementation support"
+        next_review: "6-month focused review"
+        optimization: "targeted implementation improvement, stakeholder re-engagement"
+        root_cause: "process barriers despite outcome achievement — fragile success"
+        ai_role: "barrier identification, adherence pattern analysis, targeted intervention"
+    process_ok_outcome_gap:
+      type: return
+      value:
+        verdict: PROCESS_OK_OUTCOME_GAP
+        action: "redesign intervention — process works but doesn't achieve outcome"
+        next_review: "3-month urgent review"
+        optimization: "intervention theory review, mechanism of action reassessment"
+        root_cause: "wrong intervention for the risk — doing the right thing wrongly"
+        ai_role: "outcome modeling, alternative intervention simulation, causal analysis"
+    implementation_gap:
+      type: return
+      value:
+        verdict: IMPLEMENTATION_GAP
+        action: "address implementation barriers — training, workflow, technology, stakeholder buy-in"
+        next_review: "3-month urgent review with implementation focus"
+        optimization: "barrier assessment, implementation science application, change management"
+        root_cause: "good intervention poorly implemented"
+        ai_role: "behavioral analytics, barrier prediction, personalized implementation support"
+    ineffective:
+      type: return
+      value:
+        verdict: INEFFECTIVE
+        action: "major program revision or replacement required"
+        next_review: "immediate regulatory discussion, 30-day action plan"
+        optimization: "fundamental redesign, alternative approach evaluation, expert consultation"
+        root_cause: "both process and outcome failing — systemic intervention failure"
+        ai_role: "root cause analysis, alternative strategy modeling, regulatory intelligence"
+tests:
+- input:
+    outcome_achieved: true
+    process_adherence_pct: 90
+  expect:
+    verdict: EFFECTIVE
+- input:
+    outcome_achieved: true
+    process_adherence_pct: 60
+  expect:
+    verdict: PARTIALLY_EFFECTIVE
+    root_cause: "process barriers despite outcome achievement — fragile success"
+- input:
+    outcome_achieved: false
+    process_adherence_pct: 85
+  expect:
+    verdict: PROCESS_OK_OUTCOME_GAP
+    root_cause: "wrong intervention for the risk — doing the right thing wrongly"
+- input:
+    outcome_achieved: false
+    process_adherence_pct: 55
+  expect:
+    verdict: IMPLEMENTATION_GAP
+    root_cause: "good intervention poorly implemented"
+- input:
+    outcome_achieved: false
+    process_adherence_pct: 30
+  expect:
+    verdict: INEFFECTIVE
+    root_cause: "both process and outcome failing — systemic intervention failure"
+- input: {}
+  expect:
+    verdict: INEFFECTIVE

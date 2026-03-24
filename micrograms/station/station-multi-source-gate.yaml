@@ -1,0 +1,303 @@
+name: station-multi-source-gate
+description: 'Gate: should this query hit multiple domains simultaneously?'
+version: 0.1.0
+tree:
+  start: check_interaction_explicit
+  nodes:
+    return_single_labeling:
+      type: return
+      value:
+        reason: 'Single drug labeling: DailyMed is primary source'
+        multi_source: false
+        domains: ''
+    return_multi_safety:
+      type: return
+      value:
+        domains: api.fda.gov,pubmed.ncbi.nlm.nih.gov,eudravigilance.ema.europa.eu
+        multi_source: true
+        reason: 'Multiple drugs with safety question: FAERS + literature + EU surveillance for comprehensive signal coverage'
+    check_single_interaction:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: drug_interaction
+      true_next: return_single_interaction
+      false_next: check_single_literature
+    return_single_source_multi_drug:
+      type: return
+      value:
+        domains: ''
+        multi_source: false
+        reason: Multiple drugs but question type does not require multi-source validation
+    return_single_interaction:
+      type: return
+      value:
+        multi_source: false
+        domains: ''
+        reason: 'Single drug, drug-interaction question: RxNav suffices (primary DDI database)'
+    return_safety_geo_gate:
+      type: return
+      value:
+        reason: 'Single drug safety query: FAERS (US) + EudraVigilance (EU) + VigiAccess (global) for geographic signal triangulation'
+        multi_source: true
+        domains: api.fda.gov,eudravigilance.ema.europa.eu,vigiaccess.org
+    return_default_single:
+      type: return
+      value:
+        domains: ''
+        multi_source: false
+        reason: 'Default: single-source lookup for standard question types'
+    check_multi_drug_question_type:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: drug_safety
+      true_next: return_multi_safety
+      false_next: check_multi_interaction
+    check_single_labeling:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: labeling
+      true_next: return_single_labeling
+      false_next: return_default_single
+    check_multi_interaction:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: drug_interaction
+      true_next: return_multi_interaction_gate
+      false_next: check_multi_labeling
+    return_multi_interaction:
+      type: return
+      value:
+        reason: Explicit drug-drug interaction check requires FAERS signals + RxNav interactions + literature review
+        multi_source: true
+        domains: api.fda.gov,rxnav.nlm.nih.gov,pubmed.ncbi.nlm.nih.gov
+    check_interaction_explicit:
+      type: condition
+      variable: requires_interaction_check
+      operator: eq
+      value: true
+      true_next: return_multi_interaction
+      false_next: check_drug_count
+    check_single_drug_question_type:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: drug_safety
+      true_next: return_safety_geo_gate
+      false_next: check_single_interaction
+    return_multi_interaction_gate:
+      type: return
+      value:
+        domains: rxnav.nlm.nih.gov,pubmed.ncbi.nlm.nih.gov,drugbank.com
+        reason: 'Multiple drugs with interaction query: RxNav + literature + DrugBank comparison for thorough DDI assessment'
+        multi_source: true
+    check_multi_labeling:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: labeling
+      true_next: return_multi_labeling
+      false_next: return_single_source_multi_drug
+    return_multi_labeling:
+      type: return
+      value:
+        multi_source: true
+        reason: 'Multiple drugs with labeling inquiry: DailyMed + literature for comprehensive product information coverage'
+        domains: dailymed.nlm.nih.gov,pubmed.ncbi.nlm.nih.gov
+    check_single_literature:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: literature
+      true_next: return_single_literature
+      false_next: check_single_labeling
+    return_single_literature:
+      type: return
+      value:
+        multi_source: false
+        domains: ''
+        reason: Literature search is inherently cross-source via PubMed aggregation
+    check_drug_count:
+      type: condition
+      variable: drug_count
+      operator: gte
+      value: 2
+      true_next: check_multi_drug_question_type
+      false_next: check_single_drug_question_type
+tests:
+- input:
+    question_type: drug_interaction
+    requires_interaction_check: true
+    drug_count: 2
+  expect:
+    multi_source: true
+    reason: Explicit drug-drug interaction check requires FAERS signals + RxNav interactions + literature review
+    domains: api.fda.gov,rxnav.nlm.nih.gov,pubmed.ncbi.nlm.nih.gov
+- input:
+    question_type: drug_safety
+    drug_count: 2
+    requires_interaction_check: false
+  expect:
+    multi_source: true
+    domains: api.fda.gov,pubmed.ncbi.nlm.nih.gov,eudravigilance.ema.europa.eu
+    reason: 'Multiple drugs with safety question: FAERS + literature + EU surveillance for comprehensive signal coverage'
+- input:
+    drug_count: 2
+    requires_interaction_check: false
+    question_type: drug_interaction
+  expect:
+    domains: rxnav.nlm.nih.gov,pubmed.ncbi.nlm.nih.gov,drugbank.com
+    reason: 'Multiple drugs with interaction query: RxNav + literature + DrugBank comparison for thorough DDI assessment'
+    multi_source: true
+- input:
+    question_type: labeling
+    requires_interaction_check: false
+    drug_count: 2
+  expect:
+    reason: 'Multiple drugs with labeling inquiry: DailyMed + literature for comprehensive product information coverage'
+    domains: dailymed.nlm.nih.gov,pubmed.ncbi.nlm.nih.gov
+    multi_source: true
+- input:
+    drug_count: 1
+    question_type: drug_safety
+    requires_interaction_check: false
+  expect:
+    multi_source: true
+    domains: api.fda.gov,eudravigilance.ema.europa.eu,vigiaccess.org
+    reason: 'Single drug safety query: FAERS (US) + EudraVigilance (EU) + VigiAccess (global) for geographic signal triangulation'
+- input:
+    question_type: drug_interaction
+    drug_count: 1
+    requires_interaction_check: false
+  expect:
+    multi_source: false
+    domains: ''
+    reason: 'Single drug, drug-interaction question: RxNav suffices (primary DDI database)'
+- input:
+    drug_count: 1
+    question_type: literature
+    requires_interaction_check: false
+  expect:
+    domains: ''
+    reason: Literature search is inherently cross-source via PubMed aggregation
+    multi_source: false
+- input:
+    question_type: labeling
+    drug_count: 1
+    requires_interaction_check: false
+  expect:
+    domains: ''
+    reason: 'Single drug labeling: DailyMed is primary source'
+    multi_source: false
+- input:
+    question_type: nomenclature
+    drug_count: 1
+    requires_interaction_check: false
+  expect:
+    multi_source: false
+    domains: ''
+    reason: 'Default: single-source lookup for standard question types'
+- input:
+    question_type: unknown_type
+    requires_interaction_check: false
+    drug_count: 0
+  expect:
+    domains: ''
+    multi_source: false
+    reason: 'Default: single-source lookup for standard question types'
+- input:
+    question_type: ''
+    requires_interaction_check: false
+    drug_count: 0
+  expect:
+    domains: ''
+    multi_source: false
+    reason: 'Default: single-source lookup for standard question types'
+- input: {}
+  expect:
+    reason: 'Default: single-source lookup for standard question types'
+    multi_source: false
+    domains: ''
+- input: {}
+  expect:
+    reason: 'Default: single-source lookup for standard question types'
+    domains: ''
+    multi_source: false
+- input: {}
+  expect:
+    reason: 'Default: single-source lookup for standard question types'
+    domains: ''
+    multi_source: false
+- input: {}
+  expect:
+    domains: ''
+    multi_source: false
+    reason: 'Default: single-source lookup for standard question types'
+- input: {}
+  expect:
+    multi_source: false
+    domains: ''
+    reason: 'Default: single-source lookup for standard question types'
+- input: {}
+  expect:
+    domains: ''
+    multi_source: false
+    reason: 'Default: single-source lookup for standard question types'
+- input: {}
+  expect:
+    reason: 'Default: single-source lookup for standard question types'
+    domains: ''
+    multi_source: false
+- input: {}
+  expect:
+    reason: 'Default: single-source lookup for standard question types'
+    multi_source: false
+    domains: ''
+- input:
+    drug_count: -1
+  expect:
+    domains: ''
+    multi_source: false
+    reason: 'Default: single-source lookup for standard question types'
+- input:
+    drug_count: 3
+  expect:
+    domains: ''
+    multi_source: false
+    reason: Multiple drugs but question type does not require multi-source validation
+- input:
+    drug_count: 200
+  expect:
+    multi_source: false
+    reason: Multiple drugs but question type does not require multi-source validation
+    domains: ''
+- input: {}
+  expect:
+    domains: ''
+    multi_source: false
+    reason: 'Default: single-source lookup for standard question types'
+interface:
+  inputs:
+    question_type:
+      type: string
+      required: false
+    requires_interaction_check:
+      type: bool
+      required: false
+    drug_count:
+      type: integer
+      required: false
+  outputs:
+    multi_source:
+      type: bool
+      required: false
+    domains:
+      type: string
+      required: false
+    reason:
+      type: string
+      required: false
+  aliases: {}

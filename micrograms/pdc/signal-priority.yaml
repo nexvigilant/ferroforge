@@ -1,0 +1,148 @@
+name: signal-priority
+description: "Domain 8: Prioritize validated signal by public health impact, severity, frequency, and vulnerable population risk."
+version: 0.1.0
+interface:
+  inputs:
+    affects_vulnerable_population:
+      type: bool
+      required: false
+    frequency:
+      type: string
+      required: false
+    mortality_risk:
+      type: bool
+      required: false
+    severity:
+      type: string
+      required: false
+  outputs:
+    action:
+      type: string
+    communication:
+      type: string
+    monitoring:
+      type: string
+    priority:
+      type: string
+    timeline_days:
+      type: int
+tree:
+  start: check_fatal_risk
+  nodes:
+    check_fatal_risk:
+      type: condition
+      variable: mortality_risk
+      operator: eq
+      value: true
+      true_next: critical_priority
+      false_next: check_vulnerable
+    check_vulnerable:
+      type: condition
+      variable: affects_vulnerable_population
+      operator: eq
+      value: true
+      true_next: check_freq_vulnerable
+      false_next: check_severity
+    check_freq_vulnerable:
+      type: condition
+      variable: frequency
+      operator: eq
+      value: common
+      true_next: critical_priority
+      false_next: high_priority
+    check_severity:
+      type: condition
+      variable: severity
+      operator: eq
+      value: severe
+      true_next: check_frequency_severe
+      false_next: check_moderate
+    check_frequency_severe:
+      type: condition
+      variable: frequency
+      operator: eq
+      value: common
+      true_next: high_priority
+      false_next: medium_priority
+    check_moderate:
+      type: condition
+      variable: severity
+      operator: eq
+      value: moderate
+      true_next: medium_priority
+      false_next: low_priority
+    critical_priority:
+      type: return
+      value:
+        priority: CRITICAL
+        action: "immediate safety committee review, regulatory notification, risk management review"
+        timeline_days: 7
+        communication: "urgent DHPC consideration, investigator notification, executive briefing"
+        monitoring: "daily progress tracking, enhanced surveillance activation"
+    high_priority:
+      type: return
+      value:
+        priority: HIGH
+        action: "expedited signal evaluation, safety committee within 30 days, B/R assessment"
+        timeline_days: 30
+        communication: "signal evaluation report, stakeholder notification, monitoring plan"
+        monitoring: "weekly progress tracking, targeted surveillance"
+    medium_priority:
+      type: return
+      value:
+        priority: MEDIUM
+        action: "scheduled signal evaluation, include in next PSUR/PBRER cycle"
+        timeline_days: 90
+        communication: "quarterly signal update, routine stakeholder reporting"
+        monitoring: "monthly progress tracking, routine surveillance"
+    low_priority:
+      type: return
+      value:
+        priority: LOW
+        action: "document and monitor, review at next routine signal evaluation"
+        timeline_days: 180
+        communication: "include in periodic safety review"
+        monitoring: "routine surveillance, semi-annual review"
+tests:
+- input:
+    mortality_risk: true
+  expect:
+    priority: CRITICAL
+    timeline_days: 7
+- input:
+    affects_vulnerable_population: true
+    frequency: common
+    mortality_risk: false
+  expect:
+    priority: CRITICAL
+- input:
+    affects_vulnerable_population: true
+    frequency: rare
+    mortality_risk: false
+  expect:
+    priority: HIGH
+    timeline_days: 30
+- input:
+    severity: severe
+    frequency: common
+    mortality_risk: false
+    affects_vulnerable_population: false
+  expect:
+    priority: HIGH
+- input:
+    severity: severe
+    frequency: rare
+  expect:
+    priority: MEDIUM
+- input:
+    severity: moderate
+  expect:
+    priority: MEDIUM
+    timeline_days: 90
+- input:
+    severity: mild
+  expect:
+    priority: LOW
+- input: {}
+  expect:
+    priority: LOW

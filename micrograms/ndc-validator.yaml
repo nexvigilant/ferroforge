@@ -1,0 +1,159 @@
+name: ndc-validator
+description: Validate NDC format and determine padding requirements
+version: 0.1.0
+tree:
+  start: validate_ndc_format
+  nodes:
+    classify_ndc_format:
+      type: condition
+      variable: ndc_format
+      operator: matches
+      value: (?i)^4-4-2$
+      true_next: format_4_4_2
+      false_next: check_5_3_2
+    format_5_4_1:
+      type: return
+      value:
+        ndc_type: 5-4-1
+        valid_format: true
+        needs_padding: true
+    invalid_format:
+      type: return
+      value:
+        ndc_type: null
+        valid_format: false
+        needs_padding: false
+    format_5_4_2:
+      type: return
+      value:
+        needs_padding: false
+        ndc_type: 5-4-2
+        valid_format: true
+    missing_input:
+      type: return
+      value:
+        ndc_type: null
+        valid_format: false
+        needs_padding: false
+    check_digit_count_max:
+      type: condition
+      variable: digit_count
+      operator: lte
+      value: 11
+      true_next: classify_ndc_format
+      false_next: invalid_format
+    check_5_4_1:
+      type: condition
+      variable: ndc_format
+      operator: matches
+      value: (?i)^5-4-1$
+      true_next: format_5_4_1
+      false_next: check_5_4_2
+    format_4_4_2:
+      type: return
+      value:
+        valid_format: true
+        needs_padding: true
+        ndc_type: 4-4-2
+    invalid_ndc_type:
+      type: return
+      value:
+        ndc_type: null
+        valid_format: false
+        needs_padding: false
+    format_5_3_2:
+      type: return
+      value:
+        ndc_type: 5-3-2
+        valid_format: true
+        needs_padding: true
+    validate_ndc_format:
+      type: condition
+      variable: ndc_format
+      operator: is_not_null
+      value: null
+      true_next: validate_digit_count
+      false_next: missing_input
+    validate_digit_count:
+      type: condition
+      variable: digit_count
+      operator: gte
+      value: 10
+      true_next: check_digit_count_max
+      false_next: invalid_format
+    check_5_3_2:
+      type: condition
+      variable: ndc_format
+      operator: matches
+      value: (?i)^5-3-2$
+      true_next: format_5_3_2
+      false_next: check_5_4_1
+    check_5_4_2:
+      type: condition
+      variable: ndc_format
+      operator: matches
+      value: (?i)^5-4-2$
+      true_next: format_5_4_2
+      false_next: invalid_ndc_type
+tests:
+- input:
+    digit_count: 0
+    ndc_format: 4-4-2
+  expect:
+    ndc_type: null
+    valid_format: false
+    needs_padding: false
+- input:
+    digit_count: 0
+  expect:
+    ndc_type: null
+    valid_format: false
+    needs_padding: false
+- input:
+    digit_count: 10
+    ndc_format: 4-4-2
+  expect:
+    valid_format: true
+    needs_padding: true
+    ndc_type: 4-4-2
+- input:
+    digit_count: 10
+    ndc_format: 5-3-2
+  expect:
+    ndc_type: 5-3-2
+    valid_format: true
+    needs_padding: true
+- input:
+    digit_count: 10
+    ndc_format: 5-4-1
+  expect:
+    ndc_type: 5-4-1
+    valid_format: true
+    needs_padding: true
+- input:
+    digit_count: 10
+    ndc_format: 5-4-2
+  expect:
+    needs_padding: false
+    ndc_type: 5-4-2
+    valid_format: true
+- input:
+    digit_count: 10
+    ndc_format: ZZZZZ_NO_MATCH
+  expect:
+    ndc_type: null
+    valid_format: false
+    needs_padding: false
+- input:
+    digit_count: 12
+    ndc_format: 4-4-2
+  expect:
+    ndc_type: null
+    valid_format: false
+    needs_padding: false
+- input: {}
+  expect:
+    ndc_type: null
+    valid_format: false
+    needs_padding: false
+interface: null

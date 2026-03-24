@@ -1,0 +1,127 @@
+name: vascular-risk-classifier
+description: 'Vascular safety classifier: maps circulatory adverse reactions to severity grades for thromboembolism, hemorrhage, and vascular disorders'
+version: 0.1.0
+interface:
+  inputs:
+    reaction_pt:
+      type: string
+      required: true
+      description: MedDRA preferred term for the vascular reaction
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    soc:
+      type: string
+    action:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_pe
+  nodes:
+    check_pe:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: PULMONARY EMBOLISM
+      true_next: critical
+      false_next: check_dvt
+    check_dvt:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: DEEP VEIN THROMBOSIS
+      true_next: serious
+      false_next: check_stroke
+    check_stroke:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: CEREBROVASCULAR ACCIDENT
+      true_next: critical
+      false_next: check_haemorrhage
+    check_haemorrhage:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: HAEMORRHAGE
+      true_next: serious
+      false_next: check_thrombosis
+    check_thrombosis:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: THROMBOSIS
+      true_next: serious
+      false_next: check_hypertension
+    check_hypertension:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: HYPERTENSION
+      true_next: moderate
+      false_next: mild
+    critical:
+      type: return
+      value:
+        severity: critical
+        soc: Vascular disorders
+        action: immediate_expedited_report
+        regulatory_reference: ICH E2D
+    serious:
+      type: return
+      value:
+        severity: serious
+        soc: Vascular disorders
+        action: expedited_report
+        regulatory_reference: ICH E2D
+    moderate:
+      type: return
+      value:
+        severity: moderate
+        soc: Vascular disorders
+        action: monitor_and_assess
+        regulatory_reference: ICH E2B
+    mild:
+      type: return
+      value:
+        severity: mild
+        soc: Vascular disorders
+        action: routine_surveillance
+        regulatory_reference: ICH E2B
+tests:
+  - name: pulmonary_embolism
+    input:
+      reaction_pt: PULMONARY EMBOLISM
+    expect:
+      severity: critical
+  - name: dvt
+    input:
+      reaction_pt: DEEP VEIN THROMBOSIS
+    expect:
+      severity: serious
+  - name: stroke
+    input:
+      reaction_pt: CEREBROVASCULAR ACCIDENT
+    expect:
+      severity: critical
+  - name: gi_haemorrhage
+    input:
+      reaction_pt: GASTROINTESTINAL HAEMORRHAGE
+    expect:
+      severity: serious
+  - name: hypertension
+    input:
+      reaction_pt: HYPERTENSION
+    expect:
+      severity: moderate
+  - name: mild_bruising
+    input:
+      reaction_pt: ECCHYMOSIS
+    expect:
+      severity: mild
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild

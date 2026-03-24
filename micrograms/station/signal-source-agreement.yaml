@@ -1,0 +1,317 @@
+name: signal-source-agreement
+description: Determines if multiple data sources agree on a safety signal and quantifies
+  agreement strength
+version: 0.1.0
+tree:
+  start: check_any_signal
+  nodes:
+    check_label_only:
+      type: condition
+      variable: label_mentions
+      operator: eq
+      value: true
+      true_next: one_signal
+      false_next: no_signal
+    check_any_signal:
+      type: condition
+      variable: faers_signal
+      operator: eq
+      value: false
+      true_next: check_literature
+      false_next: count_with_faers
+    trial_with_label:
+      type: condition
+      variable: label_mentions
+      operator: eq
+      value: true
+      true_next: two_sources
+      false_next: one_signal
+    check_label_with_two_faers_lit:
+      type: condition
+      variable: label_mentions
+      operator: eq
+      value: true
+      true_next: three_sources
+      false_next: two_sources
+    count_without_faers:
+      type: condition
+      variable: trial_signal
+      operator: eq
+      value: true
+      true_next: check_label_without_faers
+      false_next: check_label_lit_only
+    four_sources:
+      type: return
+      value:
+        confidence: high
+        agreement_level: strong
+        source_count: 4
+    check_more_with_faers_lit:
+      type: condition
+      variable: trial_signal
+      operator: eq
+      value: true
+      true_next: check_label_with_three
+      false_next: check_label_with_two_faers_lit
+    check_label_without_faers:
+      type: condition
+      variable: label_mentions
+      operator: eq
+      value: true
+      true_next: three_sources
+      false_next: two_sources
+    two_sources:
+      type: return
+      value:
+        source_count: 2
+        agreement_level: moderate
+        confidence: medium
+    check_label_lit_only:
+      type: condition
+      variable: label_mentions
+      operator: eq
+      value: true
+      true_next: two_sources
+      false_next: one_signal
+    count_with_faers:
+      type: condition
+      variable: literature_signal
+      operator: eq
+      value: true
+      true_next: check_more_with_faers_lit
+      false_next: check_trial_with_faers
+    three_sources:
+      type: return
+      value:
+        agreement_level: strong
+        source_count: 3
+        confidence: high
+    no_signal:
+      type: return
+      value:
+        agreement_level: none
+        source_count: 0
+        confidence: low
+    check_label_with_three:
+      type: condition
+      variable: label_mentions
+      operator: eq
+      value: true
+      true_next: four_sources
+      false_next: three_sources
+    check_literature:
+      type: condition
+      variable: literature_signal
+      operator: eq
+      value: false
+      true_next: check_trial
+      false_next: count_without_faers
+    check_label_with_faers_trial:
+      type: condition
+      variable: label_mentions
+      operator: eq
+      value: true
+      true_next: three_sources
+      false_next: two_sources
+    check_trial:
+      type: condition
+      variable: trial_signal
+      operator: eq
+      value: false
+      true_next: check_label_only
+      false_next: trial_with_label
+    check_label_with_faers_only:
+      type: condition
+      variable: label_mentions
+      operator: eq
+      value: true
+      true_next: two_sources
+      false_next: one_signal
+    check_trial_with_faers:
+      type: condition
+      variable: trial_signal
+      operator: eq
+      value: true
+      true_next: check_label_with_faers_trial
+      false_next: check_label_with_faers_only
+    one_signal:
+      type: return
+      value:
+        confidence: low
+        agreement_level: weak
+        source_count: 1
+tests:
+- input:
+    faers_signal: false
+    label_mentions: false
+    literature_signal: false
+    trial_signal: false
+  expect:
+    agreement_level: none
+    source_count: 0
+    confidence: low
+- input:
+    faers_signal: false
+    label_mentions: false
+    literature_signal: false
+    trial_signal: true
+  expect:
+    confidence: low
+    agreement_level: weak
+    source_count: 1
+- input:
+    faers_signal: false
+    label_mentions: false
+    literature_signal: true
+    trial_signal: false
+  expect:
+    confidence: low
+    agreement_level: weak
+    source_count: 1
+- input:
+    faers_signal: false
+    label_mentions: false
+    literature_signal: true
+    trial_signal: true
+  expect:
+    source_count: 2
+    agreement_level: moderate
+    confidence: medium
+- input:
+    faers_signal: false
+    label_mentions: true
+    literature_signal: false
+    trial_signal: false
+  expect:
+    confidence: low
+    agreement_level: weak
+    source_count: 1
+- input:
+    faers_signal: false
+    label_mentions: true
+    literature_signal: false
+    trial_signal: true
+  expect:
+    source_count: 2
+    agreement_level: moderate
+    confidence: medium
+- input:
+    faers_signal: false
+    label_mentions: true
+    literature_signal: true
+    trial_signal: false
+  expect:
+    source_count: 2
+    agreement_level: moderate
+    confidence: medium
+- input:
+    faers_signal: false
+    label_mentions: true
+    literature_signal: true
+    trial_signal: true
+  expect:
+    agreement_level: strong
+    source_count: 3
+    confidence: high
+- input:
+    faers_signal: true
+    label_mentions: false
+    literature_signal: false
+    trial_signal: false
+  expect:
+    confidence: low
+    agreement_level: weak
+    source_count: 1
+- input:
+    faers_signal: true
+    label_mentions: false
+    literature_signal: false
+    trial_signal: true
+  expect:
+    source_count: 2
+    agreement_level: moderate
+    confidence: medium
+- input:
+    faers_signal: true
+    label_mentions: false
+    literature_signal: true
+    trial_signal: false
+  expect:
+    source_count: 2
+    agreement_level: moderate
+    confidence: medium
+- input:
+    faers_signal: true
+    label_mentions: false
+    literature_signal: true
+    trial_signal: true
+  expect:
+    agreement_level: strong
+    source_count: 3
+    confidence: high
+- input:
+    faers_signal: true
+    label_mentions: true
+    literature_signal: false
+    trial_signal: false
+  expect:
+    source_count: 2
+    agreement_level: moderate
+    confidence: medium
+- input:
+    faers_signal: true
+    label_mentions: true
+    literature_signal: false
+    trial_signal: true
+  expect:
+    agreement_level: strong
+    source_count: 3
+    confidence: high
+- input:
+    faers_signal: true
+    label_mentions: true
+    literature_signal: true
+    trial_signal: false
+  expect:
+    agreement_level: strong
+    source_count: 3
+    confidence: high
+- input:
+    faers_signal: true
+    label_mentions: true
+    literature_signal: true
+    trial_signal: true
+  expect:
+    confidence: high
+    agreement_level: strong
+    source_count: 4
+- input: {}
+  expect:
+    confidence: low
+    agreement_level: weak
+    source_count: 1
+interface:
+  inputs:
+    literature_signal:
+      type: boolean
+      required: false
+    label_mentions:
+      type: boolean
+      required: false
+    faers_signal:
+      type: boolean
+      required: false
+    trial_signal:
+      type: boolean
+      required: false
+  outputs:
+    agreement_level:
+      type: string
+      required: false
+    source_count:
+      type: integer
+      required: false
+    confidence:
+      type: string
+      required: false
+  aliases: {}

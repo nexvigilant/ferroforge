@@ -1,0 +1,279 @@
+name: pbrer-section-gate
+description: 'PBRER section completeness gate: evaluates whether an ICH E2C(R2) section has sufficient data to be considered complete, partial, or missing'
+version: 0.1.0
+interface:
+  inputs:
+    section_id:
+      type: string
+      required: true
+    has_faers_data:
+      type: bool
+      required: true
+    signal_count:
+      type: number
+      required: true
+    has_benefit_risk:
+      type: bool
+      required: false
+    has_guidelines:
+      type: bool
+      required: false
+  outputs:
+    status:
+      type: string
+    missing_elements:
+      type: string
+tree:
+  start: check_section_intro
+  nodes:
+    check_section_intro:
+      type: condition
+      variable: section_id
+      operator: eq
+      value: intro
+      true_next: intro_check_faers
+      false_next: check_section_safety
+    intro_check_faers:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: intro_complete
+      false_next: intro_missing
+    intro_complete:
+      type: return
+      value:
+        status: complete
+        missing_elements: none
+    intro_missing:
+      type: return
+      value:
+        status: partial
+        missing_elements: FAERS exposure data
+    check_section_safety:
+      type: condition
+      variable: section_id
+      operator: eq
+      value: safety
+      true_next: safety_check_faers
+      false_next: check_section_signals
+    safety_check_faers:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: safety_complete
+      false_next: safety_missing
+    safety_complete:
+      type: return
+      value:
+        status: complete
+        missing_elements: none
+    safety_missing:
+      type: return
+      value:
+        status: missing
+        missing_elements: FAERS safety data required
+    check_section_signals:
+      type: condition
+      variable: section_id
+      operator: eq
+      value: signals
+      true_next: signals_check_faers
+      false_next: check_section_benefit_risk
+    signals_check_faers:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: signals_check_count
+      false_next: signals_no_data
+    signals_check_count:
+      type: condition
+      variable: signal_count
+      operator: gte
+      value: 0
+      true_next: signals_complete
+      false_next: signals_complete
+    signals_complete:
+      type: return
+      value:
+        status: complete
+        missing_elements: none
+    signals_no_data:
+      type: return
+      value:
+        status: missing
+        missing_elements: FAERS signal detection data required
+    check_section_benefit_risk:
+      type: condition
+      variable: section_id
+      operator: eq
+      value: benefit-risk
+      true_next: br_check_faers
+      false_next: conclusions_check
+    br_check_faers:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: br_check_assessment
+      false_next: br_no_faers
+    br_check_assessment:
+      type: condition
+      variable: has_benefit_risk
+      operator: eq
+      value: true
+      true_next: br_complete
+      false_next: br_partial
+    br_complete:
+      type: return
+      value:
+        status: complete
+        missing_elements: none
+    br_partial:
+      type: return
+      value:
+        status: partial
+        missing_elements: benefit-risk assessment
+    br_no_faers:
+      type: return
+      value:
+        status: missing
+        missing_elements: FAERS data and benefit-risk assessment
+    conclusions_check:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: conclusions_check_br
+      false_next: conclusions_no_data
+    conclusions_check_br:
+      type: condition
+      variable: has_benefit_risk
+      operator: eq
+      value: true
+      true_next: conclusions_complete
+      false_next: conclusions_partial
+    conclusions_complete:
+      type: return
+      value:
+        status: complete
+        missing_elements: none
+    conclusions_partial:
+      type: return
+      value:
+        status: partial
+        missing_elements: benefit-risk assessment for final conclusions
+    conclusions_no_data:
+      type: return
+      value:
+        status: missing
+        missing_elements: All prerequisite sections incomplete
+tests:
+# Intro with FAERS data
+- input:
+    section_id: intro
+    has_faers_data: true
+    signal_count: 0
+  expect:
+    status: complete
+    missing_elements: none
+# Intro without FAERS
+- input:
+    section_id: intro
+    has_faers_data: false
+    signal_count: 0
+  expect:
+    status: partial
+    missing_elements: FAERS exposure data
+# Safety with FAERS
+- input:
+    section_id: safety
+    has_faers_data: true
+    signal_count: 3
+  expect:
+    status: complete
+    missing_elements: none
+# Safety without FAERS
+- input:
+    section_id: safety
+    has_faers_data: false
+    signal_count: 0
+  expect:
+    status: missing
+    missing_elements: FAERS safety data required
+# Signals with data
+- input:
+    section_id: signals
+    has_faers_data: true
+    signal_count: 5
+  expect:
+    status: complete
+    missing_elements: none
+# Signals without data
+- input:
+    section_id: signals
+    has_faers_data: false
+    signal_count: 0
+  expect:
+    status: missing
+    missing_elements: FAERS signal detection data required
+# Benefit-risk fully complete
+- input:
+    section_id: benefit-risk
+    has_faers_data: true
+    signal_count: 2
+    has_benefit_risk: true
+  expect:
+    status: complete
+    missing_elements: none
+# Benefit-risk partial (no assessment)
+- input:
+    section_id: benefit-risk
+    has_faers_data: true
+    signal_count: 2
+    has_benefit_risk: false
+  expect:
+    status: partial
+    missing_elements: benefit-risk assessment
+# Benefit-risk missing (no FAERS)
+- input:
+    section_id: benefit-risk
+    has_faers_data: false
+    signal_count: 0
+    has_benefit_risk: false
+  expect:
+    status: missing
+    missing_elements: FAERS data and benefit-risk assessment
+# Conclusions fully complete
+- input:
+    section_id: conclusions
+    has_faers_data: true
+    signal_count: 3
+    has_benefit_risk: true
+  expect:
+    status: complete
+    missing_elements: none
+# Conclusions partial
+- input:
+    section_id: conclusions
+    has_faers_data: true
+    signal_count: 1
+    has_benefit_risk: false
+  expect:
+    status: partial
+    missing_elements: benefit-risk assessment for final conclusions
+# Conclusions no data
+- input:
+    section_id: conclusions
+    has_faers_data: false
+    signal_count: 0
+    has_benefit_risk: false
+  expect:
+    status: missing
+    missing_elements: All prerequisite sections incomplete
+- input: {}
+  expect:
+    missing_elements: All prerequisite sections incomplete
+    status: missing

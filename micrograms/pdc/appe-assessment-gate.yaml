@@ -1,0 +1,307 @@
+name: appe-assessment-gate
+description: "APPE Ch7.2: Formative and summative assessment gates. Midpoint (W3) and final (W6) with behavioral anchor thresholds."
+version: 0.1.0
+interface:
+  inputs:
+    anchor_score:
+      type: float
+      required: false
+    assessment_type:
+      type: int
+      required: false
+    portfolio_complete:
+      type: int
+      required: false
+  outputs:
+    assessment_name:
+      type: string
+    assessment_result:
+      type: string
+    ch7_section:
+      type: string
+    details:
+      type: string
+    feedback_type:
+      type: string
+    gate_passed:
+      type: bool
+    message:
+      type: string
+    next_action:
+      type: string
+    ready_for_bridge:
+      type: bool
+tree:
+  start: check_type
+  nodes:
+    check_type:
+      type: condition
+      variable: assessment_type
+      operator: eq
+      value: 1
+      true_next: midpoint_gate
+      false_next: check_final
+
+    check_final:
+      type: condition
+      variable: assessment_type
+      operator: eq
+      value: 2
+      true_next: final_gate
+      false_next: check_formative
+
+    check_formative:
+      type: condition
+      variable: assessment_type
+      operator: eq
+      value: 0
+      true_next: formative_check
+      false_next: invalid_type
+
+    # Formative (weekly): just check anchor score
+    formative_check:
+      type: condition
+      variable: anchor_score
+      operator: gte
+      value: 2.0
+      true_next: formative_on_track
+      false_next: formative_needs_attention
+
+    formative_on_track:
+      type: return
+      value:
+        gate_passed: true
+        assessment_result: ON_TRACK
+        assessment_name: "Weekly Formative"
+        next_action: "Continue current learning plan"
+        feedback_type: "reinforcement"
+
+    formative_needs_attention:
+      type: condition
+      variable: anchor_score
+      operator: gte
+      value: 1.0
+      true_next: formative_developing
+      false_next: formative_concern
+
+    formative_developing:
+      type: return
+      value:
+        gate_passed: true
+        assessment_result: DEVELOPING
+        assessment_name: "Weekly Formative"
+        next_action: "Targeted practice on weak anchors"
+        feedback_type: "corrective_with_guidance"
+
+    formative_concern:
+      type: return
+      value:
+        gate_passed: false
+        assessment_result: CONCERN
+        assessment_name: "Weekly Formative"
+        next_action: "Immediate preceptor consultation, remediation plan"
+        feedback_type: "intensive_intervention"
+
+    # Midpoint (W3): comprehensive across all foundational domains
+    midpoint_gate:
+      type: condition
+      variable: anchor_score
+      operator: gte
+      value: 2.5
+      true_next: midpoint_check_portfolio
+      false_next: midpoint_check_minimum
+
+    midpoint_check_portfolio:
+      type: condition
+      variable: portfolio_complete
+      operator: gte
+      value: 50
+      true_next: midpoint_pass
+      false_next: midpoint_portfolio_gap
+
+    midpoint_pass:
+      type: return
+      value:
+        gate_passed: true
+        assessment_result: MIDPOINT_PASS
+        assessment_name: "Week 3 Midpoint Evaluation"
+        next_action: "Proceed to Phase 2 — integration and application"
+        details: "Behavioral anchors on track, portfolio adequate"
+        ch7_section: "7.2 Summative Assessment"
+
+    midpoint_portfolio_gap:
+      type: return
+      value:
+        gate_passed: true
+        assessment_result: MIDPOINT_CONDITIONAL
+        assessment_name: "Week 3 Midpoint Evaluation"
+        next_action: "Proceed but prioritize portfolio evidence collection"
+        details: "Anchors adequate but portfolio documentation below 50%"
+        ch7_section: "7.2 Summative Assessment"
+
+    midpoint_check_minimum:
+      type: condition
+      variable: anchor_score
+      operator: gte
+      value: 1.5
+      true_next: midpoint_remediation
+      false_next: midpoint_fail
+
+    midpoint_remediation:
+      type: return
+      value:
+        gate_passed: false
+        assessment_result: MIDPOINT_REMEDIATION
+        assessment_name: "Week 3 Midpoint Evaluation"
+        next_action: "Adjustment plan — personalized focus for weeks 4-6"
+        details: "Below target but recoverable with focused intervention"
+        ch7_section: "7.2 Summative Assessment"
+
+    midpoint_fail:
+      type: return
+      value:
+        gate_passed: false
+        assessment_result: MIDPOINT_CONCERN
+        assessment_name: "Week 3 Midpoint Evaluation"
+        next_action: "Preceptor conference, possible rotation extension discussion"
+        details: "Significantly below target — intensive remediation required"
+        ch7_section: "7.2 Summative Assessment"
+
+    # Final (W6): L2 validation across all domains
+    final_gate:
+      type: condition
+      variable: anchor_score
+      operator: gte
+      value: 3.0
+      true_next: final_check_portfolio
+      false_next: final_check_minimum
+
+    final_check_portfolio:
+      type: condition
+      variable: portfolio_complete
+      operator: gte
+      value: 90
+      true_next: final_exemplary
+      false_next: final_check_portfolio_min
+
+    final_check_portfolio_min:
+      type: condition
+      variable: portfolio_complete
+      operator: gte
+      value: 75
+      true_next: final_pass
+      false_next: final_portfolio_gap
+
+    final_exemplary:
+      type: return
+      value:
+        gate_passed: true
+        assessment_result: FINAL_EXEMPLARY
+        assessment_name: "Week 6 Final Assessment"
+        next_action: "Proceed to bridge assessment for pathway selection"
+        details: "L2 behavioral anchors validated, comprehensive portfolio"
+        ready_for_bridge: true
+        ch7_section: "7.6"
+
+    final_pass:
+      type: return
+      value:
+        gate_passed: true
+        assessment_result: FINAL_PASS
+        assessment_name: "Week 6 Final Assessment"
+        next_action: "Proceed to bridge assessment, complete portfolio"
+        details: "L2 anchors validated, portfolio needs completion"
+        ready_for_bridge: true
+        ch7_section: "7.6"
+
+    final_portfolio_gap:
+      type: return
+      value:
+        gate_passed: false
+        assessment_result: FINAL_PORTFOLIO_INCOMPLETE
+        assessment_name: "Week 6 Final Assessment"
+        next_action: "Complete portfolio evidence before bridge assessment"
+        details: "Anchor performance strong but portfolio below 75% threshold"
+        ready_for_bridge: false
+        ch7_section: "7.6"
+
+    final_check_minimum:
+      type: condition
+      variable: anchor_score
+      operator: gte
+      value: 2.0
+      true_next: final_conditional
+      false_next: final_not_met
+
+    final_conditional:
+      type: return
+      value:
+        gate_passed: false
+        assessment_result: FINAL_CONDITIONAL
+        assessment_name: "Week 6 Final Assessment"
+        next_action: "Rotation extension for targeted domain remediation"
+        details: "L1+ achieved but L2 anchors not fully validated"
+        ready_for_bridge: false
+        ch7_section: "7.2"
+
+    final_not_met:
+      type: return
+      value:
+        gate_passed: false
+        assessment_result: FINAL_NOT_MET
+        assessment_name: "Week 6 Final Assessment"
+        next_action: "Extended rotation or program reassessment"
+        details: "Foundational competencies below L2 target"
+        ready_for_bridge: false
+        ch7_section: "7.2"
+
+    invalid_type:
+      type: return
+      value:
+        gate_passed: false
+        assessment_result: INVALID
+        message: "assessment_type must be 0 (formative), 1 (midpoint), or 2 (final)"
+
+tests:
+# Formative — on track
+- input: { assessment_type: 0, anchor_score: 2.5, portfolio_complete: 30 }
+  expect: { gate_passed: true, assessment_result: ON_TRACK }
+# Formative — developing
+- input: { assessment_type: 0, anchor_score: 1.5, portfolio_complete: 20 }
+  expect: { gate_passed: true, assessment_result: DEVELOPING }
+# Formative — concern
+- input: { assessment_type: 0, anchor_score: 0.5, portfolio_complete: 10 }
+  expect: { gate_passed: false, assessment_result: CONCERN }
+# Midpoint — pass
+- input: { assessment_type: 1, anchor_score: 3.0, portfolio_complete: 60 }
+  expect: { gate_passed: true, assessment_result: MIDPOINT_PASS }
+# Midpoint — conditional (portfolio gap)
+- input: { assessment_type: 1, anchor_score: 2.8, portfolio_complete: 40 }
+  expect: { gate_passed: true, assessment_result: MIDPOINT_CONDITIONAL }
+# Midpoint — remediation needed
+- input: { assessment_type: 1, anchor_score: 2.0, portfolio_complete: 50 }
+  expect: { gate_passed: false, assessment_result: MIDPOINT_REMEDIATION }
+# Midpoint — concern
+- input: { assessment_type: 1, anchor_score: 1.0, portfolio_complete: 20 }
+  expect: { gate_passed: false, assessment_result: MIDPOINT_CONCERN }
+# Final — exemplary
+- input: { assessment_type: 2, anchor_score: 3.5, portfolio_complete: 95 }
+  expect: { gate_passed: true, assessment_result: FINAL_EXEMPLARY, ready_for_bridge: true }
+# Final — pass
+- input: { assessment_type: 2, anchor_score: 3.2, portfolio_complete: 80 }
+  expect: { gate_passed: true, assessment_result: FINAL_PASS, ready_for_bridge: true }
+# Final — portfolio incomplete
+- input: { assessment_type: 2, anchor_score: 3.0, portfolio_complete: 60 }
+  expect: { gate_passed: false, assessment_result: FINAL_PORTFOLIO_INCOMPLETE, ready_for_bridge: false }
+# Final — conditional
+- input: { assessment_type: 2, anchor_score: 2.5, portfolio_complete: 50 }
+  expect: { gate_passed: false, assessment_result: FINAL_CONDITIONAL, ready_for_bridge: false }
+# Final — not met
+- input: { assessment_type: 2, anchor_score: 1.5, portfolio_complete: 30 }
+  expect: { gate_passed: false, assessment_result: FINAL_NOT_MET, ready_for_bridge: false }
+# Invalid type
+- input: { assessment_type: 5, anchor_score: 3.0, portfolio_complete: 100 }
+  expect: { assessment_result: INVALID }
+# Edge: empty (assessment_type=null, fails all eq checks → INVALID)
+- input: {}
+  expect: { gate_passed: false, assessment_result: INVALID }

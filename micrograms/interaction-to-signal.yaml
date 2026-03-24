@@ -1,0 +1,265 @@
+name: interaction-to-signal
+description: Routes drug-drug interaction characteristics to signal hypothesis and
+  priority
+version: 0.1.0
+tree:
+  start: check_type
+  nodes:
+    check_severity_pk_moderate:
+      type: condition
+      variable: severity
+      operator: eq
+      value: moderate
+      true_next: pk_moderate
+      false_next: pk_mild
+    synergistic_mild:
+      type: return
+      value:
+        signal_hypothesis: false
+        mechanism_class: enhanced_pharmacodynamic
+        priority: low
+    check_severity_synergistic:
+      type: condition
+      variable: severity
+      operator: eq
+      value: severe
+      true_next: synergistic_severe
+      false_next: check_severity_syn_moderate
+    pd_moderate:
+      type: return
+      value:
+        signal_hypothesis: true
+        priority: medium
+        mechanism_class: pharmacodynamic
+    additive_mild:
+      type: return
+      value:
+        priority: low
+        signal_hypothesis: false
+        mechanism_class: additive
+    synergistic_moderate:
+      type: return
+      value:
+        priority: medium
+        mechanism_class: enhanced_pharmacodynamic
+        signal_hypothesis: true
+    check_type_pd:
+      type: condition
+      variable: interaction_type
+      operator: eq
+      value: pd
+      true_next: check_severity_pd
+      false_next: check_type_pk
+    additive_moderate:
+      type: return
+      value:
+        priority: low
+        mechanism_class: additive
+        signal_hypothesis: false
+    check_severity_additive_moderate:
+      type: condition
+      variable: severity
+      operator: eq
+      value: moderate
+      true_next: additive_moderate
+      false_next: additive_mild
+    pd_severe:
+      type: return
+      value:
+        signal_hypothesis: true
+        mechanism_class: pharmacodynamic
+        priority: high
+    check_severity_pk:
+      type: condition
+      variable: severity
+      operator: eq
+      value: severe
+      true_next: pk_severe
+      false_next: check_severity_pk_moderate
+    check_severity_pd:
+      type: condition
+      variable: severity
+      operator: eq
+      value: severe
+      true_next: pd_severe
+      false_next: check_severity_pd_moderate
+    synergistic_severe:
+      type: return
+      value:
+        priority: high
+        signal_hypothesis: true
+        mechanism_class: enhanced_pharmacodynamic
+    pd_mild:
+      type: return
+      value:
+        signal_hypothesis: false
+        priority: low
+        mechanism_class: pharmacodynamic
+    check_severity_syn_moderate:
+      type: condition
+      variable: severity
+      operator: eq
+      value: moderate
+      true_next: synergistic_moderate
+      false_next: synergistic_mild
+    check_severity_pd_moderate:
+      type: condition
+      variable: severity
+      operator: eq
+      value: moderate
+      true_next: pd_moderate
+      false_next: pd_mild
+    pk_severe:
+      type: return
+      value:
+        signal_hypothesis: true
+        mechanism_class: pharmacokinetic
+        priority: high
+    check_type_pk:
+      type: condition
+      variable: interaction_type
+      operator: eq
+      value: pk
+      true_next: check_severity_pk
+      false_next: additive_path
+    check_type:
+      type: condition
+      variable: interaction_type
+      operator: eq
+      value: synergistic
+      true_next: check_severity_synergistic
+      false_next: check_type_pd
+    additive_severe:
+      type: return
+      value:
+        priority: medium
+        mechanism_class: additive
+        signal_hypothesis: true
+    pk_moderate:
+      type: return
+      value:
+        signal_hypothesis: true
+        mechanism_class: pharmacokinetic
+        priority: medium
+    pk_mild:
+      type: return
+      value:
+        signal_hypothesis: false
+        priority: low
+        mechanism_class: pharmacokinetic
+    additive_path:
+      type: condition
+      variable: severity
+      operator: eq
+      value: severe
+      true_next: additive_severe
+      false_next: check_severity_additive_moderate
+tests:
+- input:
+    interaction_type: ''
+    severity: ''
+  expect:
+    priority: low
+    signal_hypothesis: false
+    mechanism_class: additive
+- input:
+    interaction_type: ''
+    severity: moderate
+  expect:
+    priority: low
+    mechanism_class: additive
+    signal_hypothesis: false
+- input:
+    interaction_type: ''
+    severity: severe
+  expect:
+    priority: medium
+    mechanism_class: additive
+    signal_hypothesis: true
+- input:
+    interaction_type: pd
+    severity: ''
+  expect:
+    signal_hypothesis: false
+    priority: low
+    mechanism_class: pharmacodynamic
+- input:
+    interaction_type: pd
+    severity: moderate
+  expect:
+    signal_hypothesis: true
+    priority: medium
+    mechanism_class: pharmacodynamic
+- input:
+    interaction_type: pd
+    severity: severe
+  expect:
+    signal_hypothesis: true
+    mechanism_class: pharmacodynamic
+    priority: high
+- input:
+    interaction_type: pk
+    severity: ''
+  expect:
+    signal_hypothesis: false
+    priority: low
+    mechanism_class: pharmacokinetic
+- input:
+    interaction_type: pk
+    severity: moderate
+  expect:
+    signal_hypothesis: true
+    mechanism_class: pharmacokinetic
+    priority: medium
+- input:
+    interaction_type: pk
+    severity: severe
+  expect:
+    signal_hypothesis: true
+    mechanism_class: pharmacokinetic
+    priority: high
+- input:
+    interaction_type: synergistic
+    severity: ''
+  expect:
+    signal_hypothesis: false
+    mechanism_class: enhanced_pharmacodynamic
+    priority: low
+- input:
+    interaction_type: synergistic
+    severity: moderate
+  expect:
+    priority: medium
+    mechanism_class: enhanced_pharmacodynamic
+    signal_hypothesis: true
+- input:
+    interaction_type: synergistic
+    severity: severe
+  expect:
+    priority: high
+    signal_hypothesis: true
+    mechanism_class: enhanced_pharmacodynamic
+- input: {}
+  expect:
+    priority: low
+    signal_hypothesis: false
+    mechanism_class: additive
+interface:
+  inputs:
+    interaction_type:
+      type: string
+      required: true
+    severity:
+      type: string
+      required: true
+  outputs:
+    mechanism_class:
+      type: string
+      required: false
+    signal_hypothesis:
+      type: boolean
+      required: false
+    priority:
+      type: string
+      required: false
+  aliases: {}

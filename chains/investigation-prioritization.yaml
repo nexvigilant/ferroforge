@@ -1,0 +1,76 @@
+name: investigation-prioritization
+description: 'Transbeyesian propagation → EIG priority ranking. After propagation tells you the transfer weight and posterior class for a drug-event pair, EIG tells you whether to investigate directly or rely on propagated evidence. The propagation_count input to EIG represents how many adjacent drugs in the network would benefit from investigating this specific pair.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - transbeyesian-propagator
+  - eig-priority-ranker
+tests:
+# 1. Same class propagation + very high uncertainty → INVESTIGATE_NOW (CRITICAL)
+#    Class evidence sufficient (STRONG_UPDATE) but the pair itself is maximally uncertain with extreme extremity
+- name: same_class signal with very high uncertainty and extreme extremity — investigate the source
+  input:
+    source_prr: 8.5
+    signal_threshold: 2.0
+    transfer_weight: same_class
+    prior_strength: weak
+    uncertainty_level: very_high
+    extremity_level: extreme
+    propagation_count: 5
+  expect:
+    posterior_class: STRONG_UPDATE
+    propagation_confidence: HIGH
+    priority: INVESTIGATE_NOW
+    eig_class: CRITICAL
+
+# 2. No propagation channel + low uncertainty → NO_UPDATE + DEFER
+#    No transfer possible AND the pair is already well-characterized
+- name: no channel with low uncertainty — defer investigation
+  input:
+    source_prr: 12.0
+    signal_threshold: 2.0
+    transfer_weight: none
+    prior_strength: unknown
+    uncertainty_level: low
+    extremity_level: extreme
+    propagation_count: 5
+  expect:
+    posterior_class: NO_UPDATE
+    propagation_confidence: NONE
+    priority: DEFER
+    eig_class: LOW
+
+# 3. High transfer + weak prior + high uncertainty + large network → STRONG_UPDATE + INVESTIGATE_NOW
+#    Evidence propagates strongly AND direct investigation benefits the whole network
+- name: strong propagation with network effect triggers immediate investigation
+  input:
+    source_prr: 6.0
+    signal_threshold: 2.0
+    transfer_weight: high
+    prior_strength: weak
+    uncertainty_level: high
+    extremity_level: moderate
+    propagation_count: 4
+  expect:
+    posterior_class: STRONG_UPDATE
+    propagation_confidence: HIGH
+    priority: INVESTIGATE_NOW
+    eig_class: HIGH
+
+# 4. Moderate propagation + moderate uncertainty + low extremity → MODERATE_UPDATE + QUEUE
+#    Partial propagation, moderate uncertainty, nothing extreme — standard queue
+- name: moderate propagation with moderate uncertainty — queue for investigation
+  input:
+    source_prr: 4.5
+    signal_threshold: 2.0
+    transfer_weight: moderate
+    prior_strength: moderate
+    uncertainty_level: moderate
+    extremity_level: low
+    propagation_count: 1
+  expect:
+    posterior_class: MODERATE_UPDATE
+    propagation_confidence: MODERATE
+    priority: QUEUE
+    eig_class: MODERATE

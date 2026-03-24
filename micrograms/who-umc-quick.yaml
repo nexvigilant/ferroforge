@@ -1,0 +1,220 @@
+name: who-umc-quick
+description: 'WHO-UMC causality assessment scale: international standard alternative to Naranjo, used in VigiBase/VigiAccess reporting'
+version: 0.2.0
+primitive_signature:
+  dominant: '→'
+  expression: '→(κ + N(ς₁ < ς₂) + ∂) — restores causality via sequential condition gates'
+  primes: ['→', 'κ', 'N', 'ς', '∂']
+  arguments: ['time_plausible', 'known_reaction', 'no_alternative_explanation', 'dechallenge_positive', 'rechallenge_positive']
+  chain_prediction: 'Restores → from κ via explicit condition checklist. time_plausible restores N(ς₁ < ς₂) — temporal ordering. dechallenge/rechallenge restore ∂ — this specific drug boundary. no_alternative_explanation sharpens ∂ — excludes competing causes. known_reaction is κ(drug, reaction_database) — prior comparison evidence. Each input restores one → condition; CERTAIN requires all three restored.'
+interface:
+  inputs:
+    dechallenge_positive:
+      type: bool
+      required: false
+    known_reaction:
+      type: bool
+      required: false
+    no_alternative_explanation:
+      type: bool
+      required: false
+    rechallenge_positive:
+      type: bool
+      required: false
+    time_plausible:
+      type: bool
+      required: false
+  outputs:
+    causality:
+      type: string
+    description:
+      type: string
+    regulatory_use:
+      type: string
+    who_score:
+      type: int
+tree:
+  start: time_plausible_check
+  nodes:
+    time_plausible_check:
+      type: condition
+      variable: time_plausible
+      operator: eq
+      value: true
+      true_next: known_reaction_check
+      false_next: unclassified
+    known_reaction_check:
+      type: condition
+      variable: known_reaction
+      operator: eq
+      value: true
+      true_next: no_alternative_check
+      false_next: unlikely
+    no_alternative_check:
+      type: condition
+      variable: no_alternative_explanation
+      operator: eq
+      value: true
+      true_next: dechallenge_check
+      false_next: possible_low
+    dechallenge_check:
+      type: condition
+      variable: dechallenge_positive
+      operator: eq
+      value: true
+      true_next: rechallenge_check
+      false_next: probable
+    rechallenge_check:
+      type: condition
+      variable: rechallenge_positive
+      operator: eq
+      value: true
+      true_next: certain
+      false_next: probable
+    certain:
+      type: return
+      value:
+        causality: CERTAIN
+        who_score: 6
+        description: All criteria met including positive rechallenge
+        regulatory_use: Highest confidence for regulatory action
+    probable:
+      type: return
+      value:
+        causality: PROBABLE
+        who_score: 5
+        description: Plausible time, known reaction, no alternative, positive dechallenge
+        regulatory_use: Strong signal for further investigation
+    possible_low:
+      type: return
+      value:
+        causality: POSSIBLE
+        who_score: 3
+        description: Plausible time and known reaction but alternative explanations exist
+        regulatory_use: Monitor and collect additional information
+    unlikely:
+      type: return
+      value:
+        causality: UNLIKELY
+        who_score: 2
+        description: Plausible time but reaction not previously known to drug
+        regulatory_use: Low priority for regulatory action
+    unclassified:
+      type: return
+      value:
+        causality: UNCLASSIFIED
+        who_score: 1
+        description: Temporal relationship not established or insufficient information
+        regulatory_use: Collect more information before assessment
+tests:
+- input:
+    time_plausible: true
+    known_reaction: true
+    no_alternative_explanation: true
+    dechallenge_positive: true
+    rechallenge_positive: true
+  expect:
+    causality: CERTAIN
+    who_score: 6
+    description: All criteria met including positive rechallenge
+- input:
+    time_plausible: true
+    known_reaction: true
+    no_alternative_explanation: true
+    dechallenge_positive: true
+    rechallenge_positive: false
+  expect:
+    causality: PROBABLE
+    who_score: 5
+    description: Plausible time, known reaction, no alternative, positive dechallenge
+- input:
+    time_plausible: true
+    known_reaction: true
+    no_alternative_explanation: true
+    dechallenge_positive: false
+    rechallenge_positive: false
+  expect:
+    causality: PROBABLE
+    who_score: 5
+    description: Plausible time, known reaction, no alternative, positive dechallenge
+- input:
+    time_plausible: true
+    known_reaction: true
+    no_alternative_explanation: false
+    dechallenge_positive: false
+    rechallenge_positive: false
+  expect:
+    causality: POSSIBLE
+    who_score: 3
+    description: Plausible time and known reaction but alternative explanations exist
+- input:
+    time_plausible: true
+    known_reaction: false
+    no_alternative_explanation: true
+    dechallenge_positive: true
+    rechallenge_positive: true
+  expect:
+    causality: UNLIKELY
+    who_score: 2
+    description: Plausible time but reaction not previously known to drug
+- input:
+    time_plausible: false
+    known_reaction: true
+    no_alternative_explanation: true
+    dechallenge_positive: true
+    rechallenge_positive: true
+  expect:
+    causality: UNCLASSIFIED
+    who_score: 1
+    description: Temporal relationship not established or insufficient information
+- input:
+    time_plausible: true
+    known_reaction: true
+    no_alternative_explanation: true
+    dechallenge_positive: true
+    rechallenge_positive: true
+  expect:
+    regulatory_use: Highest confidence for regulatory action
+    who_score: 6
+    causality: CERTAIN
+- input:
+    time_plausible: true
+    known_reaction: false
+    no_alternative_explanation: false
+    dechallenge_positive: false
+    rechallenge_positive: false
+  expect:
+    causality: UNLIKELY
+    who_score: 2
+- input:
+    time_plausible: false
+    known_reaction: false
+    no_alternative_explanation: false
+    dechallenge_positive: false
+    rechallenge_positive: false
+  expect:
+    causality: UNCLASSIFIED
+    who_score: 1
+- input: {}
+  expect:
+    causality: UNCLASSIFIED
+    who_score: 1
+    description: Temporal relationship not established or insufficient information
+- input:
+    time_plausible: true
+    known_reaction: true
+    no_alternative_explanation: true
+    dechallenge_positive: false
+    rechallenge_positive: true
+  expect:
+    causality: PROBABLE
+    who_score: 5
+- input:
+    time_plausible: true
+    known_reaction: true
+    no_alternative_explanation: false
+    dechallenge_positive: true
+    rechallenge_positive: true
+  expect:
+    causality: POSSIBLE
+    who_score: 3

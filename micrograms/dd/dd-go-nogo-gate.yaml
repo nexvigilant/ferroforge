@@ -1,0 +1,160 @@
+name: dd-go-nogo-gate
+description: 'PV DD GO/NO-GO decision gate. Thresholds: ≤25 GO, ≤50 CONDITIONAL, ≤75 CAUTION, >75 NO-GO. Source: Youssef & Hammad, Drug Safety (Dec 2025)'
+version: 0.1.0
+tree:
+  start: check_null
+  nodes:
+    check_go:
+      type: condition
+      variable: final_score
+      operator: lte
+      value: 25.0
+      true_next: go
+      false_next: check_conditional
+    no_go:
+      type: return
+      value:
+        recommendation: Critical issues identified. Recommend against proceeding unless fundamental issues resolved pre-close
+        decision: NO_GO
+        monitoring_level: blocked
+    go:
+      type: return
+      value:
+        decision: GO
+        monitoring_level: standard
+        recommendation: Proceed with standard post-acquisition monitoring and integration
+    caution:
+      type: return
+      value:
+        decision: CAUTION
+        monitoring_level: intensive
+        recommendation: Significant safety/compliance concerns. Detailed mitigation plan required before proceeding. Consider price adjustment
+    check_null:
+      type: condition
+      variable: final_score
+      operator: is_null
+      value: null
+      true_next: go
+      false_next: check_go
+    conditional:
+      type: return
+      value:
+        decision: CONDITIONAL_GO
+        recommendation: Proceed with enhanced monitoring. Implement mitigation plans for findings within 90 days
+        monitoring_level: enhanced
+    check_caution:
+      type: condition
+      variable: final_score
+      operator: lte
+      value: 75.0
+      true_next: caution
+      false_next: no_go
+    check_conditional:
+      type: condition
+      variable: final_score
+      operator: lte
+      value: 50.0
+      true_next: conditional
+      false_next: check_caution
+tests:
+- input:
+    final_score: 15.0
+  expect:
+    decision: GO
+    monitoring_level: standard
+- input:
+    final_score: 25.0
+  expect:
+    decision: GO
+    monitoring_level: standard
+- input:
+    final_score: 40.0
+  expect:
+    decision: CONDITIONAL_GO
+    monitoring_level: enhanced
+- input:
+    final_score: 60.0
+  expect:
+    monitoring_level: intensive
+    decision: CAUTION
+- input:
+    final_score: 85.0
+  expect:
+    decision: NO_GO
+    monitoring_level: blocked
+- input:
+    final_score: 50.0
+  expect:
+    monitoring_level: enhanced
+    decision: CONDITIONAL_GO
+- input:
+    final_score: 75.0
+  expect:
+    decision: CAUTION
+    monitoring_level: intensive
+- input:
+    final_score: 100.0
+  expect:
+    monitoring_level: blocked
+    decision: NO_GO
+- input:
+    final_score: 0.0
+  expect:
+    monitoring_level: standard
+    decision: GO
+- input: {}
+  expect:
+    monitoring_level: standard
+    decision: GO
+- input:
+    final_score: 24.999
+  expect:
+    decision: GO
+    recommendation: Proceed with standard post-acquisition monitoring and integration
+    monitoring_level: standard
+- input:
+    final_score: 25.001
+  expect:
+    recommendation: Proceed with enhanced monitoring. Implement mitigation plans for findings within 90 days
+    monitoring_level: enhanced
+    decision: CONDITIONAL_GO
+- input:
+    final_score: 74.999
+  expect:
+    monitoring_level: intensive
+    decision: CAUTION
+    recommendation: Significant safety/compliance concerns. Detailed mitigation plan required before proceeding. Consider price adjustment
+- input:
+    final_score: 75.001
+  expect:
+    decision: NO_GO
+    monitoring_level: blocked
+    recommendation: Critical issues identified. Recommend against proceeding unless fundamental issues resolved pre-close
+- input:
+    final_score: 49.999
+  expect:
+    decision: CONDITIONAL_GO
+    monitoring_level: enhanced
+    recommendation: Proceed with enhanced monitoring. Implement mitigation plans for findings within 90 days
+- input:
+    final_score: 50.001
+  expect:
+    monitoring_level: intensive
+    recommendation: Significant safety/compliance concerns. Detailed mitigation plan required before proceeding. Consider price adjustment
+    decision: CAUTION
+interface:
+  inputs:
+    final_score:
+      type: float
+      required: false
+  outputs:
+    recommendation:
+      type: string
+      required: false
+    monitoring_level:
+      type: string
+      required: false
+    decision:
+      type: string
+      required: false
+  aliases: {}

@@ -1,0 +1,93 @@
+name: rxcui-resolver
+description: "Determine RxNav search strategy and API endpoint based on name type"
+version: 0.1.0
+
+tree:
+  start: validate_name_type
+  nodes:
+    validate_name_type:
+      type: condition
+      variable: name_type
+      operator: is_not_null
+      true_next: classify_name_type
+      false_next: missing_input
+
+    classify_name_type:
+      type: condition
+      variable: name_type
+      operator: matches
+      value: "(?i)^brand$"
+      true_next: strategy_brand
+      false_next: check_generic
+
+    check_generic:
+      type: condition
+      variable: name_type
+      operator: matches
+      value: "(?i)^generic$"
+      true_next: strategy_generic
+      false_next: check_ingredient
+
+    check_ingredient:
+      type: condition
+      variable: name_type
+      operator: matches
+      value: "(?i)^ingredient$"
+      true_next: strategy_ingredient
+      false_next: invalid_type
+
+    strategy_brand:
+      type: return
+      value:
+        search_strategy: "search_by_brand_name"
+        api_endpoint: "/REST/rxcui.json?name=<name>&search=1"
+        expected_result_type: "branded_drugs"
+
+    strategy_generic:
+      type: return
+      value:
+        search_strategy: "search_by_generic_name"
+        api_endpoint: "/REST/rxcui.json?name=<name>&search=2"
+        expected_result_type: "generic_drugs"
+
+    strategy_ingredient:
+      type: return
+      value:
+        search_strategy: "search_by_ingredient"
+        api_endpoint: "/REST/ingredients.json?rxcui=<rxcui>"
+        expected_result_type: "ingredient_drugs"
+
+    invalid_type:
+      type: return
+      value:
+        search_strategy: null
+        api_endpoint: null
+        expected_result_type: null
+
+    missing_input:
+      type: return
+      value:
+        search_strategy: null
+        api_endpoint: null
+        expected_result_type: null
+
+tests:
+  - input: { name_type: "brand" }
+    expect: { search_strategy: "search_by_brand_name", api_endpoint: "/REST/rxcui.json?name=<name>&search=1", expected_result_type: "branded_drugs" }
+
+  - input: { name_type: "generic" }
+    expect: { search_strategy: "search_by_generic_name", api_endpoint: "/REST/rxcui.json?name=<name>&search=2", expected_result_type: "generic_drugs" }
+
+  - input: { name_type: "ingredient" }
+    expect: { search_strategy: "search_by_ingredient", api_endpoint: "/REST/ingredients.json?rxcui=<rxcui>", expected_result_type: "ingredient_drugs" }
+
+  - input: { name_type: "invalid" }
+    expect: { search_strategy: null, api_endpoint: null, expected_result_type: null }
+
+  - input: { name_type: null }
+    expect: { search_strategy: null, api_endpoint: null, expected_result_type: null }
+  - input: {}
+    expect:
+      api_endpoint: null
+      expected_result_type: null
+      search_strategy: null

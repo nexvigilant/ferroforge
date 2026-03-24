@@ -1,0 +1,44 @@
+name: ab-mass-negative
+description: 'Antibody: detects negative mass values (stem-phys Mass invariant). Mass must be non-negative — single boolean gate.'
+version: 0.1.0
+interface:
+  inputs:
+    mass_value:
+      type: number
+      required: true
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: mass_value
+      operator: lt
+      value: 0
+      true_next: violation
+      false_next: clean
+    violation:
+      type: return
+      value:
+        threat: true
+        response: 'BLOCK: negative mass violates stem-phys invariant — clamp to 0'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { mass_value: 70.0 }
+  expect: { threat: false, response: 'PASS' }
+- input: { mass_value: 0 }
+  expect: { threat: false, response: 'PASS' }
+- input: { mass_value: -5 }
+  expect: { threat: true }
+- input: {}
+  expect:
+    response: PASS
+    threat: false

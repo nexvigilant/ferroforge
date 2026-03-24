@@ -1,0 +1,139 @@
+name: error-classifier
+description: "Domain 6: Classify medication error by type and stage in the medication use process — prescribing through monitoring."
+version: 0.1.0
+interface:
+  inputs:
+    error_stage:
+      type: string
+      required: false
+  outputs:
+    ai_detect:
+      type: string
+    examples:
+      type: string
+    human_factors:
+      type: string
+    investigation:
+      type: string
+    message:
+      type: string
+    prevention:
+      type: string
+    stage:
+      type: string
+tree:
+  start: check_stage
+  nodes:
+    check_stage:
+      type: condition
+      variable: error_stage
+      operator: eq
+      value: prescribing
+      true_next: prescribing
+      false_next: check_transcription
+    check_transcription:
+      type: condition
+      variable: error_stage
+      operator: eq
+      value: transcription
+      true_next: transcription
+      false_next: check_dispensing
+    check_dispensing:
+      type: condition
+      variable: error_stage
+      operator: eq
+      value: dispensing
+      true_next: dispensing
+      false_next: check_administration
+    check_administration:
+      type: condition
+      variable: error_stage
+      operator: eq
+      value: administration
+      true_next: administration
+      false_next: check_monitoring
+    check_monitoring:
+      type: condition
+      variable: error_stage
+      operator: eq
+      value: monitoring
+      true_next: monitoring
+      false_next: unclassified
+    prescribing:
+      type: return
+      value:
+        stage: PRESCRIBING
+        examples: "wrong drug, wrong dose, missed interaction, contraindication oversight"
+        human_factors: "cognitive overload, knowledge deficit, interruptions, look-alike confusion"
+        prevention: "CPOE with CDS, interaction databases, dosing calculators, standardized protocols"
+        ai_detect: "prescribing pattern analysis, interaction prediction, dose optimization"
+        investigation: "prescriber interview, order review, system analysis, formulary check"
+    transcription:
+      type: return
+      value:
+        stage: TRANSCRIPTION
+        examples: "handwriting misread, verbal order confusion, electronic system entry error"
+        human_factors: "illegible handwriting, accent/dialect, noise, system complexity"
+        prevention: "CPOE elimination of handwriting, read-back protocols, electronic verification"
+        ai_detect: "NLP for order interpretation, voice recognition validation"
+        investigation: "original order review, communication chain analysis, system log review"
+    dispensing:
+      type: return
+      value:
+        stage: DISPENSING
+        examples: "wrong drug dispensed, incorrect label, wrong strength, packaging confusion"
+        human_factors: "look-alike packaging, interruptions, workload pressure, automation reliance"
+        prevention: "barcode verification, automated dispensing, tall-man lettering, independent double-check"
+        ai_detect: "image recognition for drug identification, barcode validation, LASA detection"
+        investigation: "dispensing record review, workflow observation, packaging assessment"
+    administration:
+      type: return
+      value:
+        stage: ADMINISTRATION
+        examples: "wrong patient, wrong route, wrong time, wrong dose, omitted dose"
+        human_factors: "patient identification failure, interruptions, fatigue, workaround behaviors"
+        prevention: "barcode MAR scanning, independent double-check, smart pump limits, 5 Rights"
+        ai_detect: "real-time monitoring, smart pump integration, patient ID verification"
+        investigation: "MAR review, nurse interview, workflow analysis, timing assessment"
+    monitoring:
+      type: return
+      value:
+        stage: MONITORING
+        examples: "missed lab follow-up, inadequate therapeutic monitoring, ADR detection failure"
+        human_factors: "information overload, alert fatigue, handoff failures, system gaps"
+        prevention: "automated lab alerts, clinical surveillance dashboards, structured handoffs"
+        ai_detect: "predictive monitoring, trend analysis, alert optimization, gap detection"
+        investigation: "monitoring protocol review, alert log analysis, handoff documentation review"
+    unclassified:
+      type: return
+      value:
+        stage: UNCLASSIFIED
+        message: "Stage must be: prescribing, transcription, dispensing, administration, monitoring"
+tests:
+- input:
+    error_stage: prescribing
+  expect:
+    stage: PRESCRIBING
+- input:
+    error_stage: transcription
+  expect:
+    stage: TRANSCRIPTION
+- input:
+    error_stage: dispensing
+  expect:
+    stage: DISPENSING
+- input:
+    error_stage: administration
+  expect:
+    stage: ADMINISTRATION
+- input:
+    error_stage: monitoring
+  expect:
+    stage: MONITORING
+- input:
+    error_stage: other
+  expect:
+    stage: UNCLASSIFIED
+- input: {}
+  expect:
+    stage: UNCLASSIFIED

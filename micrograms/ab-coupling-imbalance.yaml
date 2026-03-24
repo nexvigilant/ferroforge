@@ -1,0 +1,55 @@
+name: ab-coupling-imbalance
+description: 'Antibody: detects action-reaction imbalance (stem-phys Couple trait). Input is pre-computed magnitude_delta = abs(action - reaction).'
+version: 0.1.0
+interface:
+  inputs:
+    magnitude_delta:
+      type: number
+      required: true
+      description: 'abs(action_magnitude - reaction_magnitude)'
+    tolerance:
+      type: number
+      required: true
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check_zero
+  nodes:
+    check_zero:
+      type: condition
+      variable: magnitude_delta
+      operator: eq
+      value: 0
+      true_next: clean
+      false_next: check_tolerance
+    check_tolerance:
+      type: condition
+      variable: magnitude_delta
+      operator: lte
+      value: 0.01
+      true_next: clean
+      false_next: violation
+    violation:
+      type: return
+      value:
+        threat: true
+        response: 'BLOCK: action-reaction imbalance — Newton third law violated'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { magnitude_delta: 0, tolerance: 0.01 }
+  expect: { threat: false }
+- input: { magnitude_delta: 0.005, tolerance: 0.01 }
+  expect: { threat: false }
+- input: { magnitude_delta: 5, tolerance: 0.01 }
+  expect: { threat: true }
+- input: {}
+  expect:
+    response: "BLOCK: action-reaction imbalance — Newton third law violated"
+    threat: true

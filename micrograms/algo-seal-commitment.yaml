@@ -1,0 +1,129 @@
+name: algo-seal-commitment
+description: "Algorithm 11 (SEAL): Irreversible commitment gate. Checks prerequisites before applying ∝(DEFINE). Guards against premature SEAL and ensures PERSPECTIVE was applied first."
+version: 0.1.0
+interface:
+  inputs:
+    decision_defined:
+      type: boolean
+      required: true
+    perspectives_checked:
+      type: integer
+      required: true
+    evidence_sufficient:
+      type: boolean
+      required: true
+    reversibility_cost:
+      type: string
+      required: true
+      enum: [trivial, moderate, expensive, impossible]
+  outputs:
+    seal_verdict:
+      type: string
+    algorithm:
+      type: string
+tree:
+  start: check_defined
+  nodes:
+    check_defined:
+      type: condition
+      variable: decision_defined
+      operator: eq
+      value: false
+      true_next: block_undefined
+      false_next: check_multi_perspective
+    block_undefined:
+      type: return
+      value:
+        seal_verdict: BLOCK
+        algorithm: "SEAL blocked: DEFINE not applied — cannot seal an unfixed variable"
+    check_multi_perspective:
+      type: condition
+      variable: perspectives_checked
+      operator: gte
+      value: 2
+      true_next: check_evidence
+      false_next: check_single_perspective
+    check_single_perspective:
+      type: condition
+      variable: perspectives_checked
+      operator: gte
+      value: 1
+      true_next: check_single_cost_trivial
+      false_next: block_no_perspective
+    block_no_perspective:
+      type: return
+      value:
+        seal_verdict: BLOCK
+        algorithm: "SEAL blocked: zero perspectives — Failure Mode #7 risk"
+    check_single_cost_trivial:
+      type: condition
+      variable: reversibility_cost
+      operator: eq
+      value: trivial
+      true_next: warn_proceed
+      false_next: check_single_cost_moderate
+    check_single_cost_moderate:
+      type: condition
+      variable: reversibility_cost
+      operator: eq
+      value: moderate
+      true_next: warn_proceed
+      false_next: block_high_stakes_single
+    block_high_stakes_single:
+      type: return
+      value:
+        seal_verdict: BLOCK
+        algorithm: "SEAL blocked: 1 perspective on expensive/impossible reversal — ∝ amplifies perspective collapse"
+    warn_proceed:
+      type: return
+      value:
+        seal_verdict: WARN_PROCEED
+        algorithm: "SEAL with warning: 1 perspective but low reversal cost — proceed with caution"
+    check_evidence:
+      type: condition
+      variable: evidence_sufficient
+      operator: eq
+      value: true
+      true_next: check_impossible
+      false_next: block_weak_evidence
+    block_weak_evidence:
+      type: return
+      value:
+        seal_verdict: BLOCK
+        algorithm: "SEAL blocked: insufficient evidence — ∝(DEFINE) on weak evidence creates irreversible error"
+    check_impossible:
+      type: condition
+      variable: reversibility_cost
+      operator: eq
+      value: impossible
+      true_next: seal_irreversible
+      false_next: seal_reversible
+    seal_irreversible:
+      type: return
+      value:
+        seal_verdict: SEAL
+        algorithm: "SEAL: ∝(μ(ς → π(ς))) — truly irreversible commitment. No inverse exists."
+    seal_reversible:
+      type: return
+      value:
+        seal_verdict: SEAL
+        algorithm: "SEAL: ∝(μ(ς → π(ς))) — commitment executed. Reversal possible but costly."
+tests:
+- input: { decision_defined: true, perspectives_checked: 3, evidence_sufficient: true, reversibility_cost: impossible }
+  expect: { seal_verdict: SEAL }
+- input: { decision_defined: true, perspectives_checked: 2, evidence_sufficient: true, reversibility_cost: moderate }
+  expect: { seal_verdict: SEAL }
+- input: { decision_defined: false, perspectives_checked: 3, evidence_sufficient: true, reversibility_cost: trivial }
+  expect: { seal_verdict: BLOCK }
+- input: { decision_defined: true, perspectives_checked: 0, evidence_sufficient: true, reversibility_cost: expensive }
+  expect: { seal_verdict: BLOCK }
+- input: { decision_defined: true, perspectives_checked: 1, evidence_sufficient: true, reversibility_cost: impossible }
+  expect: { seal_verdict: BLOCK }
+- input: { decision_defined: true, perspectives_checked: 1, evidence_sufficient: true, reversibility_cost: trivial }
+  expect: { seal_verdict: WARN_PROCEED }
+- input: { decision_defined: true, perspectives_checked: 3, evidence_sufficient: false, reversibility_cost: expensive }
+  expect: { seal_verdict: BLOCK }
+- input: { decision_defined: true, perspectives_checked: 1, evidence_sufficient: true, reversibility_cost: moderate }
+  expect: { seal_verdict: WARN_PROCEED }
+- input: {}
+  expect: { seal_verdict: BLOCK }

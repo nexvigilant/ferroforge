@@ -1,0 +1,197 @@
+name: susar-classifier
+description: 'ICH E2A SUSAR classification: Suspected Unexpected Serious Adverse Reaction determination from seriousness, expectedness, and causality'
+version: 0.1.0
+interface:
+  inputs:
+    causal_relationship:
+      type: string
+      required: false
+    serious:
+      type: bool
+      required: false
+    unexpected:
+      type: bool
+      required: false
+  outputs:
+    classification:
+      type: string
+    regulatory_reference:
+      type: string
+    reporting_timeline:
+      type: string
+    susar:
+      type: bool
+tree:
+  start: serious_check
+  nodes:
+    serious_check:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: unexpected_check
+      false_next: non_serious
+    unexpected_check:
+      type: condition
+      variable: unexpected
+      operator: eq
+      value: true
+      true_next: causal_certain_check
+      false_next: expected_sar
+    causal_certain_check:
+      type: condition
+      variable: causal_relationship
+      operator: eq
+      value: certain
+      true_next: susar
+      false_next: causal_probable_check
+    causal_probable_check:
+      type: condition
+      variable: causal_relationship
+      operator: eq
+      value: probable
+      true_next: susar
+      false_next: causal_possible_check
+    causal_possible_check:
+      type: condition
+      variable: causal_relationship
+      operator: eq
+      value: possible
+      true_next: susar
+      false_next: causal_unlikely_check
+    causal_unlikely_check:
+      type: condition
+      variable: causal_relationship
+      operator: eq
+      value: unlikely
+      true_next: suspected_susar
+      false_next: unexpected_sar_no_causality
+    non_serious:
+      type: return
+      value:
+        classification: NON_SERIOUS_AE
+        susar: false
+        reporting_timeline: periodic
+        regulatory_reference: ICH E2A Section II
+    expected_sar:
+      type: return
+      value:
+        classification: EXPECTED_SAR
+        susar: false
+        reporting_timeline: periodic
+        regulatory_reference: ICH E2A Section III.B
+    susar:
+      type: return
+      value:
+        classification: SUSAR
+        susar: true
+        reporting_timeline: expedited_15day
+        regulatory_reference: ICH E2A Section III.B
+    suspected_susar:
+      type: return
+      value:
+        classification: SUSPECTED_SUSAR
+        susar: false
+        reporting_timeline: expedited_15day
+        regulatory_reference: ICH E2A Section III.B
+    unexpected_sar_no_causality:
+      type: return
+      value:
+        classification: UNEXPECTED_SAR_NO_CAUSALITY
+        susar: false
+        reporting_timeline: periodic
+        regulatory_reference: ICH E2A Section III.B
+tests:
+- input:
+    serious: false
+    unexpected: true
+    causal_relationship: certain
+  expect:
+    classification: NON_SERIOUS_AE
+    susar: false
+    reporting_timeline: periodic
+- input:
+    serious: false
+    unexpected: false
+    causal_relationship: probable
+  expect:
+    classification: NON_SERIOUS_AE
+    susar: false
+    reporting_timeline: periodic
+- input:
+    serious: true
+    unexpected: false
+    causal_relationship: certain
+  expect:
+    classification: EXPECTED_SAR
+    susar: false
+    reporting_timeline: periodic
+- input:
+    serious: true
+    unexpected: false
+    causal_relationship: possible
+  expect:
+    classification: EXPECTED_SAR
+    susar: false
+    reporting_timeline: periodic
+- input:
+    serious: true
+    unexpected: true
+    causal_relationship: certain
+  expect:
+    classification: SUSAR
+    susar: true
+    reporting_timeline: expedited_15day
+- input:
+    serious: true
+    unexpected: true
+    causal_relationship: probable
+  expect:
+    classification: SUSAR
+    susar: true
+    reporting_timeline: expedited_15day
+- input:
+    serious: true
+    unexpected: true
+    causal_relationship: possible
+  expect:
+    classification: SUSAR
+    susar: true
+    reporting_timeline: expedited_15day
+- input:
+    serious: true
+    unexpected: true
+    causal_relationship: unlikely
+  expect:
+    classification: SUSPECTED_SUSAR
+    susar: false
+    reporting_timeline: expedited_15day
+- input:
+    serious: true
+    unexpected: true
+    causal_relationship: unrelated
+  expect:
+    classification: UNEXPECTED_SAR_NO_CAUSALITY
+    susar: false
+    reporting_timeline: periodic
+- input:
+    serious: false
+    unexpected: false
+    causal_relationship: unrelated
+  expect:
+    classification: NON_SERIOUS_AE
+    susar: false
+    reporting_timeline: periodic
+- input:
+    serious: true
+    unexpected: true
+    causal_relationship: certain
+  expect:
+    susar: true
+    regulatory_reference: ICH E2A Section III.B
+    reporting_timeline: expedited_15day
+- input: {}
+  expect:
+    classification: NON_SERIOUS_AE
+    susar: false
+    reporting_timeline: periodic

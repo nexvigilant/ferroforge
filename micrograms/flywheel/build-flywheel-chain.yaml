@@ -1,0 +1,216 @@
+name: build-flywheel-chain
+description: 'Closed-loop build management chain: memory-gate → job-scaler → build → cache-prune. Chains build-memory-gate and build-job-scaler into a single decision pipeline. Input is crate name + system state, output is full build strategy or block decision.'
+version: 0.1.0
+interface:
+  inputs:
+    available_mb:
+      type: int
+      required: true
+    cpu_cores:
+      type: int
+      required: true
+    crate_tier:
+      type: string
+      required: true
+    incremental_cache_gb:
+      type: int
+      required: false
+  outputs:
+    decision:
+      type: string
+    jobs:
+      type: int
+    prune_cache:
+      type: bool
+    strategy:
+      type: string
+tree:
+  start: gate_check
+  nodes:
+    gate_check:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 500
+      true_next: check_tier
+      false_next: blocked
+    check_tier:
+      type: condition
+      variable: crate_tier
+      operator: eq
+      value: heavy
+      true_next: heavy_gate
+      false_next: normal_scale
+    heavy_gate:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 2000
+      true_next: heavy_scale
+      false_next: blocked
+    heavy_scale:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 8000
+      true_next: heavy_full_check_cache
+      false_next: heavy_half_check_cache
+    heavy_full_check_cache:
+      type: condition
+      variable: incremental_cache_gb
+      operator: gte
+      value: 15
+      true_next: heavy_full_prune
+      false_next: heavy_full_no_prune
+    heavy_half_check_cache:
+      type: condition
+      variable: incremental_cache_gb
+      operator: gte
+      value: 15
+      true_next: heavy_half_prune
+      false_next: heavy_half_no_prune
+    normal_scale:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 4000
+      true_next: normal_full
+      false_next: normal_half
+    blocked:
+      type: return
+      value:
+        decision: BLOCK
+        jobs: 0
+        prune_cache: false
+        strategy: wait_for_memory
+    heavy_full_prune:
+      type: return
+      value:
+        decision: GO
+        jobs: 8
+        prune_cache: true
+        strategy: full_parallel_with_prune
+    heavy_full_no_prune:
+      type: return
+      value:
+        decision: GO
+        jobs: 8
+        prune_cache: false
+        strategy: full_parallel
+    heavy_half_prune:
+      type: return
+      value:
+        decision: GO
+        jobs: 4
+        prune_cache: true
+        strategy: half_parallel_with_prune
+    heavy_half_no_prune:
+      type: return
+      value:
+        decision: GO
+        jobs: 4
+        prune_cache: false
+        strategy: half_parallel
+    normal_full:
+      type: return
+      value:
+        decision: GO
+        jobs: 12
+        prune_cache: false
+        strategy: full_parallel
+    normal_half:
+      type: return
+      value:
+        decision: GO
+        jobs: 6
+        prune_cache: false
+        strategy: half_parallel
+tests:
+- input:
+    available_mb: 12000
+    cpu_cores: 20
+    crate_tier: heavy
+    incremental_cache_gb: 20
+  expect:
+    decision: GO
+    jobs: 8
+    prune_cache: true
+    strategy: full_parallel_with_prune
+- input:
+    available_mb: 5000
+    cpu_cores: 20
+    crate_tier: heavy
+    incremental_cache_gb: 5
+  expect:
+    decision: GO
+    jobs: 4
+    prune_cache: false
+    strategy: half_parallel
+- input:
+    available_mb: 1000
+    cpu_cores: 20
+    crate_tier: heavy
+    incremental_cache_gb: 30
+  expect:
+    decision: BLOCK
+    jobs: 0
+    prune_cache: false
+    strategy: wait_for_memory
+- input:
+    available_mb: 300
+    cpu_cores: 20
+    crate_tier: normal
+    incremental_cache_gb: 5
+  expect:
+    decision: BLOCK
+    jobs: 0
+    prune_cache: false
+    strategy: wait_for_memory
+- input:
+    available_mb: 6000
+    cpu_cores: 20
+    crate_tier: normal
+    incremental_cache_gb: 5
+  expect:
+    decision: GO
+    jobs: 12
+    prune_cache: false
+    strategy: full_parallel
+- input:
+    available_mb: 3000
+    cpu_cores: 20
+    crate_tier: normal
+    incremental_cache_gb: 5
+  expect:
+    decision: GO
+    jobs: 6
+    prune_cache: false
+    strategy: half_parallel
+# heavy_full_no_prune: plenty of RAM, small cache
+- input:
+    available_mb: 10000
+    cpu_cores: 20
+    crate_tier: heavy
+    incremental_cache_gb: 10
+  expect:
+    decision: GO
+    jobs: 8
+    prune_cache: false
+    strategy: full_parallel
+# heavy_half_prune: moderate RAM, large cache
+- input:
+    available_mb: 5000
+    cpu_cores: 20
+    crate_tier: heavy
+    incremental_cache_gb: 20
+  expect:
+    decision: GO
+    jobs: 4
+    prune_cache: true
+    strategy: half_parallel_with_prune
+- input: {}
+  expect:
+    decision: BLOCK
+    jobs: 0
+    prune_cache: false
+    strategy: wait_for_memory

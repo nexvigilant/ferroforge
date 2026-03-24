@@ -1,0 +1,131 @@
+name: dermatologic-severity-classifier
+description: 'Dermatologic safety classifier: maps skin adverse reactions to severity grades with SJS/TEN/DRESS as critical signals'
+version: 0.1.0
+interface:
+  inputs:
+    reaction_pt:
+      type: string
+      required: true
+      description: MedDRA preferred term for the dermatologic reaction
+    bsa_percent:
+      type: float
+      required: false
+      description: Body surface area affected as percentage
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    soc:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_ten
+  nodes:
+    check_ten:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: TOXIC EPIDERMAL NECROLYSIS
+      true_next: critical
+      false_next: check_sjs
+    check_sjs:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: STEVENS-JOHNSON
+      true_next: critical
+      false_next: check_dress
+    check_dress:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: DRESS
+      true_next: critical
+      false_next: check_angioedema
+    check_angioedema:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: ANGIOEDEMA
+      true_next: serious
+      false_next: check_bsa
+    check_bsa:
+      type: condition
+      variable: bsa_percent
+      operator: gte
+      value: 30
+      true_next: serious
+      false_next: check_urticaria
+    check_urticaria:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: URTICARIA
+      true_next: moderate
+      false_next: mild
+    critical:
+      type: return
+      value:
+        severity: critical
+        soc: Skin and subcutaneous tissue disorders
+        action: immediate_expedited_report
+    serious:
+      type: return
+      value:
+        severity: serious
+        soc: Skin and subcutaneous tissue disorders
+        action: expedited_report
+    moderate:
+      type: return
+      value:
+        severity: moderate
+        soc: Skin and subcutaneous tissue disorders
+        action: monitor_and_assess
+    mild:
+      type: return
+      value:
+        severity: mild
+        soc: Skin and subcutaneous tissue disorders
+        action: routine_surveillance
+tests:
+  - name: ten
+    input:
+      reaction_pt: TOXIC EPIDERMAL NECROLYSIS
+    expect:
+      severity: critical
+  - name: sjs
+    input:
+      reaction_pt: STEVENS-JOHNSON SYNDROME
+    expect:
+      severity: critical
+  - name: dress
+    input:
+      reaction_pt: DRUG REACTION WITH EOSINOPHILIA AND SYSTEMIC SYMPTOMS (DRESS)
+    expect:
+      severity: critical
+  - name: angioedema
+    input:
+      reaction_pt: ANGIOEDEMA
+    expect:
+      severity: serious
+  - name: large_bsa
+    input:
+      reaction_pt: DERMATITIS
+      bsa_percent: 40
+    expect:
+      severity: serious
+  - name: urticaria
+    input:
+      reaction_pt: URTICARIA GENERALISED
+    expect:
+      severity: moderate
+  - name: mild_rash
+    input:
+      reaction_pt: RASH
+    expect:
+      severity: mild
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild

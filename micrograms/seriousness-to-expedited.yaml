@@ -1,0 +1,96 @@
+name: seriousness-to-expedited
+description: Routes case seriousness level to expedited reporting requirements
+version: 0.1.0
+
+interface:
+  inputs:
+    seriousness_level:
+      type: string
+      required: true
+      description: "Case seriousness classification: fatal, life_threatening, hospitalization, outpatient, unknown"
+  outputs:
+    requires_expedited:
+      type: boolean
+      description: Whether expedited reporting is required
+    reporting_window_days:
+      type: integer
+      description: Number of days allowed for reporting
+    rationale:
+      type: string
+      description: Explanation of the decision
+
+tree:
+  start: check_seriousness
+  nodes:
+    check_seriousness:
+      type: condition
+      variable: seriousness_level
+      operator: eq
+      value: "fatal"
+      true_next: fatal_path
+      false_next: check_life_threatening
+
+    fatal_path:
+      type: return
+      value:
+        requires_expedited: true
+        reporting_window_days: 7
+        rationale: "Fatal cases require expedited reporting within 7 days"
+
+    check_life_threatening:
+      type: condition
+      variable: seriousness_level
+      operator: eq
+      value: "life_threatening"
+      true_next: life_threatening_path
+      false_next: check_hospitalization
+
+    life_threatening_path:
+      type: return
+      value:
+        requires_expedited: true
+        reporting_window_days: 7
+        rationale: "Life-threatening cases require expedited reporting within 7 days"
+
+    check_hospitalization:
+      type: condition
+      variable: seriousness_level
+      operator: eq
+      value: "hospitalization"
+      true_next: hospitalization_path
+      false_next: standard_reporting
+
+    hospitalization_path:
+      type: return
+      value:
+        requires_expedited: true
+        reporting_window_days: 15
+        rationale: "Hospitalization cases require reporting within 15 days"
+
+    standard_reporting:
+      type: return
+      value:
+        requires_expedited: false
+        reporting_window_days: 90
+        rationale: "Non-serious cases follow standard reporting timelines of 90 days"
+
+tests:
+  - input: { seriousness_level: "fatal" }
+    expect: { requires_expedited: true, reporting_window_days: 7, rationale: "Fatal cases require expedited reporting within 7 days" }
+
+  - input: { seriousness_level: "hospitalization" }
+    expect: { requires_expedited: true, reporting_window_days: 15, rationale: "Hospitalization cases require reporting within 15 days" }
+
+  - input: { seriousness_level: "outpatient" }
+    expect: { requires_expedited: false, reporting_window_days: 90, rationale: "Non-serious cases follow standard reporting timelines of 90 days" }
+
+  - input: { seriousness_level: "life_threatening" }
+    expect: { requires_expedited: true, reporting_window_days: 7, rationale: "Life-threatening cases require expedited reporting within 7 days" }
+
+  - input: { seriousness_level: "unknown" }
+    expect: { requires_expedited: false, reporting_window_days: 90, rationale: "Non-serious cases follow standard reporting timelines of 90 days" }
+  - input: {}
+    expect:
+      rationale: Non-serious cases follow standard reporting timelines of 90 days
+      reporting_window_days: 90
+      requires_expedited: false

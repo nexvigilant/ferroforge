@@ -1,0 +1,255 @@
+name: dose-response-classifier
+description: 'Dose-response relationship classifier: takes low_dose_rate, mid_dose_rate, and high_dose_rate adverse event frequencies and classifies the relationship pattern. Uses cross-variable comparison to determine monotonic increase, threshold effect, inverse response, or flat response. Critical for Bradford Hill dose-response criterion.'
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(low, mid, high) at σ(dose_order) — three-way ordered comparison classifying dose-response shape'
+  primes: ['κ', 'σ', 'N', '∂', 'μ']
+  arguments: ['low_dose_rate', 'mid_dose_rate', 'high_dose_rate']
+  chain_prediction: 'μ(κ(doses)) → bradford_hill_dose_response_criterion'
+interface:
+  inputs:
+    low_dose_rate:
+      type: float
+      required: true
+      description: 'Adverse event rate at low dose (events per 1000 patients)'
+    mid_dose_rate:
+      type: float
+      required: true
+      description: 'Adverse event rate at medium dose'
+    high_dose_rate:
+      type: float
+      required: true
+      description: 'Adverse event rate at high dose'
+  outputs:
+    pattern:
+      type: string
+      description: 'MONOTONIC_INCREASE, THRESHOLD_EFFECT, INVERSE, FLAT, BELL_CURVE, IRREGULAR'
+    dose_response_met:
+      type: string
+      description: 'yes/no — Bradford Hill dose-response criterion satisfied'
+    confidence:
+      type: string
+      description: 'HIGH, MEDIUM, LOW confidence in the classification'
+    interpretation:
+      type: string
+      description: 'Plain English explanation of the dose-response relationship'
+tree:
+  start: check_low_vs_mid
+  nodes:
+    check_low_vs_mid:
+      type: condition
+      variable: mid_dose_rate
+      operator: gt
+      value: '{{low_dose_rate}}'
+      true_next: mid_gt_low_check_high
+      false_next: check_mid_eq_low
+
+    check_mid_eq_low:
+      type: condition
+      variable: mid_dose_rate
+      operator: eq
+      value: '{{low_dose_rate}}'
+      true_next: flat_start_check_high
+      false_next: mid_lt_low_check_high
+
+    mid_gt_low_check_high:
+      type: condition
+      variable: high_dose_rate
+      operator: gt
+      value: '{{mid_dose_rate}}'
+      true_next: monotonic_increase
+      false_next: check_high_eq_mid
+
+    check_high_eq_mid:
+      type: condition
+      variable: high_dose_rate
+      operator: eq
+      value: '{{mid_dose_rate}}'
+      true_next: threshold_effect
+      false_next: bell_curve
+
+    monotonic_increase:
+      type: return
+      value:
+        pattern: MONOTONIC_INCREASE
+        dose_response_met: 'yes'
+        confidence: HIGH
+        interpretation: 'Clear dose-response gradient — adverse event rate increases with each dose level. Strongest support for Bradford Hill dose-response criterion.'
+
+    threshold_effect:
+      type: return
+      value:
+        pattern: THRESHOLD_EFFECT
+        dose_response_met: 'yes'
+        confidence: MEDIUM
+        interpretation: 'Dose-response plateaus at mid dose. Suggests saturation — receptor occupancy or metabolic capacity reached.'
+
+    bell_curve:
+      type: return
+      value:
+        pattern: BELL_CURVE
+        dose_response_met: 'no'
+        confidence: MEDIUM
+        interpretation: 'Rate peaks at mid dose then decreases. May indicate competing mechanisms, tolerance, or survivor bias at high dose.'
+
+    flat_start_check_high:
+      type: condition
+      variable: high_dose_rate
+      operator: gt
+      value: '{{mid_dose_rate}}'
+      true_next: late_threshold
+      false_next: check_flat_high_eq
+
+    check_flat_high_eq:
+      type: condition
+      variable: high_dose_rate
+      operator: eq
+      value: '{{mid_dose_rate}}'
+      true_next: flat_response
+      false_next: late_inverse
+
+    late_threshold:
+      type: return
+      value:
+        pattern: THRESHOLD_EFFECT
+        dose_response_met: 'yes'
+        confidence: LOW
+        interpretation: 'No effect at low-to-mid dose, then increase at high dose. Threshold effect — dose-response criterion weakly supported.'
+
+    flat_response:
+      type: return
+      value:
+        pattern: FLAT
+        dose_response_met: 'no'
+        confidence: HIGH
+        interpretation: 'No dose-response relationship. Equal rates across all dose levels suggests the event is unrelated to dose.'
+
+    late_inverse:
+      type: return
+      value:
+        pattern: IRREGULAR
+        dose_response_met: 'no'
+        confidence: LOW
+        interpretation: 'Flat at low-mid then decreasing at high dose. May indicate protective effect or data quality issues.'
+
+    mid_lt_low_check_high:
+      type: condition
+      variable: high_dose_rate
+      operator: gt
+      value: '{{mid_dose_rate}}'
+      true_next: check_high_vs_low_irregular
+      false_next: check_inverse_flat
+
+    check_high_vs_low_irregular:
+      type: condition
+      variable: high_dose_rate
+      operator: gt
+      value: '{{low_dose_rate}}'
+      true_next: irregular_u_shape
+      false_next: irregular_partial
+
+    irregular_u_shape:
+      type: return
+      value:
+        pattern: IRREGULAR
+        dose_response_met: 'no'
+        confidence: LOW
+        interpretation: 'U-shaped response — rate dips at mid dose then exceeds low dose at high dose. May indicate two competing mechanisms.'
+
+    irregular_partial:
+      type: return
+      value:
+        pattern: IRREGULAR
+        dose_response_met: 'no'
+        confidence: LOW
+        interpretation: 'Non-monotonic response. Rate decreases then partially recovers. Data quality or confounding likely.'
+
+    check_inverse_flat:
+      type: condition
+      variable: high_dose_rate
+      operator: eq
+      value: '{{mid_dose_rate}}'
+      true_next: inverse_plateau
+      false_next: full_inverse
+
+    inverse_plateau:
+      type: return
+      value:
+        pattern: INVERSE
+        dose_response_met: 'no'
+        confidence: MEDIUM
+        interpretation: 'Inverse dose-response with plateau. Rate decreases then stabilizes. May indicate adaptation or hormesis.'
+
+    full_inverse:
+      type: return
+      value:
+        pattern: INVERSE
+        dose_response_met: 'no'
+        confidence: MEDIUM
+        interpretation: 'Monotonic decrease in adverse event rate with dose. Contradicts expected causality. Consider protective mechanism or reporting bias.'
+
+tests:
+- input:
+    low_dose_rate: 10
+    mid_dose_rate: 25
+    high_dose_rate: 50
+  expect:
+    pattern: MONOTONIC_INCREASE
+    dose_response_met: 'yes'
+    confidence: HIGH
+
+- input:
+    low_dose_rate: 5
+    mid_dose_rate: 30
+    high_dose_rate: 30
+  expect:
+    pattern: THRESHOLD_EFFECT
+    dose_response_met: 'yes'
+    confidence: MEDIUM
+
+- input:
+    low_dose_rate: 10
+    mid_dose_rate: 40
+    high_dose_rate: 20
+  expect:
+    pattern: BELL_CURVE
+    dose_response_met: 'no'
+
+- input:
+    low_dose_rate: 15
+    mid_dose_rate: 15
+    high_dose_rate: 15
+  expect:
+    pattern: FLAT
+    dose_response_met: 'no'
+    confidence: HIGH
+
+- input:
+    low_dose_rate: 50
+    mid_dose_rate: 30
+    high_dose_rate: 10
+  expect:
+    pattern: INVERSE
+    dose_response_met: 'no'
+
+- input:
+    low_dose_rate: 20
+    mid_dose_rate: 20
+    high_dose_rate: 45
+  expect:
+    pattern: THRESHOLD_EFFECT
+    dose_response_met: 'yes'
+    confidence: LOW
+
+- input:
+    low_dose_rate: 30
+    mid_dose_rate: 10
+    high_dose_rate: 40
+  expect:
+    pattern: IRREGULAR
+    dose_response_met: 'no'
+
+- input: {}
+  expect:
+    dose_response_met: 'no'

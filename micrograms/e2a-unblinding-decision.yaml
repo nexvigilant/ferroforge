@@ -1,0 +1,135 @@
+name: e2a-unblinding-decision
+description: 'ICH E2A blinded study unblinding gate: determines whether treatment unblinding is recommended for expedited reporting'
+version: 0.1.0
+interface:
+  inputs:
+    expedited_reporting_required:
+      type: bool
+      required: false
+    serious_ae:
+      type: bool
+      required: false
+    study_blinded:
+      type: bool
+      required: false
+  outputs:
+    description:
+      type: string
+    not_applicable:
+      type: bool
+    regulatory_reference:
+      type: string
+    scope:
+      type: string
+    unblinding_recommended:
+      type: bool
+tree:
+  start: check_blinded
+  nodes:
+    check_blinded:
+      type: condition
+      variable: study_blinded
+      operator: eq
+      value: true
+      true_next: check_serious
+      false_next: not_applicable
+    check_serious:
+      type: condition
+      variable: serious_ae
+      operator: eq
+      value: true
+      true_next: check_expedited
+      false_next: no_unblinding
+    check_expedited:
+      type: condition
+      variable: expedited_reporting_required
+      operator: eq
+      value: true
+      true_next: unblinding_recommended
+      false_next: no_unblinding
+    unblinding_recommended:
+      type: return
+      value:
+        unblinding_recommended: true
+        scope: PATIENT_ONLY
+        description: Unblinding recommended for the specific patient to fulfill expedited reporting obligations
+        regulatory_reference: ICH E2A Section III.B.2
+    not_applicable:
+      type: return
+      value:
+        unblinding_recommended: false
+        not_applicable: true
+        scope: NONE
+        description: Study is not blinded - unblinding decision not applicable
+        regulatory_reference: ICH E2A Section III.B.2
+    no_unblinding:
+      type: return
+      value:
+        unblinding_recommended: false
+        not_applicable: false
+        scope: NONE
+        description: Unblinding not recommended - case does not meet expedited reporting criteria
+        regulatory_reference: ICH E2A Section III.B.2
+tests:
+# All three true - unblinding recommended
+- input:
+    study_blinded: true
+    serious_ae: true
+    expedited_reporting_required: true
+  expect:
+    unblinding_recommended: true
+    scope: PATIENT_ONLY
+    description: Unblinding recommended for the specific patient to fulfill expedited reporting obligations
+    regulatory_reference: ICH E2A Section III.B.2
+# Study not blinded - not applicable
+- input:
+    study_blinded: false
+    serious_ae: true
+    expedited_reporting_required: true
+  expect:
+    unblinding_recommended: false
+    not_applicable: true
+    scope: NONE
+    description: Study is not blinded - unblinding decision not applicable
+    regulatory_reference: ICH E2A Section III.B.2
+# Blinded but not serious - no unblinding
+- input:
+    study_blinded: true
+    serious_ae: false
+    expedited_reporting_required: true
+  expect:
+    unblinding_recommended: false
+    not_applicable: false
+    scope: NONE
+    description: Unblinding not recommended - case does not meet expedited reporting criteria
+    regulatory_reference: ICH E2A Section III.B.2
+# Blinded, serious, but not expedited - no unblinding
+- input:
+    study_blinded: true
+    serious_ae: true
+    expedited_reporting_required: false
+  expect:
+    unblinding_recommended: false
+    not_applicable: false
+    scope: NONE
+    description: Unblinding not recommended - case does not meet expedited reporting criteria
+    regulatory_reference: ICH E2A Section III.B.2
+# Empty input - not applicable (defaults to not blinded)
+- input: {}
+  expect:
+    unblinding_recommended: false
+    not_applicable: true
+    scope: NONE
+    description: Study is not blinded - unblinding decision not applicable
+    regulatory_reference: ICH E2A Section III.B.2
+# All false
+- input:
+    study_blinded: false
+    serious_ae: false
+    expedited_reporting_required: false
+  expect:
+    unblinding_recommended: false
+    not_applicable: true
+    scope: NONE
+    description: Study is not blinded - unblinding decision not applicable
+    regulatory_reference: ICH E2A Section III.B.2

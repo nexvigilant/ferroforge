@@ -1,0 +1,100 @@
+name: reality-gate
+description: 'VDAG Reality Gradient gate: APPROVED (>=50), WARN (>=20), BLOCKED (<20 = testing theater)'
+version: 0.1.0
+interface:
+  inputs:
+    reality_score:
+      type: int
+      required: false
+  outputs:
+    executable:
+      type: bool
+    verdict:
+      type: string
+tree:
+  start: check_approved
+  nodes:
+    check_approved:
+      type: condition
+      variable: reality_score
+      operator: gte
+      value: 50
+      true_next: approved
+      false_next: check_warn
+    check_warn:
+      type: condition
+      variable: reality_score
+      operator: gte
+      value: 20
+      true_next: warn
+      false_next: blocked
+    approved:
+      type: return
+      value:
+        verdict: APPROVED
+        executable: true
+    warn:
+      type: return
+      value:
+        verdict: WARN
+        executable: true
+    blocked:
+      type: return
+      value:
+        verdict: BLOCKED
+        executable: false
+tests:
+- input:
+    reality_score: 66
+  expect:
+    verdict: APPROVED
+    executable: true
+- input:
+    reality_score: 59
+  expect:
+    verdict: APPROVED
+    executable: true
+- input:
+    reality_score: 44
+  expect:
+    verdict: WARN
+    executable: true
+- input:
+    reality_score: 35
+  expect:
+    verdict: WARN
+    executable: true
+- input:
+    reality_score: 20
+  expect:
+    verdict: WARN
+    executable: true
+- input:
+    reality_score: 19
+  expect:
+    verdict: BLOCKED
+    executable: false
+- input:
+    reality_score: 2
+  expect:
+    verdict: BLOCKED
+    executable: false
+- input:
+    reality_score: 0
+  expect:
+    verdict: BLOCKED
+    executable: false
+- input:
+    reality_score: 50
+  expect:
+    verdict: APPROVED
+    executable: true
+- input:
+    reality_score: 100
+  expect:
+    verdict: APPROVED
+    executable: true
+- input: {}
+  expect:
+    executable: false
+    verdict: BLOCKED

@@ -1,0 +1,208 @@
+name: signal-intelligence-router
+description: "Routes accumulated signal intelligence to appropriate next action based on signal count, cross-drug overlap, and insight maturity. Exercises the ρ (Recursion) primitive — each accumulation cycle feeds back into the routing decision."
+version: 0.1.0
+interface:
+  inputs:
+    active_signal_count:
+      type: int
+      required: true
+    cross_drug_signals:
+      type: int
+      required: false
+    unassessed_count:
+      type: int
+      required: false
+    has_class_effect:
+      type: bool
+      required: false
+    insight_count:
+      type: int
+      required: false
+  outputs:
+    action:
+      type: string
+    priority:
+      type: string
+    recommended_tool:
+      type: string
+    reason:
+      type: string
+    recursion_depth:
+      type: string
+tree:
+  start: check_signals
+  nodes:
+    check_signals:
+      type: condition
+      variable: active_signal_count
+      operator: gte
+      value: 1
+      true_next: check_unassessed
+      false_next: no_signals
+    no_signals:
+      type: return
+      value:
+        action: continue_monitoring
+        priority: LOW
+        recommended_tool: signal_detection
+        reason: No active signals in intelligence state. Continue routine signal detection.
+        recursion_depth: base_case
+    check_unassessed:
+      type: condition
+      variable: unassessed_count
+      operator: gte
+      value: 5
+      true_next: triage_backlog
+      false_next: check_class_effect
+    triage_backlog:
+      type: return
+      value:
+        action: triage_unassessed
+        priority: URGENT
+        recommended_tool: causality_assessment
+        reason: 5+ unassessed signals accumulated. Triage backlog before further accumulation.
+        recursion_depth: accumulation_overflow
+    check_class_effect:
+      type: condition
+      variable: has_class_effect
+      operator: eq
+      value: true
+      true_next: class_effect_escalation
+      false_next: check_cross_drug
+    class_effect_escalation:
+      type: return
+      value:
+        action: class_effect_review
+        priority: URGENT
+        recommended_tool: drug_comparator
+        reason: Class effect detected across multiple drugs. Cross-drug comparison required.
+        recursion_depth: pattern_detected
+    check_cross_drug:
+      type: condition
+      variable: cross_drug_signals
+      operator: gte
+      value: 3
+      true_next: cross_drug_review
+      false_next: check_insight_maturity
+    cross_drug_review:
+      type: return
+      value:
+        action: cross_drug_analysis
+        priority: HIGH
+        recommended_tool: drug_comparator
+        reason: 3+ signals span multiple drugs. Cross-drug analysis may reveal shared mechanism.
+        recursion_depth: cross_reference
+    check_insight_maturity:
+      type: condition
+      variable: insight_count
+      operator: gte
+      value: 3
+      true_next: insight_synthesis
+      false_next: standard_accumulation
+    insight_synthesis:
+      type: return
+      value:
+        action: synthesize_insights
+        priority: STANDARD
+        recommended_tool: reporting
+        reason: 3+ insights accumulated. Synthesize into safety intelligence report.
+        recursion_depth: synthesis
+    standard_accumulation:
+      type: return
+      value:
+        action: continue_accumulation
+        priority: STANDARD
+        recommended_tool: signal_detection
+        reason: Active signals present but no escalation triggers met. Continue accumulation cycle.
+        recursion_depth: accumulating
+tests:
+- name: no_signals_base_case
+  input:
+    active_signal_count: 0
+  expect:
+    action: continue_monitoring
+    priority: LOW
+    recursion_depth: base_case
+- name: unassessed_backlog
+  input:
+    active_signal_count: 8
+    unassessed_count: 7
+  expect:
+    action: triage_unassessed
+    priority: URGENT
+    recursion_depth: accumulation_overflow
+- name: class_effect_detected
+  input:
+    active_signal_count: 4
+    unassessed_count: 1
+    has_class_effect: true
+  expect:
+    action: class_effect_review
+    priority: URGENT
+    recommended_tool: drug_comparator
+    recursion_depth: pattern_detected
+- name: cross_drug_threshold
+  input:
+    active_signal_count: 5
+    unassessed_count: 2
+    has_class_effect: false
+    cross_drug_signals: 3
+  expect:
+    action: cross_drug_analysis
+    priority: HIGH
+    recursion_depth: cross_reference
+- name: insight_synthesis_ready
+  input:
+    active_signal_count: 3
+    unassessed_count: 0
+    has_class_effect: false
+    cross_drug_signals: 1
+    insight_count: 4
+  expect:
+    action: synthesize_insights
+    priority: STANDARD
+    recursion_depth: synthesis
+- name: standard_accumulation
+  input:
+    active_signal_count: 2
+    unassessed_count: 1
+    has_class_effect: false
+    cross_drug_signals: 0
+    insight_count: 1
+  expect:
+    action: continue_accumulation
+    priority: STANDARD
+    recursion_depth: accumulating
+- name: exact_unassessed_threshold
+  input:
+    active_signal_count: 5
+    unassessed_count: 5
+  expect:
+    action: triage_unassessed
+    priority: URGENT
+- name: below_unassessed_threshold
+  input:
+    active_signal_count: 5
+    unassessed_count: 4
+    has_class_effect: false
+    cross_drug_signals: 0
+    insight_count: 0
+  expect:
+    action: continue_accumulation
+    priority: STANDARD
+- name: cross_drug_below_threshold
+  input:
+    active_signal_count: 3
+    unassessed_count: 0
+    has_class_effect: false
+    cross_drug_signals: 2
+    insight_count: 0
+  expect:
+    action: continue_accumulation
+    priority: STANDARD
+- name: empty_input_defaults
+  input: {}
+  expect:
+    action: continue_monitoring
+    priority: LOW
+    recursion_depth: base_case

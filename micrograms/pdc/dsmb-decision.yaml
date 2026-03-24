@@ -1,0 +1,160 @@
+name: dsmb-decision
+description: "Domain 5: DSMB recommendation routing — continue, modify, or terminate based on safety/efficacy balance and stopping rules."
+version: 0.1.0
+interface:
+  inputs:
+    futility_threshold_met:
+      type: bool
+      required: false
+    safety_concern_level:
+      type: string
+      required: false
+    stopping_rule_met:
+      type: bool
+      required: false
+  outputs:
+    actions:
+      type: string
+    communication:
+      type: string
+    documentation:
+      type: string
+    followup:
+      type: string
+    recommendation:
+      type: string
+    urgency:
+      type: string
+tree:
+  start: check_stopping_rule
+  nodes:
+    check_stopping_rule:
+      type: condition
+      variable: stopping_rule_met
+      operator: eq
+      value: true
+      true_next: check_safety_concern
+      false_next: check_safety_signal
+    check_safety_concern:
+      type: condition
+      variable: safety_concern_level
+      operator: eq
+      value: critical
+      true_next: recommend_terminate
+      false_next: check_futility
+    check_futility:
+      type: condition
+      variable: futility_threshold_met
+      operator: eq
+      value: true
+      true_next: recommend_terminate
+      false_next: recommend_modify
+    check_safety_signal:
+      type: condition
+      variable: safety_concern_level
+      operator: eq
+      value: critical
+      true_next: recommend_suspend
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: safety_concern_level
+      operator: eq
+      value: moderate
+      true_next: recommend_modify
+      false_next: check_minor
+    check_minor:
+      type: condition
+      variable: safety_concern_level
+      operator: eq
+      value: minor
+      true_next: recommend_continue_enhanced
+      false_next: recommend_continue
+    recommend_terminate:
+      type: return
+      value:
+        recommendation: TERMINATE
+        urgency: IMMEDIATE
+        actions: "stop enrollment, discontinue treatment, notify investigators within 24 hours"
+        communication: "sponsor, regulatory authorities, ethics committees, all investigators"
+        documentation: "DSMB meeting minutes, rationale, safety data summary, benefit-risk assessment"
+        followup: "patient safety follow-up plan, unblinding if needed, regulatory notification"
+    recommend_suspend:
+      type: return
+      value:
+        recommendation: SUSPEND
+        urgency: HIGH
+        actions: "pause enrollment, continue treating enrolled patients if safe, enhanced monitoring"
+        communication: "sponsor notification, regulatory discussion, investigator alert"
+        documentation: "suspension rationale, enhanced monitoring plan, resumption criteria"
+        followup: "safety review within 30 days, resumption or termination decision"
+    recommend_modify:
+      type: return
+      value:
+        recommendation: MODIFY
+        urgency: MODERATE
+        actions: "protocol amendment, dose modification, enhanced monitoring, eligibility criteria update"
+        communication: "sponsor, regulatory authority notification, investigator update, EC/IRB amendment"
+        documentation: "modification rationale, updated safety monitoring plan, revised benefit-risk"
+        followup: "implementation verification, safety monitoring with new parameters"
+    recommend_continue_enhanced:
+      type: return
+      value:
+        recommendation: CONTINUE_ENHANCED
+        urgency: LOW
+        actions: "continue per protocol with additional safety monitoring measures"
+        communication: "sponsor update, next scheduled DSMB meeting"
+        documentation: "enhanced monitoring rationale, additional safety parameters"
+        followup: "review at next DSMB meeting or earlier if triggers met"
+    recommend_continue:
+      type: return
+      value:
+        recommendation: CONTINUE
+        urgency: NONE
+        actions: "continue per protocol, no changes needed"
+        communication: "routine DSMB report to sponsor"
+        documentation: "meeting minutes documenting review and recommendation"
+        followup: "next scheduled DSMB meeting"
+tests:
+- input:
+    stopping_rule_met: true
+    safety_concern_level: critical
+  expect:
+    recommendation: TERMINATE
+    urgency: IMMEDIATE
+- input:
+    stopping_rule_met: true
+    futility_threshold_met: true
+    safety_concern_level: moderate
+  expect:
+    recommendation: TERMINATE
+- input:
+    stopping_rule_met: true
+    safety_concern_level: moderate
+    futility_threshold_met: false
+  expect:
+    recommendation: MODIFY
+- input:
+    safety_concern_level: critical
+    stopping_rule_met: false
+  expect:
+    recommendation: SUSPEND
+    urgency: HIGH
+- input:
+    safety_concern_level: moderate
+    stopping_rule_met: false
+  expect:
+    recommendation: MODIFY
+- input:
+    safety_concern_level: minor
+    stopping_rule_met: false
+  expect:
+    recommendation: CONTINUE_ENHANCED
+- input:
+    safety_concern_level: none
+    stopping_rule_met: false
+  expect:
+    recommendation: CONTINUE
+- input: {}
+  expect:
+    recommendation: CONTINUE

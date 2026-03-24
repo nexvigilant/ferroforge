@@ -1,0 +1,129 @@
+name: confidence-gate
+description: 'Gate on confidence level: HIGH (>=0.8), MEDIUM (>=0.5), LOW (<0.5)'
+version: 0.1.0
+interface:
+  inputs:
+    confidence:
+      type: string
+      required: false
+  outputs:
+    actionable:
+      type: bool
+    confidence_level:
+      type: string
+tree:
+  start: high_check
+  nodes:
+    high_check:
+      type: condition
+      variable: confidence
+      operator: gte
+      value: 80
+      true_next: high
+      false_next: medium_check
+    high:
+      type: return
+      value:
+        confidence_level: HIGH
+        actionable: true
+    medium:
+      type: return
+      value:
+        actionable: true
+        confidence_level: MEDIUM
+    low:
+      type: return
+      value:
+        actionable: false
+        confidence_level: LOW
+    medium_check:
+      type: condition
+      variable: confidence
+      operator: gte
+      value: 50
+      true_next: medium
+      false_next: low
+tests:
+- input:
+    confidence: 90
+  expect:
+    confidence_level: HIGH
+    actionable: true
+- input:
+    confidence: 65
+  expect:
+    actionable: true
+    confidence_level: MEDIUM
+- input:
+    confidence: 30
+  expect:
+    actionable: false
+    confidence_level: LOW
+- input:
+    confidence: 80
+  expect:
+    actionable: true
+    confidence_level: HIGH
+- input:
+    confidence: 50
+  expect:
+    confidence_level: MEDIUM
+    actionable: true
+- input:
+    confidence: 49
+  expect:
+    confidence_level: LOW
+    actionable: false
+- input:
+    confidence: 0
+  expect:
+    actionable: false
+    confidence_level: LOW
+- input:
+    confidence: -1
+  expect:
+    confidence_level: LOW
+    actionable: false
+- input:
+    confidence: 79
+  expect:
+    actionable: true
+    confidence_level: MEDIUM
+- input:
+    confidence: 81
+  expect:
+    confidence_level: HIGH
+    actionable: true
+- input:
+    confidence: 8000
+  expect:
+    actionable: true
+    confidence_level: HIGH
+- input: {}
+  expect:
+    confidence_level: LOW
+    actionable: false
+- input:
+    confidence: 0
+  expect:
+    actionable: false
+    confidence_level: LOW
+- input:
+    confidence: -1
+  expect:
+    actionable: false
+    confidence_level: LOW
+- input:
+    confidence: 51
+  expect:
+    actionable: true
+    confidence_level: MEDIUM
+- input:
+    confidence: 5000
+  expect:
+    confidence_level: HIGH
+    actionable: true
+- input: {}
+  expect:
+    actionable: false
+    confidence_level: LOW

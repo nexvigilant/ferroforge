@@ -1,0 +1,202 @@
+name: cpa-router
+description: "PDC: Route CPA (1-8) to practice function with capstone detection"
+version: 0.1.0
+interface:
+  inputs:
+    cpa_id:
+      type: int
+      required: false
+  outputs:
+    description:
+      type: string
+    error:
+      type: string
+    function:
+      type: string
+    gateway_epa:
+      type: int
+    gateway_min_level:
+      type: int
+    is_capstone:
+      type: bool
+    requires_ai_gateway:
+      type: bool
+tree:
+  start: check_valid
+  nodes:
+    check_valid:
+      type: condition
+      variable: cpa_id
+      operator: gte
+      value: 1
+      true_next: check_upper
+      false_next: invalid_cpa
+    check_upper:
+      type: condition
+      variable: cpa_id
+      operator: lte
+      value: 8
+      true_next: check_capstone
+      false_next: invalid_cpa
+    check_capstone:
+      type: condition
+      variable: cpa_id
+      operator: eq
+      value: 8
+      true_next: capstone_cpa
+      false_next: check_case
+    check_case:
+      type: condition
+      variable: cpa_id
+      operator: eq
+      value: 1
+      true_next: case_management
+      false_next: check_signal
+    check_signal:
+      type: condition
+      variable: cpa_id
+      operator: eq
+      value: 2
+      true_next: signal_management
+      false_next: check_risk
+    check_risk:
+      type: condition
+      variable: cpa_id
+      operator: eq
+      value: 3
+      true_next: risk_management
+      false_next: check_quality
+    check_quality:
+      type: condition
+      variable: cpa_id
+      operator: eq
+      value: 4
+      true_next: quality_compliance
+      false_next: check_data
+    check_data:
+      type: condition
+      variable: cpa_id
+      operator: eq
+      value: 5
+      true_next: data_technology
+      false_next: check_comm
+    check_comm:
+      type: condition
+      variable: cpa_id
+      operator: eq
+      value: 6
+      true_next: communication_stakeholder
+      false_next: research_development
+    case_management:
+      type: return
+      value:
+        function: CASE_MANAGEMENT
+        description: "Foundation of pharmacovigilance practice"
+        is_capstone: false
+        requires_ai_gateway: false
+    signal_management:
+      type: return
+      value:
+        function: SIGNAL_MANAGEMENT
+        description: "Proactive safety surveillance and assessment"
+        is_capstone: false
+        requires_ai_gateway: false
+    risk_management:
+      type: return
+      value:
+        function: RISK_MANAGEMENT
+        description: "Strategic approaches to minimizing medication risks"
+        is_capstone: false
+        requires_ai_gateway: false
+    quality_compliance:
+      type: return
+      value:
+        function: QUALITY_COMPLIANCE
+        description: "Ensuring excellence and regulatory adherence"
+        is_capstone: false
+        requires_ai_gateway: false
+    data_technology:
+      type: return
+      value:
+        function: DATA_TECHNOLOGY
+        description: "Managing information and leveraging digital tools"
+        is_capstone: false
+        requires_ai_gateway: false
+    communication_stakeholder:
+      type: return
+      value:
+        function: COMMUNICATION_STAKEHOLDER
+        description: "Engaging effectively across constituencies"
+        is_capstone: false
+        requires_ai_gateway: false
+    research_development:
+      type: return
+      value:
+        function: RESEARCH_DEVELOPMENT
+        description: "Advancing safety science and methodology"
+        is_capstone: false
+        requires_ai_gateway: false
+    capstone_cpa:
+      type: return
+      value:
+        function: AI_ENHANCED_PV
+        description: "Integrating artificial intelligence across all functions"
+        is_capstone: true
+        requires_ai_gateway: true
+        gateway_epa: 10
+        gateway_min_level: 4
+    invalid_cpa:
+      type: return
+      value:
+        function: INVALID
+        error: "CPA ID must be 1-8"
+tests:
+- input:
+    cpa_id: 1
+  expect:
+    function: CASE_MANAGEMENT
+    is_capstone: false
+- input:
+    cpa_id: 2
+  expect:
+    function: SIGNAL_MANAGEMENT
+    is_capstone: false
+- input:
+    cpa_id: 3
+  expect:
+    function: RISK_MANAGEMENT
+- input:
+    cpa_id: 4
+  expect:
+    function: QUALITY_COMPLIANCE
+- input:
+    cpa_id: 5
+  expect:
+    function: DATA_TECHNOLOGY
+- input:
+    cpa_id: 6
+  expect:
+    function: COMMUNICATION_STAKEHOLDER
+- input:
+    cpa_id: 7
+  expect:
+    function: RESEARCH_DEVELOPMENT
+- input:
+    cpa_id: 8
+  expect:
+    function: AI_ENHANCED_PV
+    is_capstone: true
+    requires_ai_gateway: true
+    gateway_epa: 10
+    gateway_min_level: 4
+- input:
+    cpa_id: 0
+  expect:
+    function: INVALID
+- input:
+    cpa_id: 9
+  expect:
+    function: INVALID
+- input: {}
+  expect:
+    function: INVALID

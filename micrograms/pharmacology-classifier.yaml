@@ -1,0 +1,172 @@
+name: pharmacology-classifier
+description: Classify drug pharmacology by mechanism of action and therapeutic area
+version: 0.1.0
+tree:
+  start: check_moa
+  nodes:
+    missing_input:
+      type: return
+      value:
+        pharmacology_category: unknown
+        safety_relevant: true
+        therapeutic_area: null
+    therapeutic_neuro:
+      type: return
+      value:
+        safety_relevant: true
+        therapeutic_area: neurology_psychiatry
+        pharmacology_category: neuro_agent
+    unknown_mechanism:
+      type: return
+      value:
+        therapeutic_area: null
+        safety_relevant: true
+        pharmacology_category: unknown
+    check_enzyme:
+      type: condition
+      variable: mechanism_of_action
+      operator: matches
+      value: (?i)(enzyme|inhibitor|catalytic)
+      true_next: classify_therapeutic_area
+      false_next: unknown_mechanism
+    therapeutic_cardiovascular:
+      type: return
+      value:
+        pharmacology_category: cardiovascular_agent
+        therapeutic_area: cardiology
+        safety_relevant: true
+    check_moa:
+      type: condition
+      variable: mechanism_of_action
+      operator: is_not_null
+      value: null
+      true_next: check_drug_class
+      false_next: missing_input
+    therapeutic_other:
+      type: return
+      value:
+        pharmacology_category: other
+        safety_relevant: false
+        therapeutic_area: general
+    missing_class:
+      type: return
+      value:
+        therapeutic_area: null
+        safety_relevant: true
+        pharmacology_category: unknown
+    classify_pharmacology:
+      type: condition
+      variable: mechanism_of_action
+      operator: matches
+      value: (?i)(receptor antagonist|blocker|inhibitor)
+      true_next: classify_therapeutic_area
+      false_next: check_agonist
+    check_neuro:
+      type: condition
+      variable: drug_class
+      operator: matches
+      value: (?i)(psychotropic|neurological|neuro|psychiatric)
+      true_next: therapeutic_neuro
+      false_next: therapeutic_other
+    check_infectious:
+      type: condition
+      variable: drug_class
+      operator: matches
+      value: (?i)(antibiotic|antiviral|antifungal|antimicrobial)
+      true_next: therapeutic_infectious
+      false_next: check_neuro
+    check_agonist:
+      type: condition
+      variable: mechanism_of_action
+      operator: matches
+      value: (?i)(agonist|activator|enhancer)
+      true_next: classify_therapeutic_area
+      false_next: check_enzyme
+    check_drug_class:
+      type: condition
+      variable: drug_class
+      operator: is_not_null
+      value: null
+      true_next: classify_pharmacology
+      false_next: missing_class
+    therapeutic_infectious:
+      type: return
+      value:
+        pharmacology_category: antimicrobial_agent
+        therapeutic_area: infectious_disease
+        safety_relevant: true
+    classify_therapeutic_area:
+      type: condition
+      variable: drug_class
+      operator: matches
+      value: (?i)(cardiac|cardiovascular|heart)
+      true_next: therapeutic_cardiovascular
+      false_next: check_infectious
+tests:
+- input:
+    drug_class: ZZZZZ_NO_MATCH
+    mechanism_of_action: ZZZZZ_NO_MATCH
+  expect:
+    therapeutic_area: null
+    safety_relevant: true
+    pharmacology_category: unknown
+- input:
+    drug_class: ZZZZZ_NO_MATCH
+    mechanism_of_action: agonist
+  expect:
+    pharmacology_category: other
+    safety_relevant: false
+    therapeutic_area: general
+- input:
+    drug_class: ZZZZZ_NO_MATCH
+    mechanism_of_action: enzyme
+  expect:
+    pharmacology_category: other
+    safety_relevant: false
+    therapeutic_area: general
+- input:
+    drug_class: ZZZZZ_NO_MATCH
+    mechanism_of_action: receptor antagonist
+  expect:
+    pharmacology_category: other
+    safety_relevant: false
+    therapeutic_area: general
+- input:
+    drug_class: ZZZZZ_NO_MATCH
+  expect:
+    pharmacology_category: unknown
+    safety_relevant: true
+    therapeutic_area: null
+- input:
+    drug_class: antibiotic
+    mechanism_of_action: agonist
+  expect:
+    pharmacology_category: antimicrobial_agent
+    therapeutic_area: infectious_disease
+    safety_relevant: true
+- input:
+    drug_class: cardiac
+    mechanism_of_action: agonist
+  expect:
+    pharmacology_category: cardiovascular_agent
+    therapeutic_area: cardiology
+    safety_relevant: true
+- input:
+    drug_class: psychotropic
+    mechanism_of_action: agonist
+  expect:
+    safety_relevant: true
+    therapeutic_area: neurology_psychiatry
+    pharmacology_category: neuro_agent
+- input:
+    mechanism_of_action: ZZZZZ_NO_MATCH
+  expect:
+    therapeutic_area: null
+    safety_relevant: true
+    pharmacology_category: unknown
+- input: {}
+  expect:
+    pharmacology_category: unknown
+    safety_relevant: true
+    therapeutic_area: null
+interface: null

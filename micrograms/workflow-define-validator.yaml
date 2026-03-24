@@ -1,0 +1,103 @@
+name: workflow-define-validator
+description: 'PVOS workflow definition: validates that a workflow definition has required steps (detect + report) and minimum length before registration'
+version: 0.1.0
+interface:
+  inputs:
+    has_detect_step:
+      type: bool
+      required: false
+    has_report_step:
+      type: bool
+      required: false
+    step_count:
+      type: int
+      required: false
+  outputs:
+    description:
+      type: string
+    status:
+      type: string
+tree:
+  start: check_length
+  nodes:
+    check_length:
+      type: condition
+      variable: step_count
+      operator: gte
+      value: 2
+      true_next: check_detect
+      false_next: too_short
+    check_detect:
+      type: condition
+      variable: has_detect_step
+      operator: eq
+      value: true
+      true_next: check_report
+      false_next: missing_detect
+    check_report:
+      type: condition
+      variable: has_report_step
+      operator: eq
+      value: true
+      true_next: valid
+      false_next: missing_report
+    valid:
+      type: return
+      value:
+        status: VALID
+        description: Workflow definition complete - detection and reporting steps present
+    too_short:
+      type: return
+      value:
+        status: TOO_SHORT
+        description: Workflow must have at least 2 steps to be registered
+    missing_detect:
+      type: return
+      value:
+        status: MISSING_DETECT
+        description: Workflow missing signal detection step - required for PV workflows
+    missing_report:
+      type: return
+      value:
+        status: MISSING_REPORT
+        description: Workflow missing regulatory reporting step - required for PV workflows
+tests:
+- input:
+    step_count: 4
+    has_detect_step: true
+    has_report_step: true
+  expect:
+    status: VALID
+    description: Workflow definition complete - detection and reporting steps present
+- input:
+    step_count: 4
+    has_detect_step: false
+    has_report_step: true
+  expect:
+    status: MISSING_DETECT
+    description: Workflow missing signal detection step - required for PV workflows
+- input:
+    step_count: 4
+    has_detect_step: true
+    has_report_step: false
+  expect:
+    status: MISSING_REPORT
+    description: Workflow missing regulatory reporting step - required for PV workflows
+- input:
+    step_count: 1
+    has_detect_step: true
+    has_report_step: true
+  expect:
+    status: TOO_SHORT
+    description: Workflow must have at least 2 steps to be registered
+- input:
+    step_count: 0
+    has_detect_step: false
+    has_report_step: false
+  expect:
+    status: TOO_SHORT
+    description: Workflow must have at least 2 steps to be registered
+- input: {}
+  expect:
+    description: Workflow must have at least 2 steps to be registered
+    status: TOO_SHORT

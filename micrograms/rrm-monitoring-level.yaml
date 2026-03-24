@@ -1,0 +1,177 @@
+name: rrm-monitoring-level
+description: "Railway Reference Model monitoring level classifier. Maps a monitoring system to ETCS-equivalent levels: L1 (spot/periodic), L2 (continuous/streaming), L3 (moving block/predictive). Higher levels subsume lower. Level determines capacity and detection latency."
+version: 0.1.0
+interface:
+  inputs:
+    is_continuous:
+      type: bool
+      required: false
+    is_predictive:
+      type: bool
+      required: false
+    update_frequency_per_hour:
+      type: int
+      required: false
+    has_position_reporting:
+      type: bool
+      required: false
+    detection_latency_hours:
+      type: int
+      required: false
+  outputs:
+    etcs_level:
+      type: int
+    level_name:
+      type: string
+    railway_equivalent:
+      type: string
+    pv_equivalent:
+      type: string
+    capacity_multiplier:
+      type: string
+    detection_capability:
+      type: string
+tree:
+  start: check_predictive
+  nodes:
+    check_predictive:
+      type: condition
+      variable: is_predictive
+      operator: eq
+      value: true
+      true_next: level_3
+      false_next: check_continuous
+    check_continuous:
+      type: condition
+      variable: is_continuous
+      operator: eq
+      value: true
+      true_next: check_position
+      false_next: check_frequency
+    check_position:
+      type: condition
+      variable: has_position_reporting
+      operator: eq
+      value: true
+      true_next: level_3
+      false_next: level_2
+    check_frequency:
+      type: condition
+      variable: update_frequency_per_hour
+      operator: gte
+      value: 60
+      true_next: level_2
+      false_next: check_moderate_frequency
+    check_moderate_frequency:
+      type: condition
+      variable: update_frequency_per_hour
+      operator: gte
+      value: 1
+      true_next: level_1
+      false_next: check_latency
+    check_latency:
+      type: condition
+      variable: detection_latency_hours
+      operator: lte
+      value: 24
+      true_next: level_1
+      false_next: check_latency_slow
+    check_latency_slow:
+      type: condition
+      variable: detection_latency_hours
+      operator: lte
+      value: 720
+      true_next: level_0
+      false_next: level_0
+    level_0:
+      type: return
+      value:
+        etcs_level: 0
+        level_name: "Time Interval"
+        railway_equivalent: "Pre-signaling era (1830s) — trains depart at time intervals with no track state knowledge"
+        pv_equivalent: "Spontaneous reporting only — no systematic monitoring, signals discovered by chance"
+        capacity_multiplier: "1x (baseline)"
+        detection_capability: "Reactive only — events detected after harm occurs"
+    level_1:
+      type: return
+      value:
+        etcs_level: 1
+        level_name: "Spot Transmission"
+        railway_equivalent: "ETCS L1 — Eurobalises provide movement authority at discrete track points"
+        pv_equivalent: "Periodic safety reporting (PSUR/PBRER) — state snapshots at regulatory intervals"
+        capacity_multiplier: "1.0-1.2x"
+        detection_capability: "Periodic detection — signals found at scheduled review points"
+    level_2:
+      type: return
+      value:
+        etcs_level: 2
+        level_name: "Continuous Supervision"
+        railway_equivalent: "ETCS L2 — Radio Block Centre streams movement authority continuously"
+        pv_equivalent: "Real-time FAERS monitoring — continuous analysis of adverse event reports as they arrive"
+        capacity_multiplier: "1.2-1.5x"
+        detection_capability: "Continuous detection — signals found as data arrives"
+    level_3:
+      type: return
+      value:
+        etcs_level: 3
+        level_name: "Moving Block"
+        railway_equivalent: "ETCS L3 — train reports position continuously, blocks shrink to braking distance"
+        pv_equivalent: "Predictive PV — ML models dynamically adjust thresholds, signals detected before reports accumulate"
+        capacity_multiplier: "1.3-1.5x"
+        detection_capability: "Predictive detection — signals anticipated from emerging patterns"
+tests:
+- input:
+    is_predictive: true
+  expect:
+    etcs_level: 3
+    level_name: "Moving Block"
+- input:
+    is_continuous: true
+    has_position_reporting: true
+  expect:
+    etcs_level: 3
+    level_name: "Moving Block"
+- input:
+    is_continuous: true
+    has_position_reporting: false
+  expect:
+    etcs_level: 2
+    level_name: "Continuous Supervision"
+- input:
+    update_frequency_per_hour: 120
+  expect:
+    etcs_level: 2
+    level_name: "Continuous Supervision"
+- input:
+    update_frequency_per_hour: 4
+  expect:
+    etcs_level: 1
+    level_name: "Spot Transmission"
+- input:
+    detection_latency_hours: 12
+  expect:
+    etcs_level: 1
+    level_name: "Spot Transmission"
+- input:
+    detection_latency_hours: 168
+  expect:
+    etcs_level: 0
+    level_name: "Time Interval"
+- input: {}
+  expect:
+    etcs_level: 0
+    level_name: "Time Interval"
+- input:
+    is_predictive: false
+    is_continuous: false
+    update_frequency_per_hour: 0
+    detection_latency_hours: 8760
+  expect:
+    etcs_level: 0
+    level_name: "Time Interval"
+- input:
+    is_continuous: true
+    is_predictive: true
+  expect:
+    etcs_level: 3
+    level_name: "Moving Block"

@@ -1,0 +1,168 @@
+name: faers-report-quality
+description: Assesses FAERS adverse event report quality. Evaluates presence of critical
+  fields and seriousness to determine reportability.
+version: 0.1.0
+interface:
+  inputs:
+    has_drug_name:
+      type: bool
+      required: false
+    has_reaction:
+      type: bool
+      required: false
+    has_outcome:
+      type: bool
+      required: false
+    has_reporter:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+  outputs:
+    quality_score:
+      type: string
+    missing_fields:
+      type: string
+    reportable:
+      type: bool
+tree:
+  start: check_drug
+  nodes:
+    check_drug:
+      type: condition
+      variable: has_drug_name
+      operator: eq
+      value: true
+      true_next: check_reaction
+      false_next: missing_drug
+    check_reaction:
+      type: condition
+      variable: has_reaction
+      operator: eq
+      value: true
+      true_next: check_outcome
+      false_next: missing_reaction
+    check_outcome:
+      type: condition
+      variable: has_outcome
+      operator: eq
+      value: true
+      true_next: check_reporter
+      false_next: missing_outcome
+    check_reporter:
+      type: condition
+      variable: has_reporter
+      operator: eq
+      value: true
+      true_next: check_seriousness
+      false_next: missing_reporter
+    check_seriousness:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: high_quality
+      false_next: medium_quality
+    missing_drug:
+      type: return
+      value:
+        quality_score: low
+        missing_fields: drug_name
+        reportable: false
+    missing_reaction:
+      type: return
+      value:
+        quality_score: low
+        missing_fields: reaction
+        reportable: false
+    missing_outcome:
+      type: return
+      value:
+        quality_score: medium
+        missing_fields: outcome
+        reportable: true
+    missing_reporter:
+      type: return
+      value:
+        quality_score: medium
+        missing_fields: reporter
+        reportable: true
+    high_quality:
+      type: return
+      value:
+        quality_score: high
+        missing_fields: none
+        reportable: true
+    medium_quality:
+      type: return
+      value:
+        quality_score: medium
+        missing_fields: none
+        reportable: true
+tests:
+- input:
+    has_drug_name: false
+    has_outcome: false
+    has_reaction: false
+    has_reporter: false
+    is_serious: false
+  expect:
+    quality_score: low
+    missing_fields: drug_name
+    reportable: false
+- input:
+    has_drug_name: true
+    has_outcome: false
+    has_reaction: false
+    has_reporter: false
+    is_serious: false
+  expect:
+    quality_score: low
+    missing_fields: reaction
+    reportable: false
+- input:
+    has_drug_name: true
+    has_outcome: false
+    has_reaction: true
+    has_reporter: false
+    is_serious: false
+  expect:
+    quality_score: medium
+    missing_fields: outcome
+    reportable: true
+- input:
+    has_drug_name: true
+    has_outcome: true
+    has_reaction: true
+    has_reporter: false
+    is_serious: false
+  expect:
+    quality_score: medium
+    missing_fields: reporter
+    reportable: true
+- input:
+    has_drug_name: true
+    has_outcome: true
+    has_reaction: true
+    has_reporter: true
+    is_serious: false
+  expect:
+    quality_score: medium
+    missing_fields: none
+    reportable: true
+- input:
+    has_drug_name: true
+    has_outcome: true
+    has_reaction: true
+    has_reporter: true
+    is_serious: true
+  expect:
+    quality_score: high
+    missing_fields: none
+    reportable: true
+- input: {}
+  expect:
+    quality_score: low
+    missing_fields: drug_name
+    reportable: false

@@ -1,0 +1,172 @@
+name: dd-risk-multiplier
+description: 'Classify DD risk multiplier severity from count and type of active multipliers. Multiplier values: Hys Law 2.0, TdP 1.8, PML 2.0, SJS/TEN 1.7, Fraud 1.8, Death 2.0, Regulatory 1.5, Recall 1.6, Hold 1.5, REMS 1.4. Source: Youssef & Hammad, Drug Safety (Dec 2025)'
+version: 0.1.0
+tree:
+  start: check_null
+  nodes:
+    none_active:
+      type: return
+      value:
+        severity: none
+        escalation: standard
+    check_multiple_fatal:
+      type: condition
+      variable: multipliers_active
+      operator: gt
+      value: 1
+      true_next: catastrophic
+      false_next: severe
+    check_any:
+      type: condition
+      variable: multipliers_active
+      operator: eq
+      value: 0
+      true_next: none_active
+      false_next: check_fatal
+    catastrophic:
+      type: return
+      value:
+        severity: catastrophic
+        escalation: board_level
+    high:
+      type: return
+      value:
+        escalation: executive
+        severity: high
+    check_elevated:
+      type: condition
+      variable: multipliers_active
+      operator: gt
+      value: 0
+      true_next: elevated
+      false_next: none_active
+    elevated:
+      type: return
+      value:
+        severity: elevated
+        escalation: management
+    severe:
+      type: return
+      value:
+        escalation: executive
+        severity: severe
+    check_multiple:
+      type: condition
+      variable: multipliers_active
+      operator: gt
+      value: 2
+      true_next: high
+      false_next: check_elevated
+    check_fatal:
+      type: condition
+      variable: has_fatal_multiplier
+      operator: eq
+      value: true
+      true_next: check_multiple_fatal
+      false_next: check_multiple
+    check_null:
+      type: condition
+      variable: multipliers_active
+      operator: is_null
+      value: null
+      true_next: none_active
+      false_next: check_any
+tests:
+- input:
+    multipliers_active: 0
+    has_fatal_multiplier: false
+    multiplier_product: 1.0
+  expect:
+    severity: none
+    escalation: standard
+- input:
+    multipliers_active: 1
+    has_fatal_multiplier: false
+    multiplier_product: 1.4
+  expect:
+    severity: elevated
+    escalation: management
+- input:
+    multipliers_active: 1
+    multiplier_product: 2.0
+    has_fatal_multiplier: true
+  expect:
+    severity: severe
+    escalation: executive
+- input:
+    multiplier_product: 3.6
+    multipliers_active: 2
+    has_fatal_multiplier: true
+  expect:
+    escalation: board_level
+    severity: catastrophic
+- input:
+    has_fatal_multiplier: false
+    multiplier_product: 3.36
+    multipliers_active: 3
+  expect:
+    escalation: executive
+    severity: high
+- input: {}
+  expect:
+    severity: none
+    escalation: standard
+- input:
+    multipliers_active: -1
+  expect:
+    severity: none
+    escalation: standard
+- input:
+    multipliers_active: 100
+  expect:
+    escalation: executive
+    severity: high
+- input:
+    multipliers_active: -1
+  expect:
+    escalation: standard
+    severity: none
+- input:
+    multipliers_active: -1
+  expect:
+    severity: none
+    escalation: standard
+- input:
+    multipliers_active: -1
+  expect:
+    severity: none
+    escalation: standard
+- input:
+    multipliers_active: -1
+  expect:
+    severity: none
+    escalation: standard
+- input:
+    multipliers_active: -1
+  expect:
+    escalation: standard
+    severity: none
+- input:
+    multipliers_active: 200
+  expect:
+    escalation: executive
+    severity: high
+interface:
+  inputs:
+    has_fatal_multiplier:
+      type: bool
+      required: false
+    multiplier_product:
+      type: float
+      required: false
+    multipliers_active:
+      type: int
+      required: false
+  outputs:
+    escalation:
+      type: string
+      required: false
+    severity:
+      type: string
+      required: false
+  aliases: {}

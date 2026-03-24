@@ -1,0 +1,227 @@
+name: pregnancy-exposure
+description: 'Pregnancy exposure categorization and reporting requirements per ICH E2C/FDA guidance: trims risk level and mandates reporting based on teratogen status and outcome'
+version: 0.1.0
+interface:
+  inputs:
+    known_teratogen:
+      type: bool
+      required: false
+    live_birth:
+      type: bool
+      required: false
+    outcome_known:
+      type: bool
+      required: false
+    trimester:
+      type: int
+      required: false
+  outputs:
+    action:
+      type: string
+    regulatory_reference:
+      type: string
+    reporting:
+      type: string
+    risk:
+      type: string
+    trimester_context:
+      type: string
+tree:
+  start: known_teratogen_check
+  nodes:
+    known_teratogen_check:
+      type: condition
+      variable: known_teratogen
+      operator: eq
+      value: true
+      true_next: teratogen_trimester_check
+      false_next: no_teratogen_outcome_check
+    teratogen_trimester_check:
+      type: condition
+      variable: trimester
+      operator: eq
+      value: 1
+      true_next: critical_t1
+      false_next: teratogen_t2_check
+    teratogen_t2_check:
+      type: condition
+      variable: trimester
+      operator: eq
+      value: 2
+      true_next: high_t2t3
+      false_next: teratogen_t3_check
+    teratogen_t3_check:
+      type: condition
+      variable: trimester
+      operator: eq
+      value: 3
+      true_next: high_t2t3
+      false_next: moderate_preconception
+    no_teratogen_outcome_check:
+      type: condition
+      variable: outcome_known
+      operator: eq
+      value: true
+      true_next: no_teratogen_live_birth_check
+      false_next: pending_outcome
+    no_teratogen_live_birth_check:
+      type: condition
+      variable: live_birth
+      operator: eq
+      value: true
+      true_next: low_live_birth
+      false_next: high_adverse_outcome
+    critical_t1:
+      type: return
+      value:
+        risk: CRITICAL
+        action: expedited_report_7day
+        reporting: mandatory
+        trimester_context: first_trimester_organogenesis
+        regulatory_reference: ICH E2C FDA Pregnancy Exposure Registry
+    high_t2t3:
+      type: return
+      value:
+        risk: HIGH
+        action: expedited_report_15day
+        reporting: mandatory
+        trimester_context: second_or_third_trimester
+        regulatory_reference: ICH E2C FDA Pregnancy Exposure Registry
+    moderate_preconception:
+      type: return
+      value:
+        risk: MODERATE
+        action: monitor_conception
+        reporting: recommended
+        trimester_context: preconception
+        regulatory_reference: ICH E2C FDA Pregnancy Exposure Registry
+    high_adverse_outcome:
+      type: return
+      value:
+        risk: HIGH
+        action: investigate_causality
+        reporting: mandatory
+        trimester_context: adverse_outcome_no_teratogen
+        regulatory_reference: ICH E2C FDA Pregnancy Exposure Registry
+    low_live_birth:
+      type: return
+      value:
+        risk: LOW
+        action: routine_followup
+        reporting: periodic
+        trimester_context: live_birth_no_teratogen
+        regulatory_reference: ICH E2C FDA Pregnancy Exposure Registry
+    pending_outcome:
+      type: return
+      value:
+        risk: PENDING
+        action: followup_required
+        reporting: track_outcome
+        trimester_context: outcome_unknown
+        regulatory_reference: ICH E2C FDA Pregnancy Exposure Registry
+tests:
+- input:
+    trimester: 1
+    known_teratogen: true
+    outcome_known: false
+    live_birth: false
+  expect:
+    risk: CRITICAL
+    action: expedited_report_7day
+    reporting: mandatory
+- input:
+    trimester: 2
+    known_teratogen: true
+    outcome_known: true
+    live_birth: false
+  expect:
+    risk: HIGH
+    action: expedited_report_15day
+    reporting: mandatory
+- input:
+    trimester: 3
+    known_teratogen: true
+    outcome_known: true
+    live_birth: true
+  expect:
+    risk: HIGH
+    action: expedited_report_15day
+    reporting: mandatory
+- input:
+    trimester: 0
+    known_teratogen: true
+    outcome_known: false
+    live_birth: false
+  expect:
+    risk: MODERATE
+    action: monitor_conception
+    reporting: recommended
+- input:
+    trimester: 2
+    known_teratogen: false
+    outcome_known: true
+    live_birth: false
+  expect:
+    risk: HIGH
+    action: investigate_causality
+    reporting: mandatory
+- input:
+    trimester: 3
+    known_teratogen: false
+    outcome_known: true
+    live_birth: true
+  expect:
+    risk: LOW
+    action: routine_followup
+    reporting: periodic
+- input:
+    trimester: 2
+    known_teratogen: false
+    outcome_known: false
+    live_birth: false
+  expect:
+    risk: PENDING
+    action: followup_required
+    reporting: track_outcome
+- input:
+    trimester: 1
+    known_teratogen: false
+    outcome_known: false
+    live_birth: false
+  expect:
+    risk: PENDING
+    action: followup_required
+    reporting: track_outcome
+- input:
+    trimester: 1
+    known_teratogen: true
+    outcome_known: true
+    live_birth: true
+  expect:
+    risk: CRITICAL
+    action: expedited_report_7day
+    reporting: mandatory
+    trimester_context: first_trimester_organogenesis
+- input:
+    trimester: 0
+    known_teratogen: false
+    outcome_known: false
+    live_birth: false
+  expect:
+    risk: PENDING
+    action: followup_required
+    reporting: track_outcome
+- input: {}
+  expect:
+    risk: PENDING
+    action: followup_required
+    reporting: track_outcome
+- input:
+    trimester: 3
+    known_teratogen: false
+    outcome_known: false
+    live_birth: false
+  expect:
+    risk: PENDING
+    action: followup_required
+    reporting: track_outcome

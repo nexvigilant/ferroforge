@@ -1,0 +1,151 @@
+name: domain-classifier
+description: "PDC: Classify competency domain ID (1-15) into thematic group and layer"
+version: 0.1.0
+interface:
+  inputs:
+    domain_id:
+      type: int
+      required: false
+  outputs:
+    description:
+      type: string
+    domain_range:
+      type: string
+    error:
+      type: string
+    layer:
+      type: string
+    thematic_group:
+      type: string
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: domain_id
+      operator: is_null
+      value: null
+      true_next: foundational
+      false_next: check_foundational
+    check_foundational:
+      type: condition
+      variable: domain_id
+      operator: lte
+      value: 3
+      true_next: foundational
+      false_next: check_process
+    check_process:
+      type: condition
+      variable: domain_id
+      operator: lte
+      value: 9
+      true_next: process_methodology
+      false_next: check_assessment
+    check_assessment:
+      type: condition
+      variable: domain_id
+      operator: lte
+      value: 12
+      true_next: assessment_strategy
+      false_next: check_integration
+    check_integration:
+      type: condition
+      variable: domain_id
+      operator: lte
+      value: 15
+      true_next: integration_communication
+      false_next: invalid_domain
+    foundational:
+      type: return
+      value:
+        thematic_group: FOUNDATIONAL
+        layer: theoretical_base
+        domain_range: "1-3"
+        description: "Foundations, Clinical ADRs, Important ADR Recognition"
+    process_methodology:
+      type: return
+      value:
+        thematic_group: PROCESS_METHODOLOGY
+        layer: operational_capability
+        domain_range: "4-9"
+        description: "ICSRs, Clinical Trials, Med Errors, Spontaneous Reporting, Signal Detection, Post-Auth Studies"
+    assessment_strategy:
+      type: return
+      value:
+        thematic_group: ASSESSMENT_STRATEGY
+        layer: decision_making
+        domain_range: "10-12"
+        description: "Benefit-Risk, Risk Management, Regulatory Procedures"
+    integration_communication:
+      type: return
+      value:
+        thematic_group: INTEGRATION_COMMUNICATION
+        layer: collaboration
+        domain_range: "13-15"
+        description: "Global PV, Communication, Information Sources"
+    invalid_domain:
+      type: return
+      value:
+        thematic_group: INVALID
+        layer: unknown
+        error: "Domain ID must be 1-15"
+tests:
+- input:
+    domain_id: 1
+  expect:
+    thematic_group: FOUNDATIONAL
+    layer: theoretical_base
+- input:
+    domain_id: 3
+  expect:
+    thematic_group: FOUNDATIONAL
+    layer: theoretical_base
+- input:
+    domain_id: 4
+  expect:
+    thematic_group: PROCESS_METHODOLOGY
+    layer: operational_capability
+- input:
+    domain_id: 8
+  expect:
+    thematic_group: PROCESS_METHODOLOGY
+    layer: operational_capability
+- input:
+    domain_id: 9
+  expect:
+    thematic_group: PROCESS_METHODOLOGY
+    layer: operational_capability
+- input:
+    domain_id: 10
+  expect:
+    thematic_group: ASSESSMENT_STRATEGY
+    layer: decision_making
+- input:
+    domain_id: 12
+  expect:
+    thematic_group: ASSESSMENT_STRATEGY
+    layer: decision_making
+- input:
+    domain_id: 13
+  expect:
+    thematic_group: INTEGRATION_COMMUNICATION
+    layer: collaboration
+- input:
+    domain_id: 15
+  expect:
+    thematic_group: INTEGRATION_COMMUNICATION
+    layer: collaboration
+- input:
+    domain_id: 16
+  expect:
+    thematic_group: INVALID
+    error: "Domain ID must be 1-15"
+- input:
+    domain_id: 0
+  expect:
+    thematic_group: FOUNDATIONAL
+    layer: theoretical_base
+- input: {}
+  expect:
+    thematic_group: FOUNDATIONAL
+    layer: theoretical_base

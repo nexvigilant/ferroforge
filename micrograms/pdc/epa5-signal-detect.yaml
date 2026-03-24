@@ -1,0 +1,175 @@
+name: epa5-signal-detect
+description: "EPA 5: Detect and validate safety signals — routes by signal strength, evidence quality, and clinical significance."
+version: 0.1.0
+interface:
+  inputs:
+    case_count:
+      type: int
+      required: false
+    chi_squared:
+      type: float
+      required: false
+    clinical_significance:
+      type: string
+      required: false
+    has_biological_plausibility:
+      type: bool
+      required: false
+    has_literature_support:
+      type: bool
+      required: false
+    prr:
+      type: float
+      required: false
+  outputs:
+    action:
+      type: string
+    evidence_level:
+      type: string
+    methods_used:
+      type: string
+    next_steps:
+      type: string
+    outcome:
+      type: string
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2
+      true_next: check_chi2
+      false_next: check_qualitative
+    check_chi2:
+      type: condition
+      variable: chi_squared
+      operator: gte
+      value: 4
+      true_next: check_case_count
+      false_next: weak_statistical
+    check_case_count:
+      type: condition
+      variable: case_count
+      operator: gte
+      value: 3
+      true_next: statistical_signal
+      false_next: insufficient_cases
+    check_qualitative:
+      type: condition
+      variable: has_literature_support
+      operator: eq
+      value: true
+      true_next: qualitative_signal
+      false_next: check_mechanism
+    check_mechanism:
+      type: condition
+      variable: has_biological_plausibility
+      operator: eq
+      value: true
+      true_next: hypothesis_signal
+      false_next: no_signal
+    statistical_signal:
+      type: condition
+      variable: clinical_significance
+      operator: eq
+      value: high
+      true_next: validated_signal
+      false_next: signal_for_review
+    validated_signal:
+      type: return
+      value:
+        outcome: VALIDATED_SIGNAL
+        action: "escalate to safety committee, prepare signal assessment report"
+        evidence_level: strong
+        next_steps: "benefit-risk update, risk management review, regulatory notification"
+        methods_used: "PRR + chi-squared + clinical review"
+    signal_for_review:
+      type: return
+      value:
+        outcome: SIGNAL_FOR_REVIEW
+        action: "schedule clinical review, gather additional evidence"
+        evidence_level: moderate
+        next_steps: "expanded analysis, literature review, expert consultation"
+        methods_used: "PRR + chi-squared, clinical significance pending"
+    weak_statistical:
+      type: return
+      value:
+        outcome: WEAK_STATISTICAL
+        action: "monitor, reanalyze next quarter with accumulated data"
+        evidence_level: weak
+        next_steps: "continued monitoring, data accumulation"
+    insufficient_cases:
+      type: return
+      value:
+        outcome: INSUFFICIENT_CASES
+        action: "flag for monitoring, await additional reports"
+        evidence_level: preliminary
+        next_steps: "active surveillance, case series development"
+    qualitative_signal:
+      type: return
+      value:
+        outcome: QUALITATIVE_SIGNAL
+        action: "literature-supported concern, initiate formal signal evaluation"
+        evidence_level: moderate
+        next_steps: "systematic review, quantitative analysis, signal assessment"
+    hypothesis_signal:
+      type: return
+      value:
+        outcome: HYPOTHESIS
+        action: "biological plausibility noted, design targeted study"
+        evidence_level: theoretical
+        next_steps: "hypothesis testing, targeted data collection"
+    no_signal:
+      type: return
+      value:
+        outcome: NO_SIGNAL
+        action: "document review, continue routine monitoring"
+        evidence_level: none
+        next_steps: "routine surveillance"
+tests:
+- input:
+    prr: 3.5
+    chi_squared: 8.2
+    case_count: 12
+    clinical_significance: high
+  expect:
+    outcome: VALIDATED_SIGNAL
+    evidence_level: strong
+- input:
+    prr: 2.5
+    chi_squared: 5.0
+    case_count: 5
+    clinical_significance: low
+  expect:
+    outcome: SIGNAL_FOR_REVIEW
+    evidence_level: moderate
+- input:
+    prr: 2.1
+    chi_squared: 3.0
+  expect:
+    outcome: WEAK_STATISTICAL
+- input:
+    prr: 2.5
+    chi_squared: 6.0
+    case_count: 2
+  expect:
+    outcome: INSUFFICIENT_CASES
+- input:
+    prr: 1.5
+    has_literature_support: true
+  expect:
+    outcome: QUALITATIVE_SIGNAL
+- input:
+    prr: 1.0
+    has_biological_plausibility: true
+  expect:
+    outcome: HYPOTHESIS
+- input:
+    prr: 0.8
+  expect:
+    outcome: NO_SIGNAL
+- input: {}
+  expect:
+    outcome: NO_SIGNAL

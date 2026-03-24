@@ -1,0 +1,229 @@
+name: config-pubmed-signal-strength
+description: "Score evidence strength from PubMed search-signal-literature results. Evaluates publication volume, recency, and study type mix."
+version: 0.1.0
+
+interface:
+  inputs:
+    total_articles:
+      type: int
+      required: false
+      description: "Total signal-related articles found"
+    case_report_count:
+      type: int
+      required: false
+      description: "Number of case reports"
+    systematic_review_count:
+      type: int
+      required: false
+      description: "Number of systematic reviews or meta-analyses"
+    recent_count:
+      type: int
+      required: false
+      description: "Articles published in last 2 years"
+    has_regulatory_citation:
+      type: bool
+      required: false
+      description: "At least one article references regulatory action"
+  outputs:
+    evidence_strength:
+      type: string
+      description: "strong, moderate, emerging, weak, absent"
+    literature_signal:
+      type: bool
+    recommended_depth:
+      type: string
+
+tree:
+  start: check_articles
+  nodes:
+    check_articles:
+      type: condition
+      variable: total_articles
+      operator: is_null
+      true_next: absent
+      false_next: check_any
+
+    check_any:
+      type: condition
+      variable: total_articles
+      operator: eq
+      value: 0
+      true_next: absent
+      false_next: check_systematic
+
+    check_systematic:
+      type: condition
+      variable: systematic_review_count
+      operator: is_null
+      true_next: check_volume
+      false_next: check_has_systematic
+
+    check_has_systematic:
+      type: condition
+      variable: systematic_review_count
+      operator: gte
+      value: 1
+      true_next: strong_evidence
+      false_next: check_volume
+
+    check_volume:
+      type: condition
+      variable: total_articles
+      operator: gte
+      value: 20
+      true_next: check_regulatory
+      false_next: check_moderate_volume
+
+    check_regulatory:
+      type: condition
+      variable: has_regulatory_citation
+      operator: eq
+      value: true
+      true_next: strong_evidence
+      false_next: moderate_evidence
+
+    check_moderate_volume:
+      type: condition
+      variable: total_articles
+      operator: gte
+      value: 5
+      true_next: check_recency
+      false_next: check_case_reports
+
+    check_recency:
+      type: condition
+      variable: recent_count
+      operator: is_null
+      true_next: moderate_evidence
+      false_next: check_recent_ratio
+
+    check_recent_ratio:
+      type: condition
+      variable: recent_count
+      operator: gte
+      value: 3
+      true_next: moderate_evidence
+      false_next: emerging_evidence
+
+    check_case_reports:
+      type: condition
+      variable: case_report_count
+      operator: is_null
+      true_next: weak_evidence
+      false_next: check_case_count
+
+    check_case_count:
+      type: condition
+      variable: case_report_count
+      operator: gte
+      value: 2
+      true_next: emerging_evidence
+      false_next: weak_evidence
+
+    strong_evidence:
+      type: return
+      value:
+        evidence_strength: strong
+        literature_signal: true
+        recommended_depth: full_review
+
+    moderate_evidence:
+      type: return
+      value:
+        evidence_strength: moderate
+        literature_signal: true
+        recommended_depth: targeted_review
+
+    emerging_evidence:
+      type: return
+      value:
+        evidence_strength: emerging
+        literature_signal: true
+        recommended_depth: monitor_literature
+
+    weak_evidence:
+      type: return
+      value:
+        evidence_strength: weak
+        literature_signal: false
+        recommended_depth: periodic_search
+
+    absent:
+      type: return
+      value:
+        evidence_strength: absent
+        literature_signal: false
+        recommended_depth: none
+
+tests:
+  - input:
+      total_articles: 30
+      case_report_count: 8
+      systematic_review_count: 2
+      recent_count: 10
+      has_regulatory_citation: true
+    expect:
+      evidence_strength: strong
+      literature_signal: true
+      recommended_depth: full_review
+
+  - input:
+      total_articles: 25
+      case_report_count: 5
+      systematic_review_count: 0
+      recent_count: 8
+      has_regulatory_citation: true
+    expect:
+      evidence_strength: strong
+      literature_signal: true
+      recommended_depth: full_review
+
+  - input:
+      total_articles: 12
+      case_report_count: 4
+      systematic_review_count: 0
+      recent_count: 5
+      has_regulatory_citation: false
+    expect:
+      evidence_strength: moderate
+      literature_signal: true
+      recommended_depth: targeted_review
+
+  - input:
+      total_articles: 8
+      case_report_count: 3
+      recent_count: 1
+      has_regulatory_citation: false
+    expect:
+      evidence_strength: emerging
+      literature_signal: true
+      recommended_depth: monitor_literature
+
+  - input:
+      total_articles: 3
+      case_report_count: 2
+    expect:
+      evidence_strength: emerging
+      literature_signal: true
+      recommended_depth: monitor_literature
+
+  - input:
+      total_articles: 2
+      case_report_count: 1
+    expect:
+      evidence_strength: weak
+      literature_signal: false
+      recommended_depth: periodic_search
+
+  - input:
+      total_articles: 0
+    expect:
+      evidence_strength: absent
+      literature_signal: false
+      recommended_depth: none
+
+  - input: {}
+    expect:
+      evidence_strength: absent
+      literature_signal: false
+      recommended_depth: none

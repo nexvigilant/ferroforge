@@ -1,0 +1,47 @@
+name: ab-charge-imbalance
+description: 'Antibody: detects charge imbalance in reaction (prima-chem conservation). Input is pre-computed charge_delta = charge_after - charge_before.'
+version: 0.1.0
+interface:
+  inputs:
+    charge_delta:
+      type: number
+      required: true
+      description: 'charge_after - charge_before (0 = conserved)'
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: charge_delta
+      operator: eq
+      value: 0
+      true_next: clean
+      false_next: violation
+    violation:
+      type: return
+      value:
+        threat: true
+        response: 'BLOCK: charge not conserved across reaction'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { charge_delta: 0 }
+  expect: { threat: false }
+- input: { charge_delta: 1 }
+  expect: { threat: true }
+- input: { charge_delta: -1 }
+  expect: { threat: true }
+- input: { charge_delta: 3 }
+  expect: { threat: true }
+- input: {}
+  expect:
+    response: "BLOCK: charge not conserved across reaction"
+    threat: true

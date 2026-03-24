@@ -1,0 +1,351 @@
+name: multi-signal-ranker
+description: 'Rank 4 PV signal measures (PRR, ROR, IC, EBGM) against each other using cross-variable comparison. Determines which method gives strongest evidence, how many agree on signal detection, and overall concordance. Uses threshold: PRR>=2, ROR>=2, IC>=0.5, EBGM>=2.'
+version: 0.1.0
+interface:
+  inputs:
+    prr:
+      type: float
+      required: false
+      description: 'Proportional Reporting Ratio'
+    ror:
+      type: float
+      required: false
+      description: 'Reporting Odds Ratio'
+    ic:
+      type: float
+      required: false
+      description: 'Information Component (IC025)'
+    ebgm:
+      type: float
+      required: false
+      description: 'Empirical Bayes Geometric Mean'
+  outputs:
+    strongest_method:
+      type: string
+      description: 'Which signal method is strongest: PRR, ROR, IC, EBGM, or NONE'
+    signals_detected:
+      type: int
+      description: 'Count of methods detecting a signal (0-4)'
+    concordance:
+      type: string
+      description: 'ALL_AGREE, MAJORITY, MIXED, NONE_DETECTED'
+    ranking:
+      type: string
+      description: 'Ordered ranking of signal strength'
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(PRR, ROR, IC, EBGM) at ∂(thresholds) — four-way cross-variable comparison ranking signals'
+  primes: ['κ', '∂', 'N', 'σ']
+  arguments: ['prr', 'ror', 'ic', 'ebgm']
+  chain_prediction: 'σ(κ(signals)) → ranked signal assessment'
+tree:
+  start: check_prr
+  nodes:
+    # Check each signal against its threshold
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: prr_detected_check_ror
+      false_next: prr_absent_check_ror
+
+    prr_detected_check_ror:
+      type: condition
+      variable: ror
+      operator: gte
+      value: 2.0
+      true_next: prr_ror_detected_check_ic
+      false_next: prr_only_check_ic
+
+    prr_absent_check_ror:
+      type: condition
+      variable: ror
+      operator: gte
+      value: 2.0
+      true_next: ror_only_check_ic
+      false_next: none_so_far_check_ic
+
+    # PRR+ROR detected, check IC
+    prr_ror_detected_check_ic:
+      type: condition
+      variable: ic
+      operator: gte
+      value: 0.5
+      true_next: three_check_ebgm_prr_ror_ic
+      false_next: two_check_ebgm_prr_ror
+
+    # PRR only, check IC
+    prr_only_check_ic:
+      type: condition
+      variable: ic
+      operator: gte
+      value: 0.5
+      true_next: two_check_ebgm_prr_ic
+      false_next: one_check_ebgm_prr
+
+    # ROR only, check IC
+    ror_only_check_ic:
+      type: condition
+      variable: ic
+      operator: gte
+      value: 0.5
+      true_next: two_check_ebgm_ror_ic
+      false_next: one_check_ebgm_ror
+
+    # None so far, check IC
+    none_so_far_check_ic:
+      type: condition
+      variable: ic
+      operator: gte
+      value: 0.5
+      true_next: one_check_ebgm_ic
+      false_next: zero_check_ebgm
+
+    # 3 detected (PRR+ROR+IC), check EBGM
+    three_check_ebgm_prr_ror_ic:
+      type: condition
+      variable: ebgm
+      operator: gte
+      value: 2.0
+      true_next: all_four_detected
+      false_next: three_detected
+
+    # 2 detected (PRR+ROR), check EBGM
+    two_check_ebgm_prr_ror:
+      type: condition
+      variable: ebgm
+      operator: gte
+      value: 2.0
+      true_next: three_detected
+      false_next: two_detected_prr_ror
+
+    # 2 detected (PRR+IC), check EBGM
+    two_check_ebgm_prr_ic:
+      type: condition
+      variable: ebgm
+      operator: gte
+      value: 2.0
+      true_next: three_detected
+      false_next: two_detected_mixed
+
+    # 2 detected (ROR+IC), check EBGM
+    two_check_ebgm_ror_ic:
+      type: condition
+      variable: ebgm
+      operator: gte
+      value: 2.0
+      true_next: three_detected
+      false_next: two_detected_mixed
+
+    # 1 detected (PRR), check EBGM
+    one_check_ebgm_prr:
+      type: condition
+      variable: ebgm
+      operator: gte
+      value: 2.0
+      true_next: two_detected_mixed
+      false_next: one_detected
+
+    # 1 detected (ROR), check EBGM
+    one_check_ebgm_ror:
+      type: condition
+      variable: ebgm
+      operator: gte
+      value: 2.0
+      true_next: two_detected_mixed
+      false_next: one_detected
+
+    # 1 detected (IC), check EBGM
+    one_check_ebgm_ic:
+      type: condition
+      variable: ebgm
+      operator: gte
+      value: 2.0
+      true_next: two_detected_mixed
+      false_next: one_detected
+
+    # 0 detected, check EBGM
+    zero_check_ebgm:
+      type: condition
+      variable: ebgm
+      operator: gte
+      value: 2.0
+      true_next: one_detected
+      false_next: none_detected
+
+    # Terminal nodes
+    all_four_detected:
+      type: return
+      value:
+        signals_detected: 4
+        concordance: ALL_AGREE
+        strongest_method: MULTIPLE
+        ranking: 'All four methods detect signal — unanimous agreement'
+
+    three_detected:
+      type: return
+      value:
+        signals_detected: 3
+        concordance: MAJORITY
+        strongest_method: MULTIPLE
+        ranking: 'Three of four methods detect signal — strong majority agreement'
+
+    two_detected_prr_ror:
+      type: return
+      value:
+        signals_detected: 2
+        concordance: MIXED
+        strongest_method: PRR_ROR
+        ranking: 'PRR and ROR agree, IC and EBGM do not — frequency-based methods aligned'
+
+    two_detected_mixed:
+      type: return
+      value:
+        signals_detected: 2
+        concordance: MIXED
+        strongest_method: MIXED
+        ranking: 'Two of four methods detect signal — partial agreement'
+
+    one_detected:
+      type: return
+      value:
+        signals_detected: 1
+        concordance: MIXED
+        strongest_method: ISOLATED
+        ranking: 'Only one method detects signal — isolated finding, investigate further'
+
+    none_detected:
+      type: return
+      value:
+        signals_detected: 0
+        concordance: NONE_DETECTED
+        strongest_method: NONE
+        ranking: 'No method detects signal — below all thresholds'
+
+tests:
+# All four agree — strong signal
+- input:
+    prr: 5.0
+    ror: 4.0
+    ic: 1.2
+    ebgm: 3.5
+  expect:
+    signals_detected: 4
+    concordance: ALL_AGREE
+
+# Three agree
+- input:
+    prr: 3.0
+    ror: 2.5
+    ic: 0.8
+    ebgm: 1.5
+  expect:
+    signals_detected: 3
+    concordance: MAJORITY
+
+# Two agree
+- input:
+    prr: 4.0
+    ror: 3.0
+    ic: 0.2
+    ebgm: 1.0
+  expect:
+    signals_detected: 2
+    concordance: MIXED
+
+# Only one detects
+- input:
+    prr: 3.0
+    ror: 1.5
+    ic: 0.3
+    ebgm: 1.0
+  expect:
+    signals_detected: 1
+    concordance: MIXED
+
+# None detect
+- input:
+    prr: 1.0
+    ror: 1.2
+    ic: 0.1
+    ebgm: 0.8
+  expect:
+    signals_detected: 0
+    concordance: NONE_DETECTED
+
+# Edge: exactly at thresholds
+- input:
+    prr: 2.0
+    ror: 2.0
+    ic: 0.5
+    ebgm: 2.0
+  expect:
+    signals_detected: 4
+    concordance: ALL_AGREE
+
+# ROR only detected (prr below, ror above, ic below, ebgm below)
+- input:
+    prr: 1.5
+    ror: 3.0
+    ic: 0.3
+    ebgm: 1.0
+  expect:
+    signals_detected: 1
+    concordance: MIXED
+
+# IC only detected (prr below, ror below, ic above, ebgm below)
+- input:
+    prr: 1.0
+    ror: 1.5
+    ic: 0.8
+    ebgm: 1.0
+  expect:
+    signals_detected: 1
+    concordance: MIXED
+
+# PRR + IC detected, ROR not (prr above, ror below, ic above, ebgm below)
+- input:
+    prr: 2.5
+    ror: 1.5
+    ic: 0.7
+    ebgm: 1.0
+  expect:
+    signals_detected: 2
+    concordance: MIXED
+
+# ROR + IC detected, PRR not (prr below, ror above, ic above, ebgm below)
+- input:
+    prr: 1.5
+    ror: 2.5
+    ic: 0.6
+    ebgm: 1.0
+  expect:
+    signals_detected: 2
+    concordance: MIXED
+
+# ROR + EBGM detected (prr below, ror above, ic below, ebgm above)
+- input:
+    prr: 1.5
+    ror: 2.5
+    ic: 0.3
+    ebgm: 2.5
+  expect:
+    signals_detected: 2
+    concordance: MIXED
+
+# IC + EBGM detected (prr below, ror below, ic above, ebgm above)
+- input:
+    prr: 1.0
+    ror: 1.0
+    ic: 0.8
+    ebgm: 2.5
+  expect:
+    signals_detected: 2
+    concordance: MIXED
+
+# Null input safety
+- input: {}
+  expect:
+    signals_detected: 0
+    concordance: NONE_DETECTED

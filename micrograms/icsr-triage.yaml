@@ -1,0 +1,227 @@
+name: icsr-triage
+description: 'ICSR case intake: classify drug reaction by signal strength, seriousness, causality, and route to appropriate deadline'
+version: 0.1.0
+interface:
+  inputs:
+    death:
+      type: bool
+      required: false
+    hospitalization:
+      type: bool
+      required: false
+    naranjo_score:
+      type: int
+      required: false
+    prr:
+      type: float
+      required: false
+  outputs:
+    action:
+      type: string
+    channel:
+      type: string
+    deadline_days:
+      type: int
+    triage:
+      type: string
+tree:
+  start: signal_check
+  nodes:
+    monitor_case:
+      type: return
+      value:
+        triage: MONITOR
+        channel: backlog
+        action: periodic_review
+        deadline_days: 90
+    serious_check:
+      type: condition
+      variable: death
+      operator: eq
+      value: true
+      true_next: critical_case
+      false_next: hosp_check
+    low_signal:
+      type: return
+      value:
+        channel: archive
+        triage: LOW_SIGNAL
+        action: document
+        deadline_days: 90
+    causality_check:
+      type: condition
+      variable: naranjo_score
+      operator: gte
+      value: 5
+      true_next: probable_case
+      false_next: monitor_case
+    signal_check:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2
+      true_next: serious_check
+      false_next: low_signal
+    critical_case:
+      type: return
+      value:
+        deadline_days: 7
+        action: expedited_report
+        triage: CRITICAL
+        channel: pager
+    serious_case:
+      type: return
+      value:
+        triage: SERIOUS
+        deadline_days: 15
+        action: expedited_report
+        channel: slack
+    probable_case:
+      type: return
+      value:
+        channel: queue
+        action: investigate
+        triage: PROBABLE
+        deadline_days: 30
+    hosp_check:
+      type: condition
+      variable: hospitalization
+      operator: eq
+      value: true
+      true_next: serious_case
+      false_next: causality_check
+tests:
+- input:
+    hospitalization: false
+    death: true
+    prr: 3.5
+    naranjo_score: 8
+  expect:
+    deadline_days: 7
+    action: expedited_report
+    triage: CRITICAL
+- input:
+    prr: 2.5
+    hospitalization: true
+    naranjo_score: 6
+    death: false
+  expect:
+    triage: SERIOUS
+    action: expedited_report
+    deadline_days: 15
+- input:
+    hospitalization: false
+    prr: 4.0
+    death: false
+    naranjo_score: 7
+  expect:
+    deadline_days: 30
+    triage: PROBABLE
+    action: investigate
+- input:
+    naranjo_score: 2
+    hospitalization: false
+    death: false
+    prr: 2.1
+  expect:
+    deadline_days: 90
+    triage: MONITOR
+    action: periodic_review
+- input:
+    hospitalization: true
+    death: true
+    naranjo_score: 9
+    prr: 1.5
+  expect:
+    action: document
+    triage: LOW_SIGNAL
+    deadline_days: 90
+- input:
+    death: false
+    prr: 0.5
+    naranjo_score: 0
+    hospitalization: false
+  expect:
+    deadline_days: 90
+    action: document
+    triage: LOW_SIGNAL
+- input: {}
+  expect:
+    triage: LOW_SIGNAL
+    channel: archive
+    action: document
+    deadline_days: 90
+- input:
+    naranjo_score: -1
+  expect:
+    triage: LOW_SIGNAL
+    action: document
+    deadline_days: 90
+    channel: archive
+- input:
+    naranjo_score: 4
+  expect:
+    action: document
+    deadline_days: 90
+    channel: archive
+    triage: LOW_SIGNAL
+- input:
+    naranjo_score: 500
+  expect:
+    action: document
+    channel: archive
+    triage: LOW_SIGNAL
+    deadline_days: 90
+- input: {}
+  expect:
+    triage: LOW_SIGNAL
+    channel: archive
+    action: document
+    deadline_days: 90
+- input:
+    prr: 0
+  expect:
+    deadline_days: 90
+    action: document
+    channel: archive
+    triage: LOW_SIGNAL
+- input:
+    prr: -1
+  expect:
+    triage: LOW_SIGNAL
+    channel: archive
+    action: document
+    deadline_days: 90
+- input:
+    prr: 1
+  expect:
+    deadline_days: 90
+    action: document
+    triage: LOW_SIGNAL
+    channel: archive
+- input:
+    prr: 3
+  expect:
+    triage: MONITOR
+    channel: backlog
+    action: periodic_review
+    deadline_days: 90
+- input:
+    prr: 200
+  expect:
+    channel: backlog
+    deadline_days: 90
+    action: periodic_review
+    triage: MONITOR
+- input: {}
+  expect:
+    action: document
+    channel: archive
+    triage: LOW_SIGNAL
+    deadline_days: 90
+- input: {}
+  expect:
+    action: document
+    triage: LOW_SIGNAL
+    deadline_days: 90
+    channel: archive

@@ -1,0 +1,111 @@
+name: interaction-severity-classifier
+description: Classify drug-drug interactions by severity based on type and mechanism
+version: 0.1.0
+tree:
+  start: check_interaction_type
+  nodes:
+    classify_severity:
+      type: condition
+      variable: interaction_type
+      operator: matches
+      value: (?i)(contraindicated|contraindication)
+      true_next: severity_major
+      false_next: check_significant
+    severity_moderate:
+      type: return
+      value:
+        severity: moderate
+        clinical_significance: monitor_recommended
+        action_required: true
+    severity_major:
+      type: return
+      value:
+        severity: major
+        action_required: true
+        clinical_significance: significant_risk
+    check_potent:
+      type: condition
+      variable: mechanism
+      operator: matches
+      value: (?i)(potent|strong|inhibitor|inducer)
+      true_next: severity_major
+      false_next: severity_moderate
+    missing_mechanism:
+      type: return
+      value:
+        clinical_significance: null
+        action_required: true
+        severity: unknown
+    missing_input:
+      type: return
+      value:
+        clinical_significance: null
+        action_required: true
+        severity: unknown
+    check_interaction_type:
+      type: condition
+      variable: interaction_type
+      operator: is_not_null
+      value: null
+      true_next: check_mechanism
+      false_next: missing_input
+    check_significant:
+      type: condition
+      variable: mechanism
+      operator: matches
+      value: (?i)(cyp3a4|metabolism|hepatic|renal|clearance|elimination)
+      true_next: check_potent
+      false_next: severity_minor
+    severity_minor:
+      type: return
+      value:
+        action_required: false
+        severity: minor
+        clinical_significance: minimal_risk
+    check_mechanism:
+      type: condition
+      variable: mechanism
+      operator: is_not_null
+      value: null
+      true_next: classify_severity
+      false_next: missing_mechanism
+tests:
+- input:
+    interaction_type: ZZZZZ_NO_MATCH
+    mechanism: ZZZZZ_NO_MATCH
+  expect:
+    action_required: false
+    severity: minor
+    clinical_significance: minimal_risk
+- input:
+    interaction_type: ZZZZZ_NO_MATCH
+    mechanism: cyp3a4
+  expect:
+    severity: moderate
+    clinical_significance: monitor_recommended
+    action_required: true
+- input:
+    interaction_type: ZZZZZ_NO_MATCH
+  expect:
+    clinical_significance: null
+    action_required: true
+    severity: unknown
+- input:
+    interaction_type: contraindicated
+    mechanism: ZZZZZ_NO_MATCH
+  expect:
+    severity: major
+    action_required: true
+    clinical_significance: significant_risk
+- input:
+    mechanism: ZZZZZ_NO_MATCH
+  expect:
+    clinical_significance: null
+    action_required: true
+    severity: unknown
+- input: {}
+  expect:
+    clinical_significance: null
+    action_required: true
+    severity: unknown
+interface: null

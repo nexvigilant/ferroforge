@@ -1,0 +1,106 @@
+name: cpa-capability
+description: "CPA capability matrix — given a CPA and level, returns what that CPA can produce at that competency level."
+version: 0.1.0
+interface:
+  inputs:
+    level:
+      type: string
+      required: false
+  outputs:
+    can_do:
+      type: string
+    cannot_do:
+      type: string
+    hitl:
+      type: string
+    output_type:
+      type: string
+    supervision:
+      type: string
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: level
+      operator: is_null
+      value: null
+      true_next: foundation_capability
+      false_next: check_level_foundation
+    check_level_foundation:
+      type: condition
+      variable: level
+      operator: lte
+      value: 2
+      true_next: foundation_capability
+      false_next: check_independent
+    check_independent:
+      type: condition
+      variable: level
+      operator: eq
+      value: 3
+      true_next: independent_capability
+      false_next: check_advanced
+    check_advanced:
+      type: condition
+      variable: level
+      operator: eq
+      value: 4
+      true_next: advanced_capability
+      false_next: strategic_capability
+    foundation_capability:
+      type: return
+      value:
+        can_do: "observe, assist, learn, document under supervision"
+        cannot_do: "independent decisions, complex cases, process design, innovation"
+        output_type: "learning artifacts, supervised work products"
+        supervision: direct
+        hitl: "all outputs reviewed before use"
+    independent_capability:
+      type: return
+      value:
+        can_do: "routine work independently, mentor newcomers, propose improvements, validate AI outputs"
+        cannot_do: "enterprise strategy, novel methodology, regulatory policy, industry transformation"
+        output_type: "production work products, process improvements, training materials"
+        supervision: consultative
+        hitl: "spot-check outputs, review innovations"
+    advanced_capability:
+      type: return
+      value:
+        can_do: "complex problem solving, innovation leadership, process design, AI strategy, cross-functional coordination"
+        cannot_do: "industry transformation, global policy, paradigm creation"
+        output_type: "strategic initiatives, novel methodologies, validated AI implementations"
+        supervision: remote
+        hitl: "review strategic decisions, approve cross-CPA work"
+    strategic_capability:
+      type: return
+      value:
+        can_do: "organizational transformation, industry influence, paradigm creation, policy development, legacy building"
+        cannot_do: "n/a — full autonomous authority within domain"
+        output_type: "industry standards, organizational transformations, policy contributions"
+        supervision: none
+        hitl: "patient safety decisions only"
+tests:
+- input:
+    level: 1
+  expect:
+    supervision: direct
+- input:
+    level: 2
+  expect:
+    supervision: direct
+- input:
+    level: 3
+  expect:
+    supervision: consultative
+- input:
+    level: 4
+  expect:
+    supervision: remote
+- input:
+    level: 5
+  expect:
+    supervision: none
+- input: {}
+  expect:
+    supervision: direct

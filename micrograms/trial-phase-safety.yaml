@@ -1,0 +1,175 @@
+name: trial-phase-safety
+description: Classifies clinical trial safety endpoint significance by trial phase
+  and sample size
+version: 0.1.0
+tree:
+  start: check_safety
+  nodes:
+    check_sample_size:
+      type: condition
+      variable: sample_size
+      operator: gte
+      value: 500
+      true_next: phase3_pivotal
+      false_next: phase3_small
+    check_phase1:
+      type: condition
+      variable: trial_phase
+      operator: eq
+      value: '1'
+      true_next: phase1_safety
+      false_next: check_phase2
+    phase3_small:
+      type: return
+      value:
+        regulatory_weight: supportive
+        safety_classification: confirmatory_safety_signal
+        data_quality: moderate
+    unknown_phase:
+      type: return
+      value:
+        data_quality: unverified
+        safety_classification: unclassified_safety
+        regulatory_weight: unknown
+    phase4_safety:
+      type: return
+      value:
+        safety_classification: post_marketing_surveillance
+        regulatory_weight: regulatory_commitment
+        data_quality: real_world
+    check_phase4:
+      type: condition
+      variable: trial_phase
+      operator: eq
+      value: '4'
+      true_next: phase4_safety
+      false_next: unknown_phase
+    check_phase3:
+      type: condition
+      variable: trial_phase
+      operator: eq
+      value: '3'
+      true_next: check_sample_size
+      false_next: check_phase4
+    no_safety:
+      type: return
+      value:
+        regulatory_weight: none
+        data_quality: not_applicable
+        safety_classification: no_safety_assessment
+    check_safety:
+      type: condition
+      variable: has_safety_endpoint
+      operator: eq
+      value: true
+      true_next: check_phase1
+      false_next: no_safety
+    phase2_safety:
+      type: return
+      value:
+        data_quality: moderate
+        regulatory_weight: supportive
+        safety_classification: preliminary_safety_signal
+    check_phase2:
+      type: condition
+      variable: trial_phase
+      operator: eq
+      value: '2'
+      true_next: phase2_safety
+      false_next: check_phase3
+    phase3_pivotal:
+      type: return
+      value:
+        regulatory_weight: registrational
+        data_quality: high
+        safety_classification: pivotal_safety_data
+    phase1_safety:
+      type: return
+      value:
+        safety_classification: dose_limiting_toxicity
+        regulatory_weight: exploratory
+        data_quality: preliminary
+tests:
+- input:
+    has_safety_endpoint: false
+    sample_size: 0
+    trial_phase: ''
+  expect:
+    regulatory_weight: none
+    data_quality: not_applicable
+    safety_classification: no_safety_assessment
+- input:
+    has_safety_endpoint: true
+    sample_size: 0
+    trial_phase: ''
+  expect:
+    data_quality: unverified
+    safety_classification: unclassified_safety
+    regulatory_weight: unknown
+- input:
+    has_safety_endpoint: true
+    sample_size: 0
+    trial_phase: '1'
+  expect:
+    safety_classification: dose_limiting_toxicity
+    regulatory_weight: exploratory
+    data_quality: preliminary
+- input:
+    has_safety_endpoint: true
+    sample_size: 0
+    trial_phase: '2'
+  expect:
+    data_quality: moderate
+    regulatory_weight: supportive
+    safety_classification: preliminary_safety_signal
+- input:
+    has_safety_endpoint: true
+    sample_size: 0
+    trial_phase: '3'
+  expect:
+    regulatory_weight: supportive
+    safety_classification: confirmatory_safety_signal
+    data_quality: moderate
+- input:
+    has_safety_endpoint: true
+    sample_size: 0
+    trial_phase: '4'
+  expect:
+    safety_classification: post_marketing_surveillance
+    regulatory_weight: regulatory_commitment
+    data_quality: real_world
+- input:
+    has_safety_endpoint: true
+    sample_size: 1000
+    trial_phase: '3'
+  expect:
+    regulatory_weight: registrational
+    data_quality: high
+    safety_classification: pivotal_safety_data
+- input: {}
+  expect:
+    regulatory_weight: none
+    data_quality: not_applicable
+    safety_classification: no_safety_assessment
+interface:
+  inputs:
+    trial_phase:
+      type: string
+      required: false
+    has_safety_endpoint:
+      type: bool
+      required: false
+    sample_size:
+      type: int
+      required: false
+  outputs:
+    regulatory_weight:
+      type: string
+      required: false
+    data_quality:
+      type: string
+      required: false
+    safety_classification:
+      type: string
+      required: false
+  aliases: {}

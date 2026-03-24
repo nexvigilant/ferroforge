@@ -1,0 +1,65 @@
+name: seriousness-to-deadline
+description: 'ICH E2A seriousness classification → boolean decomposition. Carries seriousness criteria through to produce boolean flags (serious, fatal, life_threatening) for downstream consumption.'
+version: 0.2.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - case-seriousness
+  - transform-seriousness-to-bool
+tests:
+- name: death criterion — serious and fatal
+  input:
+    death: true
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+  expect:
+    serious: true
+    serious_ae: true
+    fatal: true
+    life_threatening: false
+    seriousness: SERIOUS
+- name: life-threatening criterion — serious but not fatal
+  input:
+    death: false
+    hospitalization: false
+    disability: false
+    life_threatening: true
+    congenital_anomaly: false
+    medically_important: false
+  expect:
+    serious: true
+    serious_ae: true
+    fatal: false
+    life_threatening: true
+    seriousness: SERIOUS
+- name: hospitalization criterion — serious other
+  input:
+    death: false
+    hospitalization: true
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+  expect:
+    serious: true
+    serious_ae: true
+    fatal: false
+    life_threatening: false
+    seriousness: SERIOUS
+- name: non-serious — all flags false
+  input:
+    death: false
+    hospitalization: false
+    disability: false
+    life_threatening: false
+    congenital_anomaly: false
+    medically_important: false
+  expect:
+    serious: false
+    serious_ae: false
+    fatal: false
+    life_threatening: false
+    seriousness: NON-SERIOUS

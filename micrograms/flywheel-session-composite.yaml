@@ -1,0 +1,217 @@
+name: flywheel-session-composite
+description: Combines session velocity, reality gate verdict, and momentum classification into unified flywheel health assessment. Bridges session-velocity, reality-gate, and momentum-conservation outputs into health-traffic-classifier and friction-dissipation inputs.
+version: 0.1.0
+tree:
+  start: check_verdict
+  nodes:
+    blocked_session:
+      type: return
+      value:
+        status: RED
+        flywheel_assessment: Session blocked by reality gate — no forward progress possible
+        velocity: STALLED
+    check_momentum_high:
+      type: condition
+      variable: above_critical
+      operator: eq
+      value: true
+      true_next: optimal_session
+      false_next: high_velocity_low_momentum
+    check_band_warn:
+      type: condition
+      variable: session_band
+      operator: eq
+      value: HIGH
+      true_next: warn_but_productive
+      false_next: degraded_session
+    warn_but_productive:
+      type: return
+      value:
+        status: YELLOW
+        velocity: MODERATE
+        flywheel_assessment: Reality gate warning but high output — address gate issues to sustain velocity
+    low_band_good_momentum:
+      type: return
+      value:
+        velocity: SLOW
+        flywheel_assessment: Low session output but momentum preserved — temporary slowdown
+        status: YELLOW
+    high_velocity_low_momentum:
+      type: return
+      value:
+        status: GREEN
+        velocity: FAST
+        flywheel_assessment: High output but momentum below critical — sustain pace to build inertia
+    check_verdict:
+      type: condition
+      variable: verdict
+      operator: eq
+      value: BLOCKED
+      true_next: blocked_session
+      false_next: check_verdict_warn
+    stalled_session:
+      type: return
+      value:
+        flywheel_assessment: Low output and momentum below critical — flywheel stalling
+        status: RED
+        velocity: STALLED
+    check_band_moderate:
+      type: condition
+      variable: session_band
+      operator: eq
+      value: MODERATE
+      true_next: moderate_session
+      false_next: check_above_critical
+    optimal_session:
+      type: return
+      value:
+        status: GREEN
+        velocity: FAST
+        flywheel_assessment: High velocity with strong momentum — flywheel fully engaged
+    check_above_critical:
+      type: condition
+      variable: above_critical
+      operator: eq
+      value: true
+      true_next: low_band_good_momentum
+      false_next: stalled_session
+    check_band_high:
+      type: condition
+      variable: session_band
+      operator: eq
+      value: HIGH
+      true_next: check_momentum_high
+      false_next: check_band_moderate
+    moderate_session:
+      type: return
+      value:
+        status: GREEN
+        velocity: MODERATE
+        flywheel_assessment: Moderate velocity with approved reality gate — steady progress
+    degraded_session:
+      type: return
+      value:
+        velocity: SLOW
+        status: YELLOW
+        flywheel_assessment: Reality gate warning with low output — flywheel losing momentum
+    check_verdict_warn:
+      type: condition
+      variable: verdict
+      operator: eq
+      value: WARN
+      true_next: check_band_warn
+      false_next: check_band_high
+tests:
+- input:
+    session_band: HIGH
+    above_critical: true
+    verdict: BLOCKED
+  expect:
+    status: RED
+    velocity: STALLED
+- input:
+    verdict: APPROVED
+    session_band: HIGH
+    above_critical: true
+  expect:
+    velocity: FAST
+    status: GREEN
+- input:
+    verdict: APPROVED
+    session_band: HIGH
+    above_critical: false
+  expect:
+    status: GREEN
+    velocity: FAST
+- input:
+    verdict: APPROVED
+    session_band: MODERATE
+    above_critical: true
+  expect:
+    velocity: MODERATE
+    status: GREEN
+- input:
+    above_critical: true
+    verdict: APPROVED
+    session_band: LOW
+  expect:
+    status: YELLOW
+    velocity: SLOW
+- input:
+    above_critical: false
+    verdict: APPROVED
+    session_band: LOW
+  expect:
+    velocity: STALLED
+    status: RED
+- input:
+    verdict: WARN
+    session_band: HIGH
+    above_critical: true
+  expect:
+    velocity: MODERATE
+    status: YELLOW
+- input:
+    verdict: WARN
+    above_critical: false
+    session_band: LOW
+  expect:
+    velocity: SLOW
+    status: YELLOW
+- input: {}
+  expect:
+    velocity: STALLED
+    flywheel_assessment: Low output and momentum below critical — flywheel stalling
+    status: RED
+- input: {}
+  expect:
+    velocity: STALLED
+    flywheel_assessment: Low output and momentum below critical — flywheel stalling
+    status: RED
+- input: {}
+  expect:
+    velocity: STALLED
+    flywheel_assessment: Low output and momentum below critical — flywheel stalling
+    status: RED
+- input: {}
+  expect:
+    flywheel_assessment: Low output and momentum below critical — flywheel stalling
+    status: RED
+    velocity: STALLED
+- input: {}
+  expect:
+    flywheel_assessment: Low output and momentum below critical — flywheel stalling
+    status: RED
+    velocity: STALLED
+- input: {}
+  expect:
+    flywheel_assessment: Low output and momentum below critical — flywheel stalling
+    velocity: STALLED
+    status: RED
+- input: {}
+  expect:
+    status: RED
+    velocity: STALLED
+    flywheel_assessment: Low output and momentum below critical — flywheel stalling
+interface:
+  inputs:
+    verdict:
+      type: string
+      required: false
+    session_band:
+      type: string
+      required: false
+    above_critical:
+      type: bool
+      required: false
+  outputs:
+    velocity:
+      type: string
+      required: true
+    flywheel_assessment:
+      type: string
+      required: true
+    status:
+      type: string
+      required: true
+  aliases: {}

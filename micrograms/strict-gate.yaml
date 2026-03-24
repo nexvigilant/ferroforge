@@ -1,0 +1,78 @@
+name: strict-gate
+description: Pass/fail gate against a configurable threshold
+version: 0.1.0
+interface:
+  inputs:
+    value:
+      type: int
+      required: false
+  outputs:
+    gate:
+      type: string
+    passed:
+      type: bool
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: value
+      operator: gte
+      value: 100
+      true_next: pass
+      false_next: fail
+    pass:
+      type: return
+      value:
+        passed: true
+        gate: PASS
+    fail:
+      type: return
+      value:
+        gate: FAIL
+        passed: false
+tests:
+- input:
+    value: 95
+  expect:
+    gate: FAIL
+    passed: false
+- input:
+    value: 80
+  expect:
+    gate: FAIL
+    passed: false
+- input:
+    value: 79
+  expect:
+    gate: FAIL
+    passed: false
+- input:
+    value: 0
+  expect:
+    gate: FAIL
+    passed: false
+- input:
+    value: -1
+  expect:
+    gate: FAIL
+    passed: false
+- input:
+    value: 99
+  expect:
+    gate: FAIL
+    passed: false
+- input:
+    value: 101
+  expect:
+    gate: PASS
+    passed: true
+- input:
+    value: 10000
+  expect:
+    gate: PASS
+    passed: true
+- input: {}
+  expect:
+    gate: FAIL
+    passed: false

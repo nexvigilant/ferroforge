@@ -1,0 +1,63 @@
+name: signal-trajectory-monitoring
+description: "Signal trajectory monitoring: detect trend direction → classify trajectory shape via centroid tracking → check for recurrence patterns. Answers: Is the signal trending, what is its trajectory shape, and is it recurring?"
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - signal-trend-detector        # Detect trend direction from pre-computed PRR change
+  - trajectory-centroid           # Classify trajectory shape from centroid velocity/acceleration
+  - signal-recurrence-detector   # Detect if this is novel, recurring, or systemic
+tests:
+- name: stable_trajectory_novel_signal
+  input:
+    prr_current: 3.2
+    pct_change: -5.0
+    centroid_velocity: -0.3
+    centroid_acceleration: -0.1
+    centroid_current: 2.8
+    centroid_previous: 3.1
+    centroid_delta: -0.3
+    occurrence_count: 1
+    prior_action_taken: false
+    window_days: 90
+  expect:
+    trend: STABLE
+    trajectory_class: STABLE_OR_IMPROVING
+    recurrence_class: NOVEL
+    escalation_required: false
+
+- name: accelerating_drift_systemic_failure
+  input:
+    prr_current: 8.5
+    pct_change: 75.0
+    centroid_velocity: 2.5
+    centroid_acceleration: 1.2
+    centroid_current: 7.8
+    centroid_previous: 5.3
+    centroid_delta: 2.5
+    occurrence_count: 4
+    prior_action_taken: true
+    window_days: 60
+  expect:
+    trend: RISING
+    trajectory_class: ACCELERATING_DRIFT
+    recurrence_class: SYSTEMIC_FAILURE
+    escalation_required: true
+
+- name: oscillating_recurring_pattern
+  input:
+    prr_current: 4.0
+    pct_change: 15.0
+    centroid_velocity: -0.1
+    centroid_acceleration: 0.3
+    centroid_current: 4.2
+    centroid_previous: 4.0
+    centroid_delta: 0.2
+    occurrence_count: 2
+    prior_action_taken: false
+    window_days: 45
+  expect:
+    trend: RISING
+    trajectory_class: OSCILLATING
+    recurrence_class: RECURRING
+    escalation_required: false

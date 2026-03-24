@@ -1,0 +1,202 @@
+name: compliance-evidence-mapper
+description: 'Maps case processing outputs to ICH control evidence. Takes chain results (report_type, timeline, signal_detected, causality) and produces structured compliance evidence linking to specific ICH E2A-E2E controls.'
+version: 0.1.0
+interface:
+  inputs:
+    benefit_risk_assessed:
+      type: bool
+      required: false
+    causality:
+      type: string
+      required: false
+    report_type:
+      type: string
+      required: false
+    signal_detected:
+      type: bool
+      required: false
+    timeline:
+      type: string
+      required: false
+    valid_icsr:
+      type: bool
+      required: false
+  outputs:
+    compliance_status:
+      type: string
+    control_id:
+      type: string
+    evidence_description:
+      type: string
+    evidence_type:
+      type: string
+tree:
+  start: check_signal
+  nodes:
+    check_signal:
+      type: condition
+      variable: signal_detected
+      operator: eq
+      value: true
+      true_next: signal_evidence
+      false_next: check_report_type
+    check_report_type:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: IND_SAFETY
+      true_next: expedited_ind_evidence
+      false_next: check_field_alert
+    check_field_alert:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: FIELD_ALERT
+      true_next: expedited_postmarket_evidence
+      false_next: check_periodic
+    check_periodic:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: PSUR_DSUR
+      true_next: periodic_evidence
+      false_next: check_line_listing
+    check_line_listing:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: LINE_LISTING
+      true_next: line_listing_evidence
+      false_next: check_icsr
+    check_icsr:
+      type: condition
+      variable: valid_icsr
+      operator: eq
+      value: true
+      true_next: icsr_evidence
+      false_next: check_benefit_risk
+    check_benefit_risk:
+      type: condition
+      variable: benefit_risk_assessed
+      operator: eq
+      value: true
+      true_next: br_evidence
+      false_next: no_evidence
+    signal_evidence:
+      type: return
+      value:
+        control_id: ICH-E2C-2
+        evidence_type: signal_detection
+        compliance_status: implemented
+        evidence_description: "Signal detected via PRR/ROR/IC/EBGM convergent analysis against FAERS database"
+    expedited_ind_evidence:
+      type: return
+      value:
+        control_id: ICH-E2A-2
+        evidence_type: expedited_reporting
+        compliance_status: implemented
+        evidence_description: "IND safety report classified per 21 CFR 312.32 with correct timeline"
+    expedited_postmarket_evidence:
+      type: return
+      value:
+        control_id: ICH-E2A-2
+        evidence_type: expedited_reporting
+        compliance_status: implemented
+        evidence_description: "Field alert classified per 21 CFR 314.80 with 15-day timeline"
+    periodic_evidence:
+      type: return
+      value:
+        control_id: ICH-E2A-3
+        evidence_type: periodic_reporting
+        compliance_status: partial
+        evidence_description: "Case classified for PSUR/DSUR periodic reporting per ICH E2C(R2). Report generation not implemented."
+    line_listing_evidence:
+      type: return
+      value:
+        control_id: ICH-E2A-3
+        evidence_type: periodic_reporting
+        compliance_status: partial
+        evidence_description: "Non-serious case classified for line listing periodic report per ICH E2C(R2)."
+    icsr_evidence:
+      type: return
+      value:
+        control_id: ICH-E2A-1
+        evidence_type: icsr_validation
+        compliance_status: partial
+        evidence_description: "ICSR validated with 4 minimum criteria per ICH E2A Section III.A. Collection system not implemented."
+    br_evidence:
+      type: return
+      value:
+        control_id: ICH-E2C-3
+        evidence_type: benefit_risk
+        compliance_status: partial
+        evidence_description: "Benefit-risk classification completed. Full quantitative B/R framework not implemented."
+    no_evidence:
+      type: return
+      value:
+        control_id: ICH-E2A-1
+        evidence_type: none
+        compliance_status: not_implemented
+        evidence_description: "No compliance evidence generated - case not yet processed"
+tests:
+- name: signal detected maps to E2C-2 implemented
+  input:
+    signal_detected: true
+  expect:
+    control_id: ICH-E2C-2
+    evidence_type: signal_detection
+    compliance_status: implemented
+- name: IND safety report maps to E2A-2 implemented
+  input:
+    report_type: IND_SAFETY
+    signal_detected: false
+  expect:
+    control_id: ICH-E2A-2
+    evidence_type: expedited_reporting
+    compliance_status: implemented
+- name: field alert maps to E2A-2 implemented
+  input:
+    report_type: FIELD_ALERT
+    signal_detected: false
+  expect:
+    control_id: ICH-E2A-2
+    evidence_type: expedited_reporting
+    compliance_status: implemented
+- name: periodic report maps to E2A-3 partial
+  input:
+    report_type: PSUR_DSUR
+    signal_detected: false
+  expect:
+    control_id: ICH-E2A-3
+    evidence_type: periodic_reporting
+    compliance_status: partial
+- name: line listing maps to E2A-3 partial
+  input:
+    report_type: LINE_LISTING
+    signal_detected: false
+  expect:
+    control_id: ICH-E2A-3
+    evidence_type: periodic_reporting
+    compliance_status: partial
+- name: valid ICSR maps to E2A-1 partial
+  input:
+    valid_icsr: true
+    signal_detected: false
+  expect:
+    control_id: ICH-E2A-1
+    evidence_type: icsr_validation
+    compliance_status: partial
+- name: benefit risk assessed maps to E2C-3 partial
+  input:
+    benefit_risk_assessed: true
+    signal_detected: false
+  expect:
+    control_id: ICH-E2C-3
+    evidence_type: benefit_risk
+    compliance_status: partial
+- name: null input produces no evidence
+  input: {}
+  expect:
+    control_id: ICH-E2A-1
+    evidence_type: none
+    compliance_status: not_implemented

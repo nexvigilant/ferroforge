@@ -18,6 +18,8 @@ import urllib.error
 BASE_URL = "https://api.fda.gov/drug/event.json"
 DEFAULT_LIMIT = 10
 DEFAULT_COUNT_FIELD = "patient.reaction.reactionmeddrapt.exact"
+_FAERS_DATE_MIN = "19000101"
+_FAERS_DATE_MAX = "20991231"
 
 
 def _resolve_drug(args: dict) -> str:
@@ -390,6 +392,54 @@ def get_drug_counts(args: dict) -> dict:
     }
 
 
+def get_top_drugs(args: dict) -> dict:
+    """
+    Tool: get-top-drugs
+
+    Returns top N drugs by FAERS report count in a date range.
+    Answers "which drugs had the most adverse event reports last quarter?"
+    without requiring a specific drug name.
+    """
+    limit = int(args.get("limit", 10))
+    if limit < 1 or limit > 100:
+        limit = 10
+    date_start = _quote(args.get("date_start", "").strip()) if args.get("date_start", "").strip() else ""
+    date_end = _quote(args.get("date_end", "").strip()) if args.get("date_end", "").strip() else ""
+
+    # Build search expression
+    search_parts = []
+    if date_start and date_end:
+        search_parts.append(f"receivedate:[{date_start}+TO+{date_end}]")
+    elif date_start:
+        search_parts.append(f"receivedate:[{date_start}+TO+{_FAERS_DATE_MAX}]")
+    elif date_end:
+        search_parts.append(f"receivedate:[{_FAERS_DATE_MIN}+TO+{date_end}]")
+
+    search_expr = "+AND+".join(search_parts) if search_parts else "_exists_:receivedate"
+    count_field = "patient.drug.medicinalproduct.exact"
+    url = f"{BASE_URL}?search={search_expr}&count={count_field}&limit={limit}"
+
+    try:
+        data = _fetch(url)
+    except RuntimeError as exc:
+        return {"status": "error", "message": str(exc), "count": 0, "results": []}
+
+    raw = data.get("results", [])
+    last_updated = data.get("meta", {}).get("last_updated", "unknown")
+
+    return {
+        "status": "ok",
+        "query": {
+            "date_start": date_start or "all",
+            "date_end": date_end or "all",
+            "limit": limit,
+        },
+        "last_updated": last_updated,
+        "count": len(raw),
+        "results": raw,  # [{term, count}]
+    }
+
+
 TOOL_DISPATCH = {
     "search-adverse-events": search_adverse_events,
     "get-drug-counts": get_drug_counts,
@@ -398,6 +448,7 @@ TOOL_DISPATCH = {
     "get-reporter-breakdown": get_reporter_breakdown,
     "get-drug-characterization": get_drug_characterization,
     "get-indication-counts": get_indication_counts,
+    "get-top-drugs": get_top_drugs,
 }
 
 

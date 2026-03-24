@@ -1,0 +1,160 @@
+name: escalation-decision
+description: "Determines whether a safety finding should be escalated to a human pharmacovigilance officer"
+version: 0.1.0
+
+interface:
+  inputs:
+    is_fatal:
+      type: bool
+      description: "Whether the adverse event resulted in death"
+    is_unexpected:
+      type: bool
+      description: "Whether the adverse event is unexpected or unlabeled"
+    signal_strength:
+      type: string
+      description: "Strength of the detected signal: strong, moderate, weak"
+    involves_pediatric:
+      type: bool
+      description: "Whether the case involves a pediatric patient"
+    involves_pregnancy:
+      type: bool
+      description: "Whether the case involves pregnancy or reproductive outcome"
+  outputs:
+    escalate:
+      type: bool
+      description: "Whether escalation is required"
+    urgency:
+      type: string
+      description: "Escalation urgency: immediate, 24hr, weekly, none"
+    reason:
+      type: string
+      description: "Justification for escalation decision"
+
+tree:
+  start: check_fatal
+  nodes:
+    check_fatal:
+      type: condition
+      variable: is_fatal
+      operator: eq
+      value: true
+      true_next: return_immediate_fatal
+      false_next: check_pediatric
+
+    return_immediate_fatal:
+      type: return
+      value:
+        escalate: true
+        urgency: "immediate"
+        reason: "Fatal outcome requires immediate escalation"
+
+    check_pediatric:
+      type: condition
+      variable: involves_pediatric
+      operator: eq
+      value: true
+      true_next: return_immediate_pediatric
+      false_next: check_pregnancy
+
+    return_immediate_pediatric:
+      type: return
+      value:
+        escalate: true
+        urgency: "immediate"
+        reason: "Pediatric adverse event requires immediate escalation"
+
+    check_pregnancy:
+      type: condition
+      variable: involves_pregnancy
+      operator: eq
+      value: true
+      true_next: return_immediate_pregnancy
+      false_next: check_unexpected_strong_signal
+
+    return_immediate_pregnancy:
+      type: return
+      value:
+        escalate: true
+        urgency: "immediate"
+        reason: "Pregnancy-related adverse event requires immediate escalation"
+
+    check_unexpected_strong_signal:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: check_strong_signal
+      false_next: check_moderate_signal
+
+    check_strong_signal:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "strong"
+      true_next: return_24hr_unexpected_strong
+      false_next: check_moderate_signal
+
+    return_24hr_unexpected_strong:
+      type: return
+      value:
+        escalate: true
+        urgency: "24hr"
+        reason: "Unexpected adverse event with strong signal strength"
+
+    check_moderate_signal:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "moderate"
+      true_next: check_unexpected_moderate
+      false_next: return_no_escalate_weak
+
+    check_unexpected_moderate:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: return_weekly_moderate
+      false_next: return_no_escalate_weak
+
+    return_weekly_moderate:
+      type: return
+      value:
+        escalate: true
+        urgency: "weekly"
+        reason: "Unexpected adverse event with moderate signal strength"
+
+    return_no_escalate_weak:
+      type: return
+      value:
+        escalate: false
+        urgency: "none"
+        reason: "Weak signal strength does not warrant escalation"
+
+tests:
+  - input: { is_fatal: true, is_unexpected: false, signal_strength: "weak", involves_pediatric: false, involves_pregnancy: false }
+    expect: { escalate: true, urgency: "immediate", reason: "Fatal outcome requires immediate escalation" }
+
+  - input: { is_fatal: false, is_unexpected: false, signal_strength: "weak", involves_pediatric: true, involves_pregnancy: false }
+    expect: { escalate: true, urgency: "immediate", reason: "Pediatric adverse event requires immediate escalation" }
+
+  - input: { is_fatal: false, is_unexpected: false, signal_strength: "weak", involves_pediatric: false, involves_pregnancy: true }
+    expect: { escalate: true, urgency: "immediate", reason: "Pregnancy-related adverse event requires immediate escalation" }
+
+  - input: { is_fatal: false, is_unexpected: true, signal_strength: "strong", involves_pediatric: false, involves_pregnancy: false }
+    expect: { escalate: true, urgency: "24hr", reason: "Unexpected adverse event with strong signal strength" }
+
+  - input: { is_fatal: false, is_unexpected: true, signal_strength: "moderate", involves_pediatric: false, involves_pregnancy: false }
+    expect: { escalate: true, urgency: "weekly", reason: "Unexpected adverse event with moderate signal strength" }
+
+  - input: { is_fatal: false, is_unexpected: false, signal_strength: "moderate", involves_pediatric: false, involves_pregnancy: false }
+    expect: { escalate: false, urgency: "none", reason: "Weak signal strength does not warrant escalation" }
+
+  - input: { is_fatal: false, is_unexpected: false, signal_strength: "weak", involves_pediatric: false, involves_pregnancy: false }
+    expect: { escalate: false, urgency: "none", reason: "Weak signal strength does not warrant escalation" }
+
+  - input: { is_fatal: false, is_unexpected: true, signal_strength: "weak", involves_pediatric: false, involves_pregnancy: false }
+    expect: { escalate: false, urgency: "none", reason: "Weak signal strength does not warrant escalation" }
+
+  - input: {}
+    expect: { escalate: false, urgency: "none", reason: "Weak signal strength does not warrant escalation" }

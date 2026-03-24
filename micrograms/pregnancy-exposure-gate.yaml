@@ -1,0 +1,151 @@
+name: pregnancy-exposure-gate
+description: 'Pregnancy exposure and teratogenicity classifier: maps reproductive adverse reactions to severity grades per FDA pregnancy categories and ICH S5(R3)'
+version: 0.1.0
+interface:
+  inputs:
+    reaction_pt:
+      type: string
+      required: true
+      description: MedDRA preferred term for the reproductive/teratogenic reaction
+    trimester:
+      type: int
+      required: false
+      description: Trimester of exposure (1, 2, or 3)
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    soc:
+      type: string
+    action:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_congenital
+  nodes:
+    check_congenital:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: CONGENITAL
+      true_next: critical
+      false_next: check_foetal_death
+    check_foetal_death:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: FOETAL DEATH
+      true_next: critical
+      false_next: check_spontaneous_abortion
+    check_spontaneous_abortion:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: ABORTION SPONTANEOUS
+      true_next: serious
+      false_next: check_trimester1
+    check_trimester1:
+      type: condition
+      variable: trimester
+      operator: eq
+      value: 1
+      true_next: serious_t1
+      false_next: check_foetal
+    check_foetal:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: FOETAL
+      true_next: serious_foetal
+      false_next: check_fertility
+    check_fertility:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: FERTILITY
+      true_next: moderate
+      false_next: mild
+    critical:
+      type: return
+      value:
+        severity: critical
+        soc: Congenital, familial and genetic disorders
+        action: immediate_expedited_report
+        regulatory_reference: ICH S5(R3)
+    serious:
+      type: return
+      value:
+        severity: serious
+        soc: Pregnancy, puerperium and perinatal conditions
+        action: expedited_report
+        regulatory_reference: ICH S5(R3)
+    serious_t1:
+      type: return
+      value:
+        severity: serious
+        soc: Pregnancy, puerperium and perinatal conditions
+        action: expedited_report
+        regulatory_reference: ICH S5(R3)
+    serious_foetal:
+      type: return
+      value:
+        severity: serious
+        soc: Pregnancy, puerperium and perinatal conditions
+        action: expedited_report
+        regulatory_reference: ICH S5(R3)
+    moderate:
+      type: return
+      value:
+        severity: moderate
+        soc: Reproductive system and breast disorders
+        action: monitor_and_assess
+        regulatory_reference: ICH S5(R3)
+    mild:
+      type: return
+      value:
+        severity: mild
+        soc: Reproductive system and breast disorders
+        action: routine_surveillance
+        regulatory_reference: ICH S5(R3)
+tests:
+  - name: congenital_anomaly
+    input:
+      reaction_pt: CONGENITAL HEART DISEASE
+    expect:
+      severity: critical
+  - name: foetal_death
+    input:
+      reaction_pt: FOETAL DEATH
+    expect:
+      severity: critical
+  - name: spontaneous_abortion
+    input:
+      reaction_pt: ABORTION SPONTANEOUS
+    expect:
+      severity: serious
+  - name: first_trimester_exposure
+    input:
+      reaction_pt: DRUG EXPOSURE DURING PREGNANCY
+      trimester: 1
+    expect:
+      severity: serious
+  - name: foetal_distress
+    input:
+      reaction_pt: FOETAL DISTRESS SYNDROME
+    expect:
+      severity: serious
+  - name: fertility_issue
+    input:
+      reaction_pt: MALE FERTILITY DECREASED
+    expect:
+      severity: moderate
+  - name: mild_menstrual
+    input:
+      reaction_pt: MENSTRUAL DISORDER
+    expect:
+      severity: mild
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild

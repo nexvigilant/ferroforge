@@ -1,0 +1,85 @@
+name: algo-converge-signal
+description: "Algorithm 8 (CONVERGE): Fixpoint iteration for signal stability. Checks delta between successive estimates against tolerance tiers. Returns CONVERGED/CONTINUE/DIVERGE."
+version: 0.1.0
+interface:
+  inputs:
+    delta:
+      type: float
+      required: true
+      description: "abs(current - previous) pre-computed"
+    tolerance_met:
+      type: boolean
+      required: true
+      description: "Is delta <= tolerance? (pre-computed by caller)"
+    iteration_count:
+      type: integer
+      required: true
+    max_iterations:
+      type: integer
+      required: true
+  outputs:
+    verdict:
+      type: string
+    algorithm:
+      type: string
+tree:
+  start: check_convergence
+  nodes:
+    check_convergence:
+      type: condition
+      variable: tolerance_met
+      operator: eq
+      value: true
+      true_next: converged
+      false_next: check_max_iterations
+    check_max_iterations:
+      type: condition
+      variable: iteration_count
+      operator: gte
+      value: 20
+      true_next: diverge_exhausted
+      false_next: check_unstable
+    check_unstable:
+      type: condition
+      variable: delta
+      operator: gte
+      value: 10.0
+      true_next: diverge_unstable
+      false_next: continue_iteration
+    converged:
+      type: return
+      value:
+        verdict: CONVERGED
+        algorithm: "CONVERGE: ρ(→(Δς) at ∂) → π(ς) — delta within tolerance, fixpoint reached"
+    diverge_exhausted:
+      type: return
+      value:
+        verdict: DIVERGE
+        algorithm: "CONVERGE inverse: ∂_tolerance never satisfied within max iterations"
+    diverge_unstable:
+      type: return
+      value:
+        verdict: DIVERGE
+        algorithm: "CONVERGE inverse: Δ > 10.0 — ENERGY increasing, system unstable"
+    continue_iteration:
+      type: return
+      value:
+        verdict: CONTINUE
+        algorithm: "CONVERGE: Δ > tolerance but within bounds — iterate again"
+tests:
+- input: { delta: 0.01, tolerance_met: true, iteration_count: 5, max_iterations: 20 }
+  expect: { verdict: CONVERGED }
+- input: { delta: 0.30, tolerance_met: false, iteration_count: 3, max_iterations: 20 }
+  expect: { verdict: CONTINUE }
+- input: { delta: 0.30, tolerance_met: false, iteration_count: 20, max_iterations: 20 }
+  expect: { verdict: DIVERGE }
+- input: { delta: 22.0, tolerance_met: false, iteration_count: 2, max_iterations: 20 }
+  expect: { verdict: DIVERGE }
+- input: { delta: 0.0, tolerance_met: true, iteration_count: 1, max_iterations: 10 }
+  expect: { verdict: CONVERGED }
+- input: { delta: 0.05, tolerance_met: true, iteration_count: 8, max_iterations: 20 }
+  expect: { verdict: CONVERGED }
+- input: { delta: 1.5, tolerance_met: false, iteration_count: 1, max_iterations: 10 }
+  expect: { verdict: CONTINUE }
+- input: {}
+  expect: { verdict: CONTINUE }

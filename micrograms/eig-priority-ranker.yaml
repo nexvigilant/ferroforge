@@ -1,0 +1,319 @@
+name: eig-priority-ranker
+description: 'EIG Priority Ranker (ALG-2025-012): ranks which drug-event pair to investigate next. EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ). Three factors: uncertainty (σ⁻¹ — higher uncertainty = more to learn), extremity (|θ - 0.5| — how far from 50/50 = how decisive), propagation (Σw(1-σ) — how many adjacent drugs benefit from this investigation).'
+version: 0.1.0
+primitive_signature:
+  dominant: '→'
+  expression: '→(σ⁻¹, |θ - 0.5|, Σw(1-σ)) — causal prioritization: uncertainty × extremity × network propagation potential'
+  primes: ['→', '∂', 'κ']
+  arguments: ['uncertainty_level', 'extremity_level', 'propagation_count']
+  chain_prediction: '→ (causal prioritization). uncertainty_level encodes σ⁻¹ (information gain from investigation). extremity_level encodes |θ - 0.5| (decisiveness of evidence). propagation_count encodes Σw(1-σ) (network effect — how many adjacent drugs in the transbeyesian network benefit). Chains from transbeyesian-propagator: after propagation tells you transfer weight, EIG tells you whether to investigate directly or rely on propagated evidence.'
+interface:
+  inputs:
+    uncertainty_level:
+      type: string
+      required: false
+    extremity_level:
+      type: string
+      required: false
+    propagation_count:
+      type: integer
+      required: false
+  outputs:
+    priority:
+      type: string
+    eig_class:
+      type: string
+    rationale:
+      type: string
+    algorithm:
+      type: string
+tree:
+  start: check_uncertainty_null
+  nodes:
+    # Null gate: missing uncertainty → DEFER
+    check_uncertainty_null:
+      type: condition
+      variable: uncertainty_level
+      operator: is_null
+      value: null
+      true_next: defer_null
+      false_next: check_very_high
+
+    # very_high uncertainty dispatch
+    check_very_high:
+      type: condition
+      variable: uncertainty_level
+      operator: eq
+      value: very_high
+      true_next: vh_check_extreme
+      false_next: check_high
+
+    vh_check_extreme:
+      type: condition
+      variable: extremity_level
+      operator: eq
+      value: extreme
+      true_next: investigate_now_critical
+      false_next: investigate_soon_high
+
+    investigate_now_critical:
+      type: return
+      value:
+        priority: INVESTIGATE_NOW
+        eig_class: CRITICAL
+        rationale: Maximum uncertainty with extreme evidence divergence — highest possible information gain from direct investigation
+        algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); very_high uncertainty × extreme extremity → CRITICAL priority'
+
+    investigate_soon_high:
+      type: return
+      value:
+        priority: INVESTIGATE_SOON
+        eig_class: HIGH
+        rationale: Very high uncertainty — substantial information gain regardless of extremity level
+        algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); very_high uncertainty with non-extreme extremity → HIGH priority'
+
+    # high uncertainty dispatch
+    check_high:
+      type: condition
+      variable: uncertainty_level
+      operator: eq
+      value: high
+      true_next: high_check_propagation
+      false_next: check_moderate
+
+    high_check_propagation:
+      type: condition
+      variable: propagation_count
+      operator: gte
+      value: 3
+      true_next: investigate_now_network
+      false_next: investigate_soon_high_std
+
+    investigate_now_network:
+      type: return
+      value:
+        priority: INVESTIGATE_NOW
+        eig_class: HIGH
+        rationale: High uncertainty with large network effect — investigation benefits 3+ adjacent drugs in the transbeyesian network
+        algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); high uncertainty × propagation_count >= 3 → INVESTIGATE_NOW (network multiplier)'
+
+    investigate_soon_high_std:
+      type: return
+      value:
+        priority: INVESTIGATE_SOON
+        eig_class: HIGH
+        rationale: High uncertainty with limited network effect — direct investigation valuable but not urgent
+        algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); high uncertainty × propagation_count < 3 → INVESTIGATE_SOON'
+
+    # moderate uncertainty dispatch
+    check_moderate:
+      type: condition
+      variable: uncertainty_level
+      operator: eq
+      value: moderate
+      true_next: mod_check_extremity_extreme
+      false_next: defer_low
+
+    mod_check_extremity_extreme:
+      type: condition
+      variable: extremity_level
+      operator: eq
+      value: extreme
+      true_next: investigate_soon_moderate
+      false_next: mod_check_extremity_high
+
+    mod_check_extremity_high:
+      type: condition
+      variable: extremity_level
+      operator: eq
+      value: high
+      true_next: investigate_soon_moderate
+      false_next: queue_moderate
+
+    investigate_soon_moderate:
+      type: return
+      value:
+        priority: INVESTIGATE_SOON
+        eig_class: MODERATE
+        rationale: Moderate uncertainty but high/extreme extremity — the evidence is decisive enough to warrant prioritized investigation
+        algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); moderate uncertainty × high/extreme extremity → INVESTIGATE_SOON'
+
+    queue_moderate:
+      type: return
+      value:
+        priority: QUEUE
+        eig_class: MODERATE
+        rationale: Moderate uncertainty with moderate or lower extremity — standard queue position, investigate when capacity permits
+        algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); moderate uncertainty × moderate/low/neutral extremity → QUEUE'
+
+    # low/very_low uncertainty → DEFER
+    defer_low:
+      type: return
+      value:
+        priority: DEFER
+        eig_class: LOW
+        rationale: Low or very low uncertainty — drug-event pair already well-characterized, minimal information gain from further investigation
+        algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); low/very_low uncertainty → DEFER (σ⁻¹ ≈ 0, information gain negligible)'
+
+    # null safety fallback
+    defer_null:
+      type: return
+      value:
+        priority: DEFER
+        eig_class: LOW
+        rationale: Missing input data — cannot compute EIG without uncertainty level
+        algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); null inputs → DEFER (safe default)'
+
+tests:
+# 1. very_high + extreme + 5 propagation → INVESTIGATE_NOW, CRITICAL
+- name: very_high uncertainty with extreme extremity — maximum EIG
+  input:
+    uncertainty_level: very_high
+    extremity_level: extreme
+    propagation_count: 5
+  expect:
+    priority: INVESTIGATE_NOW
+    eig_class: CRITICAL
+    rationale: Maximum uncertainty with extreme evidence divergence — highest possible information gain from direct investigation
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); very_high uncertainty × extreme extremity → CRITICAL priority'
+
+# 2. very_high + low + 1 propagation → INVESTIGATE_SOON, HIGH
+- name: very_high uncertainty with low extremity — still high priority due to uncertainty
+  input:
+    uncertainty_level: very_high
+    extremity_level: low
+    propagation_count: 1
+  expect:
+    priority: INVESTIGATE_SOON
+    eig_class: HIGH
+    rationale: Very high uncertainty — substantial information gain regardless of extremity level
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); very_high uncertainty with non-extreme extremity → HIGH priority'
+
+# 3. high + moderate + 4 propagation → INVESTIGATE_NOW (network effect)
+- name: high uncertainty with large network — propagation multiplier triggers immediate investigation
+  input:
+    uncertainty_level: high
+    extremity_level: moderate
+    propagation_count: 4
+  expect:
+    priority: INVESTIGATE_NOW
+    eig_class: HIGH
+    rationale: High uncertainty with large network effect — investigation benefits 3+ adjacent drugs in the transbeyesian network
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); high uncertainty × propagation_count >= 3 → INVESTIGATE_NOW (network multiplier)'
+
+# 4. high + moderate + 1 propagation → INVESTIGATE_SOON
+- name: high uncertainty with small network — no propagation multiplier
+  input:
+    uncertainty_level: high
+    extremity_level: moderate
+    propagation_count: 1
+  expect:
+    priority: INVESTIGATE_SOON
+    eig_class: HIGH
+    rationale: High uncertainty with limited network effect — direct investigation valuable but not urgent
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); high uncertainty × propagation_count < 3 → INVESTIGATE_SOON'
+
+# 5. moderate + extreme + 2 → INVESTIGATE_SOON
+- name: moderate uncertainty with extreme extremity — extremity lifts priority
+  input:
+    uncertainty_level: moderate
+    extremity_level: extreme
+    propagation_count: 2
+  expect:
+    priority: INVESTIGATE_SOON
+    eig_class: MODERATE
+    rationale: Moderate uncertainty but high/extreme extremity — the evidence is decisive enough to warrant prioritized investigation
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); moderate uncertainty × high/extreme extremity → INVESTIGATE_SOON'
+
+# 6. moderate + low + 1 → QUEUE
+- name: moderate uncertainty with low extremity — standard queue
+  input:
+    uncertainty_level: moderate
+    extremity_level: low
+    propagation_count: 1
+  expect:
+    priority: QUEUE
+    eig_class: MODERATE
+    rationale: Moderate uncertainty with moderate or lower extremity — standard queue position, investigate when capacity permits
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); moderate uncertainty × moderate/low/neutral extremity → QUEUE'
+
+# 7. low + extreme + 5 → DEFER (already well-characterized)
+- name: low uncertainty with extreme extremity — well-characterized drug-event pair
+  input:
+    uncertainty_level: low
+    extremity_level: extreme
+    propagation_count: 5
+  expect:
+    priority: DEFER
+    eig_class: LOW
+    rationale: Low or very low uncertainty — drug-event pair already well-characterized, minimal information gain from further investigation
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); low/very_low uncertainty → DEFER (σ⁻¹ ≈ 0, information gain negligible)'
+
+# 8. null safety — empty input → DEFER
+- name: null safety — missing inputs default to DEFER
+  input: {}
+  expect:
+    priority: DEFER
+    eig_class: LOW
+    rationale: Missing input data — cannot compute EIG without uncertainty level
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); null inputs → DEFER (safe default)'
+
+# 9. very_low uncertainty → DEFER
+- name: very_low uncertainty — minimal information gain
+  input:
+    uncertainty_level: very_low
+    extremity_level: high
+    propagation_count: 3
+  expect:
+    priority: DEFER
+    eig_class: LOW
+    rationale: Low or very low uncertainty — drug-event pair already well-characterized, minimal information gain from further investigation
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); low/very_low uncertainty → DEFER (σ⁻¹ ≈ 0, information gain negligible)'
+
+# 10. moderate + high extremity → INVESTIGATE_SOON
+- name: moderate uncertainty with high extremity — extremity lifts from QUEUE to INVESTIGATE_SOON
+  input:
+    uncertainty_level: moderate
+    extremity_level: high
+    propagation_count: 0
+  expect:
+    priority: INVESTIGATE_SOON
+    eig_class: MODERATE
+    rationale: Moderate uncertainty but high/extreme extremity — the evidence is decisive enough to warrant prioritized investigation
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); moderate uncertainty × high/extreme extremity → INVESTIGATE_SOON'
+
+# 11. moderate + neutral extremity → QUEUE
+- name: moderate uncertainty with neutral extremity — near 50/50, low decisiveness
+  input:
+    uncertainty_level: moderate
+    extremity_level: neutral
+    propagation_count: 2
+  expect:
+    priority: QUEUE
+    eig_class: MODERATE
+    rationale: Moderate uncertainty with moderate or lower extremity — standard queue position, investigate when capacity permits
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); moderate uncertainty × moderate/low/neutral extremity → QUEUE'
+
+# 12. high uncertainty + propagation exactly 3 → INVESTIGATE_NOW (boundary test)
+- name: high uncertainty with propagation exactly at threshold — boundary triggers network effect
+  input:
+    uncertainty_level: high
+    extremity_level: low
+    propagation_count: 3
+  expect:
+    priority: INVESTIGATE_NOW
+    eig_class: HIGH
+    rationale: High uncertainty with large network effect — investigation benefits 3+ adjacent drugs in the transbeyesian network
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); high uncertainty × propagation_count >= 3 → INVESTIGATE_NOW (network multiplier)'
+
+# 13. high uncertainty + propagation 2 → INVESTIGATE_SOON (below boundary)
+- name: high uncertainty with propagation just below threshold — no network multiplier
+  input:
+    uncertainty_level: high
+    extremity_level: high
+    propagation_count: 2
+  expect:
+    priority: INVESTIGATE_SOON
+    eig_class: HIGH
+    rationale: High uncertainty with limited network effect — direct investigation valuable but not urgent
+    algorithm: 'EIG(c) = σ⁻¹ · |θ - 0.5| · Σw(1-σ); high uncertainty × propagation_count < 3 → INVESTIGATE_SOON'

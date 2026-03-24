@@ -1,0 +1,223 @@
+name: regulatory-action-predictor
+description: Predicts likely regulatory action based on cross-domain safety evidence
+version: 0.1.0
+tree:
+  start: assess_signal_strength
+  nodes:
+    assess_seriousness:
+      type: condition
+      variable: seriousness
+      operator: eq
+      value: serious
+      true_next: serious_path
+      false_next: nonserous_path
+    check_evidence_moderate_serious:
+      type: condition
+      variable: evidence_level
+      operator: eq
+      value: I
+      true_next: check_labeled_moderate
+      false_next: label_update_path
+    check_moderate_minor:
+      type: condition
+      variable: evidence_level
+      operator: eq
+      value: I
+      true_next: label_update_path
+      false_next: no_action_path
+    assess_evidence_serious:
+      type: condition
+      variable: evidence_level
+      operator: eq
+      value: I
+      true_next: dear_doctor_path
+      false_next: label_update_path
+    assess_signal_strength:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: none
+      true_next: no_action_path
+      false_next: assess_seriousness
+    no_action_path:
+      type: return
+      value:
+        urgency: low
+        predicted_action: none
+    check_labeled_serious:
+      type: condition
+      variable: is_labeled
+      operator: eq
+      value: true
+      true_next: assess_evidence_serious
+      false_next: withdrawal_path
+    nonserous_path:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: strong
+      true_next: check_evidence_minor
+      false_next: check_moderate_minor
+    label_update_path:
+      type: return
+      value:
+        urgency: medium
+        predicted_action: label_update
+    dear_doctor_path:
+      type: return
+      value:
+        predicted_action: dear_doctor
+        urgency: high
+    check_evidence_minor:
+      type: condition
+      variable: evidence_level
+      operator: eq
+      value: I
+      true_next: label_update_path
+      false_next: label_update_path
+    restriction_path:
+      type: return
+      value:
+        predicted_action: restriction
+        urgency: high
+    check_labeled_moderate:
+      type: condition
+      variable: is_labeled
+      operator: eq
+      value: true
+      true_next: restriction_path
+      false_next: dear_doctor_path
+    check_moderate_serious:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: moderate
+      true_next: check_evidence_moderate_serious
+      false_next: label_update_path
+    serious_path:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: strong
+      true_next: check_labeled_serious
+      false_next: check_moderate_serious
+    withdrawal_path:
+      type: return
+      value:
+        urgency: critical
+        predicted_action: withdrawal
+tests:
+- input:
+    is_labeled: false
+    signal_strength: strong
+    evidence_level: I
+    seriousness: serious
+  expect:
+    predicted_action: withdrawal
+    urgency: critical
+- input:
+    is_labeled: true
+    evidence_level: I
+    signal_strength: strong
+    seriousness: serious
+  expect:
+    urgency: high
+    predicted_action: dear_doctor
+- input:
+    is_labeled: true
+    seriousness: serious
+    signal_strength: moderate
+    evidence_level: I
+  expect:
+    urgency: high
+    predicted_action: restriction
+- input:
+    signal_strength: moderate
+    evidence_level: III
+    seriousness: serious
+    is_labeled: false
+  expect:
+    predicted_action: label_update
+    urgency: medium
+- input:
+    seriousness: minor
+    signal_strength: strong
+    is_labeled: false
+    evidence_level: I
+  expect:
+    predicted_action: label_update
+    urgency: medium
+- input:
+    evidence_level: V
+    is_labeled: false
+    signal_strength: none
+    seriousness: unknown
+  expect:
+    predicted_action: none
+    urgency: low
+- input: {}
+  expect:
+    urgency: low
+    predicted_action: none
+- input: {}
+  expect:
+    urgency: low
+    predicted_action: none
+- input: {}
+  expect:
+    predicted_action: none
+    urgency: low
+- input: {}
+  expect:
+    predicted_action: none
+    urgency: low
+- input: {}
+  expect:
+    urgency: low
+    predicted_action: none
+- input: {}
+  expect:
+    predicted_action: none
+    urgency: low
+- input: {}
+  expect:
+    urgency: low
+    predicted_action: none
+- input: {}
+  expect:
+    predicted_action: none
+    urgency: low
+- input: {}
+  expect:
+    urgency: low
+    predicted_action: none
+- input: {}
+  expect:
+    predicted_action: none
+    urgency: low
+- input: {}
+  expect:
+    predicted_action: none
+    urgency: low
+interface:
+  inputs:
+    seriousness:
+      type: string
+      required: false
+    evidence_level:
+      type: string
+      required: false
+    signal_strength:
+      type: string
+      required: false
+    is_labeled:
+      type: boolean
+      required: false
+  outputs:
+    predicted_action:
+      type: string
+      required: false
+    urgency:
+      type: string
+      required: false
+  aliases: {}

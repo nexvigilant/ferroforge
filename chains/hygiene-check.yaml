@@ -1,0 +1,38 @@
+name: hygiene-check
+description: 'Dev tooling: file size gate + module complexity gate → hygiene action recommendation. Full code hygiene assessment using accumulate mode to carry both size and complexity flags into the action router.'
+version: 0.2.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - file-size-gate
+  - module-complexity-gate
+  - hygiene-action
+tests:
+- name: critical file with high complexity — split and decompose
+  input:
+    line_count: 2855
+    pub_fn_count: 25
+  expect:
+    action: SPLIT_AND_DECOMPOSE
+    priority: P0
+- name: critical file but focused — split only
+  input:
+    line_count: 2855
+    pub_fn_count: 3
+  expect:
+    action: SPLIT_FILE
+    priority: P1
+- name: small file with high complexity — decompose API
+  input:
+    line_count: 100
+    pub_fn_count: 15
+  expect:
+    action: DECOMPOSE_API
+    priority: P2
+- name: healthy file — no action
+  input:
+    line_count: 100
+    pub_fn_count: 3
+  expect:
+    action: NO_ACTION
+    priority: P3

@@ -1,0 +1,230 @@
+name: signal-assessment-composite
+description: Combines PRR signal detection, Evans criteria, and trend analysis into composite signal confidence. Bridges prr-signal + evans-signal + signal-trend-detector outputs.
+version: 0.1.0
+tree:
+  start: check_evans
+  nodes:
+    possible_emerging:
+      type: return
+      value:
+        signal_confidence: LOW
+        overall_signal: POSSIBLE
+        urgency: LOW
+        assessment: No current signal but rising trend — possible emerging signal, monitor closely
+    probable_stable:
+      type: return
+      value:
+        signal_confidence: MODERATE
+        assessment: PRR signal detected but trend stable or declining — further evaluation needed
+        urgency: LOW
+        overall_signal: PROBABLE
+    check_prr_trend:
+      type: condition
+      variable: trend
+      operator: eq
+      value: RISING
+      true_next: probable_rising
+      false_next: probable_stable
+    high_confidence_accelerating:
+      type: return
+      value:
+        urgency: CRITICAL
+        signal_confidence: VERY_HIGH
+        overall_signal: CONFIRMED
+        assessment: Evans criteria met with rapidly accelerating trend — confirmed signal requiring immediate action
+    high_confidence_rising:
+      type: return
+      value:
+        signal_confidence: HIGH
+        overall_signal: CONFIRMED
+        assessment: Evans criteria met with rising trend — confirmed signal
+        urgency: HIGH
+    probable_rising:
+      type: return
+      value:
+        signal_confidence: MODERATE
+        overall_signal: PROBABLE
+        urgency: MODERATE
+        assessment: PRR signal detected with rising trend — probable signal, Evans criteria not met
+    check_no_signal_trend:
+      type: condition
+      variable: trend
+      operator: eq
+      value: RISING
+      true_next: possible_emerging
+      false_next: no_signal
+    check_trend_rising:
+      type: condition
+      variable: trend
+      operator: eq
+      value: RISING
+      true_next: check_rapid
+      false_next: evans_confirmed
+    no_signal:
+      type: return
+      value:
+        signal_confidence: NONE
+        urgency: NONE
+        overall_signal: NO_SIGNAL
+        assessment: No signal detected, no concerning trend
+    check_evans:
+      type: condition
+      variable: evans_signal
+      operator: eq
+      value: true
+      true_next: check_trend_rising
+      false_next: check_prr_only
+    check_prr_only:
+      type: condition
+      variable: signal_detected
+      operator: eq
+      value: true
+      true_next: check_prr_trend
+      false_next: check_no_signal_trend
+    evans_confirmed:
+      type: return
+      value:
+        urgency: MODERATE
+        signal_confidence: HIGH
+        assessment: Evans criteria met with stable or declining trend — confirmed signal
+        overall_signal: CONFIRMED
+    check_rapid:
+      type: condition
+      variable: velocity
+      operator: eq
+      value: RAPID
+      true_next: high_confidence_accelerating
+      false_next: high_confidence_rising
+tests:
+- input:
+    velocity: RAPID
+    signal_detected: true
+    evans_signal: true
+    trend: RISING
+  expect:
+    urgency: CRITICAL
+    overall_signal: CONFIRMED
+    signal_confidence: VERY_HIGH
+- input:
+    signal_detected: true
+    trend: RISING
+    velocity: GRADUAL
+    evans_signal: true
+  expect:
+    urgency: HIGH
+    signal_confidence: HIGH
+    overall_signal: CONFIRMED
+- input:
+    signal_detected: true
+    trend: STABLE
+    evans_signal: true
+  expect:
+    urgency: MODERATE
+    signal_confidence: HIGH
+    overall_signal: CONFIRMED
+- input:
+    evans_signal: true
+    signal_detected: true
+    trend: DECLINING
+  expect:
+    signal_confidence: HIGH
+    overall_signal: CONFIRMED
+    urgency: MODERATE
+- input:
+    signal_detected: true
+    evans_signal: false
+    trend: RISING
+  expect:
+    overall_signal: PROBABLE
+    signal_confidence: MODERATE
+    urgency: MODERATE
+- input:
+    evans_signal: false
+    signal_detected: true
+    trend: STABLE
+  expect:
+    overall_signal: PROBABLE
+    urgency: LOW
+    signal_confidence: MODERATE
+- input:
+    evans_signal: false
+    signal_detected: false
+    trend: RISING
+  expect:
+    urgency: LOW
+    signal_confidence: LOW
+    overall_signal: POSSIBLE
+- input:
+    evans_signal: false
+    signal_detected: false
+    trend: STABLE
+  expect:
+    signal_confidence: NONE
+    overall_signal: NO_SIGNAL
+    urgency: NONE
+- input:
+    trend: DECLINING
+    evans_signal: false
+    signal_detected: false
+  expect:
+    signal_confidence: NONE
+    overall_signal: NO_SIGNAL
+    urgency: NONE
+- input: {}
+  expect:
+    overall_signal: NO_SIGNAL
+    urgency: NONE
+    assessment: No signal detected, no concerning trend
+    signal_confidence: NONE
+- input: {}
+  expect:
+    signal_confidence: NONE
+    overall_signal: NO_SIGNAL
+    assessment: No signal detected, no concerning trend
+    urgency: NONE
+- input: {}
+  expect:
+    overall_signal: NO_SIGNAL
+    urgency: NONE
+    assessment: No signal detected, no concerning trend
+    signal_confidence: NONE
+- input: {}
+  expect:
+    urgency: NONE
+    signal_confidence: NONE
+    overall_signal: NO_SIGNAL
+    assessment: No signal detected, no concerning trend
+- input: {}
+  expect:
+    overall_signal: NO_SIGNAL
+    signal_confidence: NONE
+    urgency: NONE
+    assessment: No signal detected, no concerning trend
+interface:
+  inputs:
+    velocity:
+      type: string
+      required: false
+    signal_detected:
+      type: bool
+      required: false
+    trend:
+      type: string
+      required: false
+    evans_signal:
+      type: bool
+      required: false
+  outputs:
+    assessment:
+      type: string
+      required: false
+    signal_confidence:
+      type: string
+      required: false
+    urgency:
+      type: string
+      required: false
+    overall_signal:
+      type: string
+      required: false
+  aliases: {}

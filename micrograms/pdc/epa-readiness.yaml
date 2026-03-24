@@ -1,0 +1,260 @@
+name: epa-readiness
+description: "PDC: Check if a professional's domain levels meet an EPA's minimum requirements (core EPAs 1-10)"
+version: 0.1.0
+interface:
+  inputs:
+    epa_id:
+      type: int
+      required: false
+    min_domain_level:
+      type: int
+      required: false
+    min_supporting_level:
+      type: int
+      required: false
+  outputs:
+    epa_range:
+      type: string
+    epa_tier:
+      type: string
+    message:
+      type: string
+    ready:
+      type: bool
+    status:
+      type: string
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: epa_id
+      operator: is_null
+      value: null
+      true_next: not_ready_basic
+      false_next: check_epa
+    check_epa:
+      type: condition
+      variable: epa_id
+      operator: lte
+      value: 5
+      true_next: check_low_epas
+      false_next: check_high_epas
+    check_low_epas:
+      type: condition
+      variable: epa_id
+      operator: lte
+      value: 3
+      true_next: check_basic_level
+      false_next: check_intermediate_level
+    check_high_epas:
+      type: condition
+      variable: epa_id
+      operator: lte
+      value: 10
+      true_next: check_advanced_level
+      false_next: check_exec_level
+    check_basic_level:
+      type: condition
+      variable: min_domain_level
+      operator: gte
+      value: 3
+      true_next: check_supporting_basic
+      false_next: not_ready_basic
+    check_supporting_basic:
+      type: condition
+      variable: min_supporting_level
+      operator: gte
+      value: 2
+      true_next: ready_basic
+      false_next: not_ready_supporting
+    check_intermediate_level:
+      type: condition
+      variable: min_domain_level
+      operator: gte
+      value: 3
+      true_next: check_supporting_intermediate
+      false_next: not_ready_intermediate
+    check_supporting_intermediate:
+      type: condition
+      variable: min_supporting_level
+      operator: gte
+      value: 2
+      true_next: ready_intermediate
+      false_next: not_ready_supporting
+    check_advanced_level:
+      type: condition
+      variable: min_domain_level
+      operator: gte
+      value: 4
+      true_next: check_supporting_advanced
+      false_next: check_advanced_fallback
+    check_advanced_fallback:
+      type: condition
+      variable: min_domain_level
+      operator: gte
+      value: 3
+      true_next: partially_ready
+      false_next: not_ready_advanced
+    check_supporting_advanced:
+      type: condition
+      variable: min_supporting_level
+      operator: gte
+      value: 3
+      true_next: ready_advanced
+      false_next: not_ready_supporting
+    check_exec_level:
+      type: condition
+      variable: min_domain_level
+      operator: gte
+      value: 5
+      true_next: ready_exec
+      false_next: not_ready_exec
+    ready_basic:
+      type: return
+      value:
+        ready: true
+        epa_tier: "CORE_BASIC"
+        epa_range: "1-3"
+        status: READY
+        message: "Meets primary (L3+) and supporting (L2+) requirements"
+    ready_intermediate:
+      type: return
+      value:
+        ready: true
+        epa_tier: "CORE_INTERMEDIATE"
+        epa_range: "4-5"
+        status: READY
+        message: "Meets primary (L3+) and supporting (L2+) requirements"
+    ready_advanced:
+      type: return
+      value:
+        ready: true
+        epa_tier: "CORE_ADVANCED"
+        epa_range: "6-10"
+        status: READY
+        message: "Meets primary (L4+) and supporting (L3+) requirements"
+    partially_ready:
+      type: return
+      value:
+        ready: false
+        epa_tier: "CORE_ADVANCED"
+        epa_range: "6-10"
+        status: PARTIAL
+        message: "Primary domains at L3 but L4 required for EPAs 5-10. Supporting may suffice."
+    ready_exec:
+      type: return
+      value:
+        ready: true
+        epa_tier: "EXECUTIVE"
+        epa_range: "11-20"
+        status: READY
+        message: "Meets executive requirements (L5+)"
+    not_ready_basic:
+      type: return
+      value:
+        ready: false
+        status: NOT_READY
+        message: "Primary domains below L3 minimum for Core EPAs 1-3"
+    not_ready_intermediate:
+      type: return
+      value:
+        ready: false
+        status: NOT_READY
+        message: "Primary domains below L3 minimum for Core EPAs 4-5"
+    not_ready_advanced:
+      type: return
+      value:
+        ready: false
+        status: NOT_READY
+        message: "Primary domains below L3 minimum for Core EPAs 6-10"
+    not_ready_supporting:
+      type: return
+      value:
+        ready: false
+        status: NOT_READY
+        message: "Supporting domains below minimum level requirement"
+    not_ready_exec:
+      type: return
+      value:
+        ready: false
+        status: NOT_READY
+        message: "Requires L5+ for Executive EPAs 11-20"
+tests:
+- input:
+    epa_id: 1
+    min_domain_level: 3
+    min_supporting_level: 2
+  expect:
+    ready: true
+    status: READY
+    epa_tier: "CORE_BASIC"
+- input:
+    epa_id: 3
+    min_domain_level: 2
+    min_supporting_level: 2
+  expect:
+    ready: false
+    status: NOT_READY
+- input:
+    epa_id: 5
+    min_domain_level: 3
+    min_supporting_level: 2
+  expect:
+    ready: true
+    epa_tier: "CORE_INTERMEDIATE"
+- input:
+    epa_id: 8
+    min_domain_level: 4
+    min_supporting_level: 3
+  expect:
+    ready: true
+    status: READY
+    epa_tier: "CORE_ADVANCED"
+- input:
+    epa_id: 10
+    min_domain_level: 3
+    min_supporting_level: 3
+  expect:
+    ready: false
+    status: PARTIAL
+- input:
+    epa_id: 10
+    min_domain_level: 2
+    min_supporting_level: 2
+  expect:
+    ready: false
+    status: NOT_READY
+- input:
+    epa_id: 15
+    min_domain_level: 5
+  expect:
+    ready: true
+    epa_tier: EXECUTIVE
+- input:
+    epa_id: 15
+    min_domain_level: 4
+  expect:
+    ready: false
+    status: NOT_READY
+- input: {}
+  expect:
+    ready: false
+# not_ready_supporting: basic EPA, domain OK but supporting too low
+- input:
+    epa_id: 2
+    min_domain_level: 3
+    min_supporting_level: 1
+  expect:
+    ready: false
+    status: NOT_READY
+    message: "Supporting domains below minimum level requirement"
+# not_ready_intermediate: intermediate EPA, domain below L3
+- input:
+    epa_id: 4
+    min_domain_level: 2
+    min_supporting_level: 2
+  expect:
+    ready: false
+    status: NOT_READY
+    message: "Primary domains below L3 minimum for Core EPAs 4-5"

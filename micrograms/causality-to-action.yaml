@@ -1,0 +1,199 @@
+name: causality-to-action
+description: 'Bridge: routes causality assessment results to regulatory action with ICH E2B deadlines. Chains from naranjo-quick output.'
+version: 0.2.0
+primitive_signature:
+  dominant: 'π'
+  expression: 'π(→) at ∂(regulatory) — persists restored causality into regulatory action'
+  primes: ['π', '→', '∂', 'N']
+  arguments: ['causality', 'is_serious']
+  chain_prediction: 'Completes the handoff chain: → fires (causality assessed) → ∃ catches (causality level named) → π holds (regulatory action persisted with deadline). This is the terminal step — it converts → into π. The deadline_days field IS N(π) — quantified persistence with temporal boundary. REJECTED output enforces chain integrity: causality-to-action refuses input that bypassed the κ→→ restoration step.'
+interface:
+  inputs:
+    causality:
+      type: string
+      required: true
+    is_serious:
+      type: bool
+      required: false
+  outputs:
+    regulatory_action:
+      type: string
+    deadline_days:
+      type: int
+    reporting_type:
+      type: string
+    reason:
+      type: string
+tree:
+  start: check_causality_present
+  nodes:
+    check_causality_present:
+      type: condition
+      variable: causality
+      operator: is_null
+      value: null
+      true_next: reject_missing_causality
+      false_next: check_definite
+    reject_missing_causality:
+      type: return
+      value:
+        regulatory_action: REJECTED
+        deadline_days: 0
+        reporting_type: none
+        reason: "REJECTED: causality field is required. This microgram must receive output from naranjo-quick or equivalent causality assessment. Direct bypass from signal detection is not permitted."
+    check_definite:
+      type: condition
+      variable: causality
+      operator: eq
+      value: DEFINITE
+      true_next: definite_serious_check
+      false_next: check_probable
+    definite_serious_check:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: expedited_report
+      false_next: standard_report
+    expedited_report:
+      type: return
+      value:
+        regulatory_action: expedited_report
+        deadline_days: 7
+        reporting_type: IND_safety_report
+        reason: Serious case with definite causality requires 7-day expedited reporting per ICH E2B
+    standard_report:
+      type: return
+      value:
+        regulatory_action: standard_report
+        deadline_days: 15
+        reporting_type: 15_day_report
+        reason: Definite causality warrants 15-day standard reporting
+    check_probable:
+      type: condition
+      variable: causality
+      operator: eq
+      value: PROBABLE
+      true_next: probable_serious_check
+      false_next: check_possible
+    probable_serious_check:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: probable_serious
+      false_next: periodic_report
+    probable_serious:
+      type: return
+      value:
+        regulatory_action: expedited_report
+        deadline_days: 15
+        reporting_type: 15_day_report
+        reason: Serious case with probable causality requires 15-day expedited reporting per ICH E2B
+    periodic_report:
+      type: return
+      value:
+        regulatory_action: periodic_report
+        deadline_days: 90
+        reporting_type: PSUR_PBRER
+        reason: Probable causality in non-serious case included in periodic safety update
+    check_possible:
+      type: condition
+      variable: causality
+      operator: eq
+      value: POSSIBLE
+      true_next: monitor_and_document
+      false_next: document_only
+    monitor_and_document:
+      type: return
+      value:
+        regulatory_action: monitor
+        deadline_days: 90
+        reporting_type: PSUR_PBRER
+        reason: Possible causality - monitor and include in periodic reporting
+    document_only:
+      type: return
+      value:
+        regulatory_action: document
+        deadline_days: 0
+        reporting_type: internal_record
+        reason: Doubtful or no causality - document internally for signal tracking
+tests:
+- input:
+    causality: DEFINITE
+    is_serious: true
+  expect:
+    regulatory_action: expedited_report
+    deadline_days: 7
+    reporting_type: IND_safety_report
+    reason: Serious case with definite causality requires 7-day expedited reporting per ICH E2B
+- input:
+    causality: DEFINITE
+    is_serious: false
+  expect:
+    regulatory_action: standard_report
+    deadline_days: 15
+    reporting_type: 15_day_report
+    reason: Definite causality warrants 15-day standard reporting
+- input:
+    causality: PROBABLE
+    is_serious: true
+  expect:
+    regulatory_action: expedited_report
+    deadline_days: 15
+    reporting_type: 15_day_report
+    reason: Serious case with probable causality requires 15-day expedited reporting per ICH E2B
+- input:
+    causality: PROBABLE
+    is_serious: false
+  expect:
+    regulatory_action: periodic_report
+    deadline_days: 90
+    reporting_type: PSUR_PBRER
+    reason: Probable causality in non-serious case included in periodic safety update
+- input:
+    causality: POSSIBLE
+    is_serious: true
+  expect:
+    regulatory_action: monitor
+    deadline_days: 90
+    reporting_type: PSUR_PBRER
+    reason: Possible causality - monitor and include in periodic reporting
+- input:
+    causality: POSSIBLE
+    is_serious: false
+  expect:
+    regulatory_action: monitor
+    deadline_days: 90
+    reporting_type: PSUR_PBRER
+    reason: Possible causality - monitor and include in periodic reporting
+- input:
+    causality: DOUBTFUL
+    is_serious: true
+  expect:
+    regulatory_action: document
+    deadline_days: 0
+    reporting_type: internal_record
+    reason: Doubtful or no causality - document internally for signal tracking
+- input:
+    causality: DOUBTFUL
+    is_serious: false
+  expect:
+    regulatory_action: document
+    deadline_days: 0
+    reporting_type: internal_record
+    reason: Doubtful or no causality - document internally for signal tracking
+- input: {}
+  expect:
+    regulatory_action: REJECTED
+    deadline_days: 0
+    reporting_type: none
+    reason: "REJECTED: causality field is required. This microgram must receive output from naranjo-quick or equivalent causality assessment. Direct bypass from signal detection is not permitted."
+- input:
+    causality: DEFINITE
+    is_serious: true
+  expect:
+    regulatory_action: expedited_report
+    deadline_days: 7
+    reporting_type: IND_safety_report
+    reason: Serious case with definite causality requires 7-day expedited reporting per ICH E2B

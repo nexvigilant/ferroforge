@@ -1,0 +1,166 @@
+name: session-velocity
+description: 'Classify session development velocity from tool calls, commits, and files modified. Maps session metrics to flywheel velocity input for momentum tracking.'
+version: 0.1.0
+interface:
+  inputs:
+    commits:
+      type: int
+      required: false
+    files_modified:
+      type: int
+      required: false
+    tool_calls:
+      type: int
+      required: false
+  outputs:
+    contributes_to:
+      type: string
+    estimated_fix_time_ms:
+      type: int
+    session_band:
+      type: string
+tree:
+  start: check_high_output
+  nodes:
+    check_high_output:
+      type: condition
+      variable: commits
+      operator: gte
+      value: 3
+      true_next: check_high_files
+      false_next: check_moderate_output
+    check_high_files:
+      type: condition
+      variable: files_modified
+      operator: gte
+      value: 5
+      true_next: high_velocity
+      false_next: moderate_velocity
+    check_moderate_output:
+      type: condition
+      variable: commits
+      operator: gte
+      value: 1
+      true_next: check_moderate_tools
+      false_next: check_research
+    check_moderate_tools:
+      type: condition
+      variable: tool_calls
+      operator: gte
+      value: 20
+      true_next: moderate_velocity
+      false_next: low_velocity
+    check_research:
+      type: condition
+      variable: tool_calls
+      operator: gte
+      value: 30
+      true_next: research_velocity
+      false_next: stalled_velocity
+    high_velocity:
+      type: return
+      value:
+        session_band: HIGH
+        estimated_fix_time_ms: 7200000
+        contributes_to: acceleration
+    moderate_velocity:
+      type: return
+      value:
+        session_band: MODERATE
+        estimated_fix_time_ms: 43200000
+        contributes_to: maintenance
+    low_velocity:
+      type: return
+      value:
+        session_band: LOW
+        estimated_fix_time_ms: 172800000
+        contributes_to: deceleration
+    research_velocity:
+      type: return
+      value:
+        session_band: RESEARCH
+        estimated_fix_time_ms: 86400000
+        contributes_to: maintenance
+    stalled_velocity:
+      type: return
+      value:
+        session_band: STALLED
+        estimated_fix_time_ms: 604800000
+        contributes_to: deceleration
+tests:
+# HIGH: 3+ commits, 5+ files
+- input:
+    commits: 5
+    files_modified: 10
+    tool_calls: 80
+  expect:
+    session_band: HIGH
+    estimated_fix_time_ms: 7200000
+    contributes_to: acceleration
+# HIGH requires both commits and files
+- input:
+    commits: 3
+    files_modified: 3
+    tool_calls: 50
+  expect:
+    session_band: MODERATE
+    estimated_fix_time_ms: 43200000
+    contributes_to: maintenance
+# MODERATE: 1+ commits, 20+ tool calls
+- input:
+    commits: 1
+    files_modified: 2
+    tool_calls: 25
+  expect:
+    session_band: MODERATE
+    estimated_fix_time_ms: 43200000
+    contributes_to: maintenance
+# LOW: 1+ commits but few tool calls
+- input:
+    commits: 1
+    files_modified: 1
+    tool_calls: 10
+  expect:
+    session_band: LOW
+    estimated_fix_time_ms: 172800000
+    contributes_to: deceleration
+# RESEARCH: no commits but lots of tool calls
+- input:
+    commits: 0
+    files_modified: 0
+    tool_calls: 50
+  expect:
+    session_band: RESEARCH
+    estimated_fix_time_ms: 86400000
+    contributes_to: maintenance
+# STALLED: no commits, few tool calls
+- input:
+    commits: 0
+    files_modified: 0
+    tool_calls: 5
+  expect:
+    session_band: STALLED
+    estimated_fix_time_ms: 604800000
+    contributes_to: deceleration
+# Edge: exactly at thresholds
+- input:
+    commits: 3
+    files_modified: 5
+    tool_calls: 100
+  expect:
+    session_band: HIGH
+    estimated_fix_time_ms: 7200000
+    contributes_to: acceleration
+- input:
+    commits: 0
+    files_modified: 0
+    tool_calls: 30
+  expect:
+    session_band: RESEARCH
+    estimated_fix_time_ms: 86400000
+    contributes_to: maintenance
+- input: {}
+  expect:
+    contributes_to: deceleration
+    estimated_fix_time_ms: 604800000
+    session_band: STALLED

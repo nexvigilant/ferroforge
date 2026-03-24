@@ -1,0 +1,128 @@
+name: faers-result-classifier
+description: 'Classify FAERS query results by report count and serious percentage into action categories'
+version: 0.1.0
+interface:
+  inputs:
+    report_count:
+      type: int
+      required: false
+    serious_pct:
+      type: int
+      required: false
+  outputs:
+    action:
+      type: string
+    category:
+      type: string
+    priority:
+      type: int
+tree:
+  start: check_high_volume_serious
+  nodes:
+    check_high_volume_serious:
+      type: condition
+      variable: report_count
+      operator: gte
+      value: 100
+      true_next: check_serious_pct_high
+      false_next: check_moderate_volume
+    check_serious_pct_high:
+      type: condition
+      variable: serious_pct
+      operator: gte
+      value: 50
+      true_next: high_alert
+      false_next: investigate
+    check_moderate_volume:
+      type: condition
+      variable: report_count
+      operator: gte
+      value: 50
+      true_next: investigate
+      false_next: check_high_serious_pct
+    check_high_serious_pct:
+      type: condition
+      variable: serious_pct
+      operator: gte
+      value: 70
+      true_next: investigate
+      false_next: check_low_volume
+    check_low_volume:
+      type: condition
+      variable: report_count
+      operator: gte
+      value: 10
+      true_next: monitor
+      false_next: routine
+    high_alert:
+      type: return
+      value:
+        category: HIGH_ALERT
+        action: immediate_safety_review
+        priority: 1
+    investigate:
+      type: return
+      value:
+        category: INVESTIGATE
+        action: detailed_case_review
+        priority: 2
+    monitor:
+      type: return
+      value:
+        category: MONITOR
+        action: add_to_watchlist
+        priority: 3
+    routine:
+      type: return
+      value:
+        category: ROUTINE
+        action: periodic_review
+        priority: 4
+tests:
+- input:
+    report_count: 150
+    serious_pct: 60
+  expect:
+    category: HIGH_ALERT
+    action: immediate_safety_review
+    priority: 1
+- input:
+    report_count: 120
+    serious_pct: 30
+  expect:
+    category: INVESTIGATE
+    action: detailed_case_review
+    priority: 2
+- input:
+    report_count: 55
+    serious_pct: 40
+  expect:
+    category: INVESTIGATE
+    action: detailed_case_review
+    priority: 2
+- input:
+    report_count: 8
+    serious_pct: 85
+  expect:
+    category: INVESTIGATE
+    action: detailed_case_review
+    priority: 2
+- input:
+    report_count: 25
+    serious_pct: 20
+  expect:
+    category: MONITOR
+    action: add_to_watchlist
+    priority: 3
+- input:
+    report_count: 5
+    serious_pct: 20
+  expect:
+    category: ROUTINE
+    action: periodic_review
+    priority: 4
+- input: {}
+  expect:
+    action: periodic_review
+    category: ROUTINE
+    priority: 4

@@ -1,0 +1,123 @@
+name: clinical-trial-maturity
+description: Evaluates clinical trial maturity and safety data availability. Routes based on trial phase and result status.
+version: 0.1.0
+interface:
+  inputs:
+    status:
+      type: string
+      required: false
+    phase:
+      type: string
+      required: false
+    has_results:
+      type: bool
+      required: false
+    enrollment:
+      type: int
+      required: false
+  outputs:
+    maturity:
+      type: string
+    has_safety_data:
+      type: bool
+tree:
+  start: check_status
+  nodes:
+    check_status:
+      type: condition
+      variable: status
+      operator: is_null
+      true_next: return_unusable
+      false_next: check_phase
+    check_phase:
+      type: condition
+      variable: phase
+      operator: is_null
+      true_next: return_unusable
+      false_next: evaluate_results
+    evaluate_results:
+      type: condition
+      variable: has_results
+      operator: eq
+      value: true
+      true_next: return_mature
+      false_next: check_enrollment
+    check_enrollment:
+      type: condition
+      variable: enrollment
+      operator: lte
+      value: 50
+      true_next: return_early
+      false_next: check_phase_level
+    check_phase_level:
+      type: condition
+      variable: phase
+      operator: contains
+      value: "4"
+      true_next: return_mature
+      false_next: return_developing
+    return_early:
+      type: return
+      value:
+        maturity: early
+        has_safety_data: false
+    return_developing:
+      type: return
+      value:
+        maturity: developing
+        has_safety_data: false
+    return_mature:
+      type: return
+      value:
+        maturity: mature
+        has_safety_data: true
+    return_unusable:
+      type: return
+      value:
+        maturity: unusable
+        has_safety_data: false
+tests:
+  - input:
+      status: "Completed"
+      phase: "Phase 4"
+      has_results: true
+      enrollment: 1000
+    expect:
+      maturity: mature
+      has_safety_data: true
+  - input:
+      status: "Active, not recruiting"
+      phase: "Phase 3"
+      has_results: true
+      enrollment: 500
+    expect:
+      maturity: mature
+      has_safety_data: true
+  - input:
+      status: "Recruiting"
+      phase: "Phase 2"
+      has_results: false
+      enrollment: 200
+    expect:
+      maturity: developing
+      has_safety_data: false
+  - input:
+      status: "Not yet recruiting"
+      phase: "Phase 1"
+      has_results: false
+      enrollment: 50
+    expect:
+      maturity: early
+      has_safety_data: false
+  - input:
+      status: "Completed"
+      phase: "Phase 4"
+      has_results: true
+      enrollment: 5000
+    expect:
+      maturity: mature
+      has_safety_data: true
+  - input: {}
+    expect:
+      maturity: unusable
+      has_safety_data: false

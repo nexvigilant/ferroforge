@@ -1,0 +1,172 @@
+name: trial-safety-report
+description: "Domain 5: Route clinical trial safety report by type — IND safety, DSUR, IB update, CSR. Returns timeline, content, regulatory requirements."
+version: 0.1.0
+interface:
+  inputs:
+    is_expedited:
+      type: bool
+      required: false
+    is_fatal_or_life_threatening:
+      type: bool
+      required: false
+    report_type:
+      type: string
+      required: false
+  outputs:
+    ai_assist:
+      type: string
+    content:
+      type: string
+    deadline_days:
+      type: int
+    distribution:
+      type: string
+    followup:
+      type: string
+    frequency:
+      type: string
+    regulation:
+      type: string
+    report:
+      type: string
+    trigger:
+      type: string
+tree:
+  start: check_expedited
+  nodes:
+    check_expedited:
+      type: condition
+      variable: is_expedited
+      operator: eq
+      value: true
+      true_next: check_fatal_lt
+      false_next: check_report_type
+    check_fatal_lt:
+      type: condition
+      variable: is_fatal_or_life_threatening
+      operator: eq
+      value: true
+      true_next: ind_7day
+      false_next: ind_15day
+    check_report_type:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: dsur
+      true_next: dsur
+      false_next: check_ib
+    check_ib:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: ib_update
+      true_next: ib_update
+      false_next: check_csr
+    check_csr:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: csr
+      true_next: csr_safety
+      false_next: check_annual
+    check_annual:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: annual
+      true_next: annual_report
+      false_next: dsur
+    ind_7day:
+      type: return
+      value:
+        report: IND_SAFETY_7DAY
+        deadline_days: 7
+        trigger: "fatal or life-threatening, unexpected, possibly related"
+        content: "event description, causality assessment, actions taken, initial analysis"
+        distribution: "FDA, all investigators, IRBs/ECs"
+        followup: "complete report within 15 days"
+        regulation: "21 CFR 312.32(c)(2)"
+        ai_assist: "auto-classification, urgency detection, investigator notification"
+    ind_15day:
+      type: return
+      value:
+        report: IND_SAFETY_15DAY
+        deadline_days: 15
+        trigger: "serious, unexpected, possibly related"
+        content: "comprehensive event description, causality, clinical assessment, actions"
+        distribution: "FDA, all investigators, IRBs/ECs"
+        regulation: "21 CFR 312.32(c)(1), ICH E2A"
+        ai_assist: "coding, narrative draft, timeline check, distribution tracking"
+    dsur:
+      type: return
+      value:
+        report: DSUR
+        deadline_days: 60
+        frequency: "annual, on DIBD (Development International Birth Date)"
+        content: "cumulative safety summary, new safety findings, benefit-risk evaluation, trial status"
+        distribution: "regulatory authorities, ethics committees"
+        regulation: "ICH E2F"
+        ai_assist: "data aggregation, signal analysis, trend detection, auto-generation of safety tables"
+    ib_update:
+      type: return
+      value:
+        report: IB_UPDATE
+        deadline_days: 0
+        frequency: "at least annually, or when significant new safety information"
+        content: "updated safety profile, new ADR data, preclinical findings, dosing guidance"
+        distribution: "investigators, sponsors, regulatory authorities"
+        regulation: "ICH E6(R2) Section 7"
+        ai_assist: "literature integration, safety profile comparison, change tracking"
+    csr_safety:
+      type: return
+      value:
+        report: CSR_SAFETY_SECTION
+        deadline_days: 0
+        trigger: "study completion or early termination"
+        content: "integrated safety analysis, AE summary tables, SAE narratives, deaths, lab abnormalities"
+        regulation: "ICH E3"
+        ai_assist: "automated table generation, narrative drafting, signal summary, statistical analysis"
+    annual_report:
+      type: return
+      value:
+        report: IND_ANNUAL_REPORT
+        deadline_days: 60
+        frequency: "annually within 60 days of IND anniversary"
+        content: "study progress, safety update, protocol amendments, manufacturing changes"
+        regulation: "21 CFR 312.33"
+        ai_assist: "data compilation, progress tracking, safety trend analysis"
+tests:
+- input:
+    is_expedited: true
+    is_fatal_or_life_threatening: true
+  expect:
+    report: IND_SAFETY_7DAY
+    deadline_days: 7
+- input:
+    is_expedited: true
+    is_fatal_or_life_threatening: false
+  expect:
+    report: IND_SAFETY_15DAY
+    deadline_days: 15
+- input:
+    report_type: dsur
+  expect:
+    report: DSUR
+    regulation: "ICH E2F"
+- input:
+    report_type: ib_update
+  expect:
+    report: IB_UPDATE
+- input:
+    report_type: csr
+  expect:
+    report: CSR_SAFETY_SECTION
+    regulation: "ICH E3"
+- input:
+    report_type: annual
+  expect:
+    report: IND_ANNUAL_REPORT
+    regulation: "21 CFR 312.33"
+- input: {}
+  expect:
+    report: DSUR

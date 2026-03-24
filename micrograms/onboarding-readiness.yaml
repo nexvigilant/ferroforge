@@ -1,0 +1,189 @@
+name: onboarding-readiness
+description: 'PV onboarding readiness gate: evaluates completion percentage and quiz performance to classify user as ready/almost/needs_work/beginner for independent PV tool usage'
+version: 0.2.0
+interface:
+  inputs:
+    completed_modules:
+      type: number
+      required: true
+    completion_pct:
+      type: number
+      required: true
+      description: 'completed_modules / total_modules * 100'
+    quiz_score_avg:
+      type: number
+      required: true
+  outputs:
+    readiness:
+      type: string
+    next_step:
+      type: string
+tree:
+  start: check_zero_modules
+  nodes:
+    check_zero_modules:
+      type: condition
+      variable: completed_modules
+      operator: eq
+      value: 0
+      true_next: beginner
+      false_next: check_all_complete
+    check_all_complete:
+      type: condition
+      variable: completion_pct
+      operator: gte
+      value: 100
+      true_next: check_quiz_ready
+      false_next: check_most_complete
+    check_quiz_ready:
+      type: condition
+      variable: quiz_score_avg
+      operator: gte
+      value: 80
+      true_next: ready
+      false_next: check_quiz_almost
+    check_quiz_almost:
+      type: condition
+      variable: quiz_score_avg
+      operator: gte
+      value: 60
+      true_next: almost_quiz
+      false_next: needs_work_quiz
+    check_most_complete:
+      type: condition
+      variable: completion_pct
+      operator: gte
+      value: 60
+      true_next: check_partial_quiz
+      false_next: check_some_complete
+    check_partial_quiz:
+      type: condition
+      variable: quiz_score_avg
+      operator: gte
+      value: 70
+      true_next: almost_modules
+      false_next: needs_work_partial
+    check_some_complete:
+      type: condition
+      variable: completion_pct
+      operator: gte
+      value: 20
+      true_next: needs_work_early
+      false_next: beginner_started
+    beginner:
+      type: return
+      value:
+        readiness: beginner
+        next_step: Start with the Welcome to PV module
+    beginner_started:
+      type: return
+      value:
+        readiness: beginner
+        next_step: Continue the onboarding modules from where you left off
+    ready:
+      type: return
+      value:
+        readiness: ready
+        next_step: You are ready for independent PV work — explore the full toolkit
+    almost_quiz:
+      type: return
+      value:
+        readiness: almost
+        next_step: Review quiz answers — you are close to full readiness
+    needs_work_quiz:
+      type: return
+      value:
+        readiness: needs_work
+        next_step: Revisit completed modules and retake quizzes
+    almost_modules:
+      type: return
+      value:
+        readiness: almost
+        next_step: Complete remaining modules to unlock full access
+    needs_work_partial:
+      type: return
+      value:
+        readiness: needs_work
+        next_step: Focus on understanding the core concepts before continuing
+    needs_work_early:
+      type: return
+      value:
+        readiness: needs_work
+        next_step: Continue working through the onboarding modules
+tests:
+# Zero modules = beginner
+- input:
+    completed_modules: 0
+    completion_pct: 0
+    quiz_score_avg: 0
+  expect:
+    readiness: beginner
+    next_step: Start with the Welcome to PV module
+# All complete, high quiz = ready
+- input:
+    completed_modules: 5
+    completion_pct: 100
+    quiz_score_avg: 90
+  expect:
+    readiness: ready
+    next_step: You are ready for independent PV work — explore the full toolkit
+# All complete, medium quiz = almost
+- input:
+    completed_modules: 5
+    completion_pct: 100
+    quiz_score_avg: 70
+  expect:
+    readiness: almost
+    next_step: Review quiz answers — you are close to full readiness
+# All complete, low quiz = needs_work
+- input:
+    completed_modules: 5
+    completion_pct: 100
+    quiz_score_avg: 40
+  expect:
+    readiness: needs_work
+    next_step: Revisit completed modules and retake quizzes
+# 80% complete, good quiz = almost
+- input:
+    completed_modules: 4
+    completion_pct: 80
+    quiz_score_avg: 80
+  expect:
+    readiness: almost
+    next_step: Complete remaining modules to unlock full access
+# 60% complete, low quiz = needs_work
+- input:
+    completed_modules: 3
+    completion_pct: 60
+    quiz_score_avg: 50
+  expect:
+    readiness: needs_work
+    next_step: Focus on understanding the core concepts before continuing
+# 40% complete = needs_work
+- input:
+    completed_modules: 2
+    completion_pct: 40
+    quiz_score_avg: 60
+  expect:
+    readiness: needs_work
+    next_step: Continue working through the onboarding modules
+# Very low completion = beginner_started
+- input:
+    completed_modules: 1
+    completion_pct: 10
+    quiz_score_avg: 30
+  expect:
+    readiness: beginner
+    next_step: Continue the onboarding modules from where you left off
+# Boundary: exactly 80 quiz with 100% = ready
+- input:
+    completed_modules: 5
+    completion_pct: 100
+    quiz_score_avg: 80
+  expect:
+    readiness: ready
+    next_step: You are ready for independent PV work — explore the full toolkit
+- input: {}
+  expect:
+    next_step: Continue the onboarding modules from where you left off
+    readiness: beginner

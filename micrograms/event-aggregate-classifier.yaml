@@ -1,0 +1,104 @@
+name: event-aggregate-classifier
+description: 'Event aggregate traffic level: classifies overall safety status from counts of red and yellow events in a drug profile'
+version: 0.1.0
+interface:
+  inputs:
+    red_count:
+      type: number
+      required: true
+      description: 'Number of events at red (strong signal) traffic level'
+    yellow_count:
+      type: number
+      required: true
+      description: 'Number of events at yellow (moderate signal) traffic level'
+  outputs:
+    traffic_level:
+      type: string
+tree:
+  start: check_many_red
+  nodes:
+    check_many_red:
+      type: condition
+      variable: red_count
+      operator: gte
+      value: 3
+      true_next: red
+      false_next: check_any_red
+    check_any_red:
+      type: condition
+      variable: red_count
+      operator: gte
+      value: 1
+      true_next: yellow
+      false_next: check_many_yellow
+    check_many_yellow:
+      type: condition
+      variable: yellow_count
+      operator: gte
+      value: 3
+      true_next: yellow
+      false_next: green
+    red:
+      type: return
+      value:
+        traffic_level: red
+    yellow:
+      type: return
+      value:
+        traffic_level: yellow
+    green:
+      type: return
+      value:
+        traffic_level: green
+tests:
+# No signals at all
+- input:
+    red_count: 0
+    yellow_count: 0
+  expect:
+    traffic_level: green
+# Few yellows = green
+- input:
+    red_count: 0
+    yellow_count: 2
+  expect:
+    traffic_level: green
+# 3+ yellows = yellow
+- input:
+    red_count: 0
+    yellow_count: 3
+  expect:
+    traffic_level: yellow
+# 1 red = yellow
+- input:
+    red_count: 1
+    yellow_count: 0
+  expect:
+    traffic_level: yellow
+# 2 reds = yellow
+- input:
+    red_count: 2
+    yellow_count: 0
+  expect:
+    traffic_level: yellow
+# 3 reds = red (boundary)
+- input:
+    red_count: 3
+    yellow_count: 0
+  expect:
+    traffic_level: red
+# Many reds = red
+- input:
+    red_count: 5
+    yellow_count: 2
+  expect:
+    traffic_level: red
+# 1 red + many yellows = yellow (red presence dominates)
+- input:
+    red_count: 1
+    yellow_count: 5
+  expect:
+    traffic_level: yellow
+- input: {}
+  expect:
+    traffic_level: green

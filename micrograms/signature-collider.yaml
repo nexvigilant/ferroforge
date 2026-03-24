@@ -1,0 +1,368 @@
+name: signature-collider
+description: 'Primitive Collider: takes two microgram primitive signatures and predicts the resultant signature when chained. Tests whether primitive algebra is predictive — does compose(A,B) predict chain(A,B)? First experimental instrument for T1 primitive science.'
+version: 0.1.0
+primitive_signature:
+  dominant: κ
+  expression: 'κ(×(sig_a, sig_b)) — compares the product of two signatures against composition rules'
+  primes: ['κ', '×', '→', '∂', 'Σ']
+  arguments: ['sig_a', 'sig_b']
+  chain_prediction: 'ρ(κ(×(sig_a, sig_b))) — self-referential when applied to its own signature pair'
+interface:
+  inputs:
+    dominant_a:
+      type: string
+      required: true
+      description: 'Dominant primitive of microgram A'
+    dominant_b:
+      type: string
+      required: true
+      description: 'Dominant primitive of microgram B'
+    arguments_a:
+      type: string
+      required: false
+      description: 'Comma-separated arguments of A (what A operates on)'
+    arguments_b:
+      type: string
+      required: false
+      description: 'Comma-separated arguments of B (what B operates on)'
+    expression_a:
+      type: string
+      required: false
+      description: 'Full expression of A'
+    expression_b:
+      type: string
+      required: false
+      description: 'Full expression of B'
+  outputs:
+    predicted_dominant:
+      type: string
+      description: 'Predicted dominant of the chain result'
+    predicted_expression:
+      type: string
+      description: 'Predicted chain expression'
+    composition_rule:
+      type: string
+      description: 'Which composition rule fired'
+    typed_sum:
+      type: bool
+      description: 'Whether the result requires typed Σ (content-specific summation)'
+    confidence:
+      type: string
+      description: 'Prediction confidence: high (same-family), medium (compatible primes), low (cross-family)'
+    collider_note:
+      type: string
+      description: 'What the collision reveals about primitive algebra'
+tree:
+  start: route_b
+  nodes:
+    # Route on B's dominant first, then check A for identity
+    route_b:
+      type: condition
+      variable: dominant_b
+      operator: eq
+      value: 'Σ'
+      true_next: check_typed_sum
+      false_next: route_b_N
+
+    route_b_N:
+      type: condition
+      variable: dominant_b
+      operator: eq
+      value: 'N'
+      true_next: quantity_absorbs
+      false_next: route_b_causality
+
+    route_b_causality:
+      type: condition
+      variable: dominant_b
+      operator: eq
+      value: '→'
+      true_next: causal_composition
+      false_next: route_b_boundary
+
+    route_b_boundary:
+      type: condition
+      variable: dominant_b
+      operator: eq
+      value: '∂'
+      true_next: boundary_composition
+      false_next: route_b_kappa
+
+    route_b_kappa:
+      type: condition
+      variable: dominant_b
+      operator: eq
+      value: 'κ'
+      true_next: check_identity_kappa
+      false_next: route_b_state
+
+    route_b_state:
+      type: condition
+      variable: dominant_b
+      operator: eq
+      value: 'ς'
+      true_next: check_identity_state
+      false_next: route_b_void
+
+    route_b_void:
+      type: condition
+      variable: dominant_b
+      operator: eq
+      value: '∅'
+      true_next: check_identity_void
+      false_next: route_b_persist
+
+    route_b_persist:
+      type: condition
+      variable: dominant_b
+      operator: eq
+      value: 'π'
+      true_next: check_identity_persist
+      false_next: unknown_composition
+
+    # Identity checks: does A match B?
+    check_identity_kappa:
+      type: condition
+      variable: dominant_a
+      operator: eq
+      value: 'κ'
+      true_next: same_dominant_kappa
+      false_next: comparison_composition
+
+    check_identity_state:
+      type: condition
+      variable: dominant_a
+      operator: eq
+      value: 'ς'
+      true_next: same_dominant_state
+      false_next: unknown_composition
+
+    check_identity_void:
+      type: condition
+      variable: dominant_a
+      operator: eq
+      value: '∅'
+      true_next: same_dominant_void
+      false_next: unknown_composition
+
+    check_identity_persist:
+      type: condition
+      variable: dominant_a
+      operator: eq
+      value: 'π'
+      true_next: same_dominant_persist
+      false_next: unknown_composition
+
+    # Identity returns (ρ — self-similar)
+    same_dominant_kappa:
+      type: return
+      value:
+        predicted_dominant: 'κ'
+        predicted_expression: 'ρ(κ) — self-similar chain, same comparison at two scales'
+        composition_rule: 'IDENTITY — same dominant composes to recursive self-application'
+        typed_sum: false
+        confidence: high
+        collider_note: 'Two κ-dominant micrograms chain into ρ(κ). The structure is fractal — the same comparison pattern at two scales. This is the simplest composition: A∘A = ρ(A).'
+
+    same_dominant_state:
+      type: return
+      value:
+        predicted_dominant: 'ς'
+        predicted_expression: 'ρ(ς) — self-similar state observation at two scales'
+        composition_rule: 'IDENTITY — same dominant composes to recursive self-application'
+        typed_sum: false
+        confidence: high
+        collider_note: 'Two ς-dominant micrograms chain into ρ(ς). Measuring the measurement.'
+
+    same_dominant_void:
+      type: return
+      value:
+        predicted_dominant: '∅'
+        predicted_expression: 'ρ(∅) — self-similar void detection at two scales'
+        composition_rule: 'IDENTITY — same dominant composes to recursive self-application'
+        typed_sum: false
+        confidence: high
+        collider_note: 'Two ∅-dominant micrograms chain into ρ(∅). Finding the absence of absence.'
+
+    same_dominant_persist:
+      type: return
+      value:
+        predicted_dominant: 'π'
+        predicted_expression: 'ρ(π) — self-similar persistence at two scales'
+        composition_rule: 'IDENTITY — same dominant composes to recursive self-application'
+        typed_sum: false
+        confidence: high
+        collider_note: 'Two π-dominant micrograms chain into ρ(π). Persisting the persistence.'
+
+    # Aggregator: Σ absorbs A — check for typed args
+    check_typed_sum:
+      type: condition
+      variable: arguments_b
+      operator: is_not_null
+      value: ''
+      true_next: typed_sum_composition
+      false_next: untyped_sum_composition
+
+    typed_sum_composition:
+      type: return
+      value:
+        predicted_dominant: Σ
+        predicted_expression: 'Σ<{{arguments_b}}>({{dominant_a}}) — typed aggregation over A outputs'
+        composition_rule: 'TYPED_ABSORPTION — Σ with arguments absorbs A, preserving argument types'
+        typed_sum: true
+        confidence: high
+        collider_note: 'Key finding: Σ is not homogeneous. Σ<∝|π|→> ≠ Σ<κ|κ|κ>. The arguments carry domain information that pure structural composition misses. This is why the first collider experiment showed a delta.'
+
+    untyped_sum_composition:
+      type: return
+      value:
+        predicted_dominant: Σ
+        predicted_expression: 'Σ({{dominant_a}}) — untyped aggregation, content unknown'
+        composition_rule: 'UNTYPED_ABSORPTION — Σ without arguments, prediction incomplete'
+        typed_sum: false
+        confidence: low
+        collider_note: 'Without argument types, we can predict the dominant (Σ) but not the content. This is a lossy composition — structural prediction succeeds, semantic prediction fails.'
+
+    quantity_absorbs:
+      type: return
+      value:
+        predicted_dominant: N
+        predicted_expression: 'N({{dominant_a}}) — quantification of A outputs'
+        composition_rule: 'QUANTIFICATION — N counts or measures A output'
+        typed_sum: false
+        confidence: medium
+        collider_note: 'Dimensional primitive (N) wraps the structural primitive. The result is a measured version of A — same structure, now with a number attached.'
+
+    causal_composition:
+      type: return
+      value:
+        predicted_dominant: '→'
+        predicted_expression: '→({{dominant_a}}) — A output triggers causal action'
+        composition_rule: 'CAUSATION — A output triggers B action'
+        typed_sum: false
+        confidence: medium
+        collider_note: 'Causal chains are the most common composition. A produces a value, → consumes it. The chain dominant is → because the relationship IS the product.'
+
+    boundary_composition:
+      type: return
+      value:
+        predicted_dominant: '∂'
+        predicted_expression: '∂({{dominant_a}}) — boundary applied to A output'
+        composition_rule: 'GATING — ∂ filters A output at boundary'
+        typed_sum: false
+        confidence: high
+        collider_note: 'Boundary composition is the second simplest after identity. A produces, ∂ filters. The gate is the dominant because it determines what passes.'
+
+    comparison_composition:
+      type: return
+      value:
+        predicted_dominant: 'κ'
+        predicted_expression: 'κ({{dominant_a}}, expected) — B compares A output to reference'
+        composition_rule: 'EVALUATION — κ compares A output against expectation'
+        typed_sum: false
+        confidence: medium
+        collider_note: 'A produces a measurement, κ evaluates it. This is the audit pattern — measure then compare. κ dominant because the comparison IS the product.'
+
+    unknown_composition:
+      type: return
+      value:
+        predicted_dominant: '{{dominant_b}}'
+        predicted_expression: '{{dominant_b}}({{dominant_a}}) — B wraps A (default: downstream dominant wins)'
+        composition_rule: 'DEFAULT — downstream dominant absorbs upstream'
+        typed_sum: false
+        confidence: low
+        collider_note: 'No specific composition rule matched. Default: the downstream microgram dominant because it processes last. This is the weakest prediction — more rules needed.'
+
+tests:
+# Test 1: session-scorecard(κ) → scorecard-compound(Σ) with typed args
+- input:
+    dominant_a: 'κ'
+    dominant_b: 'Σ'
+    arguments_a: '∅,ς,κ,→,π,∝'
+    arguments_b: '∝,π,→'
+    expression_a: 'κ(ς(∅)) iterated'
+    expression_b: 'Σ<∝|π|→>(levels) / N'
+  expect:
+    predicted_dominant: Σ
+    composition_rule: 'TYPED_ABSORPTION — Σ with arguments absorbs A, preserving argument types'
+    typed_sum: true
+    confidence: high
+
+# Test 2: Same dominant — two κ programs chained
+- input:
+    dominant_a: 'κ'
+    dominant_b: 'κ'
+  expect:
+    composition_rule: 'IDENTITY — same dominant composes to recursive self-application'
+    confidence: high
+
+# Test 3: κ → ∂ (comparison into boundary gate)
+- input:
+    dominant_a: 'κ'
+    dominant_b: '∂'
+  expect:
+    predicted_dominant: '∂'
+    composition_rule: 'GATING — ∂ filters A output at boundary'
+    confidence: high
+
+# Test 4: Untyped Σ (no arguments — lossy prediction)
+- input:
+    dominant_a: 'κ'
+    dominant_b: 'Σ'
+  expect:
+    predicted_dominant: Σ
+    composition_rule: 'UNTYPED_ABSORPTION — Σ without arguments, prediction incomplete'
+    typed_sum: false
+    confidence: low
+
+# Test 5: κ → N (comparison into quantification)
+- input:
+    dominant_a: 'κ'
+    dominant_b: 'N'
+  expect:
+    predicted_dominant: N
+    composition_rule: 'QUANTIFICATION — N counts or measures A output'
+
+# Test 6: → → κ (causality into comparison)
+- input:
+    dominant_a: '→'
+    dominant_b: 'κ'
+  expect:
+    predicted_dominant: 'κ'
+    composition_rule: 'EVALUATION — κ compares A output against expectation'
+
+# Test 7: ∂ → → (boundary into causality)
+- input:
+    dominant_a: '∂'
+    dominant_b: '→'
+  expect:
+    predicted_dominant: '→'
+    composition_rule: 'CAUSATION — A output triggers B action'
+
+# Test 8: Unknown composition fallback
+- input:
+    dominant_a: 'ς'
+    dominant_b: 'π'
+  expect:
+    composition_rule: 'DEFAULT — downstream dominant absorbs upstream'
+    confidence: low
+
+# Test 9: Self-referential — collider applied to itself (ρ test)
+- input:
+    dominant_a: 'κ'
+    dominant_b: 'κ'
+    arguments_a: 'sig_a,sig_b'
+    arguments_b: 'sig_a,sig_b'
+    expression_a: 'κ(×(sig_a, sig_b))'
+    expression_b: 'κ(×(sig_a, sig_b))'
+  expect:
+    composition_rule: 'IDENTITY — same dominant composes to recursive self-application'
+    confidence: high
+- input: {}
+  expect:
+    collider_note: "No specific composition rule matched. Default: the downstream microgram dominant because it processes last. This is the weakest prediction — more rules needed."
+    composition_rule: DEFAULT — downstream dominant absorbs upstream
+    confidence: low
+    predicted_dominant: "null"
+    predicted_expression: "null(null) — B wraps A (default: downstream dominant wins)"
+    typed_sum: false

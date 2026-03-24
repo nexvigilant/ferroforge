@@ -1,0 +1,194 @@
+name: pv-complete-pipeline
+description: "Complete PV signal pipeline: validate (4 steps) → bridge (1 step) → assess (10 steps). 15 steps total. Validation outputs flow through bridge into assessment, so low-confidence signals automatically block SEAL and high-confidence signals fast-track."
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  # ── Phase 1: Signal Validation (4 steps) ──
+  - multi-signal-combiner
+  - signal-validation-gate
+  - signal-trend-detector
+  - signal-recurrence-detector
+  # ── Phase 2: Bridge (1 step) ──
+  - algo-validation-to-assessment-bridge
+  # ── Phase 3: Core Assessment (4 steps) ──
+  - prr-signal
+  - signal-to-causality
+  - naranjo-quick
+  - causality-to-action
+  # ── Phase 4: Enrichment (6 steps) ──
+  - algo-energy-measure
+  - algo-converge-signal
+  - algo-void-scan
+  - algo-locate-root-cause
+  - algo-seal-commitment
+  - algo-select-triage
+tests:
+- name: semaglutide_strong_signal_end_to_end
+  input:
+    # Validation inputs
+    prr_signal: STRONG
+    ror_signal: STRONG
+    ic_signal: STRONG
+    ebgm_signal: STRONG
+    prr_above_threshold: true
+    case_count_sufficient: true
+    geographic_spread: true
+    temporal_pattern: true
+    prr_current: 6.93
+    pct_change: -2.1
+    occurrence_count: 2068
+    prior_action_taken: true
+    same_signal_persists: true
+    # Core inputs
+    prr: 6.93
+    naranjo_score: 4
+    is_serious: true
+    # Energy inputs
+    downstream_consumers: 20
+    state_change_magnitude: major
+    component_persistence: established
+    # Converge inputs
+    delta: 0.16
+    iteration_count: 1
+    max_iterations: 20
+    # Void inputs
+    has_disproportionality: true
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: true
+    has_rechallenge_data: false
+    has_dose_response: false
+    has_time_to_onset: false
+    has_class_comparison: false
+    # Locate inputs
+    failure_layer: domain
+    error_reproducible: true
+    error_in_tests: true
+    recent_change: false
+    # Select inputs
+    recurrence_count: 2068
+    total_opportunities: 78284
+    fitness_threshold: 0.01
+    produces_correct_output: true
+    # Seal gets evidence_sufficient + decision_defined + perspectives_checked FROM BRIDGE
+    reversibility_cost: expensive
+  expect:
+    # Validation outputs
+    overall: CONFIRMED
+    classification: signal
+    trend: STABLE
+    # Bridge outputs (flow into SEAL)
+    evidence_sufficient: true
+    decision_defined: true
+    tolerance_met: true
+    # Assessment outputs
+    signal_detected: true
+    causality: POSSIBLE
+    regulatory_action: monitor
+    energy_class: critical
+    gap_count: 4
+    seal_verdict: SEAL
+    verdict: persist
+
+- name: weak_novel_drug_rash_blocked_by_bridge
+  input:
+    prr_signal: WEAK
+    ror_signal: WEAK
+    ic_signal: WEAK
+    ebgm_signal: WEAK
+    prr_above_threshold: false
+    case_count_sufficient: false
+    geographic_spread: false
+    temporal_pattern: false
+    prr_current: 1.3
+    pct_change: 120.0
+    occurrence_count: 8
+    prior_action_taken: false
+    same_signal_persists: false
+    prr: 1.3
+    naranjo_score: 2
+    is_serious: false
+    downstream_consumers: 3
+    state_change_magnitude: minor
+    component_persistence: recent
+    delta: 0.8
+    iteration_count: 2
+    max_iterations: 20
+    has_disproportionality: false
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: false
+    has_rechallenge_data: false
+    has_dose_response: false
+    has_time_to_onset: false
+    has_class_comparison: false
+    failure_layer: unknown
+    error_reproducible: false
+    error_in_tests: false
+    recent_change: true
+    recurrence_count: 8
+    total_opportunities: 5000
+    fitness_threshold: 0.01
+    produces_correct_output: true
+    reversibility_cost: trivial
+  expect:
+    # Validation: NO_SIGNAL but RISING
+    overall: NO_SIGNAL
+    trend: RISING
+    # Bridge: low confidence → blocks SEAL
+    evidence_sufficient: false
+    decision_defined: false
+    # Assessment: signal not detected, SEAL blocked
+    signal_detected: false
+    seal_verdict: BLOCK
+    verdict: decay
+
+- name: fully_evidenced_metformin
+  input:
+    prr_signal: STRONG
+    ror_signal: STRONG
+    ic_signal: MODERATE
+    ebgm_signal: STRONG
+    prr_above_threshold: true
+    case_count_sufficient: true
+    geographic_spread: true
+    temporal_pattern: true
+    prr_current: 3.2
+    pct_change: 1.5
+    occurrence_count: 5000
+    prior_action_taken: true
+    same_signal_persists: true
+    prr: 3.2
+    naranjo_score: 6
+    is_serious: true
+    downstream_consumers: 50
+    state_change_magnitude: breaking
+    component_persistence: foundational
+    delta: 0.05
+    iteration_count: 10
+    max_iterations: 20
+    has_disproportionality: true
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: true
+    has_rechallenge_data: true
+    has_dose_response: true
+    has_time_to_onset: true
+    has_class_comparison: true
+    failure_layer: domain
+    error_reproducible: true
+    error_in_tests: true
+    recent_change: false
+    recurrence_count: 5000
+    total_opportunities: 200000
+    fitness_threshold: 0.01
+    produces_correct_output: true
+    reversibility_cost: impossible
+  expect:
+    overall: CONFIRMED
+    signal_detected: true
+    causality: PROBABLE
+    regulatory_action: expedited_report
+    energy_class: critical
+    gap_count: 0
+    completeness: complete
+    seal_verdict: SEAL
+    verdict: persist

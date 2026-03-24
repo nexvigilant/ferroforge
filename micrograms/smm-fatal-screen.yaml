@@ -1,0 +1,125 @@
+name: smm-fatal-screen
+description: "First gate in SMM chain. Detects fatal violations and applies study-type-specific multipliers. Empirical fatal = FATAL_ZERO band (0.0 multiplier). Pre-empirical fatal = FATAL_FLOOR band (0.30 multiplier). No fatal = CLEAN. If study_type is null with fatal, defaults to pre-empirical path (conservative)."
+version: 0.1.0
+interface:
+  inputs:
+    study_type:
+      type: string
+      required: false
+    has_fatal_violation:
+      type: bool
+      required: false
+  outputs:
+    fatal_detected:
+      type: bool
+    score_band:
+      type: string
+    proceed_to_scoring:
+      type: bool
+    fatal_multiplier:
+      type: string
+    disposition_note:
+      type: string
+tree:
+  start: check_fatal
+  nodes:
+    check_fatal:
+      type: condition
+      variable: has_fatal_violation
+      operator: eq
+      value: true
+      true_next: check_study_type
+      false_next: clean_pass
+    check_study_type:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: empirical
+      true_next: fatal_empirical
+      false_next: fatal_pre_empirical
+    fatal_empirical:
+      type: return
+      value:
+        fatal_detected: true
+        score_band: FATAL_ZERO
+        proceed_to_scoring: false
+        fatal_multiplier: "0.00"
+        disposition_note: "Fatal violation in empirical work — CS SUSPENDED. Evidence excluded pending qualified review."
+    fatal_pre_empirical:
+      type: return
+      value:
+        fatal_detected: true
+        score_band: FATAL_FLOOR
+        proceed_to_scoring: false
+        fatal_multiplier: "0.30"
+        disposition_note: "Fatal violation in pre-empirical framework — MS IMMATURE. Return to workshop for maturation."
+    clean_pass:
+      type: return
+      value:
+        fatal_detected: false
+        score_band: CLEAN
+        proceed_to_scoring: true
+        fatal_multiplier: "1.00"
+        disposition_note: "No fatal violations detected. Proceed to severity scoring."
+tests:
+# Fatal + empirical = FATAL_ZERO
+- input:
+    study_type: empirical
+    has_fatal_violation: true
+  expect:
+    fatal_detected: true
+    score_band: FATAL_ZERO
+    proceed_to_scoring: false
+    fatal_multiplier: "0.00"
+# Fatal + pre-empirical = FATAL_FLOOR
+- input:
+    study_type: pre_empirical
+    has_fatal_violation: true
+  expect:
+    fatal_detected: true
+    score_band: FATAL_FLOOR
+    proceed_to_scoring: false
+    fatal_multiplier: "0.30"
+# No fatal + empirical = CLEAN
+- input:
+    study_type: empirical
+    has_fatal_violation: false
+  expect:
+    fatal_detected: false
+    score_band: CLEAN
+    proceed_to_scoring: true
+    fatal_multiplier: "1.00"
+# No fatal + pre-empirical = CLEAN with full disposition note
+- input:
+    study_type: pre_empirical
+    has_fatal_violation: false
+  expect:
+    fatal_detected: false
+    score_band: CLEAN
+    proceed_to_scoring: true
+    disposition_note: "No fatal violations detected. Proceed to severity scoring."
+# Empty input = CLEAN (no fatal detected when not specified)
+- input: {}
+  expect:
+    fatal_detected: false
+    score_band: CLEAN
+    proceed_to_scoring: true
+# Missing study_type with fatal = defaults to pre-empirical path (conservative)
+- input:
+    has_fatal_violation: true
+  expect:
+    fatal_detected: true
+    score_band: FATAL_FLOOR
+    proceed_to_scoring: false
+# Second empirical fatal (different assertion scope)
+- input:
+    study_type: empirical
+    has_fatal_violation: true
+  expect:
+    disposition_note: "Fatal violation in empirical work — CS SUSPENDED. Evidence excluded pending qualified review."
+# Second pre-empirical fatal (different assertion scope)
+- input:
+    study_type: pre_empirical
+    has_fatal_violation: true
+  expect:
+    disposition_note: "Fatal violation in pre-empirical framework — MS IMMATURE. Return to workshop for maturation."

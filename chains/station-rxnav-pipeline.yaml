@@ -1,0 +1,40 @@
+name: station-rxnav-pipeline
+description: "RxNav interaction check → severity classification → causality routing. From get-interactions output to prescribing decision."
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - config-rxnav-interaction-severity
+  - adapt-interaction-severity
+  - signal-to-causality
+tests:
+- name: contraindicated interaction → urgent causality
+  input:
+    interaction_count: 3
+    has_contraindication: true
+    has_serious: true
+    has_moderate: true
+  expect:
+    severity: contraindicated
+    signal_detected: true
+    priority: URGENT
+    next_step: causality_assessment
+- name: major interaction → urgent causality
+  input:
+    interaction_count: 5
+    has_contraindication: false
+    has_serious: true
+    has_moderate: true
+  expect:
+    severity: major
+    signal_detected: true
+    priority: URGENT
+    next_step: causality_assessment
+- name: no interactions → continue monitoring
+  input:
+    interaction_count: 0
+  expect:
+    severity: none
+    signal_detected: false
+    priority: LOW
+    next_step: continue_monitoring

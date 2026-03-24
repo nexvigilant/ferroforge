@@ -1,0 +1,529 @@
+name: smi-drift-detector
+description: "ALG-2025-029 SMI Drift Detection. Multi-threshold alerting on pre-computed drift sigma (||μ_current - μ_baseline|| / σ). Thresholds at 1.5σ/2.0σ/2.5σ/3.0σ with small-baseline downgrade (n<30) and improving-direction annotation."
+version: 0.1.0
+interface:
+  inputs:
+    drift_sigma:
+      type: float
+      required: true
+      description: "Pre-computed drift in standard deviations: ||μ_current - μ_baseline|| / σ"
+    drift_direction:
+      type: string
+      required: false
+      description: "Direction of drift: increasing, decreasing, or stable"
+    measurement_count:
+      type: integer
+      required: false
+      description: "Number of measurements in the baseline period"
+  outputs:
+    alert_level:
+      type: string
+      description: "NONE / WATCH / WARNING / ALERT / CRITICAL"
+    sigma_band:
+      type: string
+      description: "Which threshold band the drift falls in"
+    action:
+      type: string
+      description: "Recommended action based on alert level"
+    algorithm:
+      type: string
+      description: "ALG-2025-029 trace"
+tree:
+  start: check_sigma_present
+  nodes:
+    # --- Null gate ---
+    check_sigma_present:
+      type: condition
+      variable: drift_sigma
+      operator: is_not_null
+      value: true
+      true_next: check_critical
+      false_next: null_safe_none
+
+    null_safe_none:
+      type: return
+      value:
+        alert_level: NONE
+        sigma_band: "no_data"
+        action: "No drift data provided — cannot assess"
+        algorithm: "ALG-2025-029: null input → safe default NONE"
+
+    # --- CRITICAL band: >= 3.0σ ---
+    check_critical:
+      type: condition
+      variable: drift_sigma
+      operator: gte
+      value: 3.0
+      true_next: check_critical_baseline
+      false_next: check_alert
+
+    check_critical_baseline:
+      type: condition
+      variable: measurement_count
+      operator: lt
+      value: 30
+      true_next: check_critical_downgraded_direction
+      false_next: check_critical_direction
+
+    check_critical_direction:
+      type: condition
+      variable: drift_direction
+      operator: eq
+      value: decreasing
+      true_next: critical_improving
+      false_next: critical_full
+
+    critical_full:
+      type: return
+      value:
+        alert_level: CRITICAL
+        sigma_band: "≥3.0σ (0.3% false positive rate)"
+        action: "Immediate investigation required — extreme drift from baseline"
+        algorithm: "ALG-2025-029: drift ≥ 3.0σ → CRITICAL"
+
+    critical_improving:
+      type: return
+      value:
+        alert_level: CRITICAL
+        sigma_band: "≥3.0σ (0.3% false positive rate)"
+        action: "Immediate investigation required — extreme drift from baseline (improving: signal decreasing)"
+        algorithm: "ALG-2025-029: drift ≥ 3.0σ, direction decreasing → CRITICAL improving"
+
+    # Downgraded CRITICAL → ALERT due to small baseline
+    check_critical_downgraded_direction:
+      type: condition
+      variable: drift_direction
+      operator: eq
+      value: decreasing
+      true_next: critical_downgraded_improving
+      false_next: critical_downgraded
+
+    critical_downgraded:
+      type: return
+      value:
+        alert_level: ALERT
+        sigma_band: "≥3.0σ (downgraded from CRITICAL — baseline n<30)"
+        action: "Confirm with larger baseline — drift exceeds 3σ but insufficient measurement history"
+        algorithm: "ALG-2025-029: drift ≥ 3.0σ, n<30 → ALERT (downgraded)"
+
+    critical_downgraded_improving:
+      type: return
+      value:
+        alert_level: ALERT
+        sigma_band: "≥3.0σ (downgraded from CRITICAL — baseline n<30)"
+        action: "Confirm with larger baseline — drift exceeds 3σ but insufficient measurement history (improving: signal decreasing)"
+        algorithm: "ALG-2025-029: drift ≥ 3.0σ, n<30, direction decreasing → ALERT (downgraded) improving"
+
+    # --- ALERT band: >= 2.5σ ---
+    check_alert:
+      type: condition
+      variable: drift_sigma
+      operator: gte
+      value: 2.5
+      true_next: check_alert_baseline
+      false_next: check_warning
+
+    check_alert_baseline:
+      type: condition
+      variable: measurement_count
+      operator: lt
+      value: 30
+      true_next: check_alert_downgraded_direction
+      false_next: check_alert_direction
+
+    check_alert_direction:
+      type: condition
+      variable: drift_direction
+      operator: eq
+      value: decreasing
+      true_next: alert_improving
+      false_next: alert_full
+
+    alert_full:
+      type: return
+      value:
+        alert_level: ALERT
+        sigma_band: "≥2.5σ (1% false positive rate)"
+        action: "Escalate for signal review — significant drift detected"
+        algorithm: "ALG-2025-029: drift ≥ 2.5σ → ALERT"
+
+    alert_improving:
+      type: return
+      value:
+        alert_level: ALERT
+        sigma_band: "≥2.5σ (1% false positive rate)"
+        action: "Escalate for signal review — significant drift detected (improving: signal decreasing)"
+        algorithm: "ALG-2025-029: drift ≥ 2.5σ, direction decreasing → ALERT improving"
+
+    # Downgraded ALERT → WARNING due to small baseline
+    check_alert_downgraded_direction:
+      type: condition
+      variable: drift_direction
+      operator: eq
+      value: decreasing
+      true_next: alert_downgraded_improving
+      false_next: alert_downgraded
+
+    alert_downgraded:
+      type: return
+      value:
+        alert_level: WARNING
+        sigma_band: "≥2.5σ (downgraded from ALERT — baseline n<30)"
+        action: "Increase monitoring frequency — drift notable but baseline insufficient for full alert"
+        algorithm: "ALG-2025-029: drift ≥ 2.5σ, n<30 → WARNING (downgraded)"
+
+    alert_downgraded_improving:
+      type: return
+      value:
+        alert_level: WARNING
+        sigma_band: "≥2.5σ (downgraded from ALERT — baseline n<30)"
+        action: "Increase monitoring frequency — drift notable but baseline insufficient for full alert (improving: signal decreasing)"
+        algorithm: "ALG-2025-029: drift ≥ 2.5σ, n<30, direction decreasing → WARNING (downgraded) improving"
+
+    # --- WARNING band: >= 2.0σ ---
+    check_warning:
+      type: condition
+      variable: drift_sigma
+      operator: gte
+      value: 2.0
+      true_next: check_warning_baseline
+      false_next: check_watch
+
+    check_warning_baseline:
+      type: condition
+      variable: measurement_count
+      operator: lt
+      value: 30
+      true_next: check_warning_downgraded_direction
+      false_next: check_warning_direction
+
+    check_warning_direction:
+      type: condition
+      variable: drift_direction
+      operator: eq
+      value: decreasing
+      true_next: warning_improving
+      false_next: warning_full
+
+    warning_full:
+      type: return
+      value:
+        alert_level: WARNING
+        sigma_band: "≥2.0σ (5% false positive rate)"
+        action: "Schedule enhanced monitoring — moderate drift from baseline"
+        algorithm: "ALG-2025-029: drift ≥ 2.0σ → WARNING"
+
+    warning_improving:
+      type: return
+      value:
+        alert_level: WARNING
+        sigma_band: "≥2.0σ (5% false positive rate)"
+        action: "Schedule enhanced monitoring — moderate drift from baseline (improving: signal decreasing)"
+        algorithm: "ALG-2025-029: drift ≥ 2.0σ, direction decreasing → WARNING improving"
+
+    # Downgraded WARNING → WATCH due to small baseline
+    check_warning_downgraded_direction:
+      type: condition
+      variable: drift_direction
+      operator: eq
+      value: decreasing
+      true_next: warning_downgraded_improving
+      false_next: warning_downgraded
+
+    warning_downgraded:
+      type: return
+      value:
+        alert_level: WATCH
+        sigma_band: "≥2.0σ (downgraded from WARNING — baseline n<30)"
+        action: "Note drift — exceeds 2σ but baseline too small for WARNING classification"
+        algorithm: "ALG-2025-029: drift ≥ 2.0σ, n<30 → WATCH (downgraded)"
+
+    warning_downgraded_improving:
+      type: return
+      value:
+        alert_level: WATCH
+        sigma_band: "≥2.0σ (downgraded from WARNING — baseline n<30)"
+        action: "Note drift — exceeds 2σ but baseline too small for WARNING classification (improving: signal decreasing)"
+        algorithm: "ALG-2025-029: drift ≥ 2.0σ, n<30, direction decreasing → WATCH (downgraded) improving"
+
+    # --- WATCH band: >= 1.5σ ---
+    check_watch:
+      type: condition
+      variable: drift_sigma
+      operator: gte
+      value: 1.5
+      true_next: check_watch_baseline
+      false_next: none_band
+
+    check_watch_baseline:
+      type: condition
+      variable: measurement_count
+      operator: lt
+      value: 30
+      true_next: watch_downgraded
+      false_next: watch_full
+
+    watch_full:
+      type: return
+      value:
+        alert_level: WATCH
+        sigma_band: "≥1.5σ (13% false positive rate)"
+        action: "Add to watchlist — mild drift from baseline"
+        algorithm: "ALG-2025-029: drift ≥ 1.5σ → WATCH"
+
+    watch_downgraded:
+      type: return
+      value:
+        alert_level: NONE
+        sigma_band: "≥1.5σ (downgraded from WATCH — baseline n<30)"
+        action: "No action — drift exceeds 1.5σ but baseline too small to classify"
+        algorithm: "ALG-2025-029: drift ≥ 1.5σ, n<30 → NONE (downgraded)"
+
+    # --- NONE band: < 1.5σ ---
+    none_band:
+      type: return
+      value:
+        alert_level: NONE
+        sigma_band: "<1.5σ (within normal variation)"
+        action: "No action required — within expected variation"
+        algorithm: "ALG-2025-029: drift < 1.5σ → NONE"
+
+tests:
+# 1. drift 3.5σ increasing, n=100 → CRITICAL
+- input:
+    drift_sigma: 3.5
+    drift_direction: increasing
+    measurement_count: 100
+  expect:
+    alert_level: CRITICAL
+    sigma_band: "≥3.0σ (0.3% false positive rate)"
+    action: "Immediate investigation required — extreme drift from baseline"
+    algorithm: "ALG-2025-029: drift ≥ 3.0σ → CRITICAL"
+
+# 2. drift 2.7σ increasing, n=50 → ALERT
+- input:
+    drift_sigma: 2.7
+    drift_direction: increasing
+    measurement_count: 50
+  expect:
+    alert_level: ALERT
+    sigma_band: "≥2.5σ (1% false positive rate)"
+    action: "Escalate for signal review — significant drift detected"
+    algorithm: "ALG-2025-029: drift ≥ 2.5σ → ALERT"
+
+# 3. drift 2.1σ stable, n=100 → WARNING
+- input:
+    drift_sigma: 2.1
+    drift_direction: stable
+    measurement_count: 100
+  expect:
+    alert_level: WARNING
+    sigma_band: "≥2.0σ (5% false positive rate)"
+    action: "Schedule enhanced monitoring — moderate drift from baseline"
+    algorithm: "ALG-2025-029: drift ≥ 2.0σ → WARNING"
+
+# 4. drift 1.6σ increasing, n=80 → WATCH
+- input:
+    drift_sigma: 1.6
+    drift_direction: increasing
+    measurement_count: 80
+  expect:
+    alert_level: WATCH
+    sigma_band: "≥1.5σ (13% false positive rate)"
+    action: "Add to watchlist — mild drift from baseline"
+    algorithm: "ALG-2025-029: drift ≥ 1.5σ → WATCH"
+
+# 5. drift 0.8σ stable, n=100 → NONE
+- input:
+    drift_sigma: 0.8
+    drift_direction: stable
+    measurement_count: 100
+  expect:
+    alert_level: NONE
+    sigma_band: "<1.5σ (within normal variation)"
+    action: "No action required — within expected variation"
+    algorithm: "ALG-2025-029: drift < 1.5σ → NONE"
+
+# 6. drift 3.5σ but n=20 → ALERT (downgraded from CRITICAL)
+- input:
+    drift_sigma: 3.5
+    drift_direction: increasing
+    measurement_count: 20
+  expect:
+    alert_level: ALERT
+    sigma_band: "≥3.0σ (downgraded from CRITICAL — baseline n<30)"
+    action: "Confirm with larger baseline — drift exceeds 3σ but insufficient measurement history"
+    algorithm: "ALG-2025-029: drift ≥ 3.0σ, n<30 → ALERT (downgraded)"
+
+# 7. drift 2.5σ decreasing, n=100 → ALERT with improving note
+- input:
+    drift_sigma: 2.5
+    drift_direction: decreasing
+    measurement_count: 100
+  expect:
+    alert_level: ALERT
+    sigma_band: "≥2.5σ (1% false positive rate)"
+    action: "Escalate for signal review — significant drift detected (improving: signal decreasing)"
+    algorithm: "ALG-2025-029: drift ≥ 2.5σ, direction decreasing → ALERT improving"
+
+# 8. drift 0.0σ stable, n=1000 → NONE (rock stable)
+- input:
+    drift_sigma: 0.0
+    drift_direction: stable
+    measurement_count: 1000
+  expect:
+    alert_level: NONE
+    sigma_band: "<1.5σ (within normal variation)"
+    action: "No action required — within expected variation"
+    algorithm: "ALG-2025-029: drift < 1.5σ → NONE"
+
+# 9. drift 1.5σ exactly → WATCH (boundary)
+- input:
+    drift_sigma: 1.5
+    drift_direction: stable
+    measurement_count: 50
+  expect:
+    alert_level: WATCH
+    sigma_band: "≥1.5σ (13% false positive rate)"
+    action: "Add to watchlist — mild drift from baseline"
+    algorithm: "ALG-2025-029: drift ≥ 1.5σ → WATCH"
+
+# 10. null safety → NONE
+- input: {}
+  expect:
+    alert_level: NONE
+    sigma_band: "no_data"
+    action: "No drift data provided — cannot assess"
+    algorithm: "ALG-2025-029: null input → safe default NONE"
+
+# 11. drift 3.0σ exactly, increasing, n=100 → CRITICAL (boundary)
+- input:
+    drift_sigma: 3.0
+    drift_direction: increasing
+    measurement_count: 100
+  expect:
+    alert_level: CRITICAL
+    sigma_band: "≥3.0σ (0.3% false positive rate)"
+    action: "Immediate investigation required — extreme drift from baseline"
+    algorithm: "ALG-2025-029: drift ≥ 3.0σ → CRITICAL"
+
+# 12. drift 2.5σ exactly, n=100, increasing → ALERT (boundary)
+- input:
+    drift_sigma: 2.5
+    drift_direction: increasing
+    measurement_count: 100
+  expect:
+    alert_level: ALERT
+    sigma_band: "≥2.5σ (1% false positive rate)"
+    action: "Escalate for signal review — significant drift detected"
+    algorithm: "ALG-2025-029: drift ≥ 2.5σ → ALERT"
+
+# 13. drift 2.0σ exactly, n=100 → WARNING (boundary)
+- input:
+    drift_sigma: 2.0
+    drift_direction: stable
+    measurement_count: 100
+  expect:
+    alert_level: WARNING
+    sigma_band: "≥2.0σ (5% false positive rate)"
+    action: "Schedule enhanced monitoring — moderate drift from baseline"
+    algorithm: "ALG-2025-029: drift ≥ 2.0σ → WARNING"
+
+# 14. CRITICAL decreasing, full baseline → CRITICAL improving
+- input:
+    drift_sigma: 4.0
+    drift_direction: decreasing
+    measurement_count: 200
+  expect:
+    alert_level: CRITICAL
+    sigma_band: "≥3.0σ (0.3% false positive rate)"
+    action: "Immediate investigation required — extreme drift from baseline (improving: signal decreasing)"
+    algorithm: "ALG-2025-029: drift ≥ 3.0σ, direction decreasing → CRITICAL improving"
+
+# 15. WARNING decreasing, full baseline → WARNING improving
+- input:
+    drift_sigma: 2.3
+    drift_direction: decreasing
+    measurement_count: 60
+  expect:
+    alert_level: WARNING
+    sigma_band: "≥2.0σ (5% false positive rate)"
+    action: "Schedule enhanced monitoring — moderate drift from baseline (improving: signal decreasing)"
+    algorithm: "ALG-2025-029: drift ≥ 2.0σ, direction decreasing → WARNING improving"
+
+# 16. WATCH downgraded due to small baseline
+- input:
+    drift_sigma: 1.8
+    drift_direction: stable
+    measurement_count: 15
+  expect:
+    alert_level: NONE
+    sigma_band: "≥1.5σ (downgraded from WATCH — baseline n<30)"
+    action: "No action — drift exceeds 1.5σ but baseline too small to classify"
+    algorithm: "ALG-2025-029: drift ≥ 1.5σ, n<30 → NONE (downgraded)"
+
+# 17. WARNING downgraded to WATCH with decreasing direction
+- input:
+    drift_sigma: 2.4
+    drift_direction: decreasing
+    measurement_count: 10
+  expect:
+    alert_level: WATCH
+    sigma_band: "≥2.0σ (downgraded from WARNING — baseline n<30)"
+    action: "Note drift — exceeds 2σ but baseline too small for WARNING classification (improving: signal decreasing)"
+    algorithm: "ALG-2025-029: drift ≥ 2.0σ, n<30, direction decreasing → WATCH (downgraded) improving"
+
+# 18. ALERT downgraded to WARNING, increasing
+- input:
+    drift_sigma: 2.9
+    drift_direction: increasing
+    measurement_count: 5
+  expect:
+    alert_level: WARNING
+    sigma_band: "≥2.5σ (downgraded from ALERT — baseline n<30)"
+    action: "Increase monitoring frequency — drift notable but baseline insufficient for full alert"
+    algorithm: "ALG-2025-029: drift ≥ 2.5σ, n<30 → WARNING (downgraded)"
+
+# 19. CRITICAL downgraded + decreasing → ALERT downgraded improving
+- input:
+    drift_sigma: 3.2
+    drift_direction: decreasing
+    measurement_count: 25
+  expect:
+    alert_level: ALERT
+    sigma_band: "≥3.0σ (downgraded from CRITICAL — baseline n<30)"
+    action: "Confirm with larger baseline — drift exceeds 3σ but insufficient measurement history (improving: signal decreasing)"
+    algorithm: "ALG-2025-029: drift ≥ 3.0σ, n<30, direction decreasing → ALERT (downgraded) improving"
+
+# 20. drift 1.49σ → NONE (just below WATCH threshold)
+- input:
+    drift_sigma: 1.49
+    drift_direction: increasing
+    measurement_count: 100
+  expect:
+    alert_level: NONE
+    sigma_band: "<1.5σ (within normal variation)"
+    action: "No action required — within expected variation"
+    algorithm: "ALG-2025-029: drift < 1.5σ → NONE"
+
+# 21. measurement_count exactly 30 — NOT downgraded (boundary)
+- input:
+    drift_sigma: 3.5
+    drift_direction: stable
+    measurement_count: 30
+  expect:
+    alert_level: CRITICAL
+    sigma_band: "≥3.0σ (0.3% false positive rate)"
+    action: "Immediate investigation required — extreme drift from baseline"
+    algorithm: "ALG-2025-029: drift ≥ 3.0σ → CRITICAL"
+
+# 22. measurement_count 29 — IS downgraded (boundary)
+- input:
+    drift_sigma: 3.5
+    drift_direction: stable
+    measurement_count: 29
+  expect:
+    alert_level: ALERT
+    sigma_band: "≥3.0σ (downgraded from CRITICAL — baseline n<30)"
+    action: "Confirm with larger baseline — drift exceeds 3σ but insufficient measurement history"
+    algorithm: "ALG-2025-029: drift ≥ 3.0σ, n<30 → ALERT (downgraded)"

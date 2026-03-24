@@ -1,0 +1,134 @@
+name: adapt-risk-tier
+description: "Adapter: convert risk_tier from DailyMed/recall configmigrams to signal pipeline inputs"
+version: 0.1.0
+
+interface:
+  inputs:
+    risk_tier:
+      type: string
+      required: false
+      description: "From config-dailymed-adr-risk: critical, high, moderate, low"
+    urgency:
+      type: string
+      required: false
+      description: "From config-fda-recall-severity: critical, high, moderate, low, informational"
+  outputs:
+    signal_detected:
+      type: bool
+    is_serious:
+      type: bool
+    prr:
+      type: float
+
+tree:
+  start: check_risk_tier
+  nodes:
+    check_risk_tier:
+      type: condition
+      variable: risk_tier
+      operator: is_null
+      true_next: check_urgency
+      false_next: check_critical_risk
+
+    check_critical_risk:
+      type: condition
+      variable: risk_tier
+      operator: eq
+      value: "critical"
+      true_next: critical_out
+      false_next: check_high_risk
+
+    check_high_risk:
+      type: condition
+      variable: risk_tier
+      operator: eq
+      value: "high"
+      true_next: high_out
+      false_next: check_moderate_risk
+
+    check_moderate_risk:
+      type: condition
+      variable: risk_tier
+      operator: eq
+      value: "moderate"
+      true_next: moderate_out
+      false_next: low_out
+
+    check_urgency:
+      type: condition
+      variable: urgency
+      operator: is_null
+      true_next: low_out
+      false_next: check_critical_urgency
+
+    check_critical_urgency:
+      type: condition
+      variable: urgency
+      operator: eq
+      value: "critical"
+      true_next: critical_out
+      false_next: check_high_urgency
+
+    check_high_urgency:
+      type: condition
+      variable: urgency
+      operator: eq
+      value: "high"
+      true_next: high_out
+      false_next: check_moderate_urgency
+
+    check_moderate_urgency:
+      type: condition
+      variable: urgency
+      operator: eq
+      value: "moderate"
+      true_next: moderate_out
+      false_next: low_out
+
+    critical_out:
+      type: return
+      value:
+        signal_detected: true
+        is_serious: true
+        prr: 8.0
+
+    high_out:
+      type: return
+      value:
+        signal_detected: true
+        is_serious: true
+        prr: 5.0
+
+    moderate_out:
+      type: return
+      value:
+        signal_detected: true
+        is_serious: false
+        prr: 2.5
+
+    low_out:
+      type: return
+      value:
+        signal_detected: false
+        is_serious: false
+        prr: 0.5
+
+tests:
+  - input: { risk_tier: "critical" }
+    expect: { signal_detected: true, is_serious: true, prr: 8.0 }
+  - input: { risk_tier: "high" }
+    expect: { signal_detected: true, is_serious: true, prr: 5.0 }
+  - input: { risk_tier: "moderate" }
+    expect: { signal_detected: true, is_serious: false, prr: 2.5 }
+  - input: { risk_tier: "low" }
+    expect: { signal_detected: false, is_serious: false, prr: 0.5 }
+  - input: { urgency: "critical" }
+    expect: { signal_detected: true, is_serious: true, prr: 8.0 }
+  - input: { urgency: "high" }
+    expect: { signal_detected: true, is_serious: true, prr: 5.0 }
+  - input: { urgency: "moderate" }
+    expect: { signal_detected: true, is_serious: false, prr: 2.5 }
+  - input: { urgency: "low" }
+    expect: { signal_detected: false, is_serious: false, prr: 0.5 }
+  - input: {}
+    expect: { signal_detected: false, is_serious: false, prr: 0.5 }

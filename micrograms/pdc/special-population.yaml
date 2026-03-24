@@ -1,0 +1,183 @@
+name: special-population
+description: "Domain 2: Flag special population considerations for ADR assessment — pediatric, geriatric, pregnancy, renal/hepatic, immunocompromised."
+version: 0.1.0
+interface:
+  inputs:
+    age_years:
+      type: int
+      required: false
+    hepatic_impairment:
+      type: bool
+      required: false
+    immunocompromised:
+      type: bool
+      required: false
+    is_pregnant:
+      type: bool
+      required: false
+    renal_impairment:
+      type: bool
+      required: false
+  outputs:
+    ai_flag:
+      type: string
+    considerations:
+      type: string
+    dose_adjustment:
+      type: string
+    enhanced_monitoring:
+      type: bool
+    population:
+      type: string
+    special_reporting:
+      type: string
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: age_years
+      operator: is_null
+      value: null
+      true_next: unknown_return
+      false_next: check_pediatric
+    unknown_return:
+      type: return
+      value:
+        population: UNKNOWN_AGE
+        considerations: Age required for population classification
+    check_pediatric:
+      type: condition
+      variable: age_years
+      operator: lte
+      value: 17
+      true_next: pediatric
+      false_next: check_geriatric
+    check_geriatric:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 65
+      true_next: geriatric
+      false_next: check_pregnant
+    check_pregnant:
+      type: condition
+      variable: is_pregnant
+      operator: eq
+      value: true
+      true_next: pregnancy
+      false_next: check_renal
+    check_renal:
+      type: condition
+      variable: renal_impairment
+      operator: eq
+      value: true
+      true_next: renal_hepatic
+      false_next: check_hepatic
+    check_hepatic:
+      type: condition
+      variable: hepatic_impairment
+      operator: eq
+      value: true
+      true_next: renal_hepatic
+      false_next: check_immuno
+    check_immuno:
+      type: condition
+      variable: immunocompromised
+      operator: eq
+      value: true
+      true_next: immunocompromised
+      false_next: general_population
+    pediatric:
+      type: return
+      value:
+        population: PEDIATRIC
+        considerations: "developmental pharmacology, weight-based dosing, off-label use, growth effects"
+        enhanced_monitoring: true
+        dose_adjustment: "weight-based, age-stratified"
+        special_reporting: "pediatric-specific regulatory requirements"
+        ai_flag: "age-appropriate reference ranges, developmental stage modeling"
+    geriatric:
+      type: return
+      value:
+        population: GERIATRIC
+        considerations: "polypharmacy risk, age-related PK changes, frailty, falls risk, cognitive effects"
+        enhanced_monitoring: true
+        dose_adjustment: "reduced doses often needed, renal function monitoring"
+        special_reporting: "falls, cognitive decline, anticholinergic burden"
+        ai_flag: "polypharmacy interaction screening, Beers criteria check"
+    pregnancy:
+      type: return
+      value:
+        population: PREGNANCY
+        considerations: "teratogenicity, trimester-specific risks, lactation transfer, fetal monitoring"
+        enhanced_monitoring: true
+        dose_adjustment: "PK changes in pregnancy, trimester-specific"
+        special_reporting: "pregnancy registry enrollment, expedited reporting requirements"
+        ai_flag: "teratogenicity database cross-reference, pregnancy outcome tracking"
+    renal_hepatic:
+      type: return
+      value:
+        population: ORGAN_IMPAIRMENT
+        considerations: "altered drug clearance, accumulation risk, metabolite toxicity"
+        enhanced_monitoring: true
+        dose_adjustment: "renal/hepatic function-based dosing, therapeutic drug monitoring"
+        special_reporting: "organ function monitoring, dose modification documentation"
+        ai_flag: "clearance modeling, drug accumulation prediction"
+    immunocompromised:
+      type: return
+      value:
+        population: IMMUNOCOMPROMISED
+        considerations: "altered immune responses, infection susceptibility, vaccine safety, drug interactions"
+        enhanced_monitoring: true
+        dose_adjustment: "immune status-based monitoring"
+        special_reporting: "opportunistic infections, immune reconstitution events"
+        ai_flag: "immune status monitoring, infection risk modeling"
+    general_population:
+      type: return
+      value:
+        population: GENERAL
+        considerations: "standard ADR assessment protocols apply"
+        enhanced_monitoring: false
+        dose_adjustment: "standard dosing"
+        special_reporting: "routine reporting requirements"
+tests:
+- input:
+    age_years: 5
+  expect:
+    population: PEDIATRIC
+    enhanced_monitoring: true
+- input:
+    age_years: 72
+  expect:
+    population: GERIATRIC
+    enhanced_monitoring: true
+- input:
+    age_years: 30
+    is_pregnant: true
+  expect:
+    population: PREGNANCY
+- input:
+    age_years: 50
+    renal_impairment: true
+  expect:
+    population: ORGAN_IMPAIRMENT
+- input:
+    age_years: 45
+    hepatic_impairment: true
+  expect:
+    population: ORGAN_IMPAIRMENT
+- input:
+    age_years: 40
+    immunocompromised: true
+  expect:
+    population: IMMUNOCOMPROMISED
+- input:
+    age_years: 35
+  expect:
+    population: GENERAL
+    enhanced_monitoring: false
+- input: {}
+  expect:
+    population: UNKNOWN_AGE
+    considerations: Age required for population classification

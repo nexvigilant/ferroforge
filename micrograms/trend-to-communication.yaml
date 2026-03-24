@@ -1,0 +1,146 @@
+name: trend-to-communication
+description: Routes trend analysis to communication action level determination
+version: 0.1.0
+tree:
+  start: check_direction
+  nodes:
+    stable_other:
+      type: return
+      value:
+        urgency: deferred
+        communication_level: routine
+    decreasing_large:
+      type: return
+      value:
+        communication_level: none
+        urgency: deferred
+    check_direction:
+      type: condition
+      variable: trend_direction
+      operator: eq
+      value: increasing
+      true_next: check_magnitude_increasing
+      false_next: check_stable
+    stable_large:
+      type: return
+      value:
+        communication_level: routine
+        urgency: 90_days
+    decreasing_other:
+      type: return
+      value:
+        urgency: deferred
+        communication_level: none
+    check_magnitude_stable:
+      type: condition
+      variable: magnitude
+      operator: eq
+      value: large
+      true_next: stable_large
+      false_next: stable_other
+    check_magnitude_inc_moderate:
+      type: condition
+      variable: magnitude
+      operator: eq
+      value: moderate
+      true_next: increasing_moderate
+      false_next: increasing_small
+    check_stable:
+      type: condition
+      variable: trend_direction
+      operator: eq
+      value: stable
+      true_next: check_magnitude_stable
+      false_next: decreasing_path
+    increasing_large:
+      type: return
+      value:
+        communication_level: dhpc
+        urgency: immediate
+    increasing_small:
+      type: return
+      value:
+        urgency: 90_days
+        communication_level: routine
+    check_magnitude_increasing:
+      type: condition
+      variable: magnitude
+      operator: eq
+      value: large
+      true_next: increasing_large
+      false_next: check_magnitude_inc_moderate
+    decreasing_path:
+      type: condition
+      variable: magnitude
+      operator: eq
+      value: large
+      true_next: decreasing_large
+      false_next: decreasing_other
+    increasing_moderate:
+      type: return
+      value:
+        communication_level: label_update
+        urgency: 30_days
+tests:
+- input:
+    magnitude: ''
+    trend_direction: ''
+  expect:
+    urgency: deferred
+    communication_level: none
+- input:
+    magnitude: ''
+    trend_direction: increasing
+  expect:
+    urgency: 90_days
+    communication_level: routine
+- input:
+    magnitude: ''
+    trend_direction: stable
+  expect:
+    urgency: deferred
+    communication_level: routine
+- input:
+    magnitude: large
+    trend_direction: ''
+  expect:
+    communication_level: none
+    urgency: deferred
+- input:
+    magnitude: large
+    trend_direction: increasing
+  expect:
+    communication_level: dhpc
+    urgency: immediate
+- input:
+    magnitude: large
+    trend_direction: stable
+  expect:
+    communication_level: routine
+    urgency: 90_days
+- input:
+    magnitude: moderate
+    trend_direction: increasing
+  expect:
+    communication_level: label_update
+    urgency: 30_days
+- input: {}
+  expect:
+    urgency: deferred
+    communication_level: none
+interface:
+  inputs:
+    magnitude:
+      type: string
+      required: true
+    trend_direction:
+      type: string
+      required: true
+  outputs:
+    communication_level:
+      type: string
+      required: false
+    urgency:
+      type: string
+      required: false
+  aliases: {}

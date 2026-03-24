@@ -1,0 +1,125 @@
+name: label-to-expectedness
+description: Routes adverse event from label status to expectedness classification
+version: 0.1.0
+tree:
+  start: check_in_label
+  nodes:
+    check_precautions:
+      type: condition
+      variable: label_section
+      operator: eq
+      value: precautions
+      true_next: in_precautions
+      false_next: postmarketing
+    in_adverse_reactions:
+      type: return
+      value:
+        implications: Expected adverse event - weight in signal detection accordingly
+        expected: true
+        expectedness_source: labeled_adverse_reaction
+    check_section:
+      type: condition
+      variable: label_section
+      operator: eq
+      value: adverse_reactions
+      true_next: in_adverse_reactions
+      false_next: check_warnings
+    in_warnings:
+      type: return
+      value:
+        expected: true
+        implications: Expected serious event per label warnings - consider severity
+          context
+        expectedness_source: labeled_warning
+    check_warnings:
+      type: condition
+      variable: label_section
+      operator: eq
+      value: warnings
+      true_next: in_warnings
+      false_next: check_precautions
+    check_in_label:
+      type: condition
+      variable: event_in_label
+      operator: eq
+      value: true
+      true_next: check_section
+      false_next: not_in_label
+    postmarketing:
+      type: return
+      value:
+        implications: Event identified postmarketing - may represent emerging signal
+        expected: false
+        expectedness_source: postmarketing_experience
+    in_precautions:
+      type: return
+      value:
+        implications: Expected event under specific conditions - evaluate risk factors
+        expected: true
+        expectedness_source: labeled_precaution
+    not_in_label:
+      type: return
+      value:
+        implications: Unexpected event - higher potential signal value for detection
+        expected: false
+        expectedness_source: unlabeled
+tests:
+- input:
+    event_in_label: false
+    label_section: ''
+  expect:
+    implications: Unexpected event - higher potential signal value for detection
+    expected: false
+    expectedness_source: unlabeled
+- input:
+    event_in_label: true
+    label_section: ''
+  expect:
+    implications: Event identified postmarketing - may represent emerging signal
+    expected: false
+    expectedness_source: postmarketing_experience
+- input:
+    event_in_label: true
+    label_section: adverse_reactions
+  expect:
+    implications: Expected adverse event - weight in signal detection accordingly
+    expected: true
+    expectedness_source: labeled_adverse_reaction
+- input:
+    event_in_label: true
+    label_section: precautions
+  expect:
+    implications: Expected event under specific conditions - evaluate risk factors
+    expected: true
+    expectedness_source: labeled_precaution
+- input:
+    event_in_label: true
+    label_section: warnings
+  expect:
+    expected: true
+    implications: Expected serious event per label warnings - consider severity context
+    expectedness_source: labeled_warning
+- input: {}
+  expect:
+    implications: Unexpected event - higher potential signal value for detection
+    expected: false
+    expectedness_source: unlabeled
+interface:
+  inputs:
+    label_section:
+      type: string
+      required: false
+    event_in_label:
+      type: boolean
+      required: true
+  outputs:
+    expected:
+      type: boolean
+      required: false
+    expectedness_source:
+      type: string
+      required: false
+    implications:
+      type: string
+      required: false
+  aliases: {}

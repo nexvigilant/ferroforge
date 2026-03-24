@@ -1,0 +1,202 @@
+name: appe-rubric-scorer
+description: "APPE Ch7.6: Behavioral anchor rubric scorer — rates a single observation on the 4-point scale (1=Beginning to 4=Exemplary) across three dimensions"
+version: 0.1.0
+interface:
+  inputs:
+    communication_effectiveness:
+      type: int
+      required: false
+    integration_quality:
+      type: int
+      required: false
+    regulatory_knowledge:
+      type: int
+      required: false
+  outputs:
+    descriptor:
+      type: string
+    improvement_focus:
+      type: string
+    rubric_level:
+      type: string
+    score:
+      type: float
+    weakest_dimension:
+      type: string
+tree:
+  start: check4_reg
+  nodes:
+    # --- EXEMPLARY PATH: check all dimensions >= 4 ---
+    check4_reg:
+      type: condition
+      variable: regulatory_knowledge
+      operator: gte
+      value: 4
+      true_next: check4_comm
+      false_next: check3_reg
+
+    check4_comm:
+      type: condition
+      variable: communication_effectiveness
+      operator: gte
+      value: 4
+      true_next: check4_int
+      false_next: check3_comm
+
+    check4_int:
+      type: condition
+      variable: integration_quality
+      operator: gte
+      value: 4
+      true_next: exemplary
+      false_next: check3_int
+
+    # --- PROFICIENT PATH: check all dimensions >= 3 ---
+    check3_reg:
+      type: condition
+      variable: regulatory_knowledge
+      operator: gte
+      value: 3
+      true_next: check3_comm
+      false_next: check2_reg
+
+    check3_comm:
+      type: condition
+      variable: communication_effectiveness
+      operator: gte
+      value: 3
+      true_next: check3_int
+      false_next: check2_comm
+
+    check3_int:
+      type: condition
+      variable: integration_quality
+      operator: gte
+      value: 3
+      true_next: proficient
+      false_next: check2_int
+
+    # --- DEVELOPING / BEGINNING PATH: check all dimensions >= 2 ---
+    check2_reg:
+      type: condition
+      variable: regulatory_knowledge
+      operator: gte
+      value: 2
+      true_next: check2_comm
+      false_next: beginning_reg
+
+    check2_comm:
+      type: condition
+      variable: communication_effectiveness
+      operator: gte
+      value: 2
+      true_next: check2_int
+      false_next: beginning_comm
+
+    check2_int:
+      type: condition
+      variable: integration_quality
+      operator: gte
+      value: 2
+      true_next: developing
+      false_next: beginning_int
+
+    # --- RETURN NODES ---
+    exemplary:
+      type: return
+      value:
+        rubric_level: EXEMPLARY
+        score: 4.0
+        descriptor: "Demonstrates comprehensive understanding with future implications"
+        weakest_dimension: "none"
+        improvement_focus: "Maintain excellence and mentor peers through complex PV scenarios"
+
+    proficient:
+      type: return
+      value:
+        rubric_level: PROFICIENT
+        score: 3.0
+        descriptor: "Shows solid understanding with appropriate application"
+        weakest_dimension: "n/a"
+        improvement_focus: "Develop advanced application and synthesis skills toward EPA demonstration"
+
+    developing:
+      type: return
+      value:
+        rubric_level: DEVELOPING
+        score: 2.0
+        descriptor: "Basic understanding with some gaps"
+        weakest_dimension: "n/a"
+        improvement_focus: "Targeted practice in identified gap areas with preceptor guidance"
+
+    beginning_reg:
+      type: return
+      value:
+        rubric_level: BEGINNING
+        score: 1.0
+        descriptor: "Minimal knowledge, significant development needed"
+        weakest_dimension: "regulatory_knowledge"
+        improvement_focus: "Focus on ICH E2A/E2B regulatory framework fundamentals"
+
+    beginning_comm:
+      type: return
+      value:
+        rubric_level: BEGINNING
+        score: 1.0
+        descriptor: "Minimal knowledge, significant development needed"
+        weakest_dimension: "communication_effectiveness"
+        improvement_focus: "Practice structured communication in clinical and PV contexts"
+
+    beginning_int:
+      type: return
+      value:
+        rubric_level: BEGINNING
+        score: 1.0
+        descriptor: "Minimal knowledge, significant development needed"
+        weakest_dimension: "integration_quality"
+        improvement_focus: "Develop synthesis skills connecting regulatory and clinical knowledge"
+
+tests:
+# EXEMPLARY: all dimensions at 4
+- input: { regulatory_knowledge: 4, communication_effectiveness: 4, integration_quality: 4 }
+  expect: { rubric_level: EXEMPLARY, score: 4.0, weakest_dimension: none }
+# PROFICIENT: all dimensions at 3
+- input: { regulatory_knowledge: 3, communication_effectiveness: 3, integration_quality: 3 }
+  expect: { rubric_level: PROFICIENT, score: 3.0 }
+# PROFICIENT: reg=4, comm=3, int=3 (mixed near-exemplary)
+- input: { regulatory_knowledge: 4, communication_effectiveness: 3, integration_quality: 3 }
+  expect: { rubric_level: PROFICIENT, score: 3.0 }
+# PROFICIENT: reg=4, comm=4, int=3 (one dimension below exemplary)
+- input: { regulatory_knowledge: 4, communication_effectiveness: 4, integration_quality: 3 }
+  expect: { rubric_level: PROFICIENT, score: 3.0 }
+# DEVELOPING: all dimensions at 2
+- input: { regulatory_knowledge: 2, communication_effectiveness: 2, integration_quality: 2 }
+  expect: { rubric_level: DEVELOPING, score: 2.0 }
+# DEVELOPING: mixed — one proficient, one developing, one exemplary
+- input: { regulatory_knowledge: 3, communication_effectiveness: 2, integration_quality: 4 }
+  expect: { rubric_level: DEVELOPING, score: 2.0 }
+# DEVELOPING: reg=2, comm=4, int=4 (reg is the bottleneck at 2)
+- input: { regulatory_knowledge: 2, communication_effectiveness: 4, integration_quality: 4 }
+  expect: { rubric_level: DEVELOPING, score: 2.0 }
+# BEGINNING: regulatory_knowledge = 1 (weakest dimension)
+- input: { regulatory_knowledge: 1, communication_effectiveness: 3, integration_quality: 3 }
+  expect: { rubric_level: BEGINNING, score: 1.0, weakest_dimension: regulatory_knowledge }
+# BEGINNING: communication_effectiveness = 1 (weakest dimension)
+- input: { regulatory_knowledge: 3, communication_effectiveness: 1, integration_quality: 3 }
+  expect: { rubric_level: BEGINNING, score: 1.0, weakest_dimension: communication_effectiveness }
+# BEGINNING: integration_quality = 1 (weakest dimension)
+- input: { regulatory_knowledge: 4, communication_effectiveness: 4, integration_quality: 1 }
+  expect: { rubric_level: BEGINNING, score: 1.0, weakest_dimension: integration_quality }
+# BEGINNING: all dimensions at 1
+- input: { regulatory_knowledge: 1, communication_effectiveness: 1, integration_quality: 1 }
+  expect: { rubric_level: BEGINNING, score: 1.0 }
+# Edge: boundary between DEVELOPING and BEGINNING (reg=2 exactly)
+- input: { regulatory_knowledge: 2, communication_effectiveness: 3, integration_quality: 4 }
+  expect: { rubric_level: DEVELOPING, score: 2.0 }
+- input: {}
+  expect:
+    descriptor: "Minimal knowledge, significant development needed"
+    improvement_focus: Focus on ICH E2A/E2B regulatory framework fundamentals
+    rubric_level: BEGINNING
+    score: 1.0
+    weakest_dimension: regulatory_knowledge

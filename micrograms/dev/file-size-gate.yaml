@@ -1,0 +1,117 @@
+name: file-size-gate
+description: 'Code hygiene gate: classifies source files by line count for single-pass readability. Files over 500 lines need splitting.'
+version: 0.1.0
+interface:
+  inputs:
+    line_count:
+      type: int
+      required: true
+  outputs:
+    size_class:
+      type: string
+    needs_split:
+      type: bool
+    reason:
+      type: string
+tree:
+  start: check_critical
+  nodes:
+    check_critical:
+      type: condition
+      variable: line_count
+      operator: gte
+      value: 1500
+      true_next: critical
+      false_next: check_large
+    check_large:
+      type: condition
+      variable: line_count
+      operator: gte
+      value: 500
+      true_next: large
+      false_next: check_medium
+    check_medium:
+      type: condition
+      variable: line_count
+      operator: gte
+      value: 200
+      true_next: medium
+      false_next: small
+    critical:
+      type: return
+      value:
+        size_class: CRITICAL
+        needs_split: true
+        reason: File exceeds 1500 lines — exceeds LLM single-pass token limit, split immediately
+    large:
+      type: return
+      value:
+        size_class: LARGE
+        needs_split: true
+        reason: File exceeds 500 lines — split into submodules for maintainability
+    medium:
+      type: return
+      value:
+        size_class: MEDIUM
+        needs_split: false
+        reason: File is 200-499 lines — acceptable, monitor for growth
+    small:
+      type: return
+      value:
+        size_class: SMALL
+        needs_split: false
+        reason: File is under 200 lines — optimal size
+tests:
+- input:
+    line_count: 2855
+  expect:
+    size_class: CRITICAL
+    needs_split: true
+    reason: File exceeds 1500 lines — exceeds LLM single-pass token limit, split immediately
+- input:
+    line_count: 1500
+  expect:
+    size_class: CRITICAL
+    needs_split: true
+    reason: File exceeds 1500 lines — exceeds LLM single-pass token limit, split immediately
+- input:
+    line_count: 800
+  expect:
+    size_class: LARGE
+    needs_split: true
+    reason: File exceeds 500 lines — split into submodules for maintainability
+- input:
+    line_count: 500
+  expect:
+    size_class: LARGE
+    needs_split: true
+    reason: File exceeds 500 lines — split into submodules for maintainability
+- input:
+    line_count: 350
+  expect:
+    size_class: MEDIUM
+    needs_split: false
+    reason: File is 200-499 lines — acceptable, monitor for growth
+- input:
+    line_count: 200
+  expect:
+    size_class: MEDIUM
+    needs_split: false
+    reason: File is 200-499 lines — acceptable, monitor for growth
+- input:
+    line_count: 150
+  expect:
+    size_class: SMALL
+    needs_split: false
+    reason: File is under 200 lines — optimal size
+- input:
+    line_count: 0
+  expect:
+    size_class: SMALL
+    needs_split: false
+    reason: File is under 200 lines — optimal size
+- input: {}
+  expect:
+    size_class: SMALL
+    needs_split: false
+    reason: File is under 200 lines — optimal size

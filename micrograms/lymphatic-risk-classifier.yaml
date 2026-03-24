@@ -1,0 +1,126 @@
+name: lymphatic-risk-classifier
+description: 'Lymphatic safety classifier: maps lymphoproliferative and haematologic adverse reactions to severity grades'
+version: 0.1.0
+interface:
+  inputs:
+    reaction_pt:
+      type: string
+      required: true
+      description: MedDRA preferred term for the haematologic/lymphatic reaction
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    soc:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_lymphoma
+  nodes:
+    check_lymphoma:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: LYMPHOMA
+      true_next: critical
+      false_next: check_leukaemia
+    check_leukaemia:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: LEUKAEMIA
+      true_next: critical
+      false_next: check_pancytopenia
+    check_pancytopenia:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: PANCYTOPENIA
+      true_next: serious
+      false_next: check_agranulocytosis
+    check_agranulocytosis:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: AGRANULOCYTOSIS
+      true_next: serious
+      false_next: check_neutropenia
+    check_neutropenia:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: NEUTROPENIA
+      true_next: moderate
+      false_next: check_lymphopenia
+    check_lymphopenia:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: LYMPHOPENIA
+      true_next: moderate
+      false_next: mild
+    critical:
+      type: return
+      value:
+        severity: critical
+        soc: Blood and lymphatic system disorders
+        action: immediate_expedited_report
+    serious:
+      type: return
+      value:
+        severity: serious
+        soc: Blood and lymphatic system disorders
+        action: expedited_report
+    moderate:
+      type: return
+      value:
+        severity: moderate
+        soc: Blood and lymphatic system disorders
+        action: monitor_and_assess
+    mild:
+      type: return
+      value:
+        severity: mild
+        soc: Blood and lymphatic system disorders
+        action: routine_surveillance
+tests:
+  - name: lymphoma
+    input:
+      reaction_pt: B-CELL LYMPHOMA
+    expect:
+      severity: critical
+  - name: leukaemia
+    input:
+      reaction_pt: ACUTE MYELOID LEUKAEMIA
+    expect:
+      severity: critical
+  - name: pancytopenia
+    input:
+      reaction_pt: PANCYTOPENIA
+    expect:
+      severity: serious
+  - name: agranulocytosis
+    input:
+      reaction_pt: AGRANULOCYTOSIS
+    expect:
+      severity: serious
+  - name: neutropenia
+    input:
+      reaction_pt: FEBRILE NEUTROPENIA
+    expect:
+      severity: moderate
+  - name: lymphopenia
+    input:
+      reaction_pt: LYMPHOPENIA
+    expect:
+      severity: moderate
+  - name: mild_anaemia
+    input:
+      reaction_pt: ANAEMIA
+    expect:
+      severity: mild
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild

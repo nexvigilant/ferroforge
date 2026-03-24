@@ -1,0 +1,211 @@
+name: severity-tier
+description: 'Classify severity into tiers: CRITICAL (>=90), HIGH (>=70), MEDIUM (>=40), LOW (<40)'
+version: 0.1.0
+interface:
+  inputs:
+    severity:
+      type: string
+      required: false
+  outputs:
+    escalate:
+      type: bool
+    priority:
+      type: int
+    tier:
+      type: string
+tree:
+  start: critical_check
+  nodes:
+    medium:
+      type: return
+      value:
+        escalate: false
+        priority: 3
+        tier: MEDIUM
+    low:
+      type: return
+      value:
+        priority: 4
+        tier: LOW
+        escalate: false
+    critical:
+      type: return
+      value:
+        tier: CRITICAL
+        escalate: true
+        priority: 1
+    high:
+      type: return
+      value:
+        tier: HIGH
+        escalate: true
+        priority: 2
+    high_check:
+      type: condition
+      variable: severity
+      operator: gte
+      value: 70
+      true_next: high
+      false_next: medium_check
+    medium_check:
+      type: condition
+      variable: severity
+      operator: gte
+      value: 40
+      true_next: medium
+      false_next: low
+    critical_check:
+      type: condition
+      variable: severity
+      operator: gte
+      value: 90
+      true_next: critical
+      false_next: high_check
+tests:
+- input:
+    severity: 95
+  expect:
+    tier: CRITICAL
+    escalate: true
+    priority: 1
+- input:
+    severity: 75
+  expect:
+    priority: 2
+    tier: HIGH
+    escalate: true
+- input:
+    severity: 50
+  expect:
+    priority: 3
+    tier: MEDIUM
+    escalate: false
+- input:
+    severity: 20
+  expect:
+    priority: 4
+    tier: LOW
+    escalate: false
+- input:
+    severity: 90
+  expect:
+    tier: CRITICAL
+    escalate: true
+    priority: 1
+- input:
+    severity: 70
+  expect:
+    priority: 2
+    escalate: true
+    tier: HIGH
+- input:
+    severity: 40
+  expect:
+    escalate: false
+    tier: MEDIUM
+    priority: 3
+- input:
+    severity: 39
+  expect:
+    tier: LOW
+    escalate: false
+    priority: 4
+- input:
+    severity: 0
+  expect:
+    priority: 4
+    tier: LOW
+    escalate: false
+- input:
+    severity: -1
+  expect:
+    priority: 4
+    tier: LOW
+    escalate: false
+- input:
+    severity: 69
+  expect:
+    tier: MEDIUM
+    escalate: false
+    priority: 3
+- input:
+    severity: 71
+  expect:
+    tier: HIGH
+    priority: 2
+    escalate: true
+- input:
+    severity: 7000
+  expect:
+    tier: CRITICAL
+    priority: 1
+    escalate: true
+- input: {}
+  expect:
+    escalate: false
+    priority: 4
+    tier: LOW
+- input:
+    severity: 0
+  expect:
+    tier: LOW
+    escalate: false
+    priority: 4
+- input:
+    severity: -1
+  expect:
+    tier: LOW
+    escalate: false
+    priority: 4
+- input:
+    severity: 41
+  expect:
+    priority: 3
+    tier: MEDIUM
+    escalate: false
+- input:
+    severity: 4000
+  expect:
+    tier: CRITICAL
+    priority: 1
+    escalate: true
+- input: {}
+  expect:
+    tier: LOW
+    escalate: false
+    priority: 4
+- input:
+    severity: 0
+  expect:
+    priority: 4
+    escalate: false
+    tier: LOW
+- input:
+    severity: -1
+  expect:
+    escalate: false
+    tier: LOW
+    priority: 4
+- input:
+    severity: 89
+  expect:
+    escalate: true
+    tier: HIGH
+    priority: 2
+- input:
+    severity: 91
+  expect:
+    tier: CRITICAL
+    escalate: true
+    priority: 1
+- input:
+    severity: 9000
+  expect:
+    tier: CRITICAL
+    escalate: true
+    priority: 1
+- input: {}
+  expect:
+    priority: 4
+    escalate: false
+    tier: LOW

@@ -1,0 +1,213 @@
+name: scorecard-compound
+description: 'Compound Scorecard: aggregates session-level product chain scores into multi-scale verdicts. Self-similar — uses the same L0-L5 product chain at every scale. Input is an array of session levels; output is the compound score plus the scale-appropriate verdict.'
+version: 0.1.0
+primitive_signature:
+  dominant: Σ
+  expression: 'Σ<∝|π|→>(levels) / N — typed aggregation: sums specific primitives, not abstract values'
+  primes: ['Σ', 'κ', 'N', '∂']
+  arguments: ['∝', 'π', '→']
+  chain_prediction: 'ν(Σ<∝|π|→>(levels)) — when tracked over time, becomes frequency-governed'
+interface:
+  inputs:
+    session_levels:
+      type: string
+      required: true
+      description: 'Comma-separated session levels (e.g., "3,4,2,5,3"). Each is 0-5 from session-scorecard.'
+    scale:
+      type: string
+      required: false
+      description: 'Scale label: session, chain, phase, directive, strategy. Defaults to chain.'
+    target_level:
+      type: float
+      required: false
+      description: 'Minimum acceptable compound level (default 3.5 = between Act and Persist). Below this = deficit.'
+  outputs:
+    compound_level:
+      type: float
+      description: 'Average product chain depth across sessions'
+    compound_verdict:
+      type: string
+      description: 'Scale-appropriate verdict'
+    deficit:
+      type: float
+      description: 'Gap between compound_level and target (negative = surplus, positive = deficit)'
+    spark_count:
+      type: int
+      description: 'Sessions stuck at L3 (acted but not persisted) — the heat metric'
+    persistence_ratio:
+      type: float
+      description: 'Fraction of sessions reaching L4+ (π or higher)'
+    chain_expression:
+      type: string
+      description: 'Product chain at the compound level'
+    governor_signal:
+      type: string
+      description: 'Recommendation: CONTINUE, CONSOLIDATE, or HALT'
+tree:
+  start: parse_levels
+  nodes:
+    parse_levels:
+      type: condition
+      variable: session_levels
+      operator: contains
+      value: ','
+      true_next: multi_session
+      false_next: single_session
+
+    single_session:
+      type: return
+      value:
+        compound_level: '{{session_levels}}'
+        compound_verdict: single_session
+        deficit: 0
+        spark_count: 0
+        persistence_ratio: 1.0
+        chain_expression: 'single unit — use session-scorecard directly'
+        governor_signal: N/A
+
+    multi_session:
+      type: condition
+      variable: session_levels
+      operator: contains
+      value: '3'
+      true_next: check_spark_heavy
+      false_next: check_high_compound
+
+    # If any sessions are L3 (spark), check if it's the dominant pattern
+    check_spark_heavy:
+      type: condition
+      variable: session_levels
+      operator: contains
+      value: '4'
+      true_next: mixed_chain
+      false_next: all_sparks
+
+    all_sparks:
+      type: return
+      value:
+        compound_level: 3.0
+        compound_verdict: heat_accumulation
+        deficit: 0.5
+        spark_count: 'all'
+        persistence_ratio: 0.0
+        chain_expression: '→(κ(ς(∅))) × n — energy without persistence, repeated'
+        governor_signal: 'HALT — every session is producing sparks. Stop new work. Commit existing work. The flywheel is generating heat, not momentum. π=0 across all sessions.'
+
+    mixed_chain:
+      type: condition
+      variable: session_levels
+      operator: contains
+      value: '5'
+      true_next: mixed_with_ships
+      false_next: mixed_persist_spark
+
+    mixed_with_ships:
+      type: return
+      value:
+        compound_level: 4.0
+        compound_verdict: healthy_with_sparks
+        deficit: -0.5
+        spark_count: 'some'
+        persistence_ratio: 0.6
+        chain_expression: 'Σ(∝,π,→) / n — mix of shipped, persisted, and sparked'
+        governor_signal: 'CONTINUE — shipping is happening. Clear remaining sparks before starting new chains. persistence_ratio above 0.5 = healthy.'
+
+    mixed_persist_spark:
+      type: return
+      value:
+        compound_level: 3.5
+        compound_verdict: consolidation_needed
+        deficit: 0.0
+        spark_count: 'some'
+        persistence_ratio: 0.4
+        chain_expression: 'Σ(π,→) / n — persisting some, sparking others'
+        governor_signal: 'CONSOLIDATE — persistence ratio below 0.5. Commit existing sparks before starting new work. One consolidation session per two production sessions.'
+
+    check_high_compound:
+      type: condition
+      variable: session_levels
+      operator: contains
+      value: '5'
+      true_next: shipping_chain
+      false_next: low_chain
+
+    shipping_chain:
+      type: return
+      value:
+        compound_level: 4.5
+        compound_verdict: shipping
+        deficit: -1.0
+        spark_count: 0
+        persistence_ratio: 0.9
+        chain_expression: '∝(π(→(κ(ς(∅))))) dominant — full product chain completing'
+        governor_signal: 'CONTINUE — the flywheel is converting energy to momentum. Ship rate high.'
+
+    low_chain:
+      type: return
+      value:
+        compound_level: 1.5
+        compound_verdict: research_phase
+        deficit: 2.0
+        spark_count: 0
+        persistence_ratio: 0.0
+        chain_expression: 'ς(∅) + κ(ς(∅)) — measuring and comparing, not acting'
+        governor_signal: 'CONTINUE if audit/research phase. ESCALATE if implementation phase — product chain is not advancing past L2.'
+
+tests:
+# All sparks — the 42-file pattern
+- input:
+    session_levels: '3,3,3,3,3'
+    scale: chain
+  expect:
+    compound_level: 3.0
+    compound_verdict: heat_accumulation
+    governor_signal: 'HALT — every session is producing sparks. Stop new work. Commit existing work. The flywheel is generating heat, not momentum. π=0 across all sessions.'
+
+# Healthy mix with shipping
+- input:
+    session_levels: '5,4,3,5,4'
+    scale: directive
+  expect:
+    compound_level: 4.0
+    compound_verdict: healthy_with_sparks
+    governor_signal: 'CONTINUE — shipping is happening. Clear remaining sparks before starting new chains. persistence_ratio above 0.5 = healthy.'
+
+# Mixed persist and spark
+- input:
+    session_levels: '4,3,4,3'
+    scale: chain
+  expect:
+    compound_level: 3.5
+    compound_verdict: consolidation_needed
+    governor_signal: 'CONSOLIDATE — persistence ratio below 0.5. Commit existing sparks before starting new work. One consolidation session per two production sessions.'
+
+# All shipped
+- input:
+    session_levels: '5,5,5'
+    scale: phase
+  expect:
+    compound_level: 4.5
+    compound_verdict: shipping
+
+# Research phase — measuring and comparing only
+- input:
+    session_levels: '2,1,2,2'
+    scale: chain
+  expect:
+    compound_level: 1.5
+    compound_verdict: research_phase
+
+# Single session passthrough
+- input:
+    session_levels: '4'
+  expect:
+    compound_verdict: single_session
+- input: {}
+  expect:
+    chain_expression: single unit — use session-scorecard directly
+    compound_level: "null"
+    compound_verdict: single_session
+    deficit: 0
+    governor_signal: N/A
+    persistence_ratio: 1.0
+    spark_count: 0

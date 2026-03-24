@@ -1,0 +1,69 @@
+name: ab-conservation-violation
+description: 'Antibody: detects quantity conservation violations (stem-phys Preserve trait). Inputs are pre-computed delta and tolerance.'
+version: 0.1.0
+interface:
+  inputs:
+    absolute_delta:
+      type: number
+      required: true
+      description: 'abs(quantity_before - quantity_after), pre-computed'
+    tolerance:
+      type: number
+      required: true
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check_zero
+  nodes:
+    check_zero:
+      type: condition
+      variable: absolute_delta
+      operator: eq
+      value: 0
+      true_next: clean
+      false_next: check_small
+    check_small:
+      type: condition
+      variable: absolute_delta
+      operator: lte
+      value: 0.01
+      true_next: clean
+      false_next: check_medium
+    check_medium:
+      type: condition
+      variable: absolute_delta
+      operator: lte
+      value: 1.0
+      true_next: warn
+      false_next: violation
+    violation:
+      type: return
+      value:
+        threat: true
+        response: 'BLOCK: conservation violated — delta > 1.0'
+    warn:
+      type: return
+      value:
+        threat: false
+        response: 'WARN: conservation drift detected — delta between 0.01 and 1.0'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { absolute_delta: 0, tolerance: 0.01 }
+  expect: { threat: false }
+- input: { absolute_delta: 0.001, tolerance: 0.01 }
+  expect: { threat: false }
+- input: { absolute_delta: 0.5, tolerance: 0.01 }
+  expect: { threat: false }
+- input: { absolute_delta: 5.0, tolerance: 0.01 }
+  expect: { threat: true }
+- input: {}
+  expect:
+    response: "BLOCK: conservation violated — delta > 1.0"
+    threat: true

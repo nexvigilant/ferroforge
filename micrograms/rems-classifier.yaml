@@ -1,0 +1,200 @@
+name: rems-classifier
+description: 'FDA REMS type classifier: determines Risk Evaluation and Mitigation Strategy requirements per 21 CFR 314.520'
+version: 0.1.0
+interface:
+  inputs:
+    medication_guide_only:
+      type: bool
+      required: false
+    monitoring_required:
+      type: bool
+      required: false
+    patient_enrollment:
+      type: bool
+      required: false
+    prescriber_certification:
+      type: bool
+      required: false
+    restricted_distribution:
+      type: bool
+      required: false
+  outputs:
+    complexity:
+      type: string
+    elements:
+      type: string
+    regulatory_reference:
+      type: string
+    rems_type:
+      type: string
+tree:
+  start: restricted_dist_check
+  nodes:
+    restricted_dist_check:
+      type: condition
+      variable: restricted_distribution
+      operator: eq
+      value: true
+      true_next: full_rems
+      false_next: prescriber_and_patient_check
+    prescriber_and_patient_check:
+      type: condition
+      variable: prescriber_certification
+      operator: eq
+      value: true
+      true_next: patient_enrollment_check
+      false_next: prescriber_or_monitoring_check
+    patient_enrollment_check:
+      type: condition
+      variable: patient_enrollment
+      operator: eq
+      value: true
+      true_next: etasu_rems
+      false_next: prescriber_or_monitoring_check
+    prescriber_or_monitoring_check:
+      type: condition
+      variable: prescriber_certification
+      operator: eq
+      value: true
+      true_next: etasu_lite
+      false_next: monitoring_check
+    monitoring_check:
+      type: condition
+      variable: monitoring_required
+      operator: eq
+      value: true
+      true_next: etasu_lite
+      false_next: medguide_check
+    medguide_check:
+      type: condition
+      variable: medication_guide_only
+      operator: eq
+      value: true
+      true_next: medguide_only
+      false_next: no_rems
+    full_rems:
+      type: return
+      value:
+        rems_type: FULL_REMS
+        elements: "ETASU,MedGuide,CommPlan"
+        complexity: HIGH
+        regulatory_reference: 21 CFR 314.520
+    etasu_rems:
+      type: return
+      value:
+        rems_type: ETASU_REMS
+        elements: "ETASU,MedGuide"
+        complexity: HIGH
+        regulatory_reference: 21 CFR 314.520
+    etasu_lite:
+      type: return
+      value:
+        rems_type: ETASU_LITE
+        elements: "ETASU"
+        complexity: MODERATE
+        regulatory_reference: 21 CFR 314.520
+    medguide_only:
+      type: return
+      value:
+        rems_type: MEDGUIDE_ONLY
+        elements: "MedGuide"
+        complexity: LOW
+        regulatory_reference: 21 CFR 314.520
+    no_rems:
+      type: return
+      value:
+        rems_type: NO_REMS
+        elements: ""
+        complexity: NONE
+        regulatory_reference: 21 CFR 314.520
+tests:
+- input:
+    restricted_distribution: true
+    prescriber_certification: false
+    patient_enrollment: false
+    monitoring_required: false
+    medication_guide_only: false
+  expect:
+    rems_type: FULL_REMS
+    complexity: HIGH
+    regulatory_reference: 21 CFR 314.520
+- input:
+    restricted_distribution: true
+    prescriber_certification: true
+    patient_enrollment: true
+    monitoring_required: true
+    medication_guide_only: true
+  expect:
+    rems_type: FULL_REMS
+    complexity: HIGH
+- input:
+    restricted_distribution: false
+    prescriber_certification: true
+    patient_enrollment: true
+    monitoring_required: false
+    medication_guide_only: false
+  expect:
+    rems_type: ETASU_REMS
+    complexity: HIGH
+    elements: "ETASU,MedGuide"
+- input:
+    restricted_distribution: false
+    prescriber_certification: true
+    patient_enrollment: false
+    monitoring_required: false
+    medication_guide_only: false
+  expect:
+    rems_type: ETASU_LITE
+    complexity: MODERATE
+    elements: "ETASU"
+- input:
+    restricted_distribution: false
+    prescriber_certification: false
+    patient_enrollment: false
+    monitoring_required: true
+    medication_guide_only: false
+  expect:
+    rems_type: ETASU_LITE
+    complexity: MODERATE
+- input:
+    restricted_distribution: false
+    prescriber_certification: false
+    patient_enrollment: false
+    monitoring_required: false
+    medication_guide_only: true
+  expect:
+    rems_type: MEDGUIDE_ONLY
+    complexity: LOW
+    elements: "MedGuide"
+- input:
+    restricted_distribution: false
+    prescriber_certification: false
+    patient_enrollment: false
+    monitoring_required: false
+    medication_guide_only: false
+  expect:
+    rems_type: NO_REMS
+    complexity: NONE
+    elements: ""
+- input: {}
+  expect:
+    rems_type: NO_REMS
+    complexity: NONE
+- input:
+    restricted_distribution: false
+    prescriber_certification: true
+    patient_enrollment: true
+    monitoring_required: true
+    medication_guide_only: false
+  expect:
+    rems_type: ETASU_REMS
+    complexity: HIGH
+- input:
+    restricted_distribution: false
+    prescriber_certification: false
+    patient_enrollment: true
+    monitoring_required: false
+    medication_guide_only: false
+  expect:
+    rems_type: NO_REMS
+    complexity: NONE

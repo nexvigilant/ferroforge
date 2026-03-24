@@ -1,0 +1,66 @@
+name: dose-response-to-action
+description: 'Dose-response → causality → action chain: classifies dose-response relationship, feeds into Naranjo causality assessment, then determines regulatory action. Exercises cross-variable comparison microgram in chain context.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - dose-response-classifier
+  - naranjo-quick
+  - causality-to-action
+
+tests:
+# Monotonic dose-response + high Naranjo → probable → expedited
+- name: monotonic increase probable causality
+  input:
+    low_dose_rate: 10
+    mid_dose_rate: 25
+    high_dose_rate: 50
+    naranjo_score: 7
+    is_serious: true
+  expect:
+    pattern: MONOTONIC_INCREASE
+    dose_response_met: 'yes'
+    causality: PROBABLE
+    regulatory_action: expedited_report
+
+# Flat dose-response + low Naranjo → possible → monitor
+- name: flat response monitor
+  input:
+    low_dose_rate: 15
+    mid_dose_rate: 15
+    high_dose_rate: 15
+    naranjo_score: 3
+    is_serious: false
+  expect:
+    pattern: FLAT
+    dose_response_met: 'no'
+    causality: POSSIBLE
+    regulatory_action: monitor
+
+# Inverse dose-response + minimal Naranjo → possible → monitor
+- name: inverse response monitor
+  input:
+    low_dose_rate: 50
+    mid_dose_rate: 30
+    high_dose_rate: 10
+    naranjo_score: 1
+    is_serious: false
+  expect:
+    pattern: INVERSE
+    dose_response_met: 'no'
+    causality: POSSIBLE
+    regulatory_action: monitor
+
+# Threshold effect + moderate Naranjo → possible → monitor
+- name: threshold effect monitor
+  input:
+    low_dose_rate: 5
+    mid_dose_rate: 30
+    high_dose_rate: 30
+    naranjo_score: 4
+    is_serious: false
+  expect:
+    pattern: THRESHOLD_EFFECT
+    dose_response_met: 'yes'
+    causality: POSSIBLE
+    regulatory_action: monitor

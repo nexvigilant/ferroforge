@@ -1,0 +1,352 @@
+name: loop-cascade
+description: 'Flywheel loop interaction hierarchy (Spec Section 4). Cascade: 5→1→2→4,
+  with 3→2. Takes all 5 loop outputs and applies dependency rules to produce system-level
+  verdict. NOMINAL (all healthy), DEGRADED (warnings present), CASCADING (failure
+  propagating through dependency chain), COLLAPSED (2+ loops failed).'
+version: 0.1.0
+tree:
+  start: check_l5_failure
+  nodes:
+    check_l5_yield:
+      type: condition
+      variable: l5_state
+      operator: eq
+      value: yield_exceeded
+      true_next: check_l5_cascade_depth
+      false_next: check_l3_critical
+    check_l5_cascade_depth:
+      type: condition
+      variable: l1_state
+      operator: eq
+      value: disintegrated
+      true_next: collapsed_from_l5
+      false_next: check_l5_partial
+    degraded_l1:
+      type: return
+      value:
+        system_state: DEGRADED
+        cascade_path: L1_critical
+        primary_failure: L1_rim
+    nominal:
+      type: return
+      value:
+        primary_failure: none
+        system_state: NOMINAL
+        cascade_path: none
+    check_l1_state:
+      type: condition
+      variable: l1_state
+      operator: eq
+      value: disintegrated
+      true_next: collapsed_from_l1
+      false_next: check_l1_critical
+    check_l3_critical:
+      type: condition
+      variable: l3_class
+      operator: eq
+      value: critical
+      true_next: check_l3_cascade_depth
+      false_next: check_l1_state
+    degraded_l4:
+      type: return
+      value:
+        cascade_path: L4_precessing
+        system_state: DEGRADED
+        primary_failure: L4_gyroscopic
+    degraded_l4_severe:
+      type: return
+      value:
+        system_state: DEGRADED
+        cascade_path: L4_unstable
+        primary_failure: L4_gyroscopic
+    cascading_l5_to_l2:
+      type: return
+      value:
+        cascade_path: L5_to_L1_to_L2
+        system_state: CASCADING
+        primary_failure: L5_elastic
+    check_l1_momentum:
+      type: condition
+      variable: l2_above_critical
+      operator: eq
+      value: 0
+      true_next: cascading_l1_to_l2
+      false_next: degraded_l1
+    degraded_l3_warning:
+      type: return
+      value:
+        system_state: DEGRADED
+        cascade_path: L3_warning
+        primary_failure: L3_friction
+    check_l4_precessing:
+      type: condition
+      variable: l4_state
+      operator: eq
+      value: precessing
+      true_next: degraded_l4
+      false_next: degraded_l4_severe
+    degraded_l2:
+      type: return
+      value:
+        cascade_path: L2_below_critical
+        primary_failure: L2_momentum
+        system_state: DEGRADED
+    check_l5_failure:
+      type: condition
+      variable: l5_state
+      operator: eq
+      value: fatigue_failure_imminent
+      true_next: check_l5_cascade_depth
+      false_next: check_l5_yield
+    check_l2_state:
+      type: condition
+      variable: l2_above_critical
+      operator: eq
+      value: 0
+      true_next: degraded_l2
+      false_next: check_l4_state
+    degraded_l3:
+      type: return
+      value:
+        system_state: DEGRADED
+        cascade_path: L3_contained
+        primary_failure: L3_friction
+    check_l5_partial:
+      type: condition
+      variable: l2_above_critical
+      operator: eq
+      value: 0
+      true_next: cascading_l5_to_l2
+      false_next: degraded_l5
+    check_l1_critical:
+      type: condition
+      variable: l1_state
+      operator: eq
+      value: critical
+      true_next: check_l1_momentum
+      false_next: check_l2_state
+    check_warnings:
+      type: condition
+      variable: l3_class
+      operator: eq
+      value: warning
+      true_next: degraded_l3_warning
+      false_next: nominal
+    degraded_l5:
+      type: return
+      value:
+        cascade_path: L5_contained
+        system_state: DEGRADED
+        primary_failure: L5_elastic
+    cascading_l1_to_l2:
+      type: return
+      value:
+        system_state: CASCADING
+        primary_failure: L1_rim
+        cascade_path: L1_to_L2_to_L4
+    collapsed_from_l5:
+      type: return
+      value:
+        cascade_path: L5_to_L1_to_L2_to_L4
+        primary_failure: L5_elastic
+        system_state: COLLAPSED
+    check_l3_cascade_depth:
+      type: condition
+      variable: l2_above_critical
+      operator: eq
+      value: 0
+      true_next: cascading_l3_to_l2
+      false_next: degraded_l3
+    cascading_l3_to_l2:
+      type: return
+      value:
+        system_state: CASCADING
+        primary_failure: L3_friction
+        cascade_path: L3_to_L2_to_L4
+    collapsed_from_l1:
+      type: return
+      value:
+        primary_failure: L1_rim
+        cascade_path: L1_to_L2_to_L4
+        system_state: COLLAPSED
+    check_l4_state:
+      type: condition
+      variable: l4_state
+      operator: eq
+      value: stable
+      true_next: check_warnings
+      false_next: check_l4_precessing
+tests:
+- input:
+    l1_state: ''
+    l2_above_critical: -0.5
+    l3_class: ''
+    l4_state: ''
+    l5_state: ''
+  expect:
+    system_state: DEGRADED
+    cascade_path: L4_unstable
+    primary_failure: L4_gyroscopic
+- input:
+    l1_state: ''
+    l2_above_critical: -0.5
+    l3_class: ''
+    l4_state: ''
+    l5_state: fatigue_failure_imminent
+  expect:
+    cascade_path: L5_contained
+    system_state: DEGRADED
+    primary_failure: L5_elastic
+- input:
+    l1_state: ''
+    l2_above_critical: -0.5
+    l3_class: ''
+    l4_state: ''
+    l5_state: yield_exceeded
+  expect:
+    cascade_path: L5_contained
+    system_state: DEGRADED
+    primary_failure: L5_elastic
+- input:
+    l1_state: ''
+    l2_above_critical: -0.5
+    l3_class: ''
+    l4_state: precessing
+    l5_state: ''
+  expect:
+    cascade_path: L4_precessing
+    system_state: DEGRADED
+    primary_failure: L4_gyroscopic
+- input:
+    l1_state: ''
+    l2_above_critical: -0.5
+    l3_class: ''
+    l4_state: stable
+    l5_state: ''
+  expect:
+    primary_failure: none
+    system_state: NOMINAL
+    cascade_path: none
+- input:
+    l1_state: ''
+    l2_above_critical: -0.5
+    l3_class: critical
+    l4_state: ''
+    l5_state: ''
+  expect:
+    system_state: DEGRADED
+    cascade_path: L3_contained
+    primary_failure: L3_friction
+- input:
+    l1_state: ''
+    l2_above_critical: -0.5
+    l3_class: warning
+    l4_state: stable
+    l5_state: ''
+  expect:
+    system_state: DEGRADED
+    cascade_path: L3_warning
+    primary_failure: L3_friction
+- input:
+    l1_state: ''
+    l2_above_critical: 0
+    l3_class: ''
+    l4_state: ''
+    l5_state: ''
+  expect:
+    cascade_path: L2_below_critical
+    primary_failure: L2_momentum
+    system_state: DEGRADED
+- input:
+    l1_state: ''
+    l2_above_critical: 0
+    l3_class: ''
+    l4_state: ''
+    l5_state: fatigue_failure_imminent
+  expect:
+    cascade_path: L5_to_L1_to_L2
+    system_state: CASCADING
+    primary_failure: L5_elastic
+- input:
+    l1_state: ''
+    l2_above_critical: 0
+    l3_class: critical
+    l4_state: ''
+    l5_state: ''
+  expect:
+    system_state: CASCADING
+    primary_failure: L3_friction
+    cascade_path: L3_to_L2_to_L4
+- input:
+    l1_state: critical
+    l2_above_critical: -0.5
+    l3_class: ''
+    l4_state: ''
+    l5_state: ''
+  expect:
+    system_state: DEGRADED
+    cascade_path: L1_critical
+    primary_failure: L1_rim
+- input:
+    l1_state: critical
+    l2_above_critical: 0
+    l3_class: ''
+    l4_state: ''
+    l5_state: ''
+  expect:
+    system_state: CASCADING
+    primary_failure: L1_rim
+    cascade_path: L1_to_L2_to_L4
+- input:
+    l1_state: disintegrated
+    l2_above_critical: -0.5
+    l3_class: ''
+    l4_state: ''
+    l5_state: ''
+  expect:
+    primary_failure: L1_rim
+    cascade_path: L1_to_L2_to_L4
+    system_state: COLLAPSED
+- input:
+    l1_state: disintegrated
+    l2_above_critical: -0.5
+    l3_class: ''
+    l4_state: ''
+    l5_state: fatigue_failure_imminent
+  expect:
+    cascade_path: L5_to_L1_to_L2_to_L4
+    primary_failure: L5_elastic
+    system_state: COLLAPSED
+- input: {}
+  expect:
+    system_state: DEGRADED
+    cascade_path: L4_unstable
+    primary_failure: L4_gyroscopic
+interface:
+  inputs:
+    l1_state:
+      type: string
+      required: true
+    l5_state:
+      type: string
+      required: true
+    l2_above_critical:
+      type: int
+      required: true
+    l4_state:
+      type: string
+      required: true
+    l3_class:
+      type: string
+      required: true
+  outputs:
+    system_state:
+      type: string
+      required: false
+    primary_failure:
+      type: string
+      required: false
+    cascade_path:
+      type: string
+      required: false
+  aliases: {}

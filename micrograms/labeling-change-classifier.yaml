@@ -1,0 +1,138 @@
+name: labeling-change-classifier
+description: Classify FDA drug labeling changes by type and assess regulatory impact
+version: 0.1.0
+tree:
+  start: validate_change_type
+  nodes:
+    change_contraindication:
+      type: return
+      value:
+        severity_rank: 5
+        regulatory_action: contraindication_addition
+        requires_dhpc: true
+    check_warning:
+      type: condition
+      variable: change_type
+      operator: matches
+      value: (?i)^warning$
+      true_next: change_warning
+      false_next: check_precaution
+    unknown_type:
+      type: return
+      value:
+        regulatory_action: null
+        severity_rank: null
+        requires_dhpc: false
+    check_contraindication:
+      type: condition
+      variable: change_type
+      operator: matches
+      value: (?i)^contraindication$
+      true_next: change_contraindication
+      false_next: check_warning
+    missing_input:
+      type: return
+      value:
+        requires_dhpc: false
+        regulatory_action: null
+        severity_rank: null
+    classify_change:
+      type: condition
+      variable: change_type
+      operator: matches
+      value: (?i)^boxed_warning$
+      true_next: change_boxed_warning
+      false_next: check_contraindication
+    validate_change_type:
+      type: condition
+      variable: change_type
+      operator: is_not_null
+      value: null
+      true_next: classify_change
+      false_next: missing_input
+    check_adverse_reaction:
+      type: condition
+      variable: change_type
+      operator: matches
+      value: (?i)^adverse_reaction$
+      true_next: change_adverse_reaction
+      false_next: unknown_type
+    change_warning:
+      type: return
+      value:
+        severity_rank: 4
+        regulatory_action: warning_addition
+        requires_dhpc: true
+    change_precaution:
+      type: return
+      value:
+        severity_rank: 2
+        requires_dhpc: false
+        regulatory_action: precaution_update
+    change_adverse_reaction:
+      type: return
+      value:
+        requires_dhpc: false
+        severity_rank: 3
+        regulatory_action: adverse_reaction_update
+    check_precaution:
+      type: condition
+      variable: change_type
+      operator: matches
+      value: (?i)^precaution$
+      true_next: change_precaution
+      false_next: check_adverse_reaction
+    change_boxed_warning:
+      type: return
+      value:
+        requires_dhpc: true
+        regulatory_action: black_box_warning_addition
+        severity_rank: 5
+tests:
+- input:
+    change_type: ZZZZZ_NO_MATCH
+  expect:
+    regulatory_action: null
+    severity_rank: null
+    requires_dhpc: false
+- input:
+    change_type: adverse_reaction
+  expect:
+    requires_dhpc: false
+    severity_rank: 3
+    regulatory_action: adverse_reaction_update
+- input:
+    change_type: boxed_warning
+  expect:
+    requires_dhpc: true
+    regulatory_action: black_box_warning_addition
+    severity_rank: 5
+- input:
+    change_type: contraindication
+  expect:
+    severity_rank: 5
+    regulatory_action: contraindication_addition
+    requires_dhpc: true
+- input:
+    change_type: precaution
+  expect:
+    severity_rank: 2
+    requires_dhpc: false
+    regulatory_action: precaution_update
+- input:
+    change_type: warning
+  expect:
+    severity_rank: 4
+    regulatory_action: warning_addition
+    requires_dhpc: true
+- input: {}
+  expect:
+    requires_dhpc: false
+    regulatory_action: null
+    severity_rank: null
+- input: {}
+  expect:
+    requires_dhpc: false
+    regulatory_action: null
+    severity_rank: null
+interface: null

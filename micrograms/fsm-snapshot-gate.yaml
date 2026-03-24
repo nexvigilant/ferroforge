@@ -1,0 +1,72 @@
+name: fsm-snapshot-gate
+description: 'PVOS FSM snapshots: gates snapshot creation based on state change and time since last snapshot - avoid redundant captures'
+version: 0.1.0
+interface:
+  inputs:
+    minutes_since_last_snapshot:
+      type: int
+      required: false
+    state_changed:
+      type: bool
+      required: false
+  outputs:
+    decision:
+      type: string
+    description:
+      type: string
+tree:
+  start: check_state_changed
+  nodes:
+    check_state_changed:
+      type: condition
+      variable: state_changed
+      operator: eq
+      value: true
+      true_next: snapshot
+      false_next: check_time_elapsed
+    check_time_elapsed:
+      type: condition
+      variable: minutes_since_last_snapshot
+      operator: gte
+      value: 60
+      true_next: snapshot
+      false_next: skip
+    snapshot:
+      type: return
+      value:
+        decision: SNAPSHOT
+        description: State changed or 60+ minutes elapsed - create FSM snapshot
+    skip:
+      type: return
+      value:
+        decision: SKIP
+        description: State unchanged and snapshot recent - skip redundant snapshot
+tests:
+- input:
+    state_changed: true
+    minutes_since_last_snapshot: 5
+  expect:
+    decision: SNAPSHOT
+    description: State changed or 60+ minutes elapsed - create FSM snapshot
+- input:
+    state_changed: false
+    minutes_since_last_snapshot: 90
+  expect:
+    decision: SNAPSHOT
+    description: State changed or 60+ minutes elapsed - create FSM snapshot
+- input:
+    state_changed: false
+    minutes_since_last_snapshot: 30
+  expect:
+    decision: SKIP
+    description: State unchanged and snapshot recent - skip redundant snapshot
+- input:
+    state_changed: true
+    minutes_since_last_snapshot: 120
+  expect:
+    decision: SNAPSHOT
+    description: State changed or 60+ minutes elapsed - create FSM snapshot
+- input: {}
+  expect:
+    decision: SKIP
+    description: State unchanged and snapshot recent - skip redundant snapshot

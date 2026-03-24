@@ -1,0 +1,171 @@
+name: external-interface-schema
+description: 'Component: Shaft (External API) — Spec §2.4. Schema validator for external
+  interface data completeness. Validates that API health, auth, and rate limit metrics
+  exist before attempting classification.'
+version: 0.1.0
+tree:
+  start: check_endpoints
+  nodes:
+    missing_auth:
+      type: return
+      value:
+        can_compute_shaft: false
+        missing_fields: auth_success_rate_pct
+        data_complete: false
+    check_endpoints:
+      type: condition
+      variable: api_endpoints_active
+      operator: gt
+      value: 0
+      true_next: check_requests
+      false_next: missing_endpoints
+    complete:
+      type: return
+      value:
+        missing_fields: none
+        can_compute_shaft: true
+        data_complete: true
+    missing_rate_limits:
+      type: return
+      value:
+        can_compute_shaft: false
+        missing_fields: rate_limit_hits_30d
+        data_complete: false
+    check_error_rate:
+      type: condition
+      variable: error_rate_pct
+      operator: is_not_null
+      value: true
+      true_next: check_auth
+      false_next: missing_error_rate
+    missing_requests:
+      type: return
+      value:
+        data_complete: false
+        missing_fields: requests_30d
+        can_compute_shaft: false
+    missing_error_rate:
+      type: return
+      value:
+        data_complete: false
+        missing_fields: error_rate_pct
+        can_compute_shaft: false
+    check_requests:
+      type: condition
+      variable: requests_30d
+      operator: gt
+      value: 0
+      true_next: check_error_rate
+      false_next: missing_requests
+    check_rate_limits:
+      type: condition
+      variable: rate_limit_hits_30d
+      operator: is_not_null
+      value: true
+      true_next: complete
+      false_next: missing_rate_limits
+    missing_endpoints:
+      type: return
+      value:
+        missing_fields: api_endpoints_active
+        data_complete: false
+        can_compute_shaft: false
+    check_auth:
+      type: condition
+      variable: auth_success_rate_pct
+      operator: gt
+      value: 0.0
+      true_next: check_rate_limits
+      false_next: missing_auth
+tests:
+- input:
+    api_endpoints_active: -0.5
+    auth_success_rate_pct: -0.5
+    error_rate_pct: false
+    rate_limit_hits_30d: false
+    requests_30d: -0.5
+  expect:
+    missing_fields: api_endpoints_active
+    data_complete: false
+    can_compute_shaft: false
+- input:
+    api_endpoints_active: 0.5
+    auth_success_rate_pct: -0.5
+    error_rate_pct: false
+    rate_limit_hits_30d: false
+    requests_30d: -0.5
+  expect:
+    data_complete: false
+    missing_fields: requests_30d
+    can_compute_shaft: false
+- input:
+    api_endpoints_active: 0.5
+    auth_success_rate_pct: -0.5
+    error_rate_pct: false
+    rate_limit_hits_30d: false
+    requests_30d: 0.5
+  expect:
+    can_compute_shaft: false
+    missing_fields: auth_success_rate_pct
+    data_complete: false
+- input:
+    api_endpoints_active: 0.5
+    auth_success_rate_pct: -0.5
+    rate_limit_hits_30d: false
+    requests_30d: 0.5
+  expect:
+    data_complete: false
+    missing_fields: error_rate_pct
+    can_compute_shaft: false
+- input:
+    api_endpoints_active: 0.5
+    auth_success_rate_pct: 0.5
+    error_rate_pct: false
+    rate_limit_hits_30d: false
+    requests_30d: 0.5
+  expect:
+    missing_fields: none
+    can_compute_shaft: true
+    data_complete: true
+- input:
+    api_endpoints_active: 0.5
+    auth_success_rate_pct: 0.5
+    error_rate_pct: false
+    requests_30d: 0.5
+  expect:
+    can_compute_shaft: false
+    missing_fields: rate_limit_hits_30d
+    data_complete: false
+- input: {}
+  expect:
+    missing_fields: api_endpoints_active
+    data_complete: false
+    can_compute_shaft: false
+interface:
+  inputs:
+    rate_limit_hits_30d:
+      type: int
+      required: false
+    auth_success_rate_pct:
+      type: float
+      required: false
+    api_endpoints_active:
+      type: int
+      required: false
+    requests_30d:
+      type: int
+      required: false
+    error_rate_pct:
+      type: float
+      required: false
+  outputs:
+    can_compute_shaft:
+      type: bool
+      required: false
+    data_complete:
+      type: bool
+      required: false
+    missing_fields:
+      type: string
+      required: false
+  aliases: {}

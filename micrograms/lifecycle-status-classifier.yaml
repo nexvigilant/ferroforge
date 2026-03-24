@@ -1,0 +1,99 @@
+name: lifecycle-status-classifier
+description: 'PVOS entity lifecycle: classifies current lifecycle state and routes to appropriate action for new/active/suspended/archived entities'
+version: 0.1.0
+interface:
+  inputs:
+    current_state:
+      type: string
+      required: false
+  outputs:
+    action:
+      type: string
+    description:
+      type: string
+tree:
+  start: check_new
+  nodes:
+    check_new:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: new
+      true_next: action_initialize
+      false_next: check_active
+    check_active:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: active
+      true_next: action_process
+      false_next: check_suspended
+    check_suspended:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: suspended
+      true_next: action_review
+      false_next: check_archived
+    check_archived:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: archived
+      true_next: action_audit
+      false_next: action_unknown
+    action_initialize:
+      type: return
+      value:
+        action: INITIALIZE
+        description: New entity - run initialization and validation before activating
+    action_process:
+      type: return
+      value:
+        action: PROCESS
+        description: Active entity - process normally through standard workflow
+    action_review:
+      type: return
+      value:
+        action: REVIEW
+        description: Suspended entity - requires manual review before reactivation or archiving
+    action_audit:
+      type: return
+      value:
+        action: AUDIT_ONLY
+        description: Archived entity - read-only access for audit and compliance purposes
+    action_unknown:
+      type: return
+      value:
+        action: ERROR
+        description: Unknown lifecycle state - manual intervention required
+tests:
+- input:
+    current_state: new
+  expect:
+    action: INITIALIZE
+    description: New entity - run initialization and validation before activating
+- input:
+    current_state: active
+  expect:
+    action: PROCESS
+    description: Active entity - process normally through standard workflow
+- input:
+    current_state: suspended
+  expect:
+    action: REVIEW
+    description: Suspended entity - requires manual review before reactivation or archiving
+- input:
+    current_state: archived
+  expect:
+    action: AUDIT_ONLY
+    description: Archived entity - read-only access for audit and compliance purposes
+- input:
+    current_state: bogus
+  expect:
+    action: ERROR
+    description: Unknown lifecycle state - manual intervention required
+- input: {}
+  expect:
+    action: ERROR
+    description: Unknown lifecycle state - manual intervention required

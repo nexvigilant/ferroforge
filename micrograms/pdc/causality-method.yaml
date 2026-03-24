@@ -1,0 +1,125 @@
+name: causality-method
+description: "Domain 2: Route to appropriate causality assessment method based on case complexity, data availability, and context."
+version: 0.1.0
+interface:
+  inputs:
+    case_complexity:
+      type: string
+      required: false
+    has_rechallenge_data:
+      type: bool
+      required: false
+    is_regulatory_submission:
+      type: bool
+      required: false
+  outputs:
+    ai_assist:
+      type: string
+    best_for:
+      type: string
+    categories:
+      type: string
+    criteria:
+      type: string
+    limitations:
+      type: string
+    method:
+      type: string
+    name:
+      type: string
+    scoring:
+      type: string
+    strengths:
+      type: string
+    type:
+      type: string
+tree:
+  start: check_complexity
+  nodes:
+    check_complexity:
+      type: condition
+      variable: case_complexity
+      operator: eq
+      value: simple
+      true_next: check_rechallenge
+      false_next: check_complex
+    check_complex:
+      type: condition
+      variable: case_complexity
+      operator: eq
+      value: complex
+      true_next: bradford_hill
+      false_next: check_regulatory
+    check_regulatory:
+      type: condition
+      variable: is_regulatory_submission
+      operator: eq
+      value: true
+      true_next: who_umc
+      false_next: bradford_hill
+    check_rechallenge:
+      type: condition
+      variable: has_rechallenge_data
+      operator: eq
+      value: true
+      true_next: naranjo
+      false_next: who_umc
+    naranjo:
+      type: return
+      value:
+        method: NARANJO
+        name: "Naranjo Algorithm"
+        type: algorithmic
+        scoring: "0-13 point scale"
+        categories: "definite (>=9), probable (5-8), possible (1-4), doubtful (<=0)"
+        strengths: "structured, reproducible, includes rechallenge"
+        limitations: "less nuanced for complex cases, binary questions"
+        ai_assist: "auto-scoring from case data, consistency checking"
+        best_for: "routine cases with rechallenge data available"
+    who_umc:
+      type: return
+      value:
+        method: WHO_UMC
+        name: "WHO-UMC System"
+        type: clinical_judgment
+        categories: "certain, probable/likely, possible, unlikely, conditional, unassessable"
+        strengths: "global standard, flexible, clinical judgment centered"
+        limitations: "subjective, inter-rater variability"
+        ai_assist: "consistency analysis, pattern matching across global reports"
+        best_for: "regulatory submissions, global standardization, routine assessment"
+    bradford_hill:
+      type: return
+      value:
+        method: BRADFORD_HILL
+        name: "Bradford Hill Criteria"
+        type: epidemiological
+        criteria: "strength, consistency, specificity, temporality, biological gradient, plausibility, coherence, experiment, analogy"
+        strengths: "comprehensive, considers multiple evidence types, gold standard for complex cases"
+        limitations: "requires significant evidence base, time-intensive"
+        ai_assist: "evidence synthesis, literature mining, statistical analysis"
+        best_for: "complex cases, signal validation, regulatory investigations"
+tests:
+- input:
+    case_complexity: simple
+    has_rechallenge_data: true
+  expect:
+    method: NARANJO
+    type: algorithmic
+- input:
+    case_complexity: simple
+    has_rechallenge_data: false
+  expect:
+    method: WHO_UMC
+    type: clinical_judgment
+- input:
+    case_complexity: complex
+  expect:
+    method: BRADFORD_HILL
+    type: epidemiological
+- input:
+    is_regulatory_submission: true
+  expect:
+    method: WHO_UMC
+- input: {}
+  expect:
+    method: BRADFORD_HILL

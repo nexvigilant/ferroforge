@@ -1,0 +1,237 @@
+name: signal-collapse-gate
+description: 'Campion Signal Theory S = U × R × T collapse gate. If ANY component approaches zero (< 10), the signal collapses — multiplication encodes conjunction requirement. ALG-2025-041.'
+version: 0.1.0
+interface:
+  inputs:
+    rarity_score:
+      type: int
+      required: false
+    recognition_score:
+      type: int
+      required: false
+    temporal_score:
+      type: int
+      required: false
+  outputs:
+    signal_strength:
+      type: string
+    collapse_reason:
+      type: string
+    campion_S:
+      type: string
+    algorithm:
+      type: string
+tree:
+  start: check_rarity
+  nodes:
+    check_rarity:
+      type: condition
+      variable: rarity_score
+      operator: gte
+      value: 10
+      true_next: check_recognition
+      false_next: collapsed_rarity
+    collapsed_rarity:
+      type: return
+      value:
+        signal_strength: COLLAPSED
+        collapse_reason: rarity
+        campion_S: "U→0 therefore S→0"
+        algorithm: ALG-2025-041
+    check_recognition:
+      type: condition
+      variable: recognition_score
+      operator: gte
+      value: 10
+      true_next: check_temporal
+      false_next: collapsed_recognition
+    collapsed_recognition:
+      type: return
+      value:
+        signal_strength: COLLAPSED
+        collapse_reason: recognition
+        campion_S: "R→0 therefore S→0"
+        algorithm: ALG-2025-041
+    check_temporal:
+      type: condition
+      variable: temporal_score
+      operator: gte
+      value: 10
+      true_next: check_strong
+      false_next: collapsed_temporal
+    collapsed_temporal:
+      type: return
+      value:
+        signal_strength: COLLAPSED
+        collapse_reason: temporal
+        campion_S: "T→0 therefore S→0"
+        algorithm: ALG-2025-041
+    check_strong:
+      type: condition
+      variable: rarity_score
+      operator: gte
+      value: 70
+      true_next: check_strong_recognition
+      false_next: check_moderate
+    check_strong_recognition:
+      type: condition
+      variable: recognition_score
+      operator: gte
+      value: 70
+      true_next: check_strong_temporal
+      false_next: check_moderate
+    check_strong_temporal:
+      type: condition
+      variable: temporal_score
+      operator: gte
+      value: 70
+      true_next: strong
+      false_next: check_moderate
+    strong:
+      type: return
+      value:
+        signal_strength: STRONG
+        collapse_reason: none
+        campion_S: "U×R×T all high"
+        algorithm: ALG-2025-041
+    check_moderate:
+      type: condition
+      variable: rarity_score
+      operator: gte
+      value: 40
+      true_next: check_moderate_recognition
+      false_next: weak
+    check_moderate_recognition:
+      type: condition
+      variable: recognition_score
+      operator: gte
+      value: 40
+      true_next: check_moderate_temporal
+      false_next: weak
+    check_moderate_temporal:
+      type: condition
+      variable: temporal_score
+      operator: gte
+      value: 40
+      true_next: moderate
+      false_next: weak
+    moderate:
+      type: return
+      value:
+        signal_strength: MODERATE
+        collapse_reason: none
+        campion_S: "U×R×T all adequate"
+        algorithm: ALG-2025-041
+    weak:
+      type: return
+      value:
+        signal_strength: WEAK
+        collapse_reason: none
+        campion_S: "U×R×T present but low"
+        algorithm: ALG-2025-041
+tests:
+- input:
+    rarity_score: 80
+    recognition_score: 90
+    temporal_score: 85
+  expect:
+    signal_strength: STRONG
+    collapse_reason: none
+    campion_S: "U×R×T all high"
+    algorithm: ALG-2025-041
+- input:
+    rarity_score: 50
+    recognition_score: 55
+    temporal_score: 60
+  expect:
+    signal_strength: MODERATE
+    collapse_reason: none
+    campion_S: "U×R×T all adequate"
+    algorithm: ALG-2025-041
+- input:
+    rarity_score: 15
+    recognition_score: 20
+    temporal_score: 25
+  expect:
+    signal_strength: WEAK
+    collapse_reason: none
+    campion_S: "U×R×T present but low"
+    algorithm: ALG-2025-041
+- input:
+    rarity_score: 0
+    recognition_score: 90
+    temporal_score: 90
+  expect:
+    signal_strength: COLLAPSED
+    collapse_reason: rarity
+    campion_S: "U→0 therefore S→0"
+    algorithm: ALG-2025-041
+- input:
+    rarity_score: 90
+    recognition_score: 5
+    temporal_score: 90
+  expect:
+    signal_strength: COLLAPSED
+    collapse_reason: recognition
+    campion_S: "R→0 therefore S→0"
+    algorithm: ALG-2025-041
+- input:
+    rarity_score: 90
+    recognition_score: 90
+    temporal_score: 3
+  expect:
+    signal_strength: COLLAPSED
+    collapse_reason: temporal
+    campion_S: "T→0 therefore S→0"
+    algorithm: ALG-2025-041
+- input:
+    rarity_score: 0
+    recognition_score: 0
+    temporal_score: 90
+  expect:
+    signal_strength: COLLAPSED
+    collapse_reason: rarity
+    campion_S: "U→0 therefore S→0"
+    algorithm: ALG-2025-041
+- input: {}
+  expect:
+    signal_strength: COLLAPSED
+    collapse_reason: rarity
+    campion_S: "U→0 therefore S→0"
+    algorithm: ALG-2025-041
+- input:
+    rarity_score: 70
+    recognition_score: 70
+    temporal_score: 70
+  expect:
+    signal_strength: STRONG
+    collapse_reason: none
+    campion_S: "U×R×T all high"
+    algorithm: ALG-2025-041
+- input:
+    rarity_score: 40
+    recognition_score: 40
+    temporal_score: 40
+  expect:
+    signal_strength: MODERATE
+    collapse_reason: none
+    campion_S: "U×R×T all adequate"
+    algorithm: ALG-2025-041
+- input:
+    rarity_score: 100
+    recognition_score: 100
+    temporal_score: 100
+  expect:
+    signal_strength: STRONG
+    collapse_reason: none
+    campion_S: "U×R×T all high"
+    algorithm: ALG-2025-041
+- input:
+    rarity_score: 39
+    recognition_score: 50
+    temporal_score: 50
+  expect:
+    signal_strength: WEAK
+    collapse_reason: none
+    campion_S: "U×R×T present but low"
+    algorithm: ALG-2025-041

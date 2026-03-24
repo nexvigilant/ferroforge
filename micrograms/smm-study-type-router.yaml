@@ -1,0 +1,211 @@
+name: smm-study-type-router
+description: "Routes scientific works to the correct evaluation standard (SMM-001 for empirical, SMM-002 for pre-empirical). Override-first, then boolean signals, conservative default."
+version: 0.1.0
+interface:
+  inputs:
+    study_type_override:
+      type: string
+      required: false
+    has_hypothesis:
+      type: bool
+      required: false
+    has_empirical_data:
+      type: bool
+      required: false
+    has_statistical_analysis:
+      type: bool
+      required: false
+    is_framework:
+      type: bool
+      required: false
+  outputs:
+    study_type:
+      type: string
+    standard:
+      type: string
+    phase_count:
+      type: int
+    routing_basis:
+      type: string
+tree:
+  start: check_override
+  nodes:
+    check_override:
+      type: condition
+      variable: study_type_override
+      operator: eq
+      value: empirical
+      true_next: empirical_route
+      false_next: check_override_pre
+    check_override_pre:
+      type: condition
+      variable: study_type_override
+      operator: eq
+      value: pre_empirical
+      true_next: pre_empirical_route
+      false_next: check_framework
+    check_framework:
+      type: condition
+      variable: is_framework
+      operator: eq
+      value: true
+      true_next: pre_empirical_route
+      false_next: check_empirical_data
+    check_empirical_data:
+      type: condition
+      variable: has_empirical_data
+      operator: eq
+      value: true
+      true_next: check_stats
+      false_next: check_hypothesis_only
+    check_stats:
+      type: condition
+      variable: has_statistical_analysis
+      operator: eq
+      value: true
+      true_next: empirical_route
+      false_next: check_hypothesis_with_data
+    check_hypothesis_with_data:
+      type: condition
+      variable: has_hypothesis
+      operator: eq
+      value: true
+      true_next: empirical_route
+      false_next: pre_empirical_route
+    check_hypothesis_only:
+      type: condition
+      variable: has_hypothesis
+      operator: eq
+      value: true
+      true_next: check_has_stats_no_data
+      false_next: pre_empirical_route
+    check_has_stats_no_data:
+      type: condition
+      variable: has_statistical_analysis
+      operator: eq
+      value: true
+      true_next: empirical_route
+      false_next: pre_empirical_route
+    empirical_route:
+      type: return
+      value:
+        study_type: empirical
+        standard: NVG-SMM-001
+        phase_count: 10
+        routing_basis: empirical_signals_detected
+    pre_empirical_route:
+      type: return
+      value:
+        study_type: pre_empirical
+        standard: NVG-SMM-002
+        phase_count: 6
+        routing_basis: pre_empirical_default
+tests:
+# Override tests
+- input:
+    study_type_override: empirical
+  expect:
+    study_type: empirical
+    standard: NVG-SMM-001
+    phase_count: 10
+    routing_basis: empirical_signals_detected
+- input:
+    study_type_override: pre_empirical
+  expect:
+    study_type: pre_empirical
+    standard: NVG-SMM-002
+    phase_count: 6
+    routing_basis: pre_empirical_default
+# Override takes precedence over contradicting signals
+- input:
+    study_type_override: empirical
+    is_framework: true
+  expect:
+    study_type: empirical
+    standard: NVG-SMM-001
+    phase_count: 10
+- input:
+    study_type_override: pre_empirical
+    has_empirical_data: true
+    has_statistical_analysis: true
+  expect:
+    study_type: pre_empirical
+    standard: NVG-SMM-002
+    phase_count: 6
+# Framework flag routes to pre-empirical
+- input:
+    is_framework: true
+  expect:
+    study_type: pre_empirical
+    standard: NVG-SMM-002
+    phase_count: 6
+- input:
+    is_framework: true
+    has_empirical_data: true
+  expect:
+    study_type: pre_empirical
+    standard: NVG-SMM-002
+    phase_count: 6
+# Full empirical signals
+- input:
+    has_empirical_data: true
+    has_statistical_analysis: true
+    has_hypothesis: true
+  expect:
+    study_type: empirical
+    standard: NVG-SMM-001
+    phase_count: 10
+# Data + stats = empirical
+- input:
+    has_empirical_data: true
+    has_statistical_analysis: true
+  expect:
+    study_type: empirical
+    standard: NVG-SMM-001
+    phase_count: 10
+# Data + hypothesis but no stats = empirical
+- input:
+    has_empirical_data: true
+    has_hypothesis: true
+  expect:
+    study_type: empirical
+    standard: NVG-SMM-001
+    phase_count: 10
+# Data only, no hypothesis or stats = pre-empirical (conservative)
+- input:
+    has_empirical_data: true
+  expect:
+    study_type: pre_empirical
+    standard: NVG-SMM-002
+    phase_count: 6
+# Hypothesis + stats but no data = empirical (likely protocol/design paper)
+- input:
+    has_hypothesis: true
+    has_statistical_analysis: true
+  expect:
+    study_type: empirical
+    standard: NVG-SMM-001
+    phase_count: 10
+# Hypothesis only = pre-empirical
+- input:
+    has_hypothesis: true
+  expect:
+    study_type: pre_empirical
+    standard: NVG-SMM-002
+    phase_count: 6
+# Empty input = pre-empirical (conservative default)
+- input: {}
+  expect:
+    study_type: pre_empirical
+    standard: NVG-SMM-002
+    phase_count: 6
+    routing_basis: pre_empirical_default
+# Unknown override value falls through to signal checks
+- input:
+    study_type_override: unknown
+    has_empirical_data: true
+    has_statistical_analysis: true
+  expect:
+    study_type: empirical
+    standard: NVG-SMM-001
+    phase_count: 10

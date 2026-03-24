@@ -1,0 +1,58 @@
+name: ab-cortisol-saturation
+description: 'Antibody: detects cortisol saturation (stem-bio burnout threshold). When cortisol > 0.8, system is in allostatic overload.'
+version: 0.1.0
+interface:
+  inputs:
+    cortisol_level:
+      type: number
+      required: true
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: cortisol_level
+      operator: gt
+      value: 0.8
+      true_next: overload
+      false_next: check_elevated
+    check_elevated:
+      type: condition
+      variable: cortisol_level
+      operator: gt
+      value: 0.6
+      true_next: warn
+      false_next: clean
+    overload:
+      type: return
+      value:
+        threat: true
+        response: 'BLOCK: cortisol > 0.8 — allostatic overload, reduce stimuli'
+    warn:
+      type: return
+      value:
+        threat: false
+        response: 'WARN: cortisol elevated (0.6-0.8) — approaching burnout threshold'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { cortisol_level: 0.3 }
+  expect: { threat: false, response: 'PASS' }
+- input: { cortisol_level: 0.7 }
+  expect: { threat: false }
+- input: { cortisol_level: 0.9 }
+  expect: { threat: true }
+- input: { cortisol_level: 1.0 }
+  expect: { threat: true }
+- input: {}
+  expect:
+    response: PASS
+    threat: false

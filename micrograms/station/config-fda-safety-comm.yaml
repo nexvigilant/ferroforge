@@ -1,0 +1,83 @@
+name: config-fda-safety-comm
+description: "Classify FDA safety communication urgency from search output"
+version: 0.1.0
+interface:
+  inputs:
+    comm_type:
+      type: string
+      required: false
+      description: "drug_safety_communication, medwatch_alert, labeling_change"
+    affects_boxed_warning:
+      type: bool
+      required: false
+    is_new_risk:
+      type: bool
+      required: false
+    drugs_affected:
+      type: int
+      required: false
+  outputs:
+    urgency: { type: string }
+    action: { type: string }
+    update_rsi: { type: bool }
+tree:
+  start: check_type
+  nodes:
+    check_type:
+      type: condition
+      variable: comm_type
+      operator: is_null
+      true_next: no_comm
+      false_next: check_boxed
+    check_boxed:
+      type: condition
+      variable: affects_boxed_warning
+      operator: eq
+      value: true
+      true_next: critical_comm
+      false_next: check_new_risk
+    check_new_risk:
+      type: condition
+      variable: is_new_risk
+      operator: eq
+      value: true
+      true_next: high_comm
+      false_next: check_multi_drug
+    check_multi_drug:
+      type: condition
+      variable: drugs_affected
+      operator: is_null
+      true_next: standard_comm
+      false_next: check_class_effect
+    check_class_effect:
+      type: condition
+      variable: drugs_affected
+      operator: gte
+      value: 3
+      true_next: high_comm
+      false_next: standard_comm
+    critical_comm:
+      type: return
+      value: { urgency: critical, action: immediate_label_review, update_rsi: true }
+    high_comm:
+      type: return
+      value: { urgency: high, action: safety_profile_update, update_rsi: true }
+    standard_comm:
+      type: return
+      value: { urgency: standard, action: document_and_track, update_rsi: false }
+    no_comm:
+      type: return
+      value: { urgency: none, action: no_action, update_rsi: false }
+tests:
+  - input: { comm_type: "drug_safety_communication", affects_boxed_warning: true, is_new_risk: true }
+    expect: { urgency: critical, action: immediate_label_review, update_rsi: true }
+  - input: { comm_type: "medwatch_alert", affects_boxed_warning: false, is_new_risk: true }
+    expect: { urgency: high, action: safety_profile_update, update_rsi: true }
+  - input: { comm_type: "labeling_change", affects_boxed_warning: false, is_new_risk: false, drugs_affected: 5 }
+    expect: { urgency: high, action: safety_profile_update, update_rsi: true }
+  - input: { comm_type: "labeling_change", affects_boxed_warning: false, is_new_risk: false, drugs_affected: 1 }
+    expect: { urgency: standard, action: document_and_track, update_rsi: false }
+  - input: { comm_type: "drug_safety_communication", affects_boxed_warning: false, is_new_risk: false }
+    expect: { urgency: standard, action: document_and_track, update_rsi: false }
+  - input: {}
+    expect: { urgency: none, action: no_action, update_rsi: false }

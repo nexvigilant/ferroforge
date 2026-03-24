@@ -1,0 +1,229 @@
+name: investigation-start-gate
+description: Determines if an AI agent should initiate a formal safety investigation
+  based on signal detection and case seriousness
+version: 0.1.0
+tree:
+  start: check_signal_detected
+  nodes:
+    return_routine_moderate:
+      type: return
+      value:
+        priority: routine
+        reason: Moderate outcome, 5+ reports suggesting potential signal
+        investigate: true
+    check_moderate:
+      type: condition
+      variable: seriousness
+      operator: eq
+      value: moderate
+      true_next: check_moderate_report_count
+      false_next: return_skip_mild
+    check_signal_detected:
+      type: condition
+      variable: signal_detected
+      operator: eq
+      value: false
+      true_next: return_no_signal
+      false_next: check_seriousness
+    check_fatal_labeled:
+      type: condition
+      variable: is_labeled
+      operator: eq
+      value: true
+      true_next: return_immediate_fatal
+      false_next: return_immediate_fatal_unlabeled
+    return_routine_serious_unlabeled:
+      type: return
+      value:
+        investigate: true
+        priority: routine
+        reason: Serious outcome, unlabeled, 3+ reports
+    return_no_signal:
+      type: return
+      value:
+        investigate: false
+        reason: No signal detected
+        priority: skip
+    return_skip_mild:
+      type: return
+      value:
+        reason: Mild outcome, insufficient evidence for investigation
+        investigate: false
+        priority: skip
+    check_moderate_report_count:
+      type: condition
+      variable: report_count
+      operator: gte
+      value: 5
+      true_next: return_routine_moderate
+      false_next: return_skip_moderate
+    return_routine_serious_labeled:
+      type: return
+      value:
+        investigate: true
+        reason: Serious outcome, labeled, 3+ reports
+        priority: routine
+    return_routine_serious:
+      type: return
+      value:
+        investigate: false
+        priority: monitor
+        reason: Serious outcome but insufficient report count
+    return_immediate_fatal:
+      type: return
+      value:
+        investigate: true
+        priority: immediate
+        reason: Fatal outcome, labeled on product information
+    check_serious_report_count:
+      type: condition
+      variable: report_count
+      operator: gte
+      value: 3
+      true_next: check_serious_labeled
+      false_next: return_routine_serious
+    check_serious_labeled:
+      type: condition
+      variable: is_labeled
+      operator: eq
+      value: true
+      true_next: return_routine_serious_labeled
+      false_next: return_routine_serious_unlabeled
+    check_serious:
+      type: condition
+      variable: seriousness
+      operator: eq
+      value: serious
+      true_next: check_serious_report_count
+      false_next: check_moderate
+    return_skip_moderate:
+      type: return
+      value:
+        investigate: false
+        priority: monitor
+        reason: Moderate outcome with insufficient report clustering
+    return_immediate_fatal_unlabeled:
+      type: return
+      value:
+        investigate: true
+        reason: Fatal outcome, not labeled on product information
+        priority: immediate
+    check_seriousness:
+      type: condition
+      variable: seriousness
+      operator: eq
+      value: fatal
+      true_next: check_fatal_labeled
+      false_next: check_serious
+tests:
+- input:
+    is_labeled: false
+    report_count: 0
+    seriousness: ''
+    signal_detected: false
+  expect:
+    investigate: false
+    reason: No signal detected
+    priority: skip
+- input:
+    is_labeled: false
+    report_count: 0
+    seriousness: ''
+    signal_detected: true
+  expect:
+    reason: Mild outcome, insufficient evidence for investigation
+    investigate: false
+    priority: skip
+- input:
+    is_labeled: false
+    report_count: 0
+    seriousness: fatal
+    signal_detected: true
+  expect:
+    investigate: true
+    reason: Fatal outcome, not labeled on product information
+    priority: immediate
+- input:
+    is_labeled: false
+    report_count: 0
+    seriousness: moderate
+    signal_detected: true
+  expect:
+    investigate: false
+    priority: monitor
+    reason: Moderate outcome with insufficient report clustering
+- input:
+    is_labeled: false
+    report_count: 0
+    seriousness: serious
+    signal_detected: true
+  expect:
+    investigate: false
+    priority: monitor
+    reason: Serious outcome but insufficient report count
+- input:
+    is_labeled: false
+    report_count: 10
+    seriousness: moderate
+    signal_detected: true
+  expect:
+    priority: routine
+    reason: Moderate outcome, 5+ reports suggesting potential signal
+    investigate: true
+- input:
+    is_labeled: false
+    report_count: 10
+    seriousness: serious
+    signal_detected: true
+  expect:
+    investigate: true
+    priority: routine
+    reason: Serious outcome, unlabeled, 3+ reports
+- input:
+    is_labeled: true
+    report_count: 0
+    seriousness: fatal
+    signal_detected: true
+  expect:
+    investigate: true
+    priority: immediate
+    reason: Fatal outcome, labeled on product information
+- input:
+    is_labeled: true
+    report_count: 10
+    seriousness: serious
+    signal_detected: true
+  expect:
+    investigate: true
+    reason: Serious outcome, labeled, 3+ reports
+    priority: routine
+- input: {}
+  expect:
+    reason: Mild outcome, insufficient evidence for investigation
+    investigate: false
+    priority: skip
+interface:
+  inputs:
+    signal_detected:
+      type: bool
+      required: false
+    report_count:
+      type: int
+      required: false
+    is_labeled:
+      type: bool
+      required: false
+    seriousness:
+      type: string
+      required: false
+  outputs:
+    investigate:
+      type: bool
+      required: false
+    priority:
+      type: string
+      required: false
+    reason:
+      type: string
+      required: false
+  aliases: {}

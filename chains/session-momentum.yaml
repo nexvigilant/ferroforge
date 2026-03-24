@@ -1,0 +1,31 @@
+name: session-momentum
+description: 'Session velocity → velocity classification → momentum tracking. Flywheel health assessment chain using accumulate mode to carry density and MCP metrics through.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - session-velocity
+  - velocity-check
+  - momentum-tracker
+tests:
+- name: high density accelerating session
+  input:
+    density: 0.8
+    mcp_ratio: 0.3
+    nodes_wired: 4
+    previous_velocity_ms: 100
+    velocity_ratio_pct: 120
+  expect:
+    velocity_class: EXCEPTIONAL
+    feeds_momentum: true
+- name: low density steady session — still contributes momentum
+  input:
+    density: 0.2
+    mcp_ratio: 0.05
+    nodes_wired: 1
+    previous_velocity_ms: 500
+    velocity_ratio_pct: 80
+  expect:
+    velocity_class: ACCEPTABLE
+    feeds_momentum: true
+    momentum: ACCELERATING

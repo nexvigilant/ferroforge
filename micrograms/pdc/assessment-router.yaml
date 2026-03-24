@@ -1,0 +1,129 @@
+name: assessment-router
+description: "PDC: Route to assessment method based on competency type and level"
+version: 0.1.0
+interface:
+  inputs:
+    competency_type:
+      type: string
+      required: false
+    level:
+      type: string
+      required: false
+  outputs:
+    assessor:
+      type: string
+    behavioral_anchors:
+      type: string
+    entrustment_focus:
+      type: string
+    frequency:
+      type: string
+    primary_method:
+      type: string
+    secondary_method:
+      type: string
+tree:
+  start: check_level_high
+  nodes:
+    check_level_high:
+      type: condition
+      variable: level
+      operator: gte
+      value: 4
+      true_next: check_innovation
+      false_next: check_level_mid
+    check_level_mid:
+      type: condition
+      variable: level
+      operator: gte
+      value: 3
+      true_next: independent_assessment
+      false_next: foundation_assessment
+    check_innovation:
+      type: condition
+      variable: competency_type
+      operator: eq
+      value: ai_technology
+      true_next: ai_assessment
+      false_next: advanced_assessment
+    foundation_assessment:
+      type: return
+      value:
+        primary_method: DIRECT_OBSERVATION
+        secondary_method: PORTFOLIO
+        frequency: weekly
+        assessor: supervisor
+        behavioral_anchors: "observable_basics"
+        entrustment_focus: "Can perform with direct supervision"
+    independent_assessment:
+      type: return
+      value:
+        primary_method: PORTFOLIO
+        secondary_method: THREE_SIXTY_FEEDBACK
+        frequency: monthly
+        assessor: multi_source
+        behavioral_anchors: "comprehensive_independent"
+        entrustment_focus: "Can perform with available consultation"
+    advanced_assessment:
+      type: return
+      value:
+        primary_method: THREE_SIXTY_FEEDBACK
+        secondary_method: PERFORMANCE_ANALYTICS
+        frequency: quarterly
+        assessor: peer_review
+        behavioral_anchors: "innovation_development"
+        entrustment_focus: "Can supervise others performing this activity"
+    ai_assessment:
+      type: return
+      value:
+        primary_method: PERFORMANCE_ANALYTICS
+        secondary_method: PORTFOLIO
+        frequency: quarterly
+        assessor: ai_validation_panel
+        behavioral_anchors: "ai_innovation_leadership"
+        entrustment_focus: "Can design and validate AI solutions independently"
+tests:
+- input:
+    level: 1
+    competency_type: clinical
+  expect:
+    primary_method: DIRECT_OBSERVATION
+    frequency: weekly
+- input:
+    level: 2
+    competency_type: regulatory
+  expect:
+    primary_method: DIRECT_OBSERVATION
+    assessor: supervisor
+- input:
+    level: 3
+    competency_type: signal_detection
+  expect:
+    primary_method: PORTFOLIO
+    secondary_method: THREE_SIXTY_FEEDBACK
+    frequency: monthly
+- input:
+    level: 4
+    competency_type: risk_management
+  expect:
+    primary_method: THREE_SIXTY_FEEDBACK
+    frequency: quarterly
+- input:
+    level: 4
+    competency_type: ai_technology
+  expect:
+    primary_method: PERFORMANCE_ANALYTICS
+    assessor: ai_validation_panel
+- input:
+    level: 5
+    competency_type: ai_technology
+  expect:
+    primary_method: PERFORMANCE_ANALYTICS
+- input:
+    level: 5
+    competency_type: leadership
+  expect:
+    primary_method: THREE_SIXTY_FEEDBACK
+- input: {}
+  expect:
+    primary_method: DIRECT_OBSERVATION

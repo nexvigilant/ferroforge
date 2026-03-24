@@ -1,0 +1,218 @@
+name: conservation-checker
+description: "Validates primitive compositions against the conservation law ∃ = ∂(×(ς, ∅)). Routes compositions through existence, boundary, state, and void checks. Exercises the × (Product) axiomatic operator."
+version: 0.1.0
+interface:
+  inputs:
+    has_existence:
+      type: bool
+      required: true
+    has_boundary:
+      type: bool
+      required: true
+    has_state:
+      type: bool
+      required: true
+    has_void:
+      type: bool
+      required: true
+    primitive_count:
+      type: int
+      required: false
+    composition_tier:
+      type: string
+      required: false
+  outputs:
+    conservation_status:
+      type: string
+    missing_terms:
+      type: string
+    verdict:
+      type: string
+    recommendation:
+      type: string
+    completeness:
+      type: string
+tree:
+  start: check_existence
+  nodes:
+    check_existence:
+      type: condition
+      variable: has_existence
+      operator: eq
+      value: true
+      true_next: check_boundary
+      false_next: missing_existence
+    missing_existence:
+      type: return
+      value:
+        conservation_status: VIOLATED
+        missing_terms: "∃ (Existence)"
+        verdict: "Conservation law violated — no existence term. The composition produces nothing."
+        recommendation: "Add an existence-producing primitive. Without ∃, ∂(×(ς, ∅)) has no output."
+        completeness: incomplete
+    check_boundary:
+      type: condition
+      variable: has_boundary
+      operator: eq
+      value: true
+      true_next: check_state
+      false_next: missing_boundary
+    missing_boundary:
+      type: return
+      value:
+        conservation_status: VIOLATED
+        missing_terms: "∂ (Boundary)"
+        verdict: "Conservation law violated — no boundary. The composition has no identity function."
+        recommendation: "Add a boundary primitive. ∂ is the function that creates identity from ×(ς, ∅)."
+        completeness: incomplete
+    check_state:
+      type: condition
+      variable: has_state
+      operator: eq
+      value: true
+      true_next: check_void
+      false_next: missing_state
+    missing_state:
+      type: return
+      value:
+        conservation_status: VIOLATED
+        missing_terms: "ς (State)"
+        verdict: "Conservation law violated — no state. Nothing changes, so nothing can exist."
+        recommendation: "Add a state primitive. ×(ς, ∅) requires ς as the variable that ∂ fixes."
+        completeness: incomplete
+    check_void:
+      type: condition
+      variable: has_void
+      operator: eq
+      value: true
+      true_next: check_tier
+      false_next: missing_void
+    missing_void:
+      type: return
+      value:
+        conservation_status: VIOLATED
+        missing_terms: "∅ (Void)"
+        verdict: "Conservation law violated — no void. Without ∅, state has no contrast."
+        recommendation: "Add a void primitive. ×(ς, ∅) requires ∅ as the absence that defines presence."
+        completeness: incomplete
+    check_tier:
+      type: condition
+      variable: primitive_count
+      operator: gte
+      value: 8
+      true_next: full_conservation
+      false_next: minimal_conservation
+    full_conservation:
+      type: return
+      value:
+        conservation_status: CONSERVED
+        missing_terms: none
+        verdict: "Conservation law satisfied with rich composition. All four terms present with 8+ primitives."
+        recommendation: "Composition is conservation-complete and expressively rich. Ready for deployment."
+        completeness: rich
+    minimal_conservation:
+      type: return
+      value:
+        conservation_status: CONSERVED
+        missing_terms: none
+        verdict: "Conservation law satisfied. All four terms present."
+        recommendation: "Composition conserves identity. Consider adding more primitives for expressive power."
+        completeness: minimal
+tests:
+- name: all_four_terms_rich
+  input:
+    has_existence: true
+    has_boundary: true
+    has_state: true
+    has_void: true
+    primitive_count: 10
+  expect:
+    conservation_status: CONSERVED
+    missing_terms: none
+    completeness: rich
+- name: all_four_terms_minimal
+  input:
+    has_existence: true
+    has_boundary: true
+    has_state: true
+    has_void: true
+    primitive_count: 4
+  expect:
+    conservation_status: CONSERVED
+    missing_terms: none
+    completeness: minimal
+- name: missing_existence
+  input:
+    has_existence: false
+    has_boundary: true
+    has_state: true
+    has_void: true
+  expect:
+    conservation_status: VIOLATED
+    missing_terms: "∃ (Existence)"
+    completeness: incomplete
+- name: missing_boundary
+  input:
+    has_existence: true
+    has_boundary: false
+    has_state: true
+    has_void: true
+  expect:
+    conservation_status: VIOLATED
+    missing_terms: "∂ (Boundary)"
+    completeness: incomplete
+- name: missing_state
+  input:
+    has_existence: true
+    has_boundary: true
+    has_state: false
+    has_void: true
+  expect:
+    conservation_status: VIOLATED
+    missing_terms: "ς (State)"
+    completeness: incomplete
+- name: missing_void
+  input:
+    has_existence: true
+    has_boundary: true
+    has_state: true
+    has_void: false
+  expect:
+    conservation_status: VIOLATED
+    missing_terms: "∅ (Void)"
+    completeness: incomplete
+- name: all_missing
+  input:
+    has_existence: false
+    has_boundary: false
+    has_state: false
+    has_void: false
+  expect:
+    conservation_status: VIOLATED
+    missing_terms: "∃ (Existence)"
+    completeness: incomplete
+- name: exactly_eight_primitives
+  input:
+    has_existence: true
+    has_boundary: true
+    has_state: true
+    has_void: true
+    primitive_count: 8
+  expect:
+    conservation_status: CONSERVED
+    completeness: rich
+- name: seven_primitives_minimal
+  input:
+    has_existence: true
+    has_boundary: true
+    has_state: true
+    has_void: true
+    primitive_count: 7
+  expect:
+    conservation_status: CONSERVED
+    completeness: minimal
+- name: empty_input_fails
+  input: {}
+  expect:
+    conservation_status: VIOLATED
+    completeness: incomplete

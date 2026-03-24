@@ -1,0 +1,380 @@
+name: compatibility-predictor
+description: 'Compatibility Predictor: predicts whether two micrograms will be cross-compatible based on empirical matrix findings. Encodes three discovered laws: (1) Complementarity — different operators predict higher compatibility, (2) Family affinity — same name family predicts compatibility, (3) Size asymmetry — different tree sizes predict compatibility. Derived from 2,047,657-run matrix analysis across 433 micrograms.'
+version: 0.2.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(features_a, features_b) at ∂(empirical_thresholds) — comparison of structural features against matrix-derived boundaries'
+  primes: ['κ', '∂', 'N', 'μ']
+  arguments: ['operator_a', 'operator_b', 'family_a', 'family_b', 'size_a', 'size_b']
+  chain_prediction: 'μ(κ(a,b)) → chain_recommendation — maps compatibility score to chain wiring advice'
+interface:
+  inputs:
+    operator_a:
+      type: string
+      required: true
+      description: 'Dominant operator of microgram A (gt, gte, lt, lte, eq, contains, is_null, is_not_null, matches, none)'
+    operator_b:
+      type: string
+      required: true
+      description: 'Dominant operator of microgram B'
+    family_a:
+      type: string
+      required: false
+      description: 'Name family prefix of microgram A (e.g., ab, adapt, signal)'
+    family_b:
+      type: string
+      required: false
+      description: 'Name family prefix of microgram B'
+    size_a:
+      type: int
+      required: false
+      description: 'Node count of microgram A'
+    size_b:
+      type: int
+      required: false
+      description: 'Node count of microgram B'
+  outputs:
+    compatibility_score:
+      type: string
+      description: 'Predicted compatibility: HIGH (>40%), MEDIUM (25-40%), LOW (<25%)'
+    predicted_ratio:
+      type: string
+      description: 'Estimated compatibility ratio based on empirical model'
+    dominant_factor:
+      type: string
+      description: 'Which factor most influences the prediction'
+    recommendation:
+      type: string
+      description: 'Chain wiring recommendation'
+tree:
+  start: check_op_a_gt
+  nodes:
+    # Fan-out on operator_a literals, then check operator_b against same literal
+    # This avoids the cross-variable comparison limitation ({{operator_b}} doesn't resolve in conditions)
+
+    # --- operator_a == gt ---
+    check_op_a_gt:
+      type: condition
+      variable: operator_a
+      operator: eq
+      value: gt
+      true_next: check_op_b_gt
+      false_next: check_op_a_gte
+
+    check_op_b_gt:
+      type: condition
+      variable: operator_b
+      operator: eq
+      value: gt
+      true_next: same_operator
+      false_next: diff_operator
+
+    # --- operator_a == gte ---
+    check_op_a_gte:
+      type: condition
+      variable: operator_a
+      operator: eq
+      value: gte
+      true_next: check_op_b_gte
+      false_next: check_op_a_lt
+
+    check_op_b_gte:
+      type: condition
+      variable: operator_b
+      operator: eq
+      value: gte
+      true_next: same_operator
+      false_next: diff_operator
+
+    # --- operator_a == lt ---
+    check_op_a_lt:
+      type: condition
+      variable: operator_a
+      operator: eq
+      value: lt
+      true_next: check_op_b_lt
+      false_next: check_op_a_lte
+
+    check_op_b_lt:
+      type: condition
+      variable: operator_b
+      operator: eq
+      value: lt
+      true_next: same_operator
+      false_next: diff_operator
+
+    # --- operator_a == lte ---
+    check_op_a_lte:
+      type: condition
+      variable: operator_a
+      operator: eq
+      value: lte
+      true_next: check_op_b_lte
+      false_next: check_op_a_eq
+
+    check_op_b_lte:
+      type: condition
+      variable: operator_b
+      operator: eq
+      value: lte
+      true_next: same_operator
+      false_next: diff_operator
+
+    # --- operator_a == eq ---
+    check_op_a_eq:
+      type: condition
+      variable: operator_a
+      operator: eq
+      value: eq
+      true_next: check_op_b_eq
+      false_next: check_op_a_contains
+
+    check_op_b_eq:
+      type: condition
+      variable: operator_b
+      operator: eq
+      value: eq
+      true_next: same_operator
+      false_next: diff_operator
+
+    # --- operator_a == contains ---
+    check_op_a_contains:
+      type: condition
+      variable: operator_a
+      operator: eq
+      value: contains
+      true_next: check_op_b_contains
+      false_next: check_op_a_is_null
+
+    check_op_b_contains:
+      type: condition
+      variable: operator_b
+      operator: eq
+      value: contains
+      true_next: same_operator
+      false_next: diff_operator
+
+    # --- operator_a == is_null ---
+    check_op_a_is_null:
+      type: condition
+      variable: operator_a
+      operator: eq
+      value: is_null
+      true_next: check_op_b_is_null
+      false_next: check_op_a_is_not_null
+
+    check_op_b_is_null:
+      type: condition
+      variable: operator_b
+      operator: eq
+      value: is_null
+      true_next: same_operator
+      false_next: diff_operator
+
+    # --- operator_a == is_not_null ---
+    check_op_a_is_not_null:
+      type: condition
+      variable: operator_a
+      operator: eq
+      value: is_not_null
+      true_next: check_op_b_is_not_null
+      false_next: check_op_a_matches
+
+    check_op_b_is_not_null:
+      type: condition
+      variable: operator_b
+      operator: eq
+      value: is_not_null
+      true_next: same_operator
+      false_next: diff_operator
+
+    # --- operator_a == matches ---
+    check_op_a_matches:
+      type: condition
+      variable: operator_a
+      operator: eq
+      value: matches
+      true_next: check_op_b_matches
+      false_next: check_op_a_none
+
+    check_op_b_matches:
+      type: condition
+      variable: operator_b
+      operator: eq
+      value: matches
+      true_next: same_operator
+      false_next: diff_operator
+
+    # --- operator_a == none ---
+    check_op_a_none:
+      type: condition
+      variable: operator_a
+      operator: eq
+      value: none
+      true_next: check_op_b_none
+      false_next: diff_operator
+
+    check_op_b_none:
+      type: condition
+      variable: operator_b
+      operator: eq
+      value: none
+      true_next: same_operator
+      false_next: diff_operator
+
+    # ==========================================
+    # SAME OPERATOR path — check family
+    # ==========================================
+    same_operator:
+      type: condition
+      variable: family_a
+      operator: is_not_null
+      value: ''
+      true_next: same_op_check_family
+      false_next: same_op_no_family
+
+    same_op_no_family:
+      type: return
+      value:
+        compatibility_score: MEDIUM
+        predicted_ratio: '~28%'
+        dominant_factor: 'Same operator (empirical avg 28%)'
+        recommendation: 'Compatible but redundant — both do the same type of check. Consider whether chaining adds value over using either alone.'
+
+    same_op_check_family:
+      type: condition
+      variable: family_a
+      operator: eq
+      value: '{{family_b}}'
+      true_next: same_op_same_family
+      false_next: same_op_diff_family
+
+    same_op_same_family:
+      type: return
+      value:
+        compatibility_score: MEDIUM
+        predicted_ratio: '~36%'
+        dominant_factor: 'Same family (+7.8% boost) offsets same operator (-14.6% penalty)'
+        recommendation: 'Family affinity compensates for operator redundancy. Chain within family for shared interface conventions.'
+
+    same_op_diff_family:
+      type: return
+      value:
+        compatibility_score: LOW
+        predicted_ratio: '~22%'
+        dominant_factor: 'Same operator + different family = double penalty'
+        recommendation: 'Low compatibility predicted. These micrograms compete for the same role without sharing interface conventions.'
+
+    # ==========================================
+    # DIFFERENT OPERATOR path — check family
+    # ==========================================
+    diff_operator:
+      type: condition
+      variable: family_a
+      operator: is_not_null
+      value: ''
+      true_next: diff_op_check_family
+      false_next: diff_op_no_family
+
+    diff_op_no_family:
+      type: return
+      value:
+        compatibility_score: HIGH
+        predicted_ratio: '~43%'
+        dominant_factor: 'Different operators (empirical avg 43%)'
+        recommendation: 'Complementary operators — strong chain candidate. Different operators means division of labor.'
+
+    diff_op_check_family:
+      type: condition
+      variable: family_a
+      operator: eq
+      value: '{{family_b}}'
+      true_next: diff_op_same_family
+      false_next: diff_op_diff_family
+
+    diff_op_same_family:
+      type: return
+      value:
+        compatibility_score: HIGH
+        predicted_ratio: '~50%'
+        dominant_factor: 'Different operators + same family = complementary specialization'
+        recommendation: 'Ideal chain pair — complementary operators with shared interface conventions. Wire A→B with confidence.'
+
+    diff_op_diff_family:
+      type: return
+      value:
+        compatibility_score: MEDIUM
+        predicted_ratio: '~35%'
+        dominant_factor: 'Different operators (+14.6%) partly offset by different family (-7.8%)'
+        recommendation: 'Moderate compatibility. Operators complement but interfaces may need alias bridging.'
+
+tests:
+# Same operator, same family → MEDIUM (redundant but familiar)
+- input:
+    operator_a: gt
+    operator_b: gt
+    family_a: ab
+    family_b: ab
+    size_a: 8
+    size_b: 10
+  expect:
+    compatibility_score: MEDIUM
+    predicted_ratio: '~36%'
+
+# Different operators, same family → HIGH (ideal chain pair)
+- input:
+    operator_a: gt
+    operator_b: contains
+    family_a: signal
+    family_b: signal
+    size_a: 12
+    size_b: 5
+  expect:
+    compatibility_score: HIGH
+    predicted_ratio: '~50%'
+
+# Different operators, different family → MEDIUM
+- input:
+    operator_a: eq
+    operator_b: gte
+    family_a: case
+    family_b: drift
+    size_a: 15
+    size_b: 8
+  expect:
+    compatibility_score: MEDIUM
+    predicted_ratio: '~35%'
+
+# Same operator, different family → LOW
+- input:
+    operator_a: contains
+    operator_b: contains
+    family_a: workflow
+    family_b: pdc
+    size_a: 20
+    size_b: 6
+  expect:
+    compatibility_score: LOW
+    predicted_ratio: '~22%'
+
+# No family info, different operators → HIGH (complementary)
+- input:
+    operator_a: gt
+    operator_b: is_null
+  expect:
+    compatibility_score: HIGH
+    predicted_ratio: '~43%'
+
+# No family info, same operators → MEDIUM (redundant)
+- input:
+    operator_a: lte
+    operator_b: lte
+  expect:
+    compatibility_score: MEDIUM
+    predicted_ratio: '~28%'
+- input: {}
+  expect:
+    compatibility_score: HIGH
+    dominant_factor: "Different operators (empirical avg 43%)"
+    predicted_ratio: "~43%"
+    recommendation: Complementary operators — strong chain candidate. Different operators means division of labor.

@@ -1,0 +1,158 @@
+name: psur-periodicity
+description: 'Periodic Safety Update Report (PSUR) submission interval based on post-approval duration and special conditions. EMA CTD Module 1.2.5.'
+version: 0.1.0
+interface:
+  inputs:
+    years_since_approval:
+      type: int
+      required: true
+    has_special_condition:
+      type: bool
+      required: false
+  outputs:
+    periodicity:
+      type: string
+    next_due_months:
+      type: int
+    rationale:
+      type: string
+tree:
+  start: special_condition_check
+  nodes:
+    special_condition_check:
+      type: condition
+      variable: has_special_condition
+      operator: eq
+      value: true
+      true_next: special_condition_six_monthly
+      false_next: years_zero_to_two
+    years_zero_to_two:
+      type: condition
+      variable: years_since_approval
+      operator: lt
+      value: 2
+      true_next: six_monthly_result
+      false_next: years_two_to_five
+    years_two_to_five:
+      type: condition
+      variable: years_since_approval
+      operator: lt
+      value: 5
+      true_next: annual_result
+      false_next: years_five_to_ten
+    years_five_to_ten:
+      type: condition
+      variable: years_since_approval
+      operator: lt
+      value: 10
+      true_next: triennial_result
+      false_next: as_requested_result
+    special_condition_six_monthly:
+      type: return
+      value:
+        periodicity: six_monthly
+        next_due_months: 6
+        rationale: Special condition override - Enhanced safety monitoring required
+    six_monthly_result:
+      type: return
+      value:
+        periodicity: six_monthly
+        next_due_months: 6
+        rationale: Initial post-approval period (0-2 years) - Enhanced safety monitoring required
+    annual_result:
+      type: return
+      value:
+        periodicity: annual
+        next_due_months: 12
+        rationale: Early post-approval phase (2-5 years) - Annual PSUR required
+    triennial_result:
+      type: return
+      value:
+        periodicity: triennial
+        next_due_months: 36
+        rationale: Established safety profile (5-10 years) - Triennial PSUR required
+    as_requested_result:
+      type: return
+      value:
+        periodicity: as_requested
+        next_due_months: 0
+        rationale: Mature post-approval phase (>10 years) - PSUR only on request unless risk identified
+tests:
+  # 0-2 years, no special condition → 6 monthly
+  - input:
+      years_since_approval: 0
+      has_special_condition: false
+    expect:
+      periodicity: six_monthly
+      next_due_months: 6
+      rationale: Initial post-approval period (0-2 years) - Enhanced safety monitoring required
+  # 1 year, no special condition → 6 monthly
+  - input:
+      years_since_approval: 1
+      has_special_condition: false
+    expect:
+      periodicity: six_monthly
+      next_due_months: 6
+      rationale: Initial post-approval period (0-2 years) - Enhanced safety monitoring required
+  # 2-5 years, no special condition → annual
+  - input:
+      years_since_approval: 3
+      has_special_condition: false
+    expect:
+      periodicity: annual
+      next_due_months: 12
+      rationale: Early post-approval phase (2-5 years) - Annual PSUR required
+  # 5-10 years, no special condition → triennial
+  - input:
+      years_since_approval: 7
+      has_special_condition: false
+    expect:
+      periodicity: triennial
+      next_due_months: 36
+      rationale: Established safety profile (5-10 years) - Triennial PSUR required
+  # >10 years, no special condition → as_requested
+  - input:
+      years_since_approval: 15
+      has_special_condition: false
+    expect:
+      periodicity: as_requested
+      next_due_months: 0
+      rationale: Mature post-approval phase (>10 years) - PSUR only on request unless risk identified
+  # Special condition overrides to 6 monthly (0-2 years)
+  - input:
+      years_since_approval: 1
+      has_special_condition: true
+    expect:
+      periodicity: six_monthly
+      next_due_months: 6
+      rationale: Special condition override - Enhanced safety monitoring required
+  # Special condition overrides to 6 monthly (>10 years)
+  - input:
+      years_since_approval: 15
+      has_special_condition: true
+    expect:
+      periodicity: six_monthly
+      next_due_months: 6
+      rationale: Special condition override - Enhanced safety monitoring required
+  # Boundary: exactly 2 years → annual
+  - input:
+      years_since_approval: 2
+      has_special_condition: false
+    expect:
+      periodicity: annual
+      next_due_months: 12
+      rationale: Early post-approval phase (2-5 years) - Annual PSUR required
+  # Boundary: exactly 5 years → triennial
+  - input:
+      years_since_approval: 5
+      has_special_condition: false
+    expect:
+      periodicity: triennial
+      next_due_months: 36
+      rationale: Established safety profile (5-10 years) - Triennial PSUR required
+  # Empty input: required field defaults to high value (>=10) → as_requested
+  - input: {}
+    expect:
+      periodicity: as_requested
+      next_due_months: 0
+      rationale: Mature post-approval phase (>10 years) - PSUR only on request unless risk identified

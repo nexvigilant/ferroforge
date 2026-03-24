@@ -1,0 +1,86 @@
+name: alias-mismatch-detector
+description: 'Ecosystem health gate: detects unresolved field name mismatches that reduce chain connectivity'
+version: 0.1.0
+interface:
+  inputs:
+    orphan_outputs:
+      type: int
+    suggested_aliases:
+      type: int
+    alias_conflicts:
+      type: int
+  outputs:
+    health:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_conflicts
+  nodes:
+    check_conflicts:
+      type: condition
+      variable: alias_conflicts
+      operator: gt
+      value: 0
+      true_next: red
+      false_next: check_suggested
+    check_suggested:
+      type: condition
+      variable: suggested_aliases
+      operator: gt
+      value: 0
+      true_next: yellow
+      false_next: green
+    red:
+      type: return
+      value:
+        health: RED
+        action: resolve_alias_conflicts
+    yellow:
+      type: return
+      value:
+        health: YELLOW
+        action: add_suggested_aliases
+    green:
+      type: return
+      value:
+        health: GREEN
+        action: none
+tests:
+- name: conflicts trigger RED
+  input:
+    alias_conflicts: 2
+    suggested_aliases: 1
+    orphan_outputs: 3
+  expect:
+    health: RED
+    action: resolve_alias_conflicts
+- name: suggestions without conflicts trigger YELLOW
+  input:
+    alias_conflicts: 0
+    suggested_aliases: 5
+    orphan_outputs: 2
+  expect:
+    health: YELLOW
+    action: add_suggested_aliases
+- name: clean ecosystem is GREEN
+  input:
+    alias_conflicts: 0
+    suggested_aliases: 0
+    orphan_outputs: 0
+  expect:
+    health: GREEN
+    action: none
+- name: zero conflicts with suggestions is YELLOW
+  input:
+    alias_conflicts: 0
+    suggested_aliases: 1
+    orphan_outputs: 10
+  expect:
+    health: YELLOW
+    action: add_suggested_aliases
+- name: empty input defaults to GREEN
+  input: {}
+  expect:
+    health: GREEN
+    action: none

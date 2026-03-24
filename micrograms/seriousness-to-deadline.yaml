@@ -1,0 +1,190 @@
+name: seriousness-to-deadline
+description: 'Bridge: routes seriousness classification to ICH E2B reporting deadline. Chains from case-seriousness output.'
+version: 0.1.0
+interface:
+  inputs:
+    is_fatal:
+      type: bool
+      required: false
+    is_life_threatening:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+  outputs:
+    deadline_days:
+      type: int
+    deadline_type:
+      type: string
+    regulatory_basis:
+      type: string
+    report_category:
+      type: string
+tree:
+  start: check_fatal
+  nodes:
+    check_fatal:
+      type: condition
+      variable: is_fatal
+      operator: eq
+      value: true
+      true_next: check_fatal_unexpected
+      false_next: check_life_threatening
+    check_fatal_unexpected:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: seven_day_expedited
+      false_next: check_serious_expected_fatal
+    check_serious_expected_fatal:
+      type: return
+      value:
+        deadline_type: PERIODIC_PSUR
+        deadline_days: 90
+        report_category: periodic
+        regulatory_basis: ICH E2B - fatal but expected reaction included in periodic safety update
+    check_life_threatening:
+      type: condition
+      variable: is_life_threatening
+      operator: eq
+      value: true
+      true_next: check_lt_unexpected
+      false_next: check_serious
+    check_lt_unexpected:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: seven_day_expedited
+      false_next: check_serious_expected_lt
+    check_serious_expected_lt:
+      type: return
+      value:
+        deadline_type: PERIODIC_PSUR
+        deadline_days: 90
+        report_category: periodic
+        regulatory_basis: ICH E2B - life-threatening but expected reaction included in periodic safety update
+    seven_day_expedited:
+      type: return
+      value:
+        deadline_type: 7_DAY_EXPEDITED
+        deadline_days: 7
+        report_category: expedited
+        regulatory_basis: ICH E2B - fatal/life-threatening unexpected reaction requires 7-day expedited report
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_serious_unexpected
+      false_next: periodic_standard
+    check_serious_unexpected:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: fifteen_day_expedited
+      false_next: periodic_psur
+    fifteen_day_expedited:
+      type: return
+      value:
+        deadline_type: 15_DAY_EXPEDITED
+        deadline_days: 15
+        report_category: expedited
+        regulatory_basis: ICH E2B - serious unexpected reaction requires 15-day expedited report
+    periodic_psur:
+      type: return
+      value:
+        deadline_type: PERIODIC_PSUR
+        deadline_days: 90
+        report_category: periodic
+        regulatory_basis: ICH E2B - serious expected reaction included in PSUR/PBRER cycle
+    periodic_standard:
+      type: return
+      value:
+        deadline_type: PERIODIC_STANDARD
+        deadline_days: 180
+        report_category: periodic
+        regulatory_basis: ICH E2B - non-serious reaction included in standard periodic reporting
+tests:
+- input:
+    is_serious: true
+    is_fatal: true
+    is_life_threatening: false
+    is_unexpected: true
+  expect:
+    deadline_type: 7_DAY_EXPEDITED
+    deadline_days: 7
+    report_category: expedited
+    regulatory_basis: ICH E2B - fatal/life-threatening unexpected reaction requires 7-day expedited report
+- input:
+    is_serious: true
+    is_fatal: false
+    is_life_threatening: true
+    is_unexpected: true
+  expect:
+    deadline_type: 7_DAY_EXPEDITED
+    deadline_days: 7
+    report_category: expedited
+    regulatory_basis: ICH E2B - fatal/life-threatening unexpected reaction requires 7-day expedited report
+- input:
+    is_serious: true
+    is_fatal: false
+    is_life_threatening: false
+    is_unexpected: true
+  expect:
+    deadline_type: 15_DAY_EXPEDITED
+    deadline_days: 15
+    report_category: expedited
+    regulatory_basis: ICH E2B - serious unexpected reaction requires 15-day expedited report
+- input:
+    is_serious: true
+    is_fatal: false
+    is_life_threatening: false
+    is_unexpected: false
+  expect:
+    deadline_type: PERIODIC_PSUR
+    deadline_days: 90
+    report_category: periodic
+    regulatory_basis: ICH E2B - serious expected reaction included in PSUR/PBRER cycle
+- input:
+    is_serious: false
+    is_fatal: false
+    is_life_threatening: false
+    is_unexpected: false
+  expect:
+    deadline_type: PERIODIC_STANDARD
+    deadline_days: 180
+    report_category: periodic
+    regulatory_basis: ICH E2B - non-serious reaction included in standard periodic reporting
+- input:
+    is_serious: true
+    is_fatal: true
+    is_life_threatening: true
+    is_unexpected: false
+  expect:
+    deadline_type: PERIODIC_PSUR
+    deadline_days: 90
+    report_category: periodic
+    regulatory_basis: ICH E2B - fatal but expected reaction included in periodic safety update
+- input:
+    is_fatal: false
+    is_life_threatening: true
+    is_unexpected: false
+    is_serious: true
+  expect:
+    deadline_type: PERIODIC_PSUR
+    deadline_days: 90
+    report_category: periodic
+    regulatory_basis: ICH E2B - life-threatening but expected reaction included in periodic safety update
+- input: {}
+  expect:
+    deadline_days: 180
+    deadline_type: PERIODIC_STANDARD
+    regulatory_basis: ICH E2B - non-serious reaction included in standard periodic reporting
+    report_category: periodic

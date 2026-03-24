@@ -1,0 +1,181 @@
+name: evidence-grader
+description: 'Grade loop evaluation evidence quality for VDAG Reality Gradient. Maps loop_state + margin_ratio to evidence quality (NONE/WEAK/MODERATE/STRONG) with numeric score (0/33/66/100).'
+version: 0.1.0
+interface:
+  inputs:
+    loop_state:
+      type: string
+      required: true
+    margin_ratio:
+      type: integer
+      required: true
+  outputs:
+    quality:
+      type: string
+    score:
+      type: float
+tree:
+  start: check_default
+  nodes:
+    check_default:
+      type: condition
+      variable: loop_state
+      operator: eq
+      value: default
+      true_next: return_none
+      false_next: check_disintegrated
+    check_disintegrated:
+      type: condition
+      variable: loop_state
+      operator: eq
+      value: disintegrated
+      true_next: return_strong
+      false_next: check_stalled
+    check_stalled:
+      type: condition
+      variable: loop_state
+      operator: eq
+      value: stalled
+      true_next: return_strong
+      false_next: check_gimbal_lock
+    check_gimbal_lock:
+      type: condition
+      variable: loop_state
+      operator: eq
+      value: gimbal_lock
+      true_next: return_strong
+      false_next: check_fatigue
+    check_fatigue:
+      type: condition
+      variable: loop_state
+      operator: eq
+      value: fatigue_failure_imminent
+      true_next: return_strong
+      false_next: check_critical
+    check_critical:
+      type: condition
+      variable: loop_state
+      operator: eq
+      value: critical
+      true_next: return_weak
+      false_next: check_warning
+    check_warning:
+      type: condition
+      variable: loop_state
+      operator: eq
+      value: warning
+      true_next: return_moderate
+      false_next: check_low
+    check_low:
+      type: condition
+      variable: loop_state
+      operator: eq
+      value: low
+      true_next: return_weak
+      false_next: check_no_stability
+    check_no_stability:
+      type: condition
+      variable: loop_state
+      operator: eq
+      value: no_stability
+      true_next: return_weak
+      false_next: check_healthy_strong
+    check_healthy_strong:
+      type: condition
+      variable: margin_ratio
+      operator: gte
+      value: 50
+      true_next: return_strong
+      false_next: check_healthy_moderate
+    check_healthy_moderate:
+      type: condition
+      variable: margin_ratio
+      operator: gte
+      value: 10
+      true_next: return_moderate
+      false_next: return_weak
+    return_none:
+      type: return
+      value:
+        quality: NONE
+        score: 0.0
+    return_weak:
+      type: return
+      value:
+        quality: WEAK
+        score: 33.0
+    return_moderate:
+      type: return
+      value:
+        quality: MODERATE
+        score: 66.0
+    return_strong:
+      type: return
+      value:
+        quality: STRONG
+        score: 100.0
+tests:
+- input:
+    loop_state: default
+    margin_ratio: 50
+  expect:
+    quality: NONE
+    score: 0.0
+- input:
+    loop_state: disintegrated
+    margin_ratio: 0
+  expect:
+    quality: STRONG
+    score: 100.0
+- input:
+    loop_state: stalled
+    margin_ratio: 0
+  expect:
+    quality: STRONG
+    score: 100.0
+- input:
+    loop_state: gimbal_lock
+    margin_ratio: 0
+  expect:
+    quality: STRONG
+    score: 100.0
+- input:
+    loop_state: fatigue_failure_imminent
+    margin_ratio: 0
+  expect:
+    quality: STRONG
+    score: 100.0
+- input:
+    loop_state: critical
+    margin_ratio: 5
+  expect:
+    quality: WEAK
+    score: 33.0
+- input:
+    loop_state: warning
+    margin_ratio: 30
+  expect:
+    quality: MODERATE
+    score: 66.0
+- input:
+    loop_state: low
+    margin_ratio: 20
+  expect:
+    quality: WEAK
+    score: 33.0
+- input:
+    loop_state: thriving
+    margin_ratio: 75
+  expect:
+    quality: STRONG
+    score: 100.0
+- input:
+    loop_state: nominal
+    margin_ratio: 25
+  expect:
+    quality: MODERATE
+    score: 66.0
+- input: {}
+  expect:
+    quality: WEAK
+    score: 33.0

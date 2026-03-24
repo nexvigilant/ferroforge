@@ -1,0 +1,161 @@
+name: dd-domain-scorer
+description: 'Classify a PV DD domain risk level from its raw score (0-100). Raw score = (RED×100 + YELLOW×50) / total, computed upstream. Source: Youssef & Hammad, Drug Safety (Dec 2025)'
+version: 0.1.0
+tree:
+  start: check_score_null
+  nodes:
+    clean:
+      type: return
+      value:
+        action: standard_monitoring
+        risk_level: clean
+        severity: 0
+    moderate:
+      type: return
+      value:
+        action: enhanced_monitoring
+        risk_level: moderate
+        severity: 2
+    not_assessed:
+      type: return
+      value:
+        action: no_data
+        risk_level: not_assessed
+        severity: 0
+    check_critical:
+      type: condition
+      variable: has_red
+      operator: eq
+      value: true
+      true_next: check_extreme
+      false_next: check_moderate
+    critical:
+      type: return
+      value:
+        severity: 3
+        action: detailed_review
+        risk_level: critical
+    low:
+      type: return
+      value:
+        action: standard_monitoring
+        risk_level: low
+        severity: 1
+    check_extreme:
+      type: condition
+      variable: raw_score
+      operator: gt
+      value: 75.0
+      true_next: extreme
+      false_next: critical
+    extreme:
+      type: return
+      value:
+        risk_level: extreme
+        severity: 4
+        action: immediate_escalation
+    check_moderate:
+      type: condition
+      variable: has_yellow
+      operator: eq
+      value: true
+      true_next: moderate
+      false_next: check_low
+    check_low:
+      type: condition
+      variable: raw_score
+      operator: gt
+      value: 0.0
+      true_next: low
+      false_next: clean
+    check_score_null:
+      type: condition
+      variable: raw_score
+      operator: is_null
+      value: null
+      true_next: not_assessed
+      false_next: check_critical
+tests:
+- input:
+    raw_score: 85.0
+    has_red: true
+    has_yellow: false
+  expect:
+    risk_level: extreme
+    action: immediate_escalation
+    severity: 4
+- input:
+    has_yellow: true
+    has_red: true
+    raw_score: 50.0
+  expect:
+    risk_level: critical
+    action: detailed_review
+    severity: 3
+- input:
+    raw_score: 50.0
+    has_red: false
+    has_yellow: true
+  expect:
+    severity: 2
+    risk_level: moderate
+    action: enhanced_monitoring
+- input:
+    has_yellow: false
+    raw_score: 0.0
+    has_red: false
+  expect:
+    severity: 0
+    risk_level: clean
+    action: standard_monitoring
+- input: {}
+  expect:
+    action: no_data
+    risk_level: not_assessed
+    severity: 0
+- input:
+    raw_score: 74.999
+  expect:
+    action: standard_monitoring
+    risk_level: low
+    severity: 1
+- input:
+    raw_score: 75.001
+  expect:
+    severity: 1
+    action: standard_monitoring
+    risk_level: low
+- input:
+    raw_score: -0.001
+  expect:
+    severity: 0
+    action: standard_monitoring
+    risk_level: clean
+- input:
+    raw_score: 0.001
+  expect:
+    risk_level: low
+    action: standard_monitoring
+    severity: 1
+interface:
+  inputs:
+    raw_score:
+      type: float
+      required: false
+    has_yellow:
+      type: bool
+      required: false
+    has_red:
+      type: bool
+      required: false
+  outputs:
+    action:
+      type: string
+      required: false
+    severity:
+      type: int
+      required: false
+    risk_level:
+      type: string
+      required: false
+  aliases: {}

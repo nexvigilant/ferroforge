@@ -1,0 +1,297 @@
+name: reporting-rate-gate
+description: Fills the ν (Frequency) primitive gap. Rate-of-change signal detection — detects if adverse event reporting rate is accelerating, stable, or declining quarter-over-quarter.
+version: 0.1.0
+tree:
+  start: check_baseline
+  nodes:
+    signal_emerging:
+      type: return
+      value:
+        trend: SIGNAL_EMERGING
+        frequency_primitive: ν — rate of change over time
+        chemistry_analog: Dramatic increase in reaction velocity
+        action: Escalate to signal evaluation - reporting rate increased ≥50% quarter-over-quarter
+    check_watch_threshold:
+      type: condition
+      variable: rate_change_pct
+      operator: gte
+      value: 20
+      true_next: watch
+      false_next: check_stable_threshold
+    no_activity:
+      type: return
+      value:
+        frequency_primitive: ν — rate of change over time
+        trend: NO_ACTIVITY
+        chemistry_analog: Zero reaction rate across periods
+        action: Continue routine monitoring - no baseline and no current events
+    check_stable_threshold:
+      type: condition
+      variable: rate_change_pct
+      operator: gte
+      value: -20
+      true_next: stable
+      false_next: declining
+    new_signal:
+      type: return
+      value:
+        frequency_primitive: ν — rate of change over time
+        action: Initiate signal evaluation - no prior baseline, new event reporting detected
+        trend: NEW_SIGNAL
+        chemistry_analog: Appearance of new reaction intermediate with no baseline
+    check_no_baseline_count:
+      type: condition
+      variable: current_count
+      operator: gt
+      value: 0
+      true_next: new_signal
+      false_next: no_activity
+    watch:
+      type: return
+      value:
+        chemistry_analog: Moderate acceleration in reaction kinetics
+        trend: WATCH
+        frequency_primitive: ν — rate of change over time
+        action: Flag for enhanced surveillance - reporting rate increased 20-49% quarter-over-quarter
+    stable:
+      type: return
+      value:
+        chemistry_analog: Steady-state reaction equilibrium
+        frequency_primitive: ν — rate of change over time
+        action: Continue standard monitoring - reporting rate within normal variation (-20% to +19%)
+        trend: STABLE
+    check_baseline_rate:
+      type: condition
+      variable: rate_change_pct
+      operator: gte
+      value: 50
+      true_next: signal_emerging
+      false_next: check_watch_threshold
+    declining:
+      type: return
+      value:
+        action: Document trend - reporting rate declined >20% quarter-over-quarter
+        frequency_primitive: ν — rate of change over time
+        chemistry_analog: Reaction rate decreasing toward completion
+        trend: DECLINING
+    check_baseline:
+      type: condition
+      variable: baseline_exists
+      operator: eq
+      value: true
+      true_next: check_baseline_rate
+      false_next: check_no_baseline_count
+tests:
+- input:
+    rate_change_pct: 0
+    current_count: 5
+    baseline_exists: false
+  expect:
+    trend: NEW_SIGNAL
+    action: Initiate signal evaluation - no prior baseline, new event reporting detected
+    frequency_primitive: ν — rate of change over time
+    chemistry_analog: Appearance of new reaction intermediate with no baseline
+- input:
+    baseline_exists: false
+    current_count: 0
+    rate_change_pct: 0
+  expect:
+    chemistry_analog: Zero reaction rate across periods
+    frequency_primitive: ν — rate of change over time
+    trend: NO_ACTIVITY
+    action: Continue routine monitoring - no baseline and no current events
+- input:
+    rate_change_pct: 100
+    baseline_exists: true
+    current_count: 50
+  expect:
+    action: Escalate to signal evaluation - reporting rate increased ≥50% quarter-over-quarter
+    chemistry_analog: Dramatic increase in reaction velocity
+    trend: SIGNAL_EMERGING
+    frequency_primitive: ν — rate of change over time
+- input:
+    rate_change_pct: 50
+    current_count: 50
+    baseline_exists: true
+  expect:
+    chemistry_analog: Dramatic increase in reaction velocity
+    action: Escalate to signal evaluation - reporting rate increased ≥50% quarter-over-quarter
+    trend: SIGNAL_EMERGING
+    frequency_primitive: ν — rate of change over time
+- input:
+    rate_change_pct: 30
+    baseline_exists: true
+    current_count: 50
+  expect:
+    trend: WATCH
+    action: Flag for enhanced surveillance - reporting rate increased 20-49% quarter-over-quarter
+    frequency_primitive: ν — rate of change over time
+    chemistry_analog: Moderate acceleration in reaction kinetics
+- input:
+    baseline_exists: true
+    current_count: 50
+    rate_change_pct: 0
+  expect:
+    trend: STABLE
+    action: Continue standard monitoring - reporting rate within normal variation (-20% to +19%)
+    chemistry_analog: Steady-state reaction equilibrium
+    frequency_primitive: ν — rate of change over time
+- input:
+    rate_change_pct: -10
+    baseline_exists: true
+    current_count: 50
+  expect:
+    trend: STABLE
+    action: Continue standard monitoring - reporting rate within normal variation (-20% to +19%)
+    frequency_primitive: ν — rate of change over time
+    chemistry_analog: Steady-state reaction equilibrium
+- input:
+    baseline_exists: true
+    current_count: 50
+    rate_change_pct: -20
+  expect:
+    trend: STABLE
+    frequency_primitive: ν — rate of change over time
+    action: Continue standard monitoring - reporting rate within normal variation (-20% to +19%)
+    chemistry_analog: Steady-state reaction equilibrium
+- input:
+    current_count: 50
+    rate_change_pct: -50
+    baseline_exists: true
+  expect:
+    trend: DECLINING
+    chemistry_analog: Reaction rate decreasing toward completion
+    action: Document trend - reporting rate declined >20% quarter-over-quarter
+    frequency_primitive: ν — rate of change over time
+- input:
+    rate_change_pct: 19
+  expect:
+    trend: NO_ACTIVITY
+    chemistry_analog: Zero reaction rate across periods
+    action: Continue routine monitoring - no baseline and no current events
+    frequency_primitive: ν — rate of change over time
+- input:
+    rate_change_pct: 21
+  expect:
+    frequency_primitive: ν — rate of change over time
+    trend: NO_ACTIVITY
+    chemistry_analog: Zero reaction rate across periods
+    action: Continue routine monitoring - no baseline and no current events
+- input:
+    rate_change_pct: 2000
+  expect:
+    chemistry_analog: Zero reaction rate across periods
+    action: Continue routine monitoring - no baseline and no current events
+    trend: NO_ACTIVITY
+    frequency_primitive: ν — rate of change over time
+- input: {}
+  expect:
+    chemistry_analog: Zero reaction rate across periods
+    frequency_primitive: ν — rate of change over time
+    action: Continue routine monitoring - no baseline and no current events
+    trend: NO_ACTIVITY
+- input:
+    rate_change_pct: -21
+  expect:
+    frequency_primitive: ν — rate of change over time
+    action: Continue routine monitoring - no baseline and no current events
+    chemistry_analog: Zero reaction rate across periods
+    trend: NO_ACTIVITY
+- input:
+    rate_change_pct: -19
+  expect:
+    action: Continue routine monitoring - no baseline and no current events
+    frequency_primitive: ν — rate of change over time
+    chemistry_analog: Zero reaction rate across periods
+    trend: NO_ACTIVITY
+- input: {}
+  expect:
+    chemistry_analog: Zero reaction rate across periods
+    trend: NO_ACTIVITY
+    frequency_primitive: ν — rate of change over time
+    action: Continue routine monitoring - no baseline and no current events
+- input:
+    current_count: -1
+  expect:
+    trend: NO_ACTIVITY
+    action: Continue routine monitoring - no baseline and no current events
+    frequency_primitive: ν — rate of change over time
+    chemistry_analog: Zero reaction rate across periods
+- input:
+    current_count: -1
+  expect:
+    trend: NO_ACTIVITY
+    action: Continue routine monitoring - no baseline and no current events
+    chemistry_analog: Zero reaction rate across periods
+    frequency_primitive: ν — rate of change over time
+- input:
+    current_count: 1
+  expect:
+    action: Initiate signal evaluation - no prior baseline, new event reporting detected
+    trend: NEW_SIGNAL
+    chemistry_analog: Appearance of new reaction intermediate with no baseline
+    frequency_primitive: ν — rate of change over time
+- input: {}
+  expect:
+    chemistry_analog: Zero reaction rate across periods
+    trend: NO_ACTIVITY
+    frequency_primitive: ν — rate of change over time
+    action: Continue routine monitoring - no baseline and no current events
+- input:
+    rate_change_pct: 49
+  expect:
+    chemistry_analog: Zero reaction rate across periods
+    trend: NO_ACTIVITY
+    action: Continue routine monitoring - no baseline and no current events
+    frequency_primitive: ν — rate of change over time
+- input:
+    rate_change_pct: 51
+  expect:
+    action: Continue routine monitoring - no baseline and no current events
+    chemistry_analog: Zero reaction rate across periods
+    trend: NO_ACTIVITY
+    frequency_primitive: ν — rate of change over time
+- input:
+    rate_change_pct: 5000
+  expect:
+    chemistry_analog: Zero reaction rate across periods
+    frequency_primitive: ν — rate of change over time
+    trend: NO_ACTIVITY
+    action: Continue routine monitoring - no baseline and no current events
+- input: {}
+  expect:
+    frequency_primitive: ν — rate of change over time
+    action: Continue routine monitoring - no baseline and no current events
+    trend: NO_ACTIVITY
+    chemistry_analog: Zero reaction rate across periods
+- input: {}
+  expect:
+    frequency_primitive: ν — rate of change over time
+    trend: NO_ACTIVITY
+    action: Continue routine monitoring - no baseline and no current events
+    chemistry_analog: Zero reaction rate across periods
+interface:
+  inputs:
+    rate_change_pct:
+      type: i64
+      required: true
+    current_count:
+      type: i64
+      required: true
+    baseline_exists:
+      type: bool
+      required: true
+  outputs:
+    chemistry_analog:
+      type: string
+      required: false
+    trend:
+      type: string
+      required: false
+    frequency_primitive:
+      type: string
+      required: false
+    action:
+      type: string
+      required: false
+  aliases: {}

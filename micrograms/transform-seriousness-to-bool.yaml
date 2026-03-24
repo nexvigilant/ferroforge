@@ -1,0 +1,130 @@
+name: transform-seriousness-to-bool
+description: 'Transform: decomposes case-seriousness string + criterion into boolean flags (serious, fatal, life_threatening) for downstream mcgs'
+version: 0.2.0
+interface:
+  inputs:
+    seriousness:
+      type: string
+      required: true
+    criterion:
+      type: string
+      required: false
+  outputs:
+    serious:
+      type: bool
+    serious_ae:
+      type: bool
+    fatal:
+      type: bool
+    is_life_threatening:
+      type: bool
+    source:
+      type: string
+tree:
+  start: check_serious
+  nodes:
+    check_serious:
+      type: condition
+      variable: seriousness
+      operator: eq
+      value: SERIOUS
+      true_next: check_death
+      false_next: not_serious
+    check_death:
+      type: condition
+      variable: criterion
+      operator: eq
+      value: DEATH
+      true_next: serious_fatal
+      false_next: check_lt
+    check_lt:
+      type: condition
+      variable: criterion
+      operator: eq
+      value: LIFE_THREATENING
+      true_next: serious_lt
+      false_next: serious_other
+    serious_fatal:
+      type: return
+      value:
+        serious: true
+        serious_ae: true
+        fatal: true
+        is_life_threatening: false
+        source: case-seriousness
+    serious_lt:
+      type: return
+      value:
+        serious: true
+        serious_ae: true
+        fatal: false
+        is_life_threatening: true
+        source: case-seriousness
+    serious_other:
+      type: return
+      value:
+        serious: true
+        serious_ae: true
+        fatal: false
+        is_life_threatening: false
+        source: case-seriousness
+    not_serious:
+      type: return
+      value:
+        serious: false
+        serious_ae: false
+        fatal: false
+        is_life_threatening: false
+        source: case-seriousness
+tests:
+- input:
+    seriousness: SERIOUS
+    criterion: DEATH
+  expect:
+    serious: true
+    serious_ae: true
+    fatal: true
+    is_life_threatening: false
+    source: case-seriousness
+- input:
+    seriousness: SERIOUS
+    criterion: LIFE_THREATENING
+  expect:
+    serious: true
+    serious_ae: true
+    fatal: false
+    is_life_threatening: true
+    source: case-seriousness
+- input:
+    seriousness: SERIOUS
+    criterion: HOSPITALIZATION
+  expect:
+    serious: true
+    serious_ae: true
+    fatal: false
+    is_life_threatening: false
+    source: case-seriousness
+- input:
+    seriousness: SERIOUS
+    criterion: CONGENITAL_ANOMALY
+  expect:
+    serious: true
+    serious_ae: true
+    fatal: false
+    is_life_threatening: false
+    source: case-seriousness
+- input:
+    seriousness: NON-SERIOUS
+  expect:
+    serious: false
+    serious_ae: false
+    fatal: false
+    is_life_threatening: false
+    source: case-seriousness
+- input: {}
+  expect:
+    serious: false
+    serious_ae: false
+    fatal: false
+    is_life_threatening: false
+    source: case-seriousness

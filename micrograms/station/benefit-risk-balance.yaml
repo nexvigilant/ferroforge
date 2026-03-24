@@ -1,0 +1,123 @@
+name: benefit-risk-balance
+description: Simple benefit-risk assessment gate determining product balance and regulatory action recommendation. Evaluates efficacy, serious risks, alternatives, and risk minimization feasibility.
+version: 0.1.0
+interface:
+  inputs:
+    efficacy_demonstrated:
+      type: bool
+      required: false
+    serious_risk_identified:
+      type: bool
+      required: false
+    alternative_exists:
+      type: bool
+      required: false
+    risk_minimizable:
+      type: bool
+      required: false
+  outputs:
+    balance:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_efficacy
+  nodes:
+    check_efficacy:
+      type: condition
+      variable: efficacy_demonstrated
+      operator: eq
+      value: true
+      true_next: check_serious_risk
+      false_next: no_efficacy
+    no_efficacy:
+      type: return
+      value:
+        balance: unfavorable
+        action: withdraw
+    check_serious_risk:
+      type: condition
+      variable: serious_risk_identified
+      operator: eq
+      value: true
+      true_next: check_risk_minimizable
+      false_next: favorable_balance
+    favorable_balance:
+      type: return
+      value:
+        balance: favorable
+        action: continue
+    check_risk_minimizable:
+      type: condition
+      variable: risk_minimizable
+      operator: eq
+      value: true
+      true_next: check_alternative
+      false_next: unmitigatable_risk
+    unmitigatable_risk:
+      type: return
+      value:
+        balance: unfavorable
+        action: withdraw
+    check_alternative:
+      type: condition
+      variable: alternative_exists
+      operator: eq
+      value: true
+      true_next: alternative_available
+      false_next: critical_indication
+    alternative_available:
+      type: return
+      value:
+        balance: unfavorable
+        action: restrict
+    critical_indication:
+      type: return
+      value:
+        balance: uncertain
+        action: investigate
+tests:
+  - input:
+      efficacy_demonstrated: true
+      serious_risk_identified: false
+      alternative_exists: false
+      risk_minimizable: false
+    expect:
+      balance: favorable
+      action: continue
+  - input:
+      efficacy_demonstrated: false
+      serious_risk_identified: true
+      alternative_exists: true
+      risk_minimizable: false
+    expect:
+      balance: unfavorable
+      action: withdraw
+  - input:
+      efficacy_demonstrated: true
+      serious_risk_identified: true
+      alternative_exists: true
+      risk_minimizable: true
+    expect:
+      balance: unfavorable
+      action: restrict
+  - input:
+      efficacy_demonstrated: true
+      serious_risk_identified: true
+      alternative_exists: false
+      risk_minimizable: true
+    expect:
+      balance: uncertain
+      action: investigate
+  - input:
+      efficacy_demonstrated: true
+      serious_risk_identified: true
+      alternative_exists: false
+      risk_minimizable: false
+    expect:
+      balance: unfavorable
+      action: withdraw
+  - input: {}
+    expect:
+      balance: unfavorable
+      action: withdraw

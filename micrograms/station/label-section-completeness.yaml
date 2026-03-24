@@ -1,0 +1,120 @@
+name: label-section-completeness
+description: Evaluates drug label completeness for safety assessment. Gates on presence of critical safety information sections.
+version: 0.1.0
+interface:
+  inputs:
+    has_adverse_reactions:
+      type: bool
+      required: false
+    has_contraindications:
+      type: bool
+      required: false
+    has_warnings:
+      type: bool
+      required: false
+    has_interactions:
+      type: bool
+      required: false
+  outputs:
+    completeness:
+      type: string
+    safety_assessable:
+      type: bool
+tree:
+  start: count_sections
+  nodes:
+    count_sections:
+      type: condition
+      variable: has_adverse_reactions
+      operator: eq
+      value: true
+      true_next: check_contraindications
+      false_next: incomplete_baseline
+    check_contraindications:
+      type: condition
+      variable: has_contraindications
+      operator: eq
+      value: true
+      true_next: check_warnings
+      false_next: partial_check
+    check_warnings:
+      type: condition
+      variable: has_warnings
+      operator: eq
+      value: true
+      true_next: check_interactions
+      false_next: partial_check
+    check_interactions:
+      type: condition
+      variable: has_interactions
+      operator: eq
+      value: true
+      true_next: complete
+      false_next: partial_check
+    partial_check:
+      type: condition
+      variable: has_adverse_reactions
+      operator: eq
+      value: true
+      true_next: partial
+      false_next: incomplete_baseline
+    complete:
+      type: return
+      value:
+        completeness: complete
+        safety_assessable: true
+    partial:
+      type: return
+      value:
+        completeness: partial
+        safety_assessable: true
+    incomplete_baseline:
+      type: return
+      value:
+        completeness: minimal
+        safety_assessable: false
+tests:
+  - input:
+      has_adverse_reactions: true
+      has_contraindications: true
+      has_warnings: true
+      has_interactions: true
+    expect:
+      completeness: complete
+      safety_assessable: true
+  - input:
+      has_adverse_reactions: true
+      has_contraindications: true
+      has_warnings: true
+      has_interactions: false
+    expect:
+      completeness: partial
+      safety_assessable: true
+  - input:
+      has_adverse_reactions: true
+      has_contraindications: false
+      has_warnings: true
+      has_interactions: false
+    expect:
+      completeness: partial
+      safety_assessable: true
+  - input:
+      has_adverse_reactions: false
+      has_contraindications: true
+      has_warnings: true
+      has_interactions: true
+    expect:
+      completeness: minimal
+      safety_assessable: false
+  - input:
+      has_adverse_reactions: true
+      has_contraindications: true
+      has_warnings: false
+      has_interactions: true
+    expect:
+      completeness: partial
+      safety_assessable: true
+  - input: {}
+    expect:
+      completeness: minimal
+      safety_assessable: false

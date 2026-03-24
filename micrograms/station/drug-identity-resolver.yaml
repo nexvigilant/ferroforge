@@ -1,0 +1,156 @@
+name: drug-identity-resolver
+description: "Determines if multiple data sources are referring to the same drug entity"
+version: 0.1.0
+
+interface:
+  inputs:
+    has_rxcui:
+      type: boolean
+      description: "Whether RxCUI (standardized code) is available and consistent"
+    has_ndc:
+      type: boolean
+      description: "Whether NDC code is available and consistent"
+    name_match:
+      type: boolean
+      description: "Whether generic or brand names match across sources"
+    ingredient_match:
+      type: boolean
+      description: "Whether active ingredients and strength match across sources"
+  outputs:
+    identity_confidence:
+      type: string
+      description: "Confidence in drug identity: confirmed/probable/uncertain/mismatch"
+    resolved:
+      type: boolean
+      description: "Whether the drug identity is resolved"
+
+tree:
+  start: check_direct_identity
+  nodes:
+    check_direct_identity:
+      type: condition
+      variable: has_rxcui
+      operator: eq
+      value: true
+      true_next: rxcui_present
+      false_next: check_ndc
+
+    rxcui_present:
+      type: condition
+      variable: has_ndc
+      operator: eq
+      value: true
+      true_next: confirmed_identity
+      false_next: probable_rxcui
+
+    check_ndc:
+      type: condition
+      variable: has_ndc
+      operator: eq
+      value: true
+      true_next: probable_ndc
+      false_next: check_ingredient_match
+
+    confirmed_identity:
+      type: return
+      value:
+        identity_confidence: confirmed
+        resolved: true
+
+    probable_rxcui:
+      type: return
+      value:
+        identity_confidence: probable
+        resolved: true
+
+    probable_ndc:
+      type: return
+      value:
+        identity_confidence: probable
+        resolved: true
+
+    check_ingredient_match:
+      type: condition
+      variable: ingredient_match
+      operator: eq
+      value: true
+      true_next: uncertain_identity
+      false_next: mismatch_identity
+
+    uncertain_identity:
+      type: return
+      value:
+        identity_confidence: uncertain
+        resolved: false
+
+    mismatch_identity:
+      type: return
+      value:
+        identity_confidence: mismatch
+        resolved: false
+
+tests:
+  - name: "Full identity with RxCUI and NDC"
+    input:
+      has_rxcui: true
+      has_ndc: true
+      name_match: true
+      ingredient_match: true
+    expect:
+      identity_confidence: confirmed
+      resolved: true
+
+  - name: "RxCUI only without NDC"
+    input:
+      has_rxcui: true
+      has_ndc: false
+      name_match: true
+      ingredient_match: true
+    expect:
+      identity_confidence: probable
+      resolved: true
+
+  - name: "NDC only without RxCUI"
+    input:
+      has_rxcui: false
+      has_ndc: true
+      name_match: true
+      ingredient_match: true
+    expect:
+      identity_confidence: probable
+      resolved: true
+
+  - name: "Ingredients match but names differ"
+    input:
+      has_rxcui: false
+      has_ndc: false
+      name_match: false
+      ingredient_match: true
+    expect:
+      identity_confidence: uncertain
+      resolved: false
+
+  - name: "No matching identifiers or ingredients"
+    input:
+      has_rxcui: false
+      has_ndc: false
+      name_match: false
+      ingredient_match: false
+    expect:
+      identity_confidence: mismatch
+      resolved: false
+
+  - name: "Names and ingredients match but no codes"
+    input:
+      has_rxcui: false
+      has_ndc: false
+      name_match: true
+      ingredient_match: true
+    expect:
+      identity_confidence: uncertain
+      resolved: false
+  - name: null_input_safety
+    input: {}
+    expect:
+      identity_confidence: mismatch
+      resolved: false

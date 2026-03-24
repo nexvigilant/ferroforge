@@ -1,0 +1,68 @@
+name: campion-signal-theory
+description: 'Campion Signal Theory S = U × R × T: collapse gate filters before PRR disproportionality. If any component collapses, PRR is irrelevant — the signal is dead regardless of statistical measure.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - signal-collapse-gate
+  - prr-signal
+tests:
+- name: collapsed signal — PRR irrelevant even if high
+  input:
+    rarity_score: 0
+    recognition_score: 90
+    temporal_score: 90
+    prr: 8.5
+  expect:
+    signal_strength: COLLAPSED
+    collapse_reason: rarity
+    signal_detected: true
+    algorithm: ALG-2025-041
+- name: strong signal with PRR above threshold — full confirmation
+  input:
+    rarity_score: 85
+    recognition_score: 90
+    temporal_score: 80
+    prr: 3.5
+  expect:
+    signal_strength: STRONG
+    collapse_reason: none
+    signal_detected: true
+    classification: signal
+- name: strong signal with PRR below threshold — statistical noise
+  input:
+    rarity_score: 85
+    recognition_score: 90
+    temporal_score: 80
+    prr: 1.5
+  expect:
+    signal_strength: STRONG
+    collapse_reason: none
+    signal_detected: false
+    classification: noise
+- name: moderate signal with borderline PRR
+  input:
+    rarity_score: 50
+    recognition_score: 60
+    temporal_score: 55
+    prr: 2.0
+  expect:
+    signal_strength: MODERATE
+    signal_detected: true
+    classification: signal
+- name: all components zero — total collapse
+  input:
+    rarity_score: 0
+    recognition_score: 0
+    temporal_score: 0
+    prr: 10.0
+  expect:
+    signal_strength: COLLAPSED
+    collapse_reason: rarity
+    algorithm: ALG-2025-041
+- name: null inputs — collapse by default
+  input:
+    prr: 5.0
+  expect:
+    signal_strength: COLLAPSED
+    collapse_reason: rarity

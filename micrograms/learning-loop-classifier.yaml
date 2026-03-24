@@ -1,0 +1,102 @@
+name: learning-loop-classifier
+description: Determine learning loop type — triple (5th eval), double (>20% failures), or single
+version: 0.1.0
+tree:
+  start: check_triple
+  nodes:
+    single:
+      type: return
+      value:
+        loop_type: single
+        action: Fix execution errors — identify and correct the most recent failure
+    triple:
+      type: return
+      value:
+        loop_type: triple
+        action: Question the loop model itself — are loop weights and evidence grading still appropriate?
+    check_double:
+      type: condition
+      variable: failure_rate
+      operator: gt
+      value: 20
+      true_next: double
+      false_next: single
+    check_triple:
+      type: condition
+      variable: is_fifth_eval
+      operator: eq
+      value: true
+      true_next: triple
+      false_next: check_double
+    double:
+      type: return
+      value:
+        loop_type: double
+        action: Question thresholds — failure rate exceeds 20%, thresholds may be miscalibrated
+tests:
+- input:
+    is_fifth_eval: true
+    failure_rate: 5
+  expect:
+    action: Question the loop model itself — are loop weights and evidence grading still appropriate?
+    loop_type: triple
+- input:
+    failure_rate: 50
+    is_fifth_eval: true
+  expect:
+    loop_type: triple
+    action: Question the loop model itself — are loop weights and evidence grading still appropriate?
+- input:
+    failure_rate: 30
+    is_fifth_eval: false
+  expect:
+    action: Question thresholds — failure rate exceeds 20%, thresholds may be miscalibrated
+    loop_type: double
+- input:
+    is_fifth_eval: false
+    failure_rate: 21
+  expect:
+    loop_type: double
+    action: Question thresholds — failure rate exceeds 20%, thresholds may be miscalibrated
+- input:
+    failure_rate: 10
+    is_fifth_eval: false
+  expect:
+    loop_type: single
+    action: Fix execution errors — identify and correct the most recent failure
+- input:
+    is_fifth_eval: false
+    failure_rate: 0
+  expect:
+    action: Fix execution errors — identify and correct the most recent failure
+    loop_type: single
+- input:
+    failure_rate: 20
+    is_fifth_eval: false
+  expect:
+    loop_type: single
+    action: Fix execution errors — identify and correct the most recent failure
+- input:
+    failure_rate: -1
+  expect:
+    loop_type: single
+    action: Fix execution errors — identify and correct the most recent failure
+- input:
+    failure_rate: 19
+  expect:
+    loop_type: single
+    action: Fix execution errors — identify and correct the most recent failure
+- input:
+    failure_rate: 2000
+  expect:
+    action: Question thresholds — failure rate exceeds 20%, thresholds may be miscalibrated
+    loop_type: double
+- input: {}
+  expect:
+    action: Fix execution errors — identify and correct the most recent failure
+    loop_type: single
+- input: {}
+  expect:
+    loop_type: single
+    action: Fix execution errors — identify and correct the most recent failure
+interface: null

@@ -1,0 +1,128 @@
+name: flywheel-readiness
+description: Evaluate flywheel node readiness for tier promotion — 3 binary gates
+version: 0.1.0
+tree:
+  start: check_crates
+  nodes:
+    ready:
+      type: return
+      value:
+        score: 1.0
+        blocker: none
+        ready: true
+    not_ready_crates:
+      type: return
+      value:
+        score: 0.0
+        ready: false
+        blocker: crate_count < 2 — wire at least 2 crates
+    check_status:
+      type: condition
+      variable: status_active
+      operator: eq
+      value: true
+      true_next: check_consumer
+      false_next: not_ready_status
+    not_ready_status:
+      type: return
+      value:
+        blocker: status is not active
+        score: 0.33
+        ready: false
+    check_crates:
+      type: condition
+      variable: crate_count
+      operator: gte
+      value: 2
+      true_next: check_status
+      false_next: not_ready_crates
+    not_ready_consumer:
+      type: return
+      value:
+        blocker: no consumer integration
+        score: 0.67
+        ready: false
+    check_consumer:
+      type: condition
+      variable: has_consumer
+      operator: eq
+      value: true
+      true_next: ready
+      false_next: not_ready_consumer
+tests:
+- input:
+    has_consumer: true
+    status_active: true
+    crate_count: 3
+  expect:
+    blocker: none
+    ready: true
+    score: 1.0
+- input:
+    crate_count: 1
+    status_active: true
+    has_consumer: true
+  expect:
+    score: 0.0
+    ready: false
+    blocker: crate_count < 2 — wire at least 2 crates
+- input:
+    status_active: false
+    has_consumer: true
+    crate_count: 5
+  expect:
+    ready: false
+    score: 0.33
+    blocker: status is not active
+- input:
+    crate_count: 2
+    status_active: true
+    has_consumer: false
+  expect:
+    blocker: no consumer integration
+    ready: false
+    score: 0.67
+- input:
+    has_consumer: false
+    crate_count: 0
+    status_active: false
+  expect:
+    blocker: crate_count < 2 — wire at least 2 crates
+    score: 0.0
+    ready: false
+- input:
+    status_active: true
+    has_consumer: true
+    crate_count: 2
+  expect:
+    score: 1.0
+    blocker: none
+    ready: true
+- input: {}
+  expect:
+    ready: false
+    score: 0.0
+    blocker: crate_count < 2 — wire at least 2 crates
+- input:
+    crate_count: -1
+  expect:
+    blocker: crate_count < 2 — wire at least 2 crates
+    ready: false
+    score: 0.0
+- input:
+    crate_count: 200
+  expect:
+    ready: false
+    score: 0.33
+    blocker: status is not active
+- input: {}
+  expect:
+    blocker: crate_count < 2 — wire at least 2 crates
+    score: 0.0
+    ready: false
+- input: {}
+  expect:
+    blocker: crate_count < 2 — wire at least 2 crates
+    ready: false
+    score: 0.0
+interface: null

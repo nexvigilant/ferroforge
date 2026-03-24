@@ -1,0 +1,92 @@
+name: deploy-gate
+description: 'Bridge: test verdict deploy flag + quality score ship flag → release approval. Chains from test-verdict and quality-score.'
+version: 0.1.0
+interface:
+  inputs:
+    deploy:
+      type: bool
+      required: false
+    ship:
+      type: bool
+      required: false
+  outputs:
+    blockers:
+      type: string
+    release_approved:
+      type: bool
+    status:
+      type: string
+tree:
+  start: check_deploy
+  nodes:
+    check_deploy:
+      type: condition
+      variable: deploy
+      operator: eq
+      value: true
+      true_next: check_ship
+      false_next: blocked
+    check_ship:
+      type: condition
+      variable: ship
+      operator: eq
+      value: true
+      true_next: approved
+      false_next: quality_hold
+    approved:
+      type: return
+      value:
+        status: APPROVED
+        blockers: none
+        release_approved: true
+    quality_hold:
+      type: return
+      value:
+        blockers: quality score below threshold
+        release_approved: false
+        status: QUALITY_HOLD
+    blocked:
+      type: return
+      value:
+        status: TEST_BLOCKED
+        release_approved: false
+        blockers: test failures prevent deployment
+tests:
+- input:
+    ship: true
+    deploy: true
+  expect:
+    status: APPROVED
+    blockers: none
+    release_approved: true
+- input:
+    deploy: true
+    ship: false
+  expect:
+    blockers: quality score below threshold
+    status: QUALITY_HOLD
+    release_approved: false
+- input:
+    deploy: false
+    ship: true
+  expect:
+    release_approved: false
+    status: TEST_BLOCKED
+    blockers: test failures prevent deployment
+- input:
+    deploy: false
+    ship: false
+  expect:
+    blockers: test failures prevent deployment
+    release_approved: false
+    status: TEST_BLOCKED
+- input: {}
+  expect:
+    status: TEST_BLOCKED
+    release_approved: false
+    blockers: test failures prevent deployment
+- input: {}
+  expect:
+    blockers: test failures prevent deployment
+    status: TEST_BLOCKED
+    release_approved: false

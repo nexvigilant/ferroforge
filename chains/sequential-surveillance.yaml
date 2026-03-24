@@ -1,0 +1,57 @@
+name: sequential-surveillance
+description: 'Sequential signal surveillance pipeline: CUSUM drift detection → MaxSPRT confirmation gate. Chains two complementary sequential analysis methods — CUSUM detects cumulative shifts, MaxSPRT provides bounded statistical confirmation.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - cusum-monitor
+  - maxsprt-gate
+tests:
+- name: Alert case — CUSUM breached + high O/E confirms signal
+  input:
+    previous_cusum: 600
+    threshold_h: 500
+    current_value: 250
+    baseline_mean: 100
+    observed_count: 400
+    expected_count: 80
+    current_look: 5
+    max_looks: 10
+    critical_value: 300
+  expect:
+    status: ALERT
+    cusum_breached: true
+    verdict: SIGNAL_DETECTED
+    signal_confirmed: true
+- name: Normal case — no CUSUM drift, low ratio, continue monitoring
+  input:
+    previous_cusum: 0
+    threshold_h: 500
+    current_value: 110
+    baseline_mean: 100
+    observed_count: 105
+    expected_count: 100
+    current_look: 2
+    max_looks: 10
+    critical_value: 300
+  expect:
+    status: NORMAL
+    cusum_breached: false
+    verdict: CONTINUE_MONITORING
+    signal_confirmed: false
+- name: Boundary case — CUSUM accumulating, max looks reached without signal
+  input:
+    previous_cusum: 300
+    threshold_h: 500
+    current_value: 200
+    baseline_mean: 100
+    observed_count: 120
+    expected_count: 100
+    current_look: 10
+    max_looks: 10
+    critical_value: 300
+  expect:
+    status: ACCUMULATING
+    cusum_breached: false
+    verdict: STUDY_COMPLETE_NO_SIGNAL
+    signal_confirmed: false

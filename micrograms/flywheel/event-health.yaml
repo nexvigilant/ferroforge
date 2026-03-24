@@ -1,0 +1,95 @@
+name: event-health
+description: 'Flywheel event flow health: GREEN (emitting>0 AND pending<100), YELLOW (emitting>0 AND pending>=100), RED (emitting=0)'
+version: 0.1.0
+interface:
+  inputs:
+    emitting_nodes:
+      type: int
+      required: false
+    pending_events:
+      type: int
+      required: false
+  outputs:
+    action:
+      type: string
+    health:
+      type: string
+tree:
+  start: check_emitting
+  nodes:
+    check_emitting:
+      type: condition
+      variable: emitting_nodes
+      operator: gte
+      value: 1
+      true_next: check_backlog
+      false_next: red
+    check_backlog:
+      type: condition
+      variable: pending_events
+      operator: gte
+      value: 100
+      true_next: yellow
+      false_next: green
+    green:
+      type: return
+      value:
+        health: GREEN
+        action: none
+    yellow:
+      type: return
+      value:
+        health: YELLOW
+        action: drain_consumers
+    red:
+      type: return
+      value:
+        health: RED
+        action: wire_emitters
+tests:
+- input:
+    emitting_nodes: 3
+    pending_events: 5
+  expect:
+    health: GREEN
+    action: none
+- input:
+    emitting_nodes: 3
+    pending_events: 150
+  expect:
+    health: YELLOW
+    action: drain_consumers
+- input:
+    emitting_nodes: 0
+    pending_events: 0
+  expect:
+    health: RED
+    action: wire_emitters
+- input:
+    emitting_nodes: 1
+    pending_events: 0
+  expect:
+    health: GREEN
+    action: none
+- input:
+    emitting_nodes: 0
+    pending_events: 50
+  expect:
+    health: RED
+    action: wire_emitters
+- input:
+    emitting_nodes: 5
+    pending_events: 99
+  expect:
+    health: GREEN
+    action: none
+- input:
+    emitting_nodes: 5
+    pending_events: 100
+  expect:
+    health: YELLOW
+    action: drain_consumers
+- input: {}
+  expect:
+    action: wire_emitters
+    health: RED

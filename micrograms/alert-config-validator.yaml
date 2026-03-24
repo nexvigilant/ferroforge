@@ -1,0 +1,124 @@
+name: alert-config-validator
+description: 'PVOS alert configuration: validates alert config completeness - requires threshold, notification channel, and valid severity level'
+version: 0.1.0
+interface:
+  inputs:
+    has_notification:
+      type: bool
+      required: false
+    has_threshold:
+      type: bool
+      required: false
+    severity:
+      type: string
+      required: false
+  outputs:
+    description:
+      type: string
+    status:
+      type: string
+tree:
+  start: check_threshold
+  nodes:
+    check_threshold:
+      type: condition
+      variable: has_threshold
+      operator: eq
+      value: true
+      true_next: check_notification
+      false_next: missing_threshold
+    check_notification:
+      type: condition
+      variable: has_notification
+      operator: eq
+      value: true
+      true_next: check_severity_critical
+      false_next: missing_notification
+    check_severity_critical:
+      type: condition
+      variable: severity
+      operator: eq
+      value: critical
+      true_next: valid
+      false_next: check_severity_high
+    check_severity_high:
+      type: condition
+      variable: severity
+      operator: eq
+      value: high
+      true_next: valid
+      false_next: check_severity_medium
+    check_severity_medium:
+      type: condition
+      variable: severity
+      operator: eq
+      value: medium
+      true_next: valid
+      false_next: check_severity_low
+    check_severity_low:
+      type: condition
+      variable: severity
+      operator: eq
+      value: low
+      true_next: valid
+      false_next: invalid_severity
+    valid:
+      type: return
+      value:
+        status: VALID
+        description: Alert configuration complete - threshold, notification, and severity all valid
+    missing_threshold:
+      type: return
+      value:
+        status: MISSING_THRESHOLD
+        description: Alert configuration missing threshold - cannot trigger without a threshold value
+    missing_notification:
+      type: return
+      value:
+        status: MISSING_NOTIFICATION
+        description: Alert configuration missing notification channel - alerts have nowhere to be sent
+    invalid_severity:
+      type: return
+      value:
+        status: INVALID_SEVERITY
+        description: Alert severity must be critical/high/medium/low
+tests:
+- input:
+    has_threshold: true
+    has_notification: true
+    severity: critical
+  expect:
+    status: VALID
+    description: Alert configuration complete - threshold, notification, and severity all valid
+- input:
+    has_threshold: false
+    has_notification: true
+    severity: high
+  expect:
+    status: MISSING_THRESHOLD
+    description: Alert configuration missing threshold - cannot trigger without a threshold value
+- input:
+    has_threshold: true
+    has_notification: false
+    severity: medium
+  expect:
+    status: MISSING_NOTIFICATION
+    description: Alert configuration missing notification channel - alerts have nowhere to be sent
+- input:
+    has_threshold: true
+    has_notification: true
+    severity: low
+  expect:
+    status: VALID
+    description: Alert configuration complete - threshold, notification, and severity all valid
+- input:
+    has_threshold: true
+    has_notification: true
+    severity: unknown
+  expect:
+    status: INVALID_SEVERITY
+    description: Alert severity must be critical/high/medium/low
+- input: {}
+  expect:
+    description: Alert configuration missing threshold - cannot trigger without a threshold value
+    status: MISSING_THRESHOLD

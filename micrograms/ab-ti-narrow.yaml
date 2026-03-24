@@ -1,0 +1,44 @@
+name: ab-ti-narrow
+description: 'Antibody: flags narrow therapeutic index drugs (TI < 2). These require therapeutic drug monitoring — single boolean sentinel.'
+version: 0.1.0
+interface:
+  inputs:
+    therapeutic_index:
+      type: number
+      required: true
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: therapeutic_index
+      operator: lt
+      value: 2.0
+      true_next: narrow
+      false_next: clean
+    narrow:
+      type: return
+      value:
+        threat: true
+        response: 'WARN: narrow therapeutic index — requires therapeutic drug monitoring'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { therapeutic_index: 1.3 }
+  expect: { threat: true }
+- input: { therapeutic_index: 2.0 }
+  expect: { threat: false }
+- input: { therapeutic_index: 10.0 }
+  expect: { threat: false }
+- input: {}
+  expect:
+    response: PASS
+    threat: false

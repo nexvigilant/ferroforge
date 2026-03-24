@@ -1,0 +1,286 @@
+name: pmr-delay-classifier
+description: 'PMR/PMC compliance status classifier: maps status, due date, and days overdue to on_track/at_risk/delayed/critical classification with recommended action'
+version: 0.1.0
+interface:
+  inputs:
+    status:
+      type: string
+      required: true
+    has_due_date:
+      type: bool
+      required: true
+    days_overdue:
+      type: number
+      required: false
+    delay_rate:
+      type: number
+      required: false
+  outputs:
+    classification:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_fulfilled
+  nodes:
+    check_fulfilled:
+      type: condition
+      variable: status
+      operator: eq
+      value: Fulfilled
+      true_next: on_track_fulfilled
+      false_next: check_released
+    check_released:
+      type: condition
+      variable: status
+      operator: eq
+      value: Released
+      true_next: on_track_released
+      false_next: check_terminated
+    check_terminated:
+      type: condition
+      variable: status
+      operator: eq
+      value: Terminated
+      true_next: on_track_terminated
+      false_next: check_delayed
+    check_delayed:
+      type: condition
+      variable: status
+      operator: eq
+      value: Delayed
+      true_next: check_days_overdue_critical
+      false_next: check_pending
+    check_days_overdue_critical:
+      type: condition
+      variable: days_overdue
+      operator: gte
+      value: 180
+      true_next: critical_overdue
+      false_next: check_days_overdue_90
+    check_days_overdue_90:
+      type: condition
+      variable: days_overdue
+      operator: gte
+      value: 90
+      true_next: delayed_significant
+      false_next: delayed_recent
+    check_pending:
+      type: condition
+      variable: status
+      operator: eq
+      value: Pending
+      true_next: check_pending_due
+      false_next: check_ongoing
+    check_pending_due:
+      type: condition
+      variable: has_due_date
+      operator: eq
+      value: true
+      true_next: check_pending_overdue
+      false_next: pending_no_date
+    check_pending_overdue:
+      type: condition
+      variable: days_overdue
+      operator: gt
+      value: 0
+      true_next: at_risk_pending
+      false_next: on_track_pending
+    check_ongoing:
+      type: condition
+      variable: status
+      operator: eq
+      value: Ongoing
+      true_next: check_ongoing_due
+      false_next: on_track_other
+    check_ongoing_due:
+      type: condition
+      variable: has_due_date
+      operator: eq
+      value: true
+      true_next: check_ongoing_overdue
+      false_next: on_track_ongoing
+    check_ongoing_overdue:
+      type: condition
+      variable: days_overdue
+      operator: gt
+      value: 0
+      true_next: at_risk_ongoing
+      false_next: on_track_ongoing
+    on_track_fulfilled:
+      type: return
+      value:
+        classification: on_track
+        action: No action required — commitment fulfilled
+    on_track_released:
+      type: return
+      value:
+        classification: on_track
+        action: No action required — requirement released
+    on_track_terminated:
+      type: return
+      value:
+        classification: on_track
+        action: No action required — commitment terminated
+    critical_overdue:
+      type: return
+      value:
+        classification: critical
+        action: Immediate escalation — overdue by 180+ days
+    delayed_significant:
+      type: return
+      value:
+        classification: delayed
+        action: Submit progress report to FDA — overdue 90+ days
+    delayed_recent:
+      type: return
+      value:
+        classification: delayed
+        action: Review timeline and submit updated schedule
+    at_risk_pending:
+      type: return
+      value:
+        classification: at_risk
+        action: Pending commitment past due date — initiate work
+    on_track_pending:
+      type: return
+      value:
+        classification: on_track
+        action: Commitment pending — monitor due date
+    pending_no_date:
+      type: return
+      value:
+        classification: on_track
+        action: Pending without due date — request timeline from FDA
+    at_risk_ongoing:
+      type: return
+      value:
+        classification: at_risk
+        action: Ongoing but past due — accelerate completion
+    on_track_ongoing:
+      type: return
+      value:
+        classification: on_track
+        action: On track — continue per schedule
+    on_track_other:
+      type: return
+      value:
+        classification: on_track
+        action: Status noted — monitor for changes
+tests:
+# Fulfilled
+- input:
+    status: Fulfilled
+    has_due_date: true
+    days_overdue: 0
+  expect:
+    classification: on_track
+    action: No action required — commitment fulfilled
+# Released
+- input:
+    status: Released
+    has_due_date: false
+    days_overdue: 0
+  expect:
+    classification: on_track
+    action: No action required — requirement released
+# Delayed by 200 days = critical
+- input:
+    status: Delayed
+    has_due_date: true
+    days_overdue: 200
+  expect:
+    classification: critical
+    action: Immediate escalation — overdue by 180+ days
+# Delayed by 120 days = delayed
+- input:
+    status: Delayed
+    has_due_date: true
+    days_overdue: 120
+  expect:
+    classification: delayed
+    action: Submit progress report to FDA — overdue 90+ days
+# Delayed by 30 days = delayed recent
+- input:
+    status: Delayed
+    has_due_date: true
+    days_overdue: 30
+  expect:
+    classification: delayed
+    action: Review timeline and submit updated schedule
+# Pending, past due
+- input:
+    status: Pending
+    has_due_date: true
+    days_overdue: 45
+  expect:
+    classification: at_risk
+    action: Pending commitment past due date — initiate work
+# Pending, not yet due
+- input:
+    status: Pending
+    has_due_date: true
+    days_overdue: 0
+  expect:
+    classification: on_track
+    action: Commitment pending — monitor due date
+# Pending, no due date
+- input:
+    status: Pending
+    has_due_date: false
+    days_overdue: 0
+  expect:
+    classification: on_track
+    action: Pending without due date — request timeline from FDA
+# Ongoing, past due
+- input:
+    status: Ongoing
+    has_due_date: true
+    days_overdue: 15
+  expect:
+    classification: at_risk
+    action: Ongoing but past due — accelerate completion
+# Ongoing, on schedule
+- input:
+    status: Ongoing
+    has_due_date: true
+    days_overdue: 0
+  expect:
+    classification: on_track
+    action: On track — continue per schedule
+# Boundary: exactly 180 days = critical
+- input:
+    status: Delayed
+    has_due_date: true
+    days_overdue: 180
+  expect:
+    classification: critical
+    action: Immediate escalation — overdue by 180+ days
+# Boundary: exactly 90 days = delayed
+- input:
+    status: Delayed
+    has_due_date: true
+    days_overdue: 90
+  expect:
+    classification: delayed
+    action: Submit progress report to FDA — overdue 90+ days
+# on_track_terminated: commitment terminated
+- input:
+    status: Terminated
+    has_due_date: true
+    days_overdue: 0
+  expect:
+    classification: on_track
+    action: No action required — commitment terminated
+# on_track_other: unknown status falls through to catchall
+- input:
+    status: Withdrawn
+    has_due_date: false
+    days_overdue: 0
+  expect:
+    classification: on_track
+    action: Status noted — monitor for changes
+- input: {}
+  expect:
+    action: Status noted — monitor for changes
+    classification: on_track

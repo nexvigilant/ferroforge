@@ -1,0 +1,325 @@
+name: pv-loop
+description: 'Orchestrator: routes a drug-event pair through the 5-stage PV loop (Detect → Evaluate → Assess → Act → Monitor) and determines feedback triggers for loop re-entry'
+version: 0.1.0
+interface:
+  inputs:
+    signal_detected:
+      type: bool
+      required: true
+    prr:
+      type: float
+      required: false
+    causality:
+      type: string
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    new_signal_found:
+      type: bool
+      required: false
+  outputs:
+    stage:
+      type: string
+    action:
+      type: string
+    loop_status:
+      type: string
+    next_microgram:
+      type: string
+    reason:
+      type: string
+tree:
+  start: check_signal
+  nodes:
+    # ── Stage 1: DETECT ──
+    check_signal:
+      type: condition
+      variable: signal_detected
+      operator: eq
+      value: true
+      true_next: check_has_causality
+      false_next: no_signal
+    no_signal:
+      type: return
+      value:
+        stage: detect
+        action: continue_monitoring
+        loop_status: idle
+        next_microgram: evans-signal
+        reason: No signal detected - continue routine FAERS surveillance
+    # ── Stage 2: EVALUATE (implicit - signal exists, check if causality assessed) ──
+    check_has_causality:
+      type: condition
+      variable: causality
+      operator: is_not_null
+      value: true
+      true_next: check_definite
+      false_next: needs_evaluation
+    needs_evaluation:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5
+      true_next: urgent_evaluate
+      false_next: standard_evaluate
+    urgent_evaluate:
+      type: return
+      value:
+        stage: evaluate
+        action: gather_evidence_urgent
+        loop_status: active
+        next_microgram: signal-to-causality
+        reason: Strong signal (PRR >= 5.0) - urgent evidence gathering then causality assessment
+    standard_evaluate:
+      type: return
+      value:
+        stage: evaluate
+        action: gather_evidence
+        loop_status: active
+        next_microgram: signal-to-causality
+        reason: Signal detected - gather labeling, literature, and trial evidence before causality assessment
+    # ── Stage 3: ASSESS ──
+    check_definite:
+      type: condition
+      variable: causality
+      operator: eq
+      value: DEFINITE
+      true_next: check_serious_definite
+      false_next: check_probable
+    check_probable:
+      type: condition
+      variable: causality
+      operator: eq
+      value: PROBABLE
+      true_next: check_serious_probable
+      false_next: check_possible
+    check_possible:
+      type: condition
+      variable: causality
+      operator: eq
+      value: POSSIBLE
+      true_next: act_monitor
+      false_next: act_document
+    # ── Stage 4: ACT (routes based on causality + seriousness) ──
+    check_serious_definite:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: act_expedited_7
+      false_next: act_standard_15
+    check_serious_probable:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: act_expedited_15
+      false_next: act_periodic
+    act_expedited_7:
+      type: condition
+      variable: new_signal_found
+      operator: eq
+      value: true
+      true_next: feedback_expedited_7
+      false_next: close_expedited_7
+    close_expedited_7:
+      type: return
+      value:
+        stage: act
+        action: expedited_report_7day
+        loop_status: closing
+        next_microgram: causality-to-action
+        reason: DEFINITE + SERIOUS - 7-day expedited IND safety report required per ICH E2B
+    feedback_expedited_7:
+      type: return
+      value:
+        stage: monitor
+        action: expedited_report_7day_with_feedback
+        loop_status: feedback
+        next_microgram: pv-loop
+        reason: DEFINITE + SERIOUS - 7-day report filed. New signal detected during monitoring - re-entering loop at DETECT
+    act_standard_15:
+      type: return
+      value:
+        stage: act
+        action: standard_report_15day
+        loop_status: closing
+        next_microgram: causality-to-action
+        reason: DEFINITE causality - 15-day standard reporting
+    act_expedited_15:
+      type: condition
+      variable: new_signal_found
+      operator: eq
+      value: true
+      true_next: feedback_expedited_15
+      false_next: close_expedited_15
+    close_expedited_15:
+      type: return
+      value:
+        stage: act
+        action: expedited_report_15day
+        loop_status: closing
+        next_microgram: causality-to-action
+        reason: PROBABLE + SERIOUS - 15-day expedited reporting per ICH E2B
+    feedback_expedited_15:
+      type: return
+      value:
+        stage: monitor
+        action: expedited_report_15day_with_feedback
+        loop_status: feedback
+        next_microgram: pv-loop
+        reason: PROBABLE + SERIOUS - 15-day report filed. New signal detected - re-entering loop at DETECT
+    act_periodic:
+      type: return
+      value:
+        stage: act
+        action: periodic_report
+        loop_status: monitoring
+        next_microgram: causality-to-action
+        reason: PROBABLE non-serious - include in next PSUR/PBRER periodic report
+    act_monitor:
+      type: return
+      value:
+        stage: monitor
+        action: monitor_and_document
+        loop_status: monitoring
+        next_microgram: causality-to-action
+        reason: POSSIBLE causality - monitor and include in periodic reporting. Continue surveillance.
+    act_document:
+      type: return
+      value:
+        stage: monitor
+        action: document_only
+        loop_status: idle
+        next_microgram: none
+        reason: DOUBTFUL or no causality - document internally. Signal remains in surveillance pool.
+tests:
+# ── No signal: stay in detect ──
+- input:
+    signal_detected: false
+  expect:
+    stage: detect
+    action: continue_monitoring
+    loop_status: idle
+    next_microgram: evans-signal
+    reason: No signal detected - continue routine FAERS surveillance
+# ── Signal but no causality yet: needs evaluation (strong) ──
+- input:
+    signal_detected: true
+    prr: 8.5
+  expect:
+    stage: evaluate
+    action: gather_evidence_urgent
+    loop_status: active
+    next_microgram: signal-to-causality
+    reason: Strong signal (PRR >= 5.0) - urgent evidence gathering then causality assessment
+# ── Signal but no causality yet: needs evaluation (standard) ──
+- input:
+    signal_detected: true
+    prr: 3.0
+  expect:
+    stage: evaluate
+    action: gather_evidence
+    loop_status: active
+    next_microgram: signal-to-causality
+    reason: Signal detected - gather labeling, literature, and trial evidence before causality assessment
+# ── Definite + serious: expedited 7-day ──
+- input:
+    signal_detected: true
+    causality: DEFINITE
+    is_serious: true
+    new_signal_found: false
+  expect:
+    stage: act
+    action: expedited_report_7day
+    loop_status: closing
+    next_microgram: causality-to-action
+    reason: DEFINITE + SERIOUS - 7-day expedited IND safety report required per ICH E2B
+# ── Definite + serious + feedback: loop re-entry ──
+- input:
+    signal_detected: true
+    causality: DEFINITE
+    is_serious: true
+    new_signal_found: true
+  expect:
+    stage: monitor
+    action: expedited_report_7day_with_feedback
+    loop_status: feedback
+    next_microgram: pv-loop
+    reason: DEFINITE + SERIOUS - 7-day report filed. New signal detected during monitoring - re-entering loop at DETECT
+# ── Definite + non-serious: standard 15-day ──
+- input:
+    signal_detected: true
+    causality: DEFINITE
+    is_serious: false
+  expect:
+    stage: act
+    action: standard_report_15day
+    loop_status: closing
+    next_microgram: causality-to-action
+    reason: DEFINITE causality - 15-day standard reporting
+# ── Probable + serious: expedited 15-day ──
+- input:
+    signal_detected: true
+    causality: PROBABLE
+    is_serious: true
+    new_signal_found: false
+  expect:
+    stage: act
+    action: expedited_report_15day
+    loop_status: closing
+    next_microgram: causality-to-action
+    reason: PROBABLE + SERIOUS - 15-day expedited reporting per ICH E2B
+# ── Probable + serious + feedback ──
+- input:
+    signal_detected: true
+    causality: PROBABLE
+    is_serious: true
+    new_signal_found: true
+  expect:
+    stage: monitor
+    action: expedited_report_15day_with_feedback
+    loop_status: feedback
+    next_microgram: pv-loop
+    reason: PROBABLE + SERIOUS - 15-day report filed. New signal detected - re-entering loop at DETECT
+# ── Probable + non-serious: periodic ──
+- input:
+    signal_detected: true
+    causality: PROBABLE
+    is_serious: false
+  expect:
+    stage: act
+    action: periodic_report
+    loop_status: monitoring
+    next_microgram: causality-to-action
+    reason: PROBABLE non-serious - include in next PSUR/PBRER periodic report
+# ── Possible: monitor ──
+- input:
+    signal_detected: true
+    causality: POSSIBLE
+    is_serious: true
+  expect:
+    stage: monitor
+    action: monitor_and_document
+    loop_status: monitoring
+    next_microgram: causality-to-action
+    reason: POSSIBLE causality - monitor and include in periodic reporting. Continue surveillance.
+# ── Doubtful: document only ──
+- input:
+    signal_detected: true
+    causality: DOUBTFUL
+  expect:
+    stage: monitor
+    action: document_only
+    loop_status: idle
+    next_microgram: none
+    reason: DOUBTFUL or no causality - document internally. Signal remains in surveillance pool.
+# ── Empty input: no signal ──
+- input: {}
+  expect:
+    stage: detect
+    action: continue_monitoring
+    loop_status: idle
+    next_microgram: evans-signal
+    reason: No signal detected - continue routine FAERS surveillance

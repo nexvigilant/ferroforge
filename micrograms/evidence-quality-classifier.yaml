@@ -1,0 +1,314 @@
+name: evidence-quality-classifier
+description: Grade loop evidence quality from state string — none/weak/moderate/strong
+version: 0.1.0
+tree:
+  start: check_default
+  nodes:
+    check_weak_critical:
+      type: condition
+      variable: state
+      operator: eq
+      value: critical
+      true_next: weak
+      false_next: check_weak_low
+    check_weak_low:
+      type: condition
+      variable: state
+      operator: eq
+      value: low
+      true_next: weak
+      false_next: check_weak_nostability
+    check_failure_stalled:
+      type: condition
+      variable: state
+      operator: eq
+      value: stalled
+      true_next: strong_failure
+      false_next: check_failure_gimbal
+    check_weak_nostability:
+      type: condition
+      variable: state
+      operator: eq
+      value: no_stability
+      true_next: weak
+      false_next: check_warning
+    strong_failure:
+      type: return
+      value:
+        achieved_target: false
+        score: 1.0
+        quality: strong
+    check_failure_gimbal:
+      type: condition
+      variable: state
+      operator: eq
+      value: gimbal_lock
+      true_next: strong_failure
+      false_next: check_failure_fatigue
+    check_failure_fatigue:
+      type: condition
+      variable: state
+      operator: eq
+      value: fatigue_failure_imminent
+      true_next: strong_failure
+      false_next: check_weak_critical
+    moderate:
+      type: return
+      value:
+        quality: moderate
+        score: 0.66
+        achieved_target: true
+    strong_healthy:
+      type: return
+      value:
+        score: 1.0
+        achieved_target: true
+        quality: strong
+    weak:
+      type: return
+      value:
+        achieved_target: false
+        quality: weak
+        score: 0.33
+    check_warning:
+      type: condition
+      variable: state
+      operator: eq
+      value: warning
+      true_next: moderate
+      false_next: check_margin_strong
+    check_default:
+      type: condition
+      variable: state
+      operator: eq
+      value: default
+      true_next: none
+      false_next: check_failure_disintegrated
+    none:
+      type: return
+      value:
+        score: 0
+        quality: none
+        achieved_target: false
+    weak_healthy:
+      type: return
+      value:
+        quality: weak
+        achieved_target: true
+        score: 0.33
+    check_margin_strong:
+      type: condition
+      variable: margin_ratio
+      operator: gte
+      value: 50
+      true_next: strong_healthy
+      false_next: check_margin_moderate
+    check_margin_moderate:
+      type: condition
+      variable: margin_ratio
+      operator: gte
+      value: 10
+      true_next: moderate_healthy
+      false_next: weak_healthy
+    check_failure_disintegrated:
+      type: condition
+      variable: state
+      operator: eq
+      value: disintegrated
+      true_next: strong_failure
+      false_next: check_failure_stalled
+    moderate_healthy:
+      type: return
+      value:
+        achieved_target: true
+        quality: moderate
+        score: 0.66
+tests:
+- input:
+    margin_ratio: 0
+    state: default
+  expect:
+    quality: none
+    score: 0
+    achieved_target: false
+- input:
+    state: disintegrated
+    margin_ratio: 0
+  expect:
+    achieved_target: false
+    score: 1.0
+    quality: strong
+- input:
+    state: stalled
+    margin_ratio: 0
+  expect:
+    achieved_target: false
+    score: 1.0
+    quality: strong
+- input:
+    state: gimbal_lock
+    margin_ratio: 0
+  expect:
+    achieved_target: false
+    quality: strong
+    score: 1.0
+- input:
+    margin_ratio: 0
+    state: fatigue_failure_imminent
+  expect:
+    score: 1.0
+    achieved_target: false
+    quality: strong
+- input:
+    state: critical
+    margin_ratio: 0
+  expect:
+    quality: weak
+    score: 0.33
+    achieved_target: false
+- input:
+    state: low
+    margin_ratio: 0
+  expect:
+    score: 0.33
+    achieved_target: false
+    quality: weak
+- input:
+    margin_ratio: 0
+    state: no_stability
+  expect:
+    score: 0.33
+    achieved_target: false
+    quality: weak
+- input:
+    margin_ratio: 30
+    state: warning
+  expect:
+    quality: moderate
+    achieved_target: true
+    score: 0.66
+- input:
+    state: thriving
+    margin_ratio: 60
+  expect:
+    score: 1.0
+    quality: strong
+    achieved_target: true
+- input:
+    state: healthy
+    margin_ratio: 25
+  expect:
+    quality: moderate
+    score: 0.66
+    achieved_target: true
+- input:
+    margin_ratio: 5
+    state: nominal
+  expect:
+    quality: weak
+    achieved_target: true
+    score: 0.33
+- input: {}
+  expect:
+    quality: weak
+    achieved_target: true
+    score: 0.33
+- input: {}
+  expect:
+    quality: weak
+    achieved_target: true
+    score: 0.33
+- input: {}
+  expect:
+    score: 0.33
+    achieved_target: true
+    quality: weak
+- input: {}
+  expect:
+    quality: weak
+    score: 0.33
+    achieved_target: true
+- input: {}
+  expect:
+    achieved_target: true
+    score: 0.33
+    quality: weak
+- input: {}
+  expect:
+    achieved_target: true
+    score: 0.33
+    quality: weak
+- input: {}
+  expect:
+    score: 0.33
+    achieved_target: true
+    quality: weak
+- input: {}
+  expect:
+    achieved_target: true
+    score: 0.33
+    quality: weak
+- input:
+    margin_ratio: -1
+  expect:
+    score: 0.33
+    achieved_target: true
+    quality: weak
+- input:
+    margin_ratio: 49
+  expect:
+    score: 0.66
+    achieved_target: true
+    quality: moderate
+- input:
+    margin_ratio: 51
+  expect:
+    score: 1.0
+    quality: strong
+    achieved_target: true
+- input:
+    margin_ratio: 5000
+  expect:
+    score: 1.0
+    achieved_target: true
+    quality: strong
+- input: {}
+  expect:
+    quality: weak
+    achieved_target: true
+    score: 0.33
+- input:
+    margin_ratio: -1
+  expect:
+    achieved_target: true
+    quality: weak
+    score: 0.33
+- input:
+    margin_ratio: 9
+  expect:
+    quality: weak
+    achieved_target: true
+    score: 0.33
+- input:
+    margin_ratio: 11
+  expect:
+    achieved_target: true
+    score: 0.66
+    quality: moderate
+- input:
+    margin_ratio: 1000
+  expect:
+    achieved_target: true
+    quality: strong
+    score: 1.0
+- input: {}
+  expect:
+    quality: weak
+    score: 0.33
+    achieved_target: true
+- input: {}
+  expect:
+    achieved_target: true
+    score: 0.33
+    quality: weak
+interface: null

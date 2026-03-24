@@ -1,0 +1,151 @@
+name: quality-score
+description: 'Classify code quality score: PASS (>=80), WARN (>=60), FAIL (<60)'
+version: 0.1.0
+interface:
+  inputs:
+    score:
+      type: float
+      required: false
+  outputs:
+    review_required:
+      type: bool
+    ship:
+      type: bool
+    verdict:
+      type: string
+tree:
+  start: pass_check
+  nodes:
+    pass:
+      type: return
+      value:
+        review_required: false
+        verdict: PASS
+        ship: true
+    warn:
+      type: return
+      value:
+        ship: false
+        review_required: true
+        verdict: WARN
+    pass_check:
+      type: condition
+      variable: score
+      operator: gte
+      value: 80
+      true_next: pass
+      false_next: warn_check
+    warn_check:
+      type: condition
+      variable: score
+      operator: gte
+      value: 60
+      true_next: warn
+      false_next: fail
+    fail:
+      type: return
+      value:
+        ship: false
+        verdict: FAIL
+        review_required: true
+tests:
+- input:
+    score: 95
+  expect:
+    verdict: PASS
+    ship: true
+    review_required: false
+- input:
+    score: 75
+  expect:
+    ship: false
+    verdict: WARN
+    review_required: true
+- input:
+    score: 45
+  expect:
+    verdict: FAIL
+    ship: false
+    review_required: true
+- input:
+    score: 80
+  expect:
+    verdict: PASS
+    ship: true
+    review_required: false
+- input:
+    score: 60
+  expect:
+    verdict: WARN
+    ship: false
+    review_required: true
+- input:
+    score: 59
+  expect:
+    verdict: FAIL
+    review_required: true
+    ship: false
+- input:
+    score: 0
+  expect:
+    ship: false
+    review_required: true
+    verdict: FAIL
+- input:
+    score: -1
+  expect:
+    ship: false
+    verdict: FAIL
+    review_required: true
+- input:
+    score: 79
+  expect:
+    review_required: true
+    verdict: WARN
+    ship: false
+- input:
+    score: 81
+  expect:
+    verdict: PASS
+    review_required: false
+    ship: true
+- input:
+    score: 8000
+  expect:
+    verdict: PASS
+    review_required: false
+    ship: true
+- input: {}
+  expect:
+    ship: false
+    verdict: FAIL
+    review_required: true
+- input:
+    score: 0
+  expect:
+    verdict: FAIL
+    review_required: true
+    ship: false
+- input:
+    score: -1
+  expect:
+    ship: false
+    verdict: FAIL
+    review_required: true
+- input:
+    score: 61
+  expect:
+    ship: false
+    verdict: WARN
+    review_required: true
+- input:
+    score: 6000
+  expect:
+    review_required: false
+    ship: true
+    verdict: PASS
+- input: {}
+  expect:
+    verdict: FAIL
+    ship: false
+    review_required: true

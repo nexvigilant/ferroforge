@@ -1,0 +1,274 @@
+name: temporal-association
+description: Assess temporal association between drug exposure and adverse event. Core Naranjo criterion. Uses pre-computed within_range boolean and fixed time windows per ICH E2A.
+version: 0.2.0
+tree:
+  start: check_before_drug
+  nodes:
+    late_onset:
+      type: return
+      value:
+        assessment: Late onset >90 days — less likely to be drug-related
+        temporal_plausibility: WEAK
+        naranjo_contribution: 0
+        confidence: LOW
+    implausible:
+      type: return
+      value:
+        assessment: Event occurred before drug exposure — not drug-related
+        confidence: HIGH
+        temporal_plausibility: IMPLAUSIBLE
+        naranjo_contribution: -1
+    check_before_drug:
+      type: condition
+      variable: event_before_drug
+      operator: eq
+      value: true
+      true_next: implausible
+      false_next: check_known_range
+    within_known_range:
+      type: return
+      value:
+        confidence: HIGH
+        temporal_plausibility: STRONG
+        assessment: Event onset within known pharmacological timeframe
+        naranjo_contribution: 2
+    check_known_range:
+      type: condition
+      variable: within_known_onset_range
+      operator: eq
+      value: true
+      true_next: within_known_range
+      false_next: check_known_range_false
+    acute_onset:
+      type: return
+      value:
+        confidence: HIGH
+        temporal_plausibility: STRONG
+        naranjo_contribution: 2
+        assessment: Acute onset (0-7 days) — strong temporal association
+    subacute_onset:
+      type: return
+      value:
+        naranjo_contribution: 1
+        confidence: MODERATE
+        assessment: Subacute onset (8-30 days) — plausible temporal association
+        temporal_plausibility: POSSIBLE
+    check_known_range_false:
+      type: condition
+      variable: within_known_onset_range
+      operator: eq
+      value: false
+      true_next: outside_known_range
+      false_next: check_acute
+    check_acute:
+      type: condition
+      variable: drug_start_to_event_days
+      operator: lte
+      value: 7
+      true_next: acute_onset
+      false_next: check_subacute
+    check_subacute:
+      type: condition
+      variable: drug_start_to_event_days
+      operator: lte
+      value: 30
+      true_next: subacute_onset
+      false_next: check_delayed
+    check_delayed:
+      type: condition
+      variable: drug_start_to_event_days
+      operator: lte
+      value: 90
+      true_next: delayed_onset
+      false_next: late_onset
+    outside_known_range:
+      type: return
+      value:
+        assessment: Event onset outside known pharmacological timeframe
+        temporal_plausibility: WEAK
+        naranjo_contribution: 0
+        confidence: LOW
+    delayed_onset:
+      type: return
+      value:
+        confidence: MODERATE
+        assessment: Delayed onset (31-90 days) — possible but less specific
+        naranjo_contribution: 1
+        temporal_plausibility: POSSIBLE
+tests:
+- input:
+    within_known_onset_range: true
+    drug_start_to_event_days: 14
+  expect:
+    confidence: HIGH
+    temporal_plausibility: STRONG
+    naranjo_contribution: 2
+- input:
+    drug_start_to_event_days: 60
+    within_known_onset_range: false
+  expect:
+    temporal_plausibility: WEAK
+    naranjo_contribution: 0
+- input:
+    drug_start_to_event_days: 10
+    event_before_drug: true
+  expect:
+    temporal_plausibility: IMPLAUSIBLE
+    naranjo_contribution: -1
+- input:
+    drug_start_to_event_days: 3
+  expect:
+    temporal_plausibility: STRONG
+    naranjo_contribution: 2
+    assessment: Acute onset (0-7 days) — strong temporal association
+- input:
+    drug_start_to_event_days: 15
+  expect:
+    assessment: Subacute onset (8-30 days) — plausible temporal association
+    naranjo_contribution: 1
+    temporal_plausibility: POSSIBLE
+- input:
+    drug_start_to_event_days: 60
+  expect:
+    naranjo_contribution: 1
+    temporal_plausibility: POSSIBLE
+- input:
+    drug_start_to_event_days: 120
+  expect:
+    naranjo_contribution: 0
+    temporal_plausibility: WEAK
+- input:
+    event_before_drug: false
+    drug_start_to_event_days: 0
+  expect:
+    naranjo_contribution: 2
+    temporal_plausibility: STRONG
+- input:
+    drug_start_to_event_days: 7
+  expect:
+    temporal_plausibility: STRONG
+- input:
+    drug_start_to_event_days: 30
+  expect:
+    temporal_plausibility: POSSIBLE
+- input:
+    drug_start_to_event_days: 90
+  expect:
+    temporal_plausibility: POSSIBLE
+- input:
+    drug_start_to_event_days: 91
+  expect:
+    temporal_plausibility: WEAK
+- input:
+    drug_start_to_event_days: -1
+  expect:
+    confidence: HIGH
+    temporal_plausibility: STRONG
+    naranjo_contribution: 2
+    assessment: Acute onset (0-7 days) — strong temporal association
+- input:
+    drug_start_to_event_days: 6
+  expect:
+    temporal_plausibility: STRONG
+    naranjo_contribution: 2
+    confidence: HIGH
+    assessment: Acute onset (0-7 days) — strong temporal association
+- input:
+    drug_start_to_event_days: 8
+  expect:
+    temporal_plausibility: POSSIBLE
+    confidence: MODERATE
+    assessment: Subacute onset (8-30 days) — plausible temporal association
+    naranjo_contribution: 1
+- input: {}
+  expect:
+    assessment: Late onset >90 days — less likely to be drug-related
+    naranjo_contribution: 0
+    temporal_plausibility: WEAK
+    confidence: LOW
+- input:
+    drug_start_to_event_days: -1
+  expect:
+    temporal_plausibility: STRONG
+    assessment: Acute onset (0-7 days) — strong temporal association
+    naranjo_contribution: 2
+    confidence: HIGH
+- input:
+    drug_start_to_event_days: 29
+  expect:
+    naranjo_contribution: 1
+    temporal_plausibility: POSSIBLE
+    confidence: MODERATE
+    assessment: Subacute onset (8-30 days) — plausible temporal association
+- input:
+    drug_start_to_event_days: 31
+  expect:
+    naranjo_contribution: 1
+    confidence: MODERATE
+    temporal_plausibility: POSSIBLE
+    assessment: Delayed onset (31-90 days) — possible but less specific
+- input:
+    drug_start_to_event_days: 3000
+  expect:
+    confidence: LOW
+    naranjo_contribution: 0
+    temporal_plausibility: WEAK
+    assessment: Late onset >90 days — less likely to be drug-related
+- input: {}
+  expect:
+    temporal_plausibility: WEAK
+    confidence: LOW
+    assessment: Late onset >90 days — less likely to be drug-related
+    naranjo_contribution: 0
+- input:
+    drug_start_to_event_days: -1
+  expect:
+    naranjo_contribution: 2
+    temporal_plausibility: STRONG
+    confidence: HIGH
+    assessment: Acute onset (0-7 days) — strong temporal association
+- input:
+    drug_start_to_event_days: 89
+  expect:
+    assessment: Delayed onset (31-90 days) — possible but less specific
+    confidence: MODERATE
+    temporal_plausibility: POSSIBLE
+    naranjo_contribution: 1
+- input:
+    drug_start_to_event_days: 9000
+  expect:
+    temporal_plausibility: WEAK
+    assessment: Late onset >90 days — less likely to be drug-related
+    confidence: LOW
+    naranjo_contribution: 0
+- input: {}
+  expect:
+    assessment: Late onset >90 days — less likely to be drug-related
+    naranjo_contribution: 0
+    confidence: LOW
+    temporal_plausibility: WEAK
+interface:
+  inputs:
+    event_before_drug:
+      type: bool
+      required: false
+    within_known_onset_range:
+      type: bool
+      required: false
+    drug_start_to_event_days:
+      type: int
+      required: true
+  outputs:
+    confidence:
+      type: string
+      required: false
+    naranjo_contribution:
+      type: int
+      required: false
+    temporal_plausibility:
+      type: string
+      required: false
+    assessment:
+      type: string
+      required: false
+  aliases: {}

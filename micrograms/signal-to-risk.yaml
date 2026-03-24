@@ -1,0 +1,225 @@
+name: signal-to-risk
+description: 'Router: routes confirmed signals into risk management actions based on signal strength, causality, and product lifecycle stage'
+version: 1.0.0
+interface:
+  inputs:
+    causality:
+      type: string
+      required: false
+    overall_signal:
+      type: string
+      required: false
+    product_lifecycle:
+      type: string
+      required: false
+  outputs:
+    next_chain:
+      type: string
+    regulatory_action_needed:
+      type: bool
+    route:
+      type: string
+    urgency:
+      type: string
+tree:
+  start: check_confirmed_signal
+  nodes:
+    check_confirmed_signal:
+      type: condition
+      variable: overall_signal
+      operator: eq
+      value: CONFIRMED
+      true_next: check_strong_causality
+      false_next: check_probable_signal
+    check_strong_causality:
+      type: condition
+      variable: causality
+      operator: eq
+      value: CERTAIN
+      true_next: immediate_action
+      false_next: check_probable_causality
+    check_probable_causality:
+      type: condition
+      variable: causality
+      operator: eq
+      value: PROBABLE
+      true_next: immediate_action
+      false_next: risk_assessment
+    immediate_action:
+      type: return
+      value:
+        route: IMMEDIATE_ACTION
+        next_chain: rems-classifier -> benefit-risk-gate
+        urgency: CRITICAL
+        regulatory_action_needed: true
+    risk_assessment:
+      type: return
+      value:
+        route: RISK_ASSESSMENT
+        next_chain: benefit-risk-gate
+        urgency: HIGH
+        regulatory_action_needed: true
+    check_probable_signal:
+      type: condition
+      variable: overall_signal
+      operator: eq
+      value: PROBABLE
+      true_next: enhanced_monitoring
+      false_next: check_possible_signal
+    enhanced_monitoring:
+      type: return
+      value:
+        route: ENHANCED_MONITORING
+        next_chain: benefit-risk-gate
+        urgency: MODERATE
+        regulatory_action_needed: false
+    check_possible_signal:
+      type: condition
+      variable: overall_signal
+      operator: eq
+      value: POSSIBLE
+      true_next: check_premarket
+      false_next: check_suggestive_signal
+    check_premarket:
+      type: condition
+      variable: product_lifecycle
+      operator: eq
+      value: premarket
+      true_next: premarket_review
+      false_next: continued_monitoring
+    premarket_review:
+      type: return
+      value:
+        route: PREMARKET_REVIEW
+        next_chain: benefit-risk-gate
+        urgency: MODERATE
+        regulatory_action_needed: true
+    continued_monitoring:
+      type: return
+      value:
+        route: CONTINUED_MONITORING
+        next_chain: cioms-frequency
+        urgency: LOW
+        regulatory_action_needed: false
+    check_suggestive_signal:
+      type: condition
+      variable: overall_signal
+      operator: eq
+      value: SUGGESTIVE
+      true_next: no_action
+      false_next: no_action
+    no_action:
+      type: return
+      value:
+        route: NO_ACTION
+        next_chain: none
+        urgency: NONE
+        regulatory_action_needed: false
+tests:
+- name: confirmed signal with certain causality triggers immediate action
+  input:
+    overall_signal: CONFIRMED
+    causality: CERTAIN
+    product_lifecycle: postmarket_mature
+  expect:
+    route: IMMEDIATE_ACTION
+    next_chain: rems-classifier -> benefit-risk-gate
+    urgency: CRITICAL
+    regulatory_action_needed: true
+- name: confirmed signal with probable causality triggers immediate action
+  input:
+    overall_signal: CONFIRMED
+    causality: PROBABLE
+    product_lifecycle: postmarket_early
+  expect:
+    route: IMMEDIATE_ACTION
+    next_chain: rems-classifier -> benefit-risk-gate
+    urgency: CRITICAL
+    regulatory_action_needed: true
+- name: confirmed signal with possible causality goes to risk assessment
+  input:
+    overall_signal: CONFIRMED
+    causality: POSSIBLE
+    product_lifecycle: postmarket_mature
+  expect:
+    route: RISK_ASSESSMENT
+    next_chain: benefit-risk-gate
+    urgency: HIGH
+    regulatory_action_needed: true
+- name: confirmed signal with unlikely causality goes to risk assessment
+  input:
+    overall_signal: CONFIRMED
+    causality: UNLIKELY
+    product_lifecycle: postmarket_mature
+  expect:
+    route: RISK_ASSESSMENT
+    next_chain: benefit-risk-gate
+    urgency: HIGH
+    regulatory_action_needed: true
+- name: probable signal routes to enhanced monitoring
+  input:
+    overall_signal: PROBABLE
+    causality: CERTAIN
+    product_lifecycle: postmarket_mature
+  expect:
+    route: ENHANCED_MONITORING
+    next_chain: benefit-risk-gate
+    urgency: MODERATE
+    regulatory_action_needed: false
+- name: possible signal in premarket triggers premarket review
+  input:
+    overall_signal: POSSIBLE
+    causality: POSSIBLE
+    product_lifecycle: premarket
+  expect:
+    route: PREMARKET_REVIEW
+    next_chain: benefit-risk-gate
+    urgency: MODERATE
+    regulatory_action_needed: true
+- name: possible signal in postmarket goes to continued monitoring
+  input:
+    overall_signal: POSSIBLE
+    causality: POSSIBLE
+    product_lifecycle: postmarket_mature
+  expect:
+    route: CONTINUED_MONITORING
+    next_chain: cioms-frequency
+    urgency: LOW
+    regulatory_action_needed: false
+- name: possible signal in early postmarket goes to continued monitoring
+  input:
+    overall_signal: POSSIBLE
+    causality: PROBABLE
+    product_lifecycle: postmarket_early
+  expect:
+    route: CONTINUED_MONITORING
+    next_chain: cioms-frequency
+    urgency: LOW
+    regulatory_action_needed: false
+- name: suggestive signal routes to no action
+  input:
+    overall_signal: SUGGESTIVE
+    causality: POSSIBLE
+    product_lifecycle: postmarket_mature
+  expect:
+    route: NO_ACTION
+    next_chain: none
+    urgency: NONE
+    regulatory_action_needed: false
+- name: no signal routes to no action
+  input:
+    overall_signal: NO_SIGNAL
+    causality: UNLIKELY
+    product_lifecycle: postmarket_mature
+  expect:
+    route: NO_ACTION
+    next_chain: none
+    urgency: NONE
+    regulatory_action_needed: false
+- name: empty input defaults to no action
+  input: {}
+  expect:
+    route: NO_ACTION
+    next_chain: none
+    urgency: NONE
+    regulatory_action_needed: false

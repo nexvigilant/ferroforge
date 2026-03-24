@@ -1,0 +1,142 @@
+name: expectedness-check
+description: 'ICH E2A expectedness classification with severity dimension: EXPECTED_LISTED, EXPECTED_CLASS, UNEXPECTED_SEVERITY, or UNEXPECTED_NATURE'
+version: 0.2.0
+interface:
+  inputs:
+    event_class_in_label:
+      type: bool
+      required: false
+    event_in_label:
+      type: bool
+      required: false
+    severity_in_label:
+      type: bool
+      required: false
+  outputs:
+    description:
+      type: string
+    expectedness:
+      type: string
+    regulatory_impact:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_event_listed
+  nodes:
+    check_event_listed:
+      type: condition
+      variable: event_in_label
+      operator: eq
+      value: true
+      true_next: check_severity_listed
+      false_next: check_class_listed
+    check_severity_listed:
+      type: condition
+      variable: severity_in_label
+      operator: eq
+      value: true
+      true_next: expected_listed
+      false_next: unexpected_severity
+    check_class_listed:
+      type: condition
+      variable: event_class_in_label
+      operator: eq
+      value: true
+      true_next: expected_class
+      false_next: unexpected_nature
+    expected_listed:
+      type: return
+      value:
+        expectedness: EXPECTED_LISTED
+        description: Specific adverse event and its observed severity are listed in product labeling
+        regulatory_impact: Periodic reporting only - no expedited submission required
+        regulatory_reference: ICH E2A Section II.C
+    unexpected_severity:
+      type: return
+      value:
+        expectedness: UNEXPECTED_SEVERITY
+        description: Adverse event nature is listed but observed severity exceeds labeling
+        regulatory_impact: Expedited reporting required - event unexpected by severity per ICH E2A
+        regulatory_reference: ICH E2A Section II.C
+    expected_class:
+      type: return
+      value:
+        expectedness: EXPECTED_CLASS
+        description: Event class is labeled but specific event not listed - borderline expectedness
+        regulatory_impact: Medical review required to confirm expectedness determination
+        regulatory_reference: ICH E2A Section II.C
+    unexpected_nature:
+      type: return
+      value:
+        expectedness: UNEXPECTED_NATURE
+        description: Adverse event not listed in product labeling - unexpected by nature
+        regulatory_impact: Expedited reporting required if case is serious per ICH E2A
+        regulatory_reference: ICH E2A Section II.C
+tests:
+# Event in label, severity in label - fully expected
+- input:
+    event_in_label: true
+    event_class_in_label: true
+    severity_in_label: true
+  expect:
+    expectedness: EXPECTED_LISTED
+    description: Specific adverse event and its observed severity are listed in product labeling
+    regulatory_impact: Periodic reporting only - no expedited submission required
+    regulatory_reference: ICH E2A Section II.C
+# Event in label, severity NOT in label - unexpected by severity
+- input:
+    event_in_label: true
+    event_class_in_label: true
+    severity_in_label: false
+  expect:
+    expectedness: UNEXPECTED_SEVERITY
+    description: Adverse event nature is listed but observed severity exceeds labeling
+    regulatory_impact: Expedited reporting required - event unexpected by severity per ICH E2A
+    regulatory_reference: ICH E2A Section II.C
+# Event in label, severity in label, class not - still expected listed
+- input:
+    event_in_label: true
+    event_class_in_label: false
+    severity_in_label: true
+  expect:
+    expectedness: EXPECTED_LISTED
+    description: Specific adverse event and its observed severity are listed in product labeling
+    regulatory_impact: Periodic reporting only - no expedited submission required
+    regulatory_reference: ICH E2A Section II.C
+# Event NOT in label, class in label - expected class
+- input:
+    event_in_label: false
+    event_class_in_label: true
+    severity_in_label: false
+  expect:
+    expectedness: EXPECTED_CLASS
+    description: Event class is labeled but specific event not listed - borderline expectedness
+    regulatory_impact: Medical review required to confirm expectedness determination
+    regulatory_reference: ICH E2A Section II.C
+# Neither event nor class in label - unexpected by nature
+- input:
+    event_in_label: false
+    event_class_in_label: false
+    severity_in_label: false
+  expect:
+    expectedness: UNEXPECTED_NATURE
+    description: Adverse event not listed in product labeling - unexpected by nature
+    regulatory_impact: Expedited reporting required if case is serious per ICH E2A
+    regulatory_reference: ICH E2A Section II.C
+# Empty input - defaults to unexpected by nature
+- input: {}
+  expect:
+    expectedness: UNEXPECTED_NATURE
+    description: Adverse event not listed in product labeling - unexpected by nature
+    regulatory_impact: Expedited reporting required if case is serious per ICH E2A
+    regulatory_reference: ICH E2A Section II.C
+# Event in label, severity missing (defaults false) - unexpected by severity
+- input:
+    event_in_label: true
+    event_class_in_label: false
+  expect:
+    expectedness: UNEXPECTED_SEVERITY
+    description: Adverse event nature is listed but observed severity exceeds labeling
+    regulatory_impact: Expedited reporting required - event unexpected by severity per ICH E2A
+    regulatory_reference: ICH E2A Section II.C

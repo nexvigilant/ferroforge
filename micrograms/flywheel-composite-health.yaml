@@ -1,0 +1,100 @@
+name: flywheel-composite-health
+description: Classify flywheel composite health score into healthy/degraded/critical
+version: 0.1.0
+tree:
+  start: check_healthy
+  nodes:
+    degraded:
+      type: return
+      value:
+        classification: degraded
+        action: Investigate — composite below healthy threshold
+    healthy:
+      type: return
+      value:
+        action: Continue normal operations
+        classification: healthy
+    check_degraded:
+      type: condition
+      variable: composite
+      operator: gte
+      value: 0.4
+      true_next: degraded
+      false_next: critical
+    check_healthy:
+      type: condition
+      variable: composite
+      operator: gte
+      value: 0.7
+      true_next: healthy
+      false_next: check_degraded
+    critical:
+      type: return
+      value:
+        action: Immediate attention — composite below degraded threshold
+        classification: critical
+tests:
+- input:
+    composite: 0.9
+  expect:
+    action: Continue normal operations
+    classification: healthy
+- input:
+    composite: 0.7
+  expect:
+    action: Continue normal operations
+    classification: healthy
+- input:
+    composite: 0.5
+  expect:
+    classification: degraded
+    action: Investigate — composite below healthy threshold
+- input:
+    composite: 0.4
+  expect:
+    action: Investigate — composite below healthy threshold
+    classification: degraded
+- input:
+    composite: 0.3
+  expect:
+    action: Immediate attention — composite below degraded threshold
+    classification: critical
+- input:
+    composite: 0.0
+  expect:
+    action: Immediate attention — composite below degraded threshold
+    classification: critical
+- input:
+    composite: 1.0
+  expect:
+    classification: healthy
+    action: Continue normal operations
+- input:
+    composite: 0.399
+  expect:
+    classification: critical
+    action: Immediate attention — composite below degraded threshold
+- input:
+    composite: 0.401
+  expect:
+    classification: degraded
+    action: Investigate — composite below healthy threshold
+- input: {}
+  expect:
+    action: Immediate attention — composite below degraded threshold
+    classification: critical
+- input:
+    composite: 0.699
+  expect:
+    action: Investigate — composite below healthy threshold
+    classification: degraded
+- input:
+    composite: 0.701
+  expect:
+    action: Continue normal operations
+    classification: healthy
+- input: {}
+  expect:
+    action: Immediate attention — composite below degraded threshold
+    classification: critical
+interface: null

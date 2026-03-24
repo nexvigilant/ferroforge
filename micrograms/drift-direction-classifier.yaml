@@ -1,0 +1,105 @@
+name: drift-direction-classifier
+description: 'Signal drift direction classifier: determines whether a signal metric is rising, falling, or stable based on percentage change'
+version: 0.1.0
+interface:
+  inputs:
+    change_pct:
+      type: number
+      required: true
+      description: 'Percentage change in signal metric (positive = increase, negative = decrease)'
+  outputs:
+    direction:
+      type: string
+    traffic_level:
+      type: string
+tree:
+  start: check_rising
+  nodes:
+    check_rising:
+      type: condition
+      variable: change_pct
+      operator: gt
+      value: 5
+      true_next: rising
+      false_next: check_falling
+    check_falling:
+      type: condition
+      variable: change_pct
+      operator: lt
+      value: -5
+      true_next: falling
+      false_next: stable
+    rising:
+      type: return
+      value:
+        direction: rising
+        traffic_level: red
+    falling:
+      type: return
+      value:
+        direction: falling
+        traffic_level: green
+    stable:
+      type: return
+      value:
+        direction: stable
+        traffic_level: green
+tests:
+# Clear rising
+- input:
+    change_pct: 15
+  expect:
+    direction: rising
+    traffic_level: red
+# Clear falling
+- input:
+    change_pct: -10
+  expect:
+    direction: falling
+    traffic_level: green
+# Stable (within +-5)
+- input:
+    change_pct: 3
+  expect:
+    direction: stable
+    traffic_level: green
+# Boundary: exactly 5 = stable (not gt)
+- input:
+    change_pct: 5
+  expect:
+    direction: stable
+    traffic_level: green
+# Boundary: exactly -5 = stable (not lt)
+- input:
+    change_pct: -5
+  expect:
+    direction: stable
+    traffic_level: green
+# Just above 5 = rising
+- input:
+    change_pct: 5.1
+  expect:
+    direction: rising
+    traffic_level: red
+# Just below -5 = falling
+- input:
+    change_pct: -5.1
+  expect:
+    direction: falling
+    traffic_level: green
+# Zero = stable
+- input:
+    change_pct: 0
+  expect:
+    direction: stable
+    traffic_level: green
+# Large positive
+- input:
+    change_pct: 80
+  expect:
+    direction: rising
+    traffic_level: red
+- input: {}
+  expect:
+    direction: stable
+    traffic_level: green

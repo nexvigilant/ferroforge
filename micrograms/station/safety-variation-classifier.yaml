@@ -1,0 +1,165 @@
+name: safety-variation-classifier
+description: Classifies the type of regulatory variation needed for safety-related
+  changes. Determines variation tier (IA, IB, II, or urgent) based on scope and urgency
+  of safety modifications.
+version: 0.1.0
+interface:
+  inputs:
+    new_adverse_reaction:
+      type: bool
+      required: false
+    frequency_change:
+      type: bool
+      required: false
+    contraindication_change:
+      type: bool
+      required: false
+    is_urgent:
+      type: bool
+      required: false
+  outputs:
+    variation_type:
+      type: string
+    timeline:
+      type: string
+tree:
+  start: check_urgent
+  nodes:
+    check_urgent:
+      type: condition
+      variable: is_urgent
+      operator: eq
+      value: true
+      true_next: urgent_restriction
+      false_next: check_contraindication
+    urgent_restriction:
+      type: return
+      value:
+        variation_type: urgent_safety_restriction
+        timeline: immediate
+    check_contraindication:
+      type: condition
+      variable: contraindication_change
+      operator: eq
+      value: true
+      true_next: check_new_reaction
+      false_next: check_frequency
+    check_new_reaction:
+      type: condition
+      variable: new_adverse_reaction
+      operator: eq
+      value: true
+      true_next: type_ib_high_impact
+      false_next: type_ib_contraindication
+    type_ib_high_impact:
+      type: return
+      value:
+        variation_type: type_IB
+        timeline: 30_days
+    type_ib_contraindication:
+      type: return
+      value:
+        variation_type: type_IB
+        timeline: 30_days
+    check_frequency:
+      type: condition
+      variable: frequency_change
+      operator: eq
+      value: true
+      true_next: check_new_reaction_freq
+      false_next: new_reaction_only
+    check_new_reaction_freq:
+      type: condition
+      variable: new_adverse_reaction
+      operator: eq
+      value: true
+      true_next: type_ia_or_ib
+      false_next: type_ia_frequency
+    type_ia_or_ib:
+      type: return
+      value:
+        variation_type: type_IB
+        timeline: 30_days
+    type_ia_frequency:
+      type: return
+      value:
+        variation_type: type_IA
+        timeline: annual_submission
+    new_reaction_only:
+      type: condition
+      variable: new_adverse_reaction
+      operator: eq
+      value: true
+      true_next: type_ia_new_reaction
+      false_next: type_ii_default
+    type_ia_new_reaction:
+      type: return
+      value:
+        variation_type: type_IA
+        timeline: annual_submission
+    type_ii_default:
+      type: return
+      value:
+        variation_type: type_II
+        timeline: 60_days
+tests:
+- input:
+    contraindication_change: false
+    frequency_change: false
+    is_urgent: false
+    new_adverse_reaction: false
+  expect:
+    variation_type: type_II
+    timeline: 60_days
+- input:
+    contraindication_change: false
+    frequency_change: false
+    is_urgent: false
+    new_adverse_reaction: true
+  expect:
+    variation_type: type_IA
+    timeline: annual_submission
+- input:
+    contraindication_change: false
+    frequency_change: false
+    is_urgent: true
+    new_adverse_reaction: false
+  expect:
+    variation_type: urgent_safety_restriction
+    timeline: immediate
+- input:
+    contraindication_change: false
+    frequency_change: true
+    is_urgent: false
+    new_adverse_reaction: false
+  expect:
+    variation_type: type_IA
+    timeline: annual_submission
+- input:
+    contraindication_change: false
+    frequency_change: true
+    is_urgent: false
+    new_adverse_reaction: true
+  expect:
+    variation_type: type_IB
+    timeline: 30_days
+- input:
+    contraindication_change: true
+    frequency_change: false
+    is_urgent: false
+    new_adverse_reaction: false
+  expect:
+    variation_type: type_IB
+    timeline: 30_days
+- input:
+    contraindication_change: true
+    frequency_change: false
+    is_urgent: false
+    new_adverse_reaction: true
+  expect:
+    variation_type: type_IB
+    timeline: 30_days
+- input: {}
+  expect:
+    variation_type: type_II
+    timeline: 60_days

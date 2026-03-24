@@ -1,0 +1,115 @@
+name: e2a-investigator-reporting
+description: 'ICH E2A investigator urgency gate: determines reporting urgency based on SAE awareness and severity'
+version: 0.1.0
+interface:
+  inputs:
+    fatal:
+      type: bool
+      required: false
+    investigator_aware_of_sae:
+      type: bool
+      required: false
+    life_threatening:
+      type: bool
+      required: false
+  outputs:
+    description:
+      type: string
+    regulatory_reference:
+      type: string
+    urgency:
+      type: string
+tree:
+  start: check_aware
+  nodes:
+    check_aware:
+      type: condition
+      variable: investigator_aware_of_sae
+      operator: eq
+      value: true
+      true_next: check_fatal
+      false_next: not_applicable
+    check_fatal:
+      type: condition
+      variable: fatal
+      operator: eq
+      value: true
+      true_next: immediate
+      false_next: check_life_threatening
+    check_life_threatening:
+      type: condition
+      variable: life_threatening
+      operator: eq
+      value: true
+      true_next: immediate
+      false_next: prompt
+    immediate:
+      type: return
+      value:
+        urgency: IMMEDIATE_24H
+        description: Fatal or life-threatening SAE requires immediate reporting within 24 hours
+        regulatory_reference: ICH E2A Section III.A
+    prompt:
+      type: return
+      value:
+        urgency: PROMPT
+        description: Serious but not fatal/life-threatening SAE requires prompt reporting to sponsor
+        regulatory_reference: ICH E2A Section III.A
+    not_applicable:
+      type: return
+      value:
+        urgency: NOT_APPLICABLE
+        description: Investigator not yet aware of SAE - reporting obligation not triggered
+        regulatory_reference: ICH E2A Section III.A
+tests:
+# Aware, fatal - immediate 24h
+- input:
+    investigator_aware_of_sae: true
+    fatal: true
+    life_threatening: false
+  expect:
+    urgency: IMMEDIATE_24H
+    description: Fatal or life-threatening SAE requires immediate reporting within 24 hours
+    regulatory_reference: ICH E2A Section III.A
+# Aware, life-threatening - immediate 24h
+- input:
+    investigator_aware_of_sae: true
+    fatal: false
+    life_threatening: true
+  expect:
+    urgency: IMMEDIATE_24H
+    description: Fatal or life-threatening SAE requires immediate reporting within 24 hours
+    regulatory_reference: ICH E2A Section III.A
+# Aware, both fatal and life-threatening - immediate 24h
+- input:
+    investigator_aware_of_sae: true
+    fatal: true
+    life_threatening: true
+  expect:
+    urgency: IMMEDIATE_24H
+    description: Fatal or life-threatening SAE requires immediate reporting within 24 hours
+    regulatory_reference: ICH E2A Section III.A
+# Aware, serious but not fatal/LT - prompt
+- input:
+    investigator_aware_of_sae: true
+    fatal: false
+    life_threatening: false
+  expect:
+    urgency: PROMPT
+    description: Serious but not fatal/life-threatening SAE requires prompt reporting to sponsor
+    regulatory_reference: ICH E2A Section III.A
+# Not aware - not applicable
+- input:
+    investigator_aware_of_sae: false
+    fatal: true
+    life_threatening: true
+  expect:
+    urgency: NOT_APPLICABLE
+    description: Investigator not yet aware of SAE - reporting obligation not triggered
+    regulatory_reference: ICH E2A Section III.A
+# Empty input - not applicable
+- input: {}
+  expect:
+    urgency: NOT_APPLICABLE
+    description: Investigator not yet aware of SAE - reporting obligation not triggered
+    regulatory_reference: ICH E2A Section III.A

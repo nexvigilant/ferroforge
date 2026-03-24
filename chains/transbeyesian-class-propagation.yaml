@@ -1,0 +1,50 @@
+name: transbeyesian-class-propagation
+description: 'PRR signal detection → transbeyesian cross-domain belief propagation. Detects a signal in the source drug via PRR threshold, then propagates the finding to a target drug using shared primitive structure (transfer_weight) as the propagation channel.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - prr-signal
+  - transbeyesian-propagator
+tests:
+# 1. Strong signal + same_class → signal detected, STRONG_UPDATE
+- name: strong GLP-1 signal propagates to class member
+  input:
+    prr: 8.5
+    source_prr: 8.5
+    signal_threshold: 2.0
+    transfer_weight: same_class
+    prior_strength: weak
+  expect:
+    signal_detected: true
+    classification: signal
+    posterior_class: STRONG_UPDATE
+    propagation_confidence: HIGH
+
+# 2. Weak signal + none → no signal detected, NO_UPDATE
+- name: sub-threshold PRR with no transfer channel — nothing propagates
+  input:
+    prr: 1.2
+    source_prr: 1.2
+    signal_threshold: 2.0
+    transfer_weight: none
+    prior_strength: unknown
+  expect:
+    signal_detected: false
+    classification: noise
+    posterior_class: NO_UPDATE
+    propagation_confidence: NONE
+
+# 3. Strong signal + high weight + weak prior → signal detected, STRONG_UPDATE
+- name: strong signal with high transfer weight updates empty prior
+  input:
+    prr: 6.0
+    source_prr: 6.0
+    signal_threshold: 2.0
+    transfer_weight: high
+    prior_strength: weak
+  expect:
+    signal_detected: true
+    classification: signal
+    posterior_class: STRONG_UPDATE
+    propagation_confidence: HIGH

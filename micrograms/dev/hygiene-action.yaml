@@ -1,0 +1,106 @@
+name: hygiene-action
+description: 'Code hygiene action router: takes file-size-gate and module-complexity-gate outputs and recommends action priority.'
+version: 0.1.0
+interface:
+  inputs:
+    needs_split:
+      type: bool
+      required: true
+    needs_decomposition:
+      type: bool
+      required: false
+  outputs:
+    action:
+      type: string
+    priority:
+      type: string
+    reason:
+      type: string
+tree:
+  start: check_split
+  nodes:
+    check_split:
+      type: condition
+      variable: needs_split
+      operator: eq
+      value: true
+      true_next: check_decomp_when_split
+      false_next: check_decomp_only
+    check_decomp_when_split:
+      type: condition
+      variable: needs_decomposition
+      operator: eq
+      value: true
+      true_next: both
+      false_next: split_only
+    check_decomp_only:
+      type: condition
+      variable: needs_decomposition
+      operator: eq
+      value: true
+      true_next: decomp_only
+      false_next: clean
+    both:
+      type: return
+      value:
+        action: SPLIT_AND_DECOMPOSE
+        priority: P0
+        reason: File is too large AND too complex — split into submodule directory with focused files
+    split_only:
+      type: return
+      value:
+        action: SPLIT_FILE
+        priority: P1
+        reason: File is too large but well-focused — split by section markers into submodules
+    decomp_only:
+      type: return
+      value:
+        action: DECOMPOSE_API
+        priority: P2
+        reason: File is small but API surface is too wide — extract cohesive function groups
+    clean:
+      type: return
+      value:
+        action: NO_ACTION
+        priority: P3
+        reason: File is within size and complexity limits — no action needed
+tests:
+- input:
+    needs_split: true
+    needs_decomposition: true
+  expect:
+    action: SPLIT_AND_DECOMPOSE
+    priority: P0
+    reason: File is too large AND too complex — split into submodule directory with focused files
+- input:
+    needs_split: true
+    needs_decomposition: false
+  expect:
+    action: SPLIT_FILE
+    priority: P1
+    reason: File is too large but well-focused — split by section markers into submodules
+- input:
+    needs_split: false
+    needs_decomposition: true
+  expect:
+    action: DECOMPOSE_API
+    priority: P2
+    reason: File is small but API surface is too wide — extract cohesive function groups
+- input:
+    needs_split: false
+    needs_decomposition: false
+  expect:
+    action: NO_ACTION
+    priority: P3
+    reason: File is within size and complexity limits — no action needed
+- input:
+    needs_split: true
+  expect:
+    action: SPLIT_FILE
+    priority: P1
+    reason: File is too large but well-focused — split by section markers into submodules
+- input: {}
+  expect:
+    action: NO_ACTION
+    priority: P3
+    reason: File is within size and complexity limits — no action needed

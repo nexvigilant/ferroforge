@@ -1,0 +1,152 @@
+name: module-loop-classifier
+description: 'Module→Loop mapping from Spec §5. Classifies each NexVigilant module to its primary and secondary flywheel loops. Pure lookup — no computation, just the authoritative mapping table encoded as a decision tree.'
+version: 0.1.0
+interface:
+  inputs:
+    module:
+      type: string
+      required: true
+  outputs:
+    primary_loop:
+      type: string
+    secondary_loop:
+      type: string
+    loop_role:
+      type: string
+tree:
+  start: check_nucleus
+  nodes:
+    check_nucleus:
+      type: condition
+      variable: module
+      operator: eq
+      value: nucleus
+      true_next: nucleus
+      false_next: check_guardian
+    check_guardian:
+      type: condition
+      variable: module
+      operator: eq
+      value: guardian
+      true_next: guardian
+      false_next: check_academy
+    check_academy:
+      type: condition
+      variable: module
+      operator: eq
+      value: academy
+      true_next: academy
+      false_next: check_community
+    check_community:
+      type: condition
+      variable: module
+      operator: eq
+      value: community
+      true_next: community
+      false_next: check_careers
+    check_careers:
+      type: condition
+      variable: module
+      operator: eq
+      value: careers
+      true_next: careers
+      false_next: check_insights
+    check_insights:
+      type: condition
+      variable: module
+      operator: eq
+      value: insights
+      true_next: insights
+      false_next: check_neural
+    check_neural:
+      type: condition
+      variable: module
+      operator: eq
+      value: neural
+      true_next: neural
+      false_next: check_core
+    check_core:
+      type: condition
+      variable: module
+      operator: eq
+      value: core
+      true_next: core
+      false_next: unknown
+    nucleus:
+      type: return
+      value:
+        primary_loop: L2_momentum
+        secondary_loop: L4_gyroscopic
+        loop_role: momentum_storage_and_mission_axis
+    guardian:
+      type: return
+      value:
+        primary_loop: L4_gyroscopic
+        secondary_loop: none
+        loop_role: regulatory_axis_stability
+    academy:
+      type: return
+      value:
+        primary_loop: L1_rim
+        secondary_loop: L5_elastic
+        loop_role: value_density_and_adaptive_capacity
+    community:
+      type: return
+      value:
+        primary_loop: L1_rim
+        secondary_loop: none
+        loop_role: primary_rim_structure
+    careers:
+      type: return
+      value:
+        primary_loop: L1_rim
+        secondary_loop: none
+        loop_role: rim_reinforcement_switching_cost
+    insights:
+      type: return
+      value:
+        primary_loop: L2_momentum
+        secondary_loop: none
+        loop_role: knowledge_persistence
+    neural:
+      type: return
+      value:
+        primary_loop: L2_momentum
+        secondary_loop: L3_friction
+        loop_role: momentum_storage_and_friction_reduction
+    core:
+      type: return
+      value:
+        primary_loop: L3_friction
+        secondary_loop: L5_elastic
+        loop_role: operational_friction_and_founder_stress
+    unknown:
+      type: return
+      value:
+        primary_loop: unknown
+        secondary_loop: unknown
+        loop_role: module_not_recognized
+tests:
+- input: { module: nucleus }
+  expect: { primary_loop: L2_momentum, secondary_loop: L4_gyroscopic, loop_role: momentum_storage_and_mission_axis }
+- input: { module: guardian }
+  expect: { primary_loop: L4_gyroscopic, secondary_loop: none, loop_role: regulatory_axis_stability }
+- input: { module: academy }
+  expect: { primary_loop: L1_rim, secondary_loop: L5_elastic, loop_role: value_density_and_adaptive_capacity }
+- input: { module: community }
+  expect: { primary_loop: L1_rim, secondary_loop: none, loop_role: primary_rim_structure }
+- input: { module: careers }
+  expect: { primary_loop: L1_rim, secondary_loop: none, loop_role: rim_reinforcement_switching_cost }
+- input: { module: insights }
+  expect: { primary_loop: L2_momentum, secondary_loop: none, loop_role: knowledge_persistence }
+- input: { module: neural }
+  expect: { primary_loop: L2_momentum, secondary_loop: L3_friction, loop_role: momentum_storage_and_friction_reduction }
+- input: { module: core }
+  expect: { primary_loop: L3_friction, secondary_loop: L5_elastic, loop_role: operational_friction_and_founder_stress }
+- input: { module: unknown_module }
+  expect: { primary_loop: unknown, secondary_loop: unknown, loop_role: module_not_recognized }
+- input: {}
+  expect:
+    loop_role: module_not_recognized
+    primary_loop: unknown
+    secondary_loop: unknown

@@ -1,0 +1,391 @@
+name: safety-profile-completeness
+description: Assesses completeness of cross-domain safety profile data
+version: 0.1.0
+tree:
+  start: check_all_five
+  nodes:
+    check_faers_lit_label_no_inter:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: adequate_four
+      false_next: partial_three_lit_label
+    partial_inter_label_only:
+      type: return
+      value:
+        profile_completeness: partial
+        gaps: missing trial and literature data
+    check_faers_literature_no_label:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: partial_faers_at_least
+      false_next: check_literature_no_label
+    check_literature_no_label:
+      type: condition
+      variable: has_literature
+      operator: eq
+      value: true
+      true_next: partial_lit_at_least
+      false_next: insufficient_no_data
+    check_literature_inter_label:
+      type: condition
+      variable: has_literature
+      operator: eq
+      value: true
+      true_next: adequate_four
+      false_next: check_faers_inter_label
+    partial_trial_at_least:
+      type: return
+      value:
+        profile_completeness: partial
+        gaps: missing label information
+    insufficient_no_data:
+      type: return
+      value:
+        gaps: no comprehensive safety data available
+        profile_completeness: insufficient
+    check_two_no_inter_trial_label:
+      type: condition
+      variable: has_literature
+      operator: eq
+      value: true
+      true_next: check_faers_four_no_inter
+      false_next: check_faers_three_no_inter
+    check_all_five:
+      type: condition
+      variable: has_interactions
+      operator: eq
+      value: true
+      true_next: check_four_when_interactions
+      false_next: check_four_without_interactions
+    check_faers_three_no_inter:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: adequate_four
+      false_next: partial_three_no_inter
+    partial_three_with_inter_label_trial:
+      type: return
+      value:
+        profile_completeness: partial
+        gaps: missing literature review
+    partial_three_no_inter:
+      type: return
+      value:
+        profile_completeness: partial
+        gaps: missing interactions data
+    check_four_without_interactions:
+      type: condition
+      variable: has_label
+      operator: eq
+      value: true
+      true_next: check_three_no_inter_label
+      false_next: check_two_sources_no_label
+    comprehensive:
+      type: return
+      value:
+        profile_completeness: comprehensive
+        gaps: none
+    partial_lit_at_least:
+      type: return
+      value:
+        gaps: missing label information
+        profile_completeness: partial
+    adequate_four_with_all_but_faers:
+      type: return
+      value:
+        gaps: missing FAERS data
+        profile_completeness: adequate
+    check_three_with_interaction_label:
+      type: condition
+      variable: has_trial_data
+      operator: eq
+      value: true
+      true_next: check_two_with_three_label_inter
+      false_next: check_adequate_with_inter_label
+    check_lit_no_inter_trial_label:
+      type: condition
+      variable: has_literature
+      operator: eq
+      value: true
+      true_next: check_faers_lit_label_no_inter
+      false_next: partial_label_only_two_sources
+    check_two_with_three_label_inter:
+      type: condition
+      variable: has_literature
+      operator: eq
+      value: true
+      true_next: check_faers_final
+      false_next: check_faers_with_trial_inter_label
+    check_faers_inter_label:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: adequate_four
+      false_next: partial_inter_label_only
+    check_three_no_inter_label:
+      type: condition
+      variable: has_trial_data
+      operator: eq
+      value: true
+      true_next: check_two_no_inter_trial_label
+      false_next: check_lit_no_inter_trial_label
+    check_two_sources_no_label:
+      type: condition
+      variable: has_trial_data
+      operator: eq
+      value: true
+      true_next: partial_trial_at_least
+      false_next: check_faers_literature_no_label
+    partial_faers_at_least:
+      type: return
+      value:
+        gaps: missing label information
+        profile_completeness: partial
+    partial_three_lit_label:
+      type: return
+      value:
+        profile_completeness: partial
+        gaps: missing trial data
+    check_faers_four_no_inter:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: adequate_four
+      false_next: partial_three_no_inter
+    check_adequate_with_inter_label:
+      type: condition
+      variable: has_trial_data
+      operator: eq
+      value: true
+      true_next: adequate_four
+      false_next: check_literature_inter_label
+    partial_label_only_two_sources:
+      type: return
+      value:
+        gaps: missing trial and literature data
+        profile_completeness: partial
+    check_faers_final:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: comprehensive
+      false_next: adequate_four_with_all_but_faers
+    check_four_when_interactions:
+      type: condition
+      variable: has_label
+      operator: eq
+      value: true
+      true_next: check_three_with_interaction_label
+      false_next: check_adequate_four_with_interaction
+    adequate_four:
+      type: return
+      value:
+        profile_completeness: adequate
+        gaps: missing interactions data
+    check_faers_with_trial_inter_label:
+      type: condition
+      variable: has_faers_data
+      operator: eq
+      value: true
+      true_next: adequate_four
+      false_next: partial_three_with_inter_label_trial
+tests:
+- input:
+    has_faers_data: false
+    has_interactions: false
+    has_label: false
+    has_literature: false
+    has_trial_data: false
+  expect:
+    gaps: no comprehensive safety data available
+    profile_completeness: insufficient
+- input:
+    has_faers_data: false
+    has_interactions: false
+    has_label: false
+    has_literature: false
+    has_trial_data: true
+  expect:
+    profile_completeness: partial
+    gaps: missing label information
+- input:
+    has_faers_data: false
+    has_interactions: false
+    has_label: false
+    has_literature: true
+    has_trial_data: false
+  expect:
+    gaps: missing label information
+    profile_completeness: partial
+- input:
+    has_faers_data: false
+    has_interactions: false
+    has_label: true
+    has_literature: false
+    has_trial_data: false
+  expect:
+    gaps: missing trial and literature data
+    profile_completeness: partial
+- input:
+    has_faers_data: false
+    has_interactions: false
+    has_label: true
+    has_literature: false
+    has_trial_data: true
+  expect:
+    profile_completeness: partial
+    gaps: missing interactions data
+- input:
+    has_faers_data: false
+    has_interactions: false
+    has_label: true
+    has_literature: true
+    has_trial_data: false
+  expect:
+    profile_completeness: partial
+    gaps: missing trial data
+- input:
+    has_faers_data: false
+    has_interactions: false
+    has_label: true
+    has_literature: true
+    has_trial_data: true
+  expect:
+    profile_completeness: partial
+    gaps: missing interactions data
+- input:
+    has_faers_data: false
+    has_interactions: true
+    has_label: true
+    has_literature: false
+    has_trial_data: false
+  expect:
+    profile_completeness: partial
+    gaps: missing trial and literature data
+- input:
+    has_faers_data: false
+    has_interactions: true
+    has_label: true
+    has_literature: false
+    has_trial_data: true
+  expect:
+    profile_completeness: partial
+    gaps: missing literature review
+- input:
+    has_faers_data: false
+    has_interactions: true
+    has_label: true
+    has_literature: true
+    has_trial_data: false
+  expect:
+    profile_completeness: adequate
+    gaps: missing interactions data
+- input:
+    has_faers_data: false
+    has_interactions: true
+    has_label: true
+    has_literature: true
+    has_trial_data: true
+  expect:
+    gaps: missing FAERS data
+    profile_completeness: adequate
+- input:
+    has_faers_data: true
+    has_interactions: false
+    has_label: false
+    has_literature: false
+    has_trial_data: false
+  expect:
+    gaps: missing label information
+    profile_completeness: partial
+- input:
+    has_faers_data: true
+    has_interactions: false
+    has_label: true
+    has_literature: false
+    has_trial_data: true
+  expect:
+    profile_completeness: adequate
+    gaps: missing interactions data
+- input:
+    has_faers_data: true
+    has_interactions: false
+    has_label: true
+    has_literature: true
+    has_trial_data: false
+  expect:
+    profile_completeness: adequate
+    gaps: missing interactions data
+- input:
+    has_faers_data: true
+    has_interactions: false
+    has_label: true
+    has_literature: true
+    has_trial_data: true
+  expect:
+    profile_completeness: adequate
+    gaps: missing interactions data
+- input:
+    has_faers_data: true
+    has_interactions: true
+    has_label: true
+    has_literature: false
+    has_trial_data: false
+  expect:
+    profile_completeness: adequate
+    gaps: missing interactions data
+- input:
+    has_faers_data: true
+    has_interactions: true
+    has_label: true
+    has_literature: false
+    has_trial_data: true
+  expect:
+    profile_completeness: adequate
+    gaps: missing interactions data
+- input:
+    has_faers_data: true
+    has_interactions: true
+    has_label: true
+    has_literature: true
+    has_trial_data: true
+  expect:
+    profile_completeness: comprehensive
+    gaps: none
+- input: {}
+  expect:
+    gaps: no comprehensive safety data available
+    profile_completeness: insufficient
+interface:
+  inputs:
+    has_literature:
+      type: boolean
+      required: false
+    has_trial_data:
+      type: boolean
+      required: false
+    has_faers_data:
+      type: boolean
+      required: false
+    has_label:
+      type: boolean
+      required: false
+    has_interactions:
+      type: boolean
+      required: false
+  outputs:
+    profile_completeness:
+      type: string
+      required: false
+    gaps:
+      type: string
+      required: false
+  aliases: {}

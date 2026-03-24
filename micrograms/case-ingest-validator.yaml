@@ -1,0 +1,103 @@
+name: case-ingest-validator
+description: 'PVOS case ingestion: validates case data completeness before ingestion - requires drug, event, and reporter to proceed'
+version: 0.1.0
+interface:
+  inputs:
+    has_drug:
+      type: bool
+      required: false
+    has_event:
+      type: bool
+      required: false
+    has_reporter:
+      type: bool
+      required: false
+  outputs:
+    description:
+      type: string
+    status:
+      type: string
+tree:
+  start: check_drug
+  nodes:
+    check_drug:
+      type: condition
+      variable: has_drug
+      operator: eq
+      value: true
+      true_next: check_event
+      false_next: rejected_no_drug
+    check_event:
+      type: condition
+      variable: has_event
+      operator: eq
+      value: true
+      true_next: check_reporter
+      false_next: incomplete_no_event
+    check_reporter:
+      type: condition
+      variable: has_reporter
+      operator: eq
+      value: true
+      true_next: valid
+      false_next: incomplete_no_reporter
+    valid:
+      type: return
+      value:
+        status: VALID
+        description: Case data complete - drug, event, and reporter all present
+    incomplete_no_event:
+      type: return
+      value:
+        status: INCOMPLETE
+        description: Missing adverse event - cannot ingest without event data
+    incomplete_no_reporter:
+      type: return
+      value:
+        status: INCOMPLETE
+        description: Missing reporter information - cannot ingest without reporter data
+    rejected_no_drug:
+      type: return
+      value:
+        status: REJECTED
+        description: Missing drug information - case rejected without suspect drug
+tests:
+- input:
+    has_drug: true
+    has_event: true
+    has_reporter: true
+  expect:
+    status: VALID
+    description: Case data complete - drug, event, and reporter all present
+- input:
+    has_drug: true
+    has_event: true
+    has_reporter: false
+  expect:
+    status: INCOMPLETE
+    description: Missing reporter information - cannot ingest without reporter data
+- input:
+    has_drug: true
+    has_event: false
+    has_reporter: true
+  expect:
+    status: INCOMPLETE
+    description: Missing adverse event - cannot ingest without event data
+- input:
+    has_drug: false
+    has_event: true
+    has_reporter: true
+  expect:
+    status: REJECTED
+    description: Missing drug information - case rejected without suspect drug
+- input:
+    has_drug: false
+    has_event: false
+    has_reporter: false
+  expect:
+    status: REJECTED
+    description: Missing drug information - case rejected without suspect drug
+- input: {}
+  expect:
+    description: Missing drug information - case rejected without suspect drug
+    status: REJECTED

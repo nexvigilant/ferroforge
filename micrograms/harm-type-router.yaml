@@ -1,0 +1,188 @@
+name: harm-type-router
+description: 'Route ToV harm types A-H to response protocols based on NexVigilant 8-type harm taxonomy'
+version: 0.1.0
+interface:
+  inputs:
+    harm_type:
+      type: string
+      required: false
+  outputs:
+    escalate:
+      type: bool
+    protocol:
+      type: string
+    severity:
+      type: string
+    sla_hours:
+      type: int
+tree:
+  start: check_type_a
+  nodes:
+    check_type_a:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: A
+      true_next: fatal_protocol
+      false_next: check_type_b
+    check_type_b:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: B
+      true_next: life_threatening_protocol
+      false_next: check_type_c
+    check_type_c:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: C
+      true_next: hospitalization_protocol
+      false_next: check_type_d
+    check_type_d:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: D
+      true_next: disability_protocol
+      false_next: check_type_e
+    check_type_e:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: E
+      true_next: congenital_protocol
+      false_next: check_type_f
+    check_type_f:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: F
+      true_next: medically_important_protocol
+      false_next: check_type_g
+    check_type_g:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: G
+      true_next: non_serious_protocol
+      false_next: other_protocol
+    fatal_protocol:
+      type: return
+      value:
+        protocol: EXPEDITED_7DAY
+        severity: FATAL
+        sla_hours: 24
+        escalate: true
+    life_threatening_protocol:
+      type: return
+      value:
+        protocol: EXPEDITED_7DAY
+        severity: LIFE_THREATENING
+        sla_hours: 24
+        escalate: true
+    hospitalization_protocol:
+      type: return
+      value:
+        protocol: EXPEDITED_15DAY
+        severity: SERIOUS
+        sla_hours: 72
+        escalate: true
+    disability_protocol:
+      type: return
+      value:
+        protocol: EXPEDITED_15DAY
+        severity: SERIOUS
+        sla_hours: 72
+        escalate: true
+    congenital_protocol:
+      type: return
+      value:
+        protocol: EXPEDITED_15DAY
+        severity: SERIOUS
+        sla_hours: 72
+        escalate: true
+    medically_important_protocol:
+      type: return
+      value:
+        protocol: EXPEDITED_15DAY
+        severity: SIGNIFICANT
+        sla_hours: 120
+        escalate: true
+    non_serious_protocol:
+      type: return
+      value:
+        protocol: PERIODIC_PSUR
+        severity: NON_SERIOUS
+        sla_hours: 720
+        escalate: false
+    other_protocol:
+      type: return
+      value:
+        protocol: PERIODIC_PSUR
+        severity: OTHER
+        sla_hours: 720
+        escalate: false
+tests:
+- input:
+    harm_type: A
+  expect:
+    protocol: EXPEDITED_7DAY
+    severity: FATAL
+    sla_hours: 24
+    escalate: true
+- input:
+    harm_type: B
+  expect:
+    protocol: EXPEDITED_7DAY
+    severity: LIFE_THREATENING
+    sla_hours: 24
+    escalate: true
+- input:
+    harm_type: C
+  expect:
+    protocol: EXPEDITED_15DAY
+    severity: SERIOUS
+    sla_hours: 72
+    escalate: true
+- input:
+    harm_type: D
+  expect:
+    protocol: EXPEDITED_15DAY
+    severity: SERIOUS
+    sla_hours: 72
+    escalate: true
+- input:
+    harm_type: E
+  expect:
+    protocol: EXPEDITED_15DAY
+    severity: SERIOUS
+    sla_hours: 72
+    escalate: true
+- input:
+    harm_type: F
+  expect:
+    protocol: EXPEDITED_15DAY
+    severity: SIGNIFICANT
+    sla_hours: 120
+    escalate: true
+- input:
+    harm_type: G
+  expect:
+    protocol: PERIODIC_PSUR
+    severity: NON_SERIOUS
+    sla_hours: 720
+    escalate: false
+- input:
+    harm_type: H
+  expect:
+    protocol: PERIODIC_PSUR
+    severity: OTHER
+    sla_hours: 720
+    escalate: false
+- input: {}
+  expect:
+    escalate: false
+    protocol: PERIODIC_PSUR
+    severity: OTHER
+    sla_hours: 720

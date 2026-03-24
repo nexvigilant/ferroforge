@@ -1,0 +1,145 @@
+name: multi-signal-storm-gate
+description: 'Acute multi-signal storm detector: classifies serotonin syndrome, neuroleptic malignant syndrome, and malignant hyperthermia'
+version: 0.1.0
+interface:
+  inputs:
+    reaction_pt:
+      type: string
+      required: true
+      description: MedDRA preferred term for the acute syndrome
+    temperature_celsius:
+      type: float
+      required: false
+    muscle_rigidity:
+      type: bool
+      required: false
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    syndrome:
+      type: string
+    soc:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_nms
+  nodes:
+    check_nms:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: NEUROLEPTIC MALIGNANT
+      true_next: critical_nms
+      false_next: check_serotonin
+    check_serotonin:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: SEROTONIN SYNDROME
+      true_next: critical_ss
+      false_next: check_malignant_hyper
+    check_malignant_hyper:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: MALIGNANT HYPERTHERMIA
+      true_next: critical_mh
+      false_next: check_high_temp
+    check_high_temp:
+      type: condition
+      variable: temperature_celsius
+      operator: gte
+      value: 41
+      true_next: serious_hyperthermia
+      false_next: check_rigidity
+    check_rigidity:
+      type: condition
+      variable: muscle_rigidity
+      operator: eq
+      value: true
+      true_next: serious_rigidity
+      false_next: mild
+    critical_nms:
+      type: return
+      value:
+        severity: critical
+        syndrome: neuroleptic_malignant_syndrome
+        soc: Nervous system disorders
+        action: immediate_expedited_report
+    critical_ss:
+      type: return
+      value:
+        severity: critical
+        syndrome: serotonin_syndrome
+        soc: Nervous system disorders
+        action: immediate_expedited_report
+    critical_mh:
+      type: return
+      value:
+        severity: critical
+        syndrome: malignant_hyperthermia
+        soc: Musculoskeletal and connective tissue disorders
+        action: immediate_expedited_report
+    serious_hyperthermia:
+      type: return
+      value:
+        severity: serious
+        syndrome: unspecified_hyperthermia
+        soc: General disorders
+        action: expedited_report
+    serious_rigidity:
+      type: return
+      value:
+        severity: serious
+        syndrome: unspecified_rigidity
+        soc: Musculoskeletal and connective tissue disorders
+        action: expedited_report
+    mild:
+      type: return
+      value:
+        severity: mild
+        syndrome: none
+        soc: General disorders
+        action: routine_surveillance
+tests:
+  - name: nms
+    input:
+      reaction_pt: NEUROLEPTIC MALIGNANT SYNDROME
+    expect:
+      severity: critical
+      syndrome: neuroleptic_malignant_syndrome
+  - name: serotonin_syndrome
+    input:
+      reaction_pt: SEROTONIN SYNDROME
+    expect:
+      severity: critical
+      syndrome: serotonin_syndrome
+  - name: malignant_hyperthermia
+    input:
+      reaction_pt: MALIGNANT HYPERTHERMIA
+    expect:
+      severity: critical
+      syndrome: malignant_hyperthermia
+  - name: high_fever
+    input:
+      reaction_pt: PYREXIA
+      temperature_celsius: 42
+    expect:
+      severity: serious
+  - name: muscle_rigidity
+    input:
+      reaction_pt: MUSCLE RIGIDITY
+      muscle_rigidity: true
+    expect:
+      severity: serious
+  - name: mild_symptoms
+    input:
+      reaction_pt: TREMOR
+    expect:
+      severity: mild
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild

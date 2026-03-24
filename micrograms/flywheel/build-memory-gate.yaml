@@ -1,0 +1,151 @@
+name: build-memory-gate
+description: 'Pre-build memory gate: checks available RAM + free swap against crate build requirements. PASS (>= threshold), WARN (50-99% of threshold), BLOCK (< 50%). Thresholds: nexcore-mcp needs 4GB, nexcore-vigilance needs 3GB, default 1GB.'
+version: 0.1.0
+interface:
+  inputs:
+    available_mb:
+      type: int
+      required: true
+    free_swap_mb:
+      type: int
+      required: true
+    crate_tier:
+      type: string
+      required: false
+  outputs:
+    decision:
+      type: string
+    total_available_mb:
+      type: int
+    threshold_mb:
+      type: int
+    headroom_pct:
+      type: int
+tree:
+  start: compute_total
+  nodes:
+    compute_total:
+      type: condition
+      variable: crate_tier
+      operator: eq
+      value: heavy
+      true_next: check_heavy_pass
+      false_next: check_normal_pass
+    check_heavy_pass:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 4000
+      true_next: pass_heavy
+      false_next: check_heavy_warn
+    check_heavy_warn:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 2000
+      true_next: warn_heavy
+      false_next: block_heavy
+    check_normal_pass:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 1000
+      true_next: pass_normal
+      false_next: check_normal_warn
+    check_normal_warn:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 500
+      true_next: warn_normal
+      false_next: block_normal
+    pass_heavy:
+      type: return
+      value:
+        decision: PASS
+        threshold_mb: 4000
+        headroom_pct: 100
+    warn_heavy:
+      type: return
+      value:
+        decision: WARN
+        threshold_mb: 4000
+        headroom_pct: 50
+    block_heavy:
+      type: return
+      value:
+        decision: BLOCK
+        threshold_mb: 4000
+        headroom_pct: 0
+    pass_normal:
+      type: return
+      value:
+        decision: PASS
+        threshold_mb: 1000
+        headroom_pct: 100
+    warn_normal:
+      type: return
+      value:
+        decision: WARN
+        threshold_mb: 1000
+        headroom_pct: 50
+    block_normal:
+      type: return
+      value:
+        decision: BLOCK
+        threshold_mb: 1000
+        headroom_pct: 0
+tests:
+- input:
+    available_mb: 8000
+    free_swap_mb: 16000
+    crate_tier: heavy
+  expect:
+    decision: PASS
+    threshold_mb: 4000
+- input:
+    available_mb: 3000
+    free_swap_mb: 500
+    crate_tier: heavy
+  expect:
+    decision: WARN
+    threshold_mb: 4000
+- input:
+    available_mb: 1500
+    free_swap_mb: 0
+    crate_tier: heavy
+  expect:
+    decision: BLOCK
+    threshold_mb: 4000
+- input:
+    available_mb: 2000
+    free_swap_mb: 1000
+    crate_tier: normal
+  expect:
+    decision: PASS
+    threshold_mb: 1000
+- input:
+    available_mb: 700
+    free_swap_mb: 200
+    crate_tier: normal
+  expect:
+    decision: WARN
+    threshold_mb: 1000
+- input:
+    available_mb: 400
+    free_swap_mb: 0
+    crate_tier: normal
+  expect:
+    decision: BLOCK
+    threshold_mb: 1000
+- input:
+    available_mb: 5000
+    free_swap_mb: 10000
+  expect:
+    decision: PASS
+    threshold_mb: 1000
+- input: {}
+  expect:
+    decision: BLOCK
+    headroom_pct: 0
+    threshold_mb: 1000

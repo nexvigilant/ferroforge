@@ -1,0 +1,54 @@
+name: refinery-mass-balance
+description: "Verify mass balance law: crude_in == products + recycled + loss. Nonzero imbalance means signals are leaking or appearing from nowhere."
+version: 0.1.0
+tree:
+  start: check_balance
+  nodes:
+    check_balance:
+      type: condition
+      variable: imbalance
+      operator: eq
+      value: 0
+      true_next: return_balanced
+      false_next: check_positive
+    check_positive:
+      type: condition
+      variable: imbalance
+      operator: gt
+      value: 0
+      true_next: return_leak
+      false_next: return_phantom
+    return_balanced:
+      type: return
+      value:
+        balance_class: BALANCED
+        balance_valid: true
+        action: "Mass balance holds; no signal leaks"
+        refinery_analog: "Conservation of mass verified; all species accounted"
+    return_leak:
+      type: return
+      value:
+        balance_class: LEAK
+        balance_valid: false
+        action: "Signals entering but not exiting; check processing pipeline for silent drops"
+        refinery_analog: "Material loss in process; check for leaks, venting, or unmetered waste streams"
+    return_phantom:
+      type: return
+      value:
+        balance_class: PHANTOM
+        balance_valid: false
+        action: "More output than input; phantom signals appearing mid-pipeline"
+        refinery_analog: "Mass appearing from nowhere; metering error or contaminated feedstock"
+tests:
+  - input: { imbalance: 0 }
+    expect: { balance_class: BALANCED, balance_valid: true }
+  - input: { imbalance: 15 }
+    expect: { balance_class: LEAK, balance_valid: false }
+  - input: { imbalance: -5 }
+    expect: { balance_class: PHANTOM, balance_valid: false }
+  - input: {}
+    expect:
+      action: More output than input; phantom signals appearing mid-pipeline
+      balance_class: PHANTOM
+      balance_valid: false
+      refinery_analog: Mass appearing from nowhere; metering error or contaminated feedstock

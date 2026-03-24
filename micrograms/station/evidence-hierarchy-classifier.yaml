@@ -1,0 +1,226 @@
+name: evidence-hierarchy-classifier
+description: Classifies evidence level based on study type and design characteristics
+version: 0.1.0
+tree:
+  start: classify_by_source
+  nodes:
+    check_rct_size:
+      type: condition
+      variable: sample_size
+      operator: gte
+      value: 100
+      true_next: level_i_high
+      false_next: level_ii_high
+    level_ii_high:
+      type: return
+      value:
+        evidence_level: II
+        weight: high
+    level_iv_low:
+      type: return
+      value:
+        evidence_level: IV
+        weight: low
+    level_v_low:
+      type: return
+      value:
+        evidence_level: V
+        weight: low
+    check_spontaneous_controlled:
+      type: condition
+      variable: is_controlled
+      operator: eq
+      value: true
+      true_next: level_iii_medium
+      false_next: level_iv_low
+    classify_by_source:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: rct
+      true_next: check_rct_size
+      false_next: check_cohort
+    level_ii_medium:
+      type: return
+      value:
+        evidence_level: II
+        weight: medium
+    check_cohort_size:
+      type: condition
+      variable: sample_size
+      operator: gte
+      value: 50
+      true_next: level_ii_medium
+      false_next: level_iii_medium
+    check_cohort:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: cohort
+      true_next: check_cohort_size
+      false_next: check_case_report
+    check_label:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: label
+      true_next: level_v_medium
+      false_next: level_v_low
+    level_iii_medium:
+      type: return
+      value:
+        evidence_level: III
+        weight: medium
+    check_spontaneous:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: spontaneous
+      true_next: check_spontaneous_controlled
+      false_next: check_label
+    level_i_high:
+      type: return
+      value:
+        evidence_level: I
+        weight: high
+    check_case_report:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: case_report
+      true_next: level_iv_low
+      false_next: check_spontaneous
+    level_v_medium:
+      type: return
+      value:
+        evidence_level: V
+        weight: medium
+tests:
+- input:
+    sample_size: 500
+    source_type: rct
+    is_controlled: true
+  expect:
+    evidence_level: I
+    weight: high
+- input:
+    source_type: rct
+    sample_size: 50
+    is_controlled: true
+  expect:
+    evidence_level: II
+    weight: high
+- input:
+    sample_size: 200
+    is_controlled: false
+    source_type: cohort
+  expect:
+    evidence_level: II
+    weight: medium
+- input:
+    is_controlled: false
+    source_type: case_report
+    sample_size: 1
+  expect:
+    evidence_level: IV
+    weight: low
+- input:
+    source_type: spontaneous
+    sample_size: 1000
+    is_controlled: true
+  expect:
+    weight: medium
+    evidence_level: III
+- input:
+    source_type: label
+    is_controlled: false
+    sample_size: 0
+  expect:
+    evidence_level: V
+    weight: medium
+- input:
+    sample_size: -1
+  expect:
+    evidence_level: V
+    weight: low
+- input:
+    sample_size: 99
+  expect:
+    evidence_level: V
+    weight: low
+- input:
+    sample_size: 101
+  expect:
+    weight: low
+    evidence_level: V
+- input:
+    sample_size: 10000
+  expect:
+    weight: low
+    evidence_level: V
+- input: {}
+  expect:
+    evidence_level: V
+    weight: low
+- input: {}
+  expect:
+    weight: low
+    evidence_level: V
+- input: {}
+  expect:
+    weight: low
+    evidence_level: V
+- input:
+    sample_size: -1
+  expect:
+    evidence_level: V
+    weight: low
+- input:
+    sample_size: 49
+  expect:
+    evidence_level: V
+    weight: low
+- input:
+    sample_size: 51
+  expect:
+    evidence_level: V
+    weight: low
+- input: {}
+  expect:
+    evidence_level: V
+    weight: low
+- input: {}
+  expect:
+    weight: low
+    evidence_level: V
+- input: {}
+  expect:
+    weight: low
+    evidence_level: V
+- input: {}
+  expect:
+    weight: low
+    evidence_level: V
+- input: {}
+  expect:
+    weight: low
+    evidence_level: V
+interface:
+  inputs:
+    is_controlled:
+      type: boolean
+      required: false
+    sample_size:
+      type: integer
+      required: false
+    source_type:
+      type: string
+      required: false
+  outputs:
+    weight:
+      type: string
+      required: false
+    evidence_level:
+      type: string
+      required: false
+  aliases: {}

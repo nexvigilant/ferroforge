@@ -1,0 +1,153 @@
+name: response-freshness-gate
+description: Validates API response data freshness. Determines if data is recent enough for the intended use case.
+version: 0.1.0
+tree:
+  start: check_is_current
+  nodes:
+    check_within_5:
+      type: condition
+      variable: data_year
+      operator: gte
+      value: 2021
+      true_next: return_acceptable
+      false_next: return_stale
+    return_stale:
+      type: return
+      value:
+        usable: false
+        freshness: stale
+    return_ancient:
+      type: return
+      value:
+        usable: false
+        freshness: ancient
+    return_current:
+      type: return
+      value:
+        usable: true
+        freshness: current
+    check_year:
+      type: condition
+      variable: data_year
+      operator: is_null
+      value: null
+      true_next: return_ancient
+      false_next: check_recent
+    check_recent:
+      type: condition
+      variable: data_year
+      operator: gte
+      value: 2020
+      true_next: check_within_5
+      false_next: return_ancient
+    return_acceptable:
+      type: return
+      value:
+        usable: true
+        freshness: acceptable
+    check_is_current:
+      type: condition
+      variable: is_current
+      operator: eq
+      value: true
+      true_next: return_current
+      false_next: check_year
+tests:
+- input:
+    data_year: 2026
+    is_current: true
+    current_year: 2026
+  expect:
+    freshness: current
+    usable: true
+- input:
+    data_year: 2024
+    current_year: 2026
+    is_current: false
+  expect:
+    freshness: acceptable
+    usable: true
+- input:
+    current_year: 2026
+    is_current: false
+    data_year: 2019
+  expect:
+    usable: false
+    freshness: ancient
+- input:
+    data_year: 2010
+    current_year: 2026
+    is_current: false
+  expect:
+    usable: false
+    freshness: ancient
+- input:
+    is_current: false
+    data_year: 2021
+    current_year: 2026
+  expect:
+    freshness: acceptable
+    usable: true
+- input: {}
+  expect:
+    freshness: ancient
+    usable: false
+- input:
+    data_year: 0
+  expect:
+    usable: false
+    freshness: ancient
+- input:
+    data_year: -1
+  expect:
+    usable: false
+    freshness: ancient
+- input:
+    data_year: 2020
+  expect:
+    usable: false
+    freshness: stale
+- input:
+    data_year: 2022
+  expect:
+    freshness: acceptable
+    usable: true
+- input:
+    data_year: 202100
+  expect:
+    freshness: acceptable
+    usable: true
+- input:
+    data_year: 0
+  expect:
+    freshness: ancient
+    usable: false
+- input:
+    data_year: -1
+  expect:
+    usable: false
+    freshness: ancient
+- input:
+    data_year: 202000
+  expect:
+    usable: true
+    freshness: acceptable
+interface:
+  inputs:
+    data_year:
+      type: int
+      required: false
+    current_year:
+      type: int
+      required: false
+    is_current:
+      type: bool
+      required: false
+  outputs:
+    usable:
+      type: bool
+      required: false
+    freshness:
+      type: string
+      required: false
+  aliases: {}

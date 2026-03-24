@@ -1,0 +1,111 @@
+name: signal-action
+description: 'Bridge: PRR signal + Naranjo causality → action urgency. Chains from prr-signal and naranjo-quick.'
+version: 0.1.0
+interface:
+  inputs:
+    causality:
+      type: string
+      required: false
+    signal_detected:
+      type: bool
+      required: false
+  outputs:
+    action_required:
+      type: bool
+    rationale:
+      type: string
+    urgency:
+      type: string
+tree:
+  start: check_signal
+  nodes:
+    check_signal:
+      type: condition
+      variable: signal_detected
+      operator: eq
+      value: true
+      true_next: check_causality
+      false_next: monitor
+    monitor:
+      type: return
+      value:
+        rationale: No signal or low causality
+        action_required: false
+        urgency: MONITOR
+    urgent:
+      type: return
+      value:
+        action_required: true
+        urgency: URGENT
+        rationale: Signal detected with definite causality
+    check_probable:
+      type: condition
+      variable: causality
+      operator: eq
+      value: probable
+      true_next: investigate
+      false_next: monitor
+    investigate:
+      type: return
+      value:
+        urgency: INVESTIGATE
+        rationale: Signal detected with probable causality
+        action_required: true
+    check_causality:
+      type: condition
+      variable: causality
+      operator: eq
+      value: definite
+      true_next: urgent
+      false_next: check_probable
+tests:
+- input:
+    causality: definite
+    signal_detected: true
+  expect:
+    rationale: Signal detected with definite causality
+    action_required: true
+    urgency: URGENT
+- input:
+    causality: probable
+    signal_detected: true
+  expect:
+    rationale: Signal detected with probable causality
+    action_required: true
+    urgency: INVESTIGATE
+- input:
+    signal_detected: true
+    causality: possible
+  expect:
+    rationale: No signal or low causality
+    urgency: MONITOR
+    action_required: false
+- input:
+    causality: definite
+    signal_detected: false
+  expect:
+    rationale: No signal or low causality
+    action_required: false
+    urgency: MONITOR
+- input:
+    signal_detected: false
+    causality: possible
+  expect:
+    action_required: false
+    urgency: MONITOR
+    rationale: No signal or low causality
+- input: {}
+  expect:
+    urgency: MONITOR
+    rationale: No signal or low causality
+    action_required: false
+- input: {}
+  expect:
+    rationale: No signal or low causality
+    urgency: MONITOR
+    action_required: false
+- input: {}
+  expect:
+    rationale: No signal or low causality
+    urgency: MONITOR
+    action_required: false

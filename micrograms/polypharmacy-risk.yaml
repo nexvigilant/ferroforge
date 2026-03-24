@@ -1,0 +1,137 @@
+name: polypharmacy-risk
+description: 'Polypharmacy risk assessment: HIGH_RISK if >5 drugs + interaction + elderly, MODERATE_RISK for intermediate combinations, LOW_RISK otherwise'
+version: 0.1.0
+interface:
+  inputs:
+    drug_count:
+      type: int
+      required: false
+    has_known_interaction:
+      type: bool
+      required: false
+    patient_age_over_65:
+      type: bool
+      required: false
+  outputs:
+    monitoring_frequency:
+      type: string
+    recommendation:
+      type: string
+    risk_level:
+      type: string
+tree:
+  start: check_high_drug_count
+  nodes:
+    check_high_drug_count:
+      type: condition
+      variable: drug_count
+      operator: gt
+      value: 5
+      true_next: check_interaction_high
+      false_next: check_moderate_drug_count
+    check_interaction_high:
+      type: condition
+      variable: has_known_interaction
+      operator: eq
+      value: true
+      true_next: check_elderly_high
+      false_next: check_moderate_drug_count
+    check_elderly_high:
+      type: condition
+      variable: patient_age_over_65
+      operator: eq
+      value: true
+      true_next: high_risk
+      false_next: moderate_risk_interaction
+    check_moderate_drug_count:
+      type: condition
+      variable: drug_count
+      operator: gt
+      value: 3
+      true_next: check_elderly_moderate
+      false_next: low_risk
+    check_elderly_moderate:
+      type: condition
+      variable: patient_age_over_65
+      operator: eq
+      value: true
+      true_next: moderate_risk_elderly
+      false_next: low_risk
+    high_risk:
+      type: return
+      value:
+        risk_level: HIGH_RISK
+        recommendation: Immediate medication review by clinical pharmacist and prescriber
+        monitoring_frequency: Daily clinical monitoring required
+    moderate_risk_interaction:
+      type: return
+      value:
+        risk_level: MODERATE_RISK
+        recommendation: Pharmacist review of drug interactions within 48 hours
+        monitoring_frequency: Weekly monitoring for adverse drug reactions
+    moderate_risk_elderly:
+      type: return
+      value:
+        risk_level: MODERATE_RISK
+        recommendation: Geriatric medication review using Beers Criteria within 72 hours
+        monitoring_frequency: Weekly monitoring for adverse drug reactions
+    low_risk:
+      type: return
+      value:
+        risk_level: LOW_RISK
+        recommendation: Routine medication reconciliation at next scheduled visit
+        monitoring_frequency: Standard monitoring per disease management protocol
+tests:
+- input:
+    drug_count: 6
+    has_known_interaction: true
+    patient_age_over_65: true
+  expect:
+    risk_level: HIGH_RISK
+    recommendation: Immediate medication review by clinical pharmacist and prescriber
+    monitoring_frequency: Daily clinical monitoring required
+- input:
+    drug_count: 8
+    has_known_interaction: true
+    patient_age_over_65: true
+  expect:
+    risk_level: HIGH_RISK
+    recommendation: Immediate medication review by clinical pharmacist and prescriber
+    monitoring_frequency: Daily clinical monitoring required
+- input:
+    drug_count: 6
+    has_known_interaction: true
+    patient_age_over_65: false
+  expect:
+    risk_level: MODERATE_RISK
+    recommendation: Pharmacist review of drug interactions within 48 hours
+    monitoring_frequency: Weekly monitoring for adverse drug reactions
+- input:
+    drug_count: 4
+    has_known_interaction: false
+    patient_age_over_65: true
+  expect:
+    risk_level: MODERATE_RISK
+    recommendation: Geriatric medication review using Beers Criteria within 72 hours
+    monitoring_frequency: Weekly monitoring for adverse drug reactions
+- input:
+    drug_count: 3
+    has_known_interaction: true
+    patient_age_over_65: true
+  expect:
+    risk_level: LOW_RISK
+    recommendation: Routine medication reconciliation at next scheduled visit
+    monitoring_frequency: Standard monitoring per disease management protocol
+- input:
+    drug_count: 2
+    has_known_interaction: false
+    patient_age_over_65: false
+  expect:
+    risk_level: LOW_RISK
+    recommendation: Routine medication reconciliation at next scheduled visit
+    monitoring_frequency: Standard monitoring per disease management protocol
+- input: {}
+  expect:
+    monitoring_frequency: Standard monitoring per disease management protocol
+    recommendation: Routine medication reconciliation at next scheduled visit
+    risk_level: LOW_RISK

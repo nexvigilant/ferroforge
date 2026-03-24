@@ -1,0 +1,199 @@
+name: appe-adr-practice
+description: "APPE Ch7.2 Domain 2: ADR classification practice — maps reaction characteristics to DoTS/WHO type (A/B/C) with confidence and teaching points."
+version: 0.1.0
+interface:
+  inputs:
+    dose_dependent:
+      type: bool
+      required: false
+    immunological:
+      type: bool
+      required: false
+    mechanism_known:
+      type: bool
+      required: false
+    onset_days:
+      type: int
+      required: false
+    reaction_predictable:
+      type: bool
+      required: false
+  outputs:
+    adr_type:
+      type: string
+    classification:
+      type: string
+    confidence:
+      type: string
+    explanation:
+      type: string
+    needs_review:
+      type: bool
+    teaching_point:
+      type: string
+tree:
+  start: check_type_a
+  nodes:
+    # Type A: Predictable + dose-dependent + mechanism known
+    check_type_a:
+      type: condition
+      variable: reaction_predictable
+      operator: eq
+      value: true
+      true_next: check_type_a_dose
+      false_next: check_type_b
+
+    check_type_a_dose:
+      type: condition
+      variable: dose_dependent
+      operator: eq
+      value: true
+      true_next: check_type_a_mechanism
+      false_next: check_type_b
+
+    check_type_a_mechanism:
+      type: condition
+      variable: mechanism_known
+      operator: eq
+      value: true
+      true_next: type_a_high
+      false_next: check_type_b
+
+    # Type B: Immunological + NOT dose-dependent
+    check_type_b:
+      type: condition
+      variable: immunological
+      operator: eq
+      value: true
+      true_next: check_type_b_not_dose
+      false_next: check_type_c
+
+    check_type_b_not_dose:
+      type: condition
+      variable: dose_dependent
+      operator: eq
+      value: false
+      true_next: type_b_high
+      false_next: check_type_c
+
+    # Type C: Chronic/delayed (onset > 365 days)
+    check_type_c:
+      type: condition
+      variable: onset_days
+      operator: gt
+      value: 365
+      true_next: type_c_moderate
+      false_next: check_type_a_delayed
+
+    # Type A delayed: onset 30-365 days, not immunological
+    check_type_a_delayed:
+      type: condition
+      variable: onset_days
+      operator: gt
+      value: 30
+      true_next: check_delayed_not_immune
+      false_next: ambiguous
+
+    check_delayed_not_immune:
+      type: condition
+      variable: immunological
+      operator: eq
+      value: false
+      true_next: type_a_delayed_moderate
+      false_next: ambiguous
+
+    # Return nodes
+    type_a_high:
+      type: return
+      value:
+        adr_type: "A"
+        classification: "Augmented"
+        confidence: "HIGH"
+        explanation: "Predictable, dose-dependent, mechanism-known reaction. Occurs due to exaggerated but normal pharmacological effect."
+        teaching_point: "Type A ADRs are most common (>80% of all ADRs). They are dose-dependent and predictable from the drug's pharmacology. Management: dose reduction or discontinuation."
+
+    type_b_high:
+      type: return
+      value:
+        adr_type: "B"
+        classification: "Bizarre"
+        confidence: "HIGH"
+        explanation: "Immunological reaction, not dose-dependent. Unrelated to the drug's primary pharmacological action."
+        teaching_point: "Type B ADRs are idiosyncratic and unpredictable. Immune-mediated reactions (e.g., anaphylaxis, SJS) often require immediate discontinuation with no rechallenge."
+
+    type_c_moderate:
+      type: return
+      value:
+        adr_type: "C"
+        classification: "Chronic/Delayed"
+        confidence: "MODERATE"
+        explanation: "Long latency (>365 days) suggests cumulative or adaptive change rather than acute pharmacological effect."
+        teaching_point: "Type C ADRs result from prolonged drug exposure (e.g., analgesic nephropathy, tardive dyskinesia). Often dose-cumulative rather than dose-rate dependent."
+
+    type_a_delayed_moderate:
+      type: return
+      value:
+        adr_type: "A"
+        classification: "Augmented (Delayed)"
+        confidence: "MODERATE"
+        explanation: "Onset 30-365 days, non-immunological. Consistent with delayed manifestation of pharmacological mechanism."
+        teaching_point: "Some Type A ADRs have delayed onset due to cumulative tissue effects or slow pharmacokinetic accumulation. Re-evaluate dose and duration of treatment."
+
+    ambiguous:
+      type: return
+      value:
+        adr_type: "UNKNOWN"
+        classification: "Ambiguous"
+        confidence: "LOW"
+        needs_review: true
+        explanation: "Reaction characteristics do not clearly map to Type A, B, or C. Further clinical and mechanistic data needed."
+        teaching_point: "When classification is unclear, document all features (onset, dose relationship, immunological markers, rechallenge) and seek expert causality assessment. Consider Naranjo or WHO-UMC scoring."
+
+tests:
+# Type A — classic: predictable, dose-dependent, mechanism known
+- input: { reaction_predictable: true, dose_dependent: true, mechanism_known: true, immunological: false, onset_days: 2 }
+  expect: { adr_type: "A", classification: "Augmented", confidence: "HIGH" }
+
+# Type B — immunological, not dose-dependent
+- input: { reaction_predictable: false, dose_dependent: false, mechanism_known: false, immunological: true, onset_days: 5 }
+  expect: { adr_type: "B", classification: "Bizarre", confidence: "HIGH" }
+
+# Type C — onset > 365 days
+- input: { reaction_predictable: false, dose_dependent: false, mechanism_known: false, immunological: false, onset_days: 400 }
+  expect: { adr_type: "C", classification: "Chronic/Delayed", confidence: "MODERATE" }
+
+# Type A delayed — onset 31-365 days, not immunological
+- input: { reaction_predictable: false, dose_dependent: false, mechanism_known: false, immunological: false, onset_days: 60 }
+  expect: { adr_type: "A", classification: "Augmented (Delayed)", confidence: "MODERATE" }
+
+# Ambiguous — immunological AND dose-dependent (mixed signals)
+- input: { reaction_predictable: false, dose_dependent: true, mechanism_known: false, immunological: true, onset_days: 10 }
+  expect: { adr_type: "UNKNOWN", needs_review: true, confidence: "LOW" }
+
+# Ambiguous — none of the criteria met
+- input: { reaction_predictable: false, dose_dependent: false, mechanism_known: false, immunological: false, onset_days: 10 }
+  expect: { adr_type: "UNKNOWN", needs_review: true }
+
+# Type A — predictable+dose_dependent but mechanism not known → falls through to Type B check → not immunological → Type C check → not > 365 → check delayed → onset 10 → ambiguous
+- input: { reaction_predictable: true, dose_dependent: true, mechanism_known: false, immunological: false, onset_days: 10 }
+  expect: { adr_type: "UNKNOWN", confidence: "LOW" }
+
+# Type B — immunological with some dose-dependence → still checks dose_dependent == false → fails → falls to Type C path
+- input: { reaction_predictable: false, dose_dependent: true, mechanism_known: false, immunological: true, onset_days: 5 }
+  expect: { adr_type: "UNKNOWN", confidence: "LOW" }
+
+# Edge: onset exactly 365 — not > 365 so not Type C; not > 30 delayed path leads to delayed check
+- input: { reaction_predictable: false, dose_dependent: false, mechanism_known: false, immunological: false, onset_days: 365 }
+  expect: { adr_type: "A", classification: "Augmented (Delayed)", confidence: "MODERATE" }
+
+# Edge: onset exactly 30 — not > 30 so goes to ambiguous
+- input: { reaction_predictable: false, dose_dependent: false, mechanism_known: false, immunological: false, onset_days: 30 }
+  expect: { adr_type: "UNKNOWN", confidence: "LOW" }
+- input: {}
+  expect:
+    adr_type: UNKNOWN
+    classification: Ambiguous
+    confidence: LOW
+    explanation: "Reaction characteristics do not clearly map to Type A, B, or C. Further clinical and mechanistic data needed."
+    needs_review: true
+    teaching_point: "When classification is unclear, document all features (onset, dose relationship, immunological markers, rechallenge) and seek expert causality assessment. Consider Naranjo or WHO-UMC scoring."

@@ -1,0 +1,221 @@
+name: algo-signal-to-action
+description: 'Algovigilance: route a classified algo signal to the correct response action based on signal type and severity'
+version: 0.1.0
+interface:
+  inputs:
+    signal_type:
+      type: string
+      required: false
+    severity:
+      type: string
+      required: false
+  outputs:
+    action:
+      type: string
+    notify:
+      type: string
+    observer_visible:
+      type: bool
+    operator_action_required:
+      type: bool
+tree:
+  start: check_signal_type
+  nodes:
+    check_signal_type:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: drift
+      true_next: drift_severity
+      false_next: check_bias
+    check_bias:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: bias
+      true_next: bias_severity
+      false_next: check_hallucination
+    check_hallucination:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: hallucination
+      true_next: hallucination_severity
+      false_next: check_alignment
+    check_alignment:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: alignment
+      true_next: alignment_severity
+      false_next: unknown_signal
+    drift_severity:
+      type: condition
+      variable: severity
+      operator: eq
+      value: P1
+      true_next: drift_critical
+      false_next: drift_routine
+    bias_severity:
+      type: condition
+      variable: severity
+      operator: eq
+      value: P1
+      true_next: bias_critical
+      false_next: bias_routine
+    hallucination_severity:
+      type: condition
+      variable: severity
+      operator: eq
+      value: P1
+      true_next: hallucination_critical
+      false_next: hallucination_routine
+    alignment_severity:
+      type: condition
+      variable: severity
+      operator: eq
+      value: P1
+      true_next: alignment_critical
+      false_next: alignment_routine
+    drift_critical:
+      type: return
+      value:
+        action: halt_pipeline_and_revert
+        notify: operator_pager
+        observer_visible: true
+        operator_action_required: true
+    drift_routine:
+      type: return
+      value:
+        action: flag_for_review
+        notify: operator_dashboard
+        observer_visible: true
+        operator_action_required: false
+    bias_critical:
+      type: return
+      value:
+        action: quarantine_outputs
+        notify: operator_pager
+        observer_visible: true
+        operator_action_required: true
+    bias_routine:
+      type: return
+      value:
+        action: add_to_fairness_report
+        notify: operator_dashboard
+        observer_visible: true
+        operator_action_required: false
+    hallucination_critical:
+      type: return
+      value:
+        action: increase_guardrails
+        notify: operator_pager
+        observer_visible: true
+        operator_action_required: true
+    hallucination_routine:
+      type: return
+      value:
+        action: log_confabulation_rate
+        notify: operator_dashboard
+        observer_visible: true
+        operator_action_required: false
+    alignment_critical:
+      type: return
+      value:
+        action: freeze_reward_model
+        notify: operator_pager
+        observer_visible: true
+        operator_action_required: true
+    alignment_routine:
+      type: return
+      value:
+        action: track_reward_divergence
+        notify: operator_dashboard
+        observer_visible: true
+        operator_action_required: false
+    unknown_signal:
+      type: return
+      value:
+        action: log_unknown
+        notify: operator_dashboard
+        observer_visible: false
+        operator_action_required: false
+tests:
+- input:
+    signal_type: drift
+    severity: P1
+  expect:
+    action: halt_pipeline_and_revert
+    notify: operator_pager
+    observer_visible: true
+    operator_action_required: true
+- input:
+    signal_type: drift
+    severity: P3
+  expect:
+    action: flag_for_review
+    notify: operator_dashboard
+    observer_visible: true
+    operator_action_required: false
+- input:
+    signal_type: bias
+    severity: P1
+  expect:
+    action: quarantine_outputs
+    notify: operator_pager
+    observer_visible: true
+    operator_action_required: true
+- input:
+    signal_type: bias
+    severity: P4
+  expect:
+    action: add_to_fairness_report
+    notify: operator_dashboard
+    observer_visible: true
+    operator_action_required: false
+- input:
+    signal_type: hallucination
+    severity: P1
+  expect:
+    action: increase_guardrails
+    notify: operator_pager
+    observer_visible: true
+    operator_action_required: true
+- input:
+    signal_type: hallucination
+    severity: P5
+  expect:
+    action: log_confabulation_rate
+    notify: operator_dashboard
+    observer_visible: true
+    operator_action_required: false
+- input:
+    signal_type: alignment
+    severity: P1
+  expect:
+    action: freeze_reward_model
+    notify: operator_pager
+    observer_visible: true
+    operator_action_required: true
+- input:
+    signal_type: alignment
+    severity: P3
+  expect:
+    action: track_reward_divergence
+    notify: operator_dashboard
+    observer_visible: true
+    operator_action_required: false
+- input: {}
+  expect:
+    action: log_unknown
+    notify: operator_dashboard
+    observer_visible: false
+    operator_action_required: false
+- input:
+    signal_type: unknown_type
+    severity: P1
+  expect:
+    action: log_unknown
+    notify: operator_dashboard
+    observer_visible: false
+    operator_action_required: false

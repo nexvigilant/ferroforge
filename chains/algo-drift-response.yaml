@@ -1,0 +1,61 @@
+name: algo-drift-response
+description: 'Algovigilance pipeline: classify AI model drift severity from distribution metrics, then route to appropriate response action. Accumulate mode carries drift classification into action routing.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - algo-drift-classify
+  - algo-signal-to-action
+tests:
+- name: critical rapid drift — halt and revert
+  input:
+    psi: 0.45
+    ks_pvalue: 0.001
+    observation_days: 3
+    signal_type: drift
+  expect:
+    drift_class: CRITICAL_RAPID
+    severity: P1
+    action: halt_pipeline_and_revert
+    notify: operator_pager
+    observer_visible: true
+    operator_action_required: true
+- name: moderate confirmed drift — flag for review
+  input:
+    psi: 0.15
+    ks_pvalue: 0.03
+    observation_days: 14
+    signal_type: drift
+  expect:
+    drift_class: MODERATE_CONFIRMED
+    severity: P3
+    action: flag_for_review
+    notify: operator_dashboard
+    observer_visible: true
+    operator_action_required: false
+- name: no drift — no action
+  input:
+    psi: 0.02
+    ks_pvalue: 0.80
+    observation_days: 60
+    signal_type: drift
+  expect:
+    drift_class: NONE
+    severity: NONE
+    action: flag_for_review
+    notify: operator_dashboard
+    observer_visible: true
+    operator_action_required: false
+- name: critical gradual drift — investigate
+  input:
+    psi: 0.30
+    ks_pvalue: 0.005
+    observation_days: 20
+    signal_type: drift
+  expect:
+    drift_class: CRITICAL_GRADUAL
+    severity: P2
+    action: flag_for_review
+    notify: operator_dashboard
+    observer_visible: true
+    operator_action_required: false

@@ -1,0 +1,341 @@
+name: config-vigiaccess-spread
+description: Classify geographic spread of WHO VigiAccess adverse reaction reports. Routes based on region count and volume concentration.
+version: 0.1.0
+tree:
+  start: check_reports
+  nodes:
+    check_global:
+      type: condition
+      variable: regions_reporting
+      operator: gte
+      value: 5
+      true_next: check_volume_for_global
+      false_next: check_multi_regional
+    check_multi_regional:
+      type: condition
+      variable: regions_reporting
+      operator: gte
+      value: 3
+      true_next: multi_regional
+      false_next: check_concentration
+    localized:
+      type: return
+      value:
+        spread_class: localized
+        geographic_signal: false
+        investigation_scope: single_region
+    check_reports:
+      type: condition
+      variable: total_reports
+      operator: is_null
+      value: null
+      true_next: insufficient
+      false_next: check_minimum
+    check_volume_only:
+      type: condition
+      variable: total_reports
+      operator: gte
+      value: 500
+      true_next: multi_regional
+      false_next: regional_cluster
+    check_volume_for_global:
+      type: condition
+      variable: total_reports
+      operator: gte
+      value: 100
+      true_next: global_concern
+      false_next: multi_regional
+    check_concentration:
+      type: condition
+      variable: top_region_pct
+      operator: is_null
+      value: null
+      true_next: regional_cluster
+      false_next: check_concentrated
+    check_regions:
+      type: condition
+      variable: regions_reporting
+      operator: is_null
+      value: null
+      true_next: check_volume_only
+      false_next: check_global
+    global_concern:
+      type: return
+      value:
+        spread_class: global_concern
+        geographic_signal: true
+        investigation_scope: worldwide
+    multi_regional:
+      type: return
+      value:
+        investigation_scope: cross_regional
+        geographic_signal: true
+        spread_class: multi_regional
+    check_minimum:
+      type: condition
+      variable: total_reports
+      operator: lt
+      value: 10
+      true_next: insufficient
+      false_next: check_regions
+    regional_cluster:
+      type: return
+      value:
+        spread_class: regional_cluster
+        investigation_scope: targeted_regions
+        geographic_signal: false
+    check_concentrated:
+      type: condition
+      variable: top_region_pct
+      operator: gte
+      value: 80
+      true_next: localized
+      false_next: regional_cluster
+    insufficient:
+      type: return
+      value:
+        spread_class: insufficient
+        geographic_signal: false
+        investigation_scope: none
+tests:
+- input:
+    top_region_pct: 40
+    regions_reporting: 6
+    total_reports: 5000
+  expect:
+    geographic_signal: true
+    spread_class: global_concern
+    investigation_scope: worldwide
+- input:
+    top_region_pct: 35
+    total_reports: 200
+    regions_reporting: 5
+  expect:
+    spread_class: global_concern
+    investigation_scope: worldwide
+    geographic_signal: true
+- input:
+    total_reports: 50
+    regions_reporting: 5
+    top_region_pct: 50
+  expect:
+    spread_class: multi_regional
+    geographic_signal: true
+    investigation_scope: cross_regional
+- input:
+    total_reports: 300
+    regions_reporting: 3
+    top_region_pct: 60
+  expect:
+    spread_class: multi_regional
+    investigation_scope: cross_regional
+    geographic_signal: true
+- input:
+    top_region_pct: 70
+    total_reports: 80
+    regions_reporting: 2
+  expect:
+    investigation_scope: targeted_regions
+    spread_class: regional_cluster
+    geographic_signal: false
+- input:
+    regions_reporting: 1
+    total_reports: 50
+    top_region_pct: 95
+  expect:
+    investigation_scope: single_region
+    spread_class: localized
+    geographic_signal: false
+- input:
+    total_reports: 5
+    regions_reporting: 1
+  expect:
+    geographic_signal: false
+    investigation_scope: none
+    spread_class: insufficient
+- input: {}
+  expect:
+    investigation_scope: none
+    geographic_signal: false
+    spread_class: insufficient
+- input:
+    regions_reporting: 0
+  expect:
+    geographic_signal: false
+    spread_class: insufficient
+    investigation_scope: none
+- input:
+    regions_reporting: -1
+  expect:
+    investigation_scope: none
+    geographic_signal: false
+    spread_class: insufficient
+- input:
+    regions_reporting: 4
+  expect:
+    spread_class: insufficient
+    investigation_scope: none
+    geographic_signal: false
+- input:
+    regions_reporting: 500
+  expect:
+    geographic_signal: false
+    investigation_scope: none
+    spread_class: insufficient
+- input:
+    regions_reporting: 0
+  expect:
+    investigation_scope: none
+    spread_class: insufficient
+    geographic_signal: false
+- input:
+    regions_reporting: -1
+  expect:
+    investigation_scope: none
+    geographic_signal: false
+    spread_class: insufficient
+- input:
+    regions_reporting: 4
+  expect:
+    geographic_signal: false
+    investigation_scope: none
+    spread_class: insufficient
+- input:
+    regions_reporting: 300
+  expect:
+    spread_class: insufficient
+    investigation_scope: none
+    geographic_signal: false
+- input:
+    total_reports: 0
+  expect:
+    spread_class: insufficient
+    geographic_signal: false
+    investigation_scope: none
+- input:
+    total_reports: -1
+  expect:
+    geographic_signal: false
+    investigation_scope: none
+    spread_class: insufficient
+- input:
+    total_reports: 499
+  expect:
+    investigation_scope: targeted_regions
+    spread_class: regional_cluster
+    geographic_signal: false
+- input:
+    total_reports: 501
+  expect:
+    geographic_signal: true
+    spread_class: multi_regional
+    investigation_scope: cross_regional
+- input:
+    total_reports: 50000
+  expect:
+    geographic_signal: true
+    investigation_scope: cross_regional
+    spread_class: multi_regional
+- input:
+    total_reports: 0
+  expect:
+    geographic_signal: false
+    investigation_scope: none
+    spread_class: insufficient
+- input:
+    total_reports: -1
+  expect:
+    spread_class: insufficient
+    investigation_scope: none
+    geographic_signal: false
+- input:
+    total_reports: 99
+  expect:
+    spread_class: regional_cluster
+    geographic_signal: false
+    investigation_scope: targeted_regions
+- input:
+    total_reports: 101
+  expect:
+    spread_class: regional_cluster
+    geographic_signal: false
+    investigation_scope: targeted_regions
+- input:
+    total_reports: 0
+  expect:
+    investigation_scope: none
+    spread_class: insufficient
+    geographic_signal: false
+- input:
+    total_reports: -1
+  expect:
+    geographic_signal: false
+    investigation_scope: none
+    spread_class: insufficient
+- input:
+    total_reports: 9
+  expect:
+    spread_class: insufficient
+    geographic_signal: false
+    investigation_scope: none
+- input:
+    total_reports: 11
+  expect:
+    spread_class: regional_cluster
+    investigation_scope: targeted_regions
+    geographic_signal: false
+- input:
+    top_region_pct: 0
+  expect:
+    spread_class: insufficient
+    geographic_signal: false
+    investigation_scope: none
+- input:
+    top_region_pct: -1
+  expect:
+    spread_class: insufficient
+    investigation_scope: none
+    geographic_signal: false
+- input:
+    top_region_pct: 79
+  expect:
+    geographic_signal: false
+    spread_class: insufficient
+    investigation_scope: none
+- input:
+    top_region_pct: 81
+  expect:
+    geographic_signal: false
+    investigation_scope: none
+    spread_class: insufficient
+- input:
+    top_region_pct: 8000
+  expect:
+    geographic_signal: false
+    investigation_scope: none
+    spread_class: insufficient
+interface:
+  inputs:
+    total_reports:
+      type: int
+      required: false
+    regions_reporting:
+      type: int
+      required: false
+    has_pediatric_reports:
+      type: bool
+      required: false
+    top_region_pct:
+      type: int
+      required: false
+  outputs:
+    investigation_scope:
+      type: string
+      required: false
+    spread_class:
+      type: string
+      required: false
+    geographic_signal:
+      type: bool
+      required: false
+  aliases: {}

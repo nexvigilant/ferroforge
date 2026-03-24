@@ -1,0 +1,174 @@
+{
+  "domain": "microgram.nexvigilant.com",
+  "private": false,
+  "url_pattern": "/microgram/*",
+  "title": "PV Decision Trees",
+  "copyright": "© 2026 NexVigilant, LLC. Decision tree logic and chain topology are proprietary.",
+  "description": "Atomic pharmacovigilance decision trees (micrograms): sub-microsecond PV logic for signal classification, causality routing, seriousness assessment, and regulatory action. Chains compose multiple micrograms into complete workflows.",
+  "proxy": "scripts/microgram_proxy.py",
+  "tools": [
+    {
+      "name": "run-pv-signal-to-action",
+      "description": "Run the core PV workflow chain: PRR signal detection → causality bridge → Naranjo assessment → regulatory action routing. Returns step-by-step decision trace with final regulatory recommendation.",
+      "parameters": [
+        {"name": "prr", "type": "number", "description": "Proportional Reporting Ratio value", "required": true},
+        {"name": "naranjo_score", "type": "integer", "description": "Naranjo ADR probability score (0-13)", "required": true},
+        {"name": "is_serious", "type": "boolean", "description": "Whether the adverse event meets ICH E2A seriousness criteria", "required": true}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "final_output": {"type": "object", "description": "Accumulated chain output with regulatory_action, deadline_days, causality, priority"},
+          "steps": {"type": "array", "description": "Per-step decision trace"},
+          "total_duration_us": {"type": "integer", "description": "Total execution time in microseconds"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-case-assessment-pipeline",
+      "description": "Run the complete case assessment chain: case validity → seriousness classification → causality evidence → regulatory action.",
+      "parameters": [
+        {"name": "prr", "type": "number", "description": "PRR value for the drug-event pair", "required": true},
+        {"name": "naranjo_score", "type": "integer", "description": "Naranjo score (0-13)", "required": true},
+        {"name": "is_serious", "type": "boolean", "description": "ICH E2A seriousness criteria met", "required": true},
+        {"name": "reporter_type", "type": "string", "description": "Reporter type: healthcare_professional, consumer, literature", "required": false},
+        {"name": "has_rechallenge", "type": "boolean", "description": "Was rechallenge performed", "required": false}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "final_output": {"type": "object"},
+          "steps": {"type": "array"},
+          "total_duration_us": {"type": "integer"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-benefit-risk-assessment",
+      "description": "Run the benefit-risk assessment chain: weighs therapeutic benefit against safety risk using PRR, Naranjo, NNH, and therapeutic index.",
+      "parameters": [
+        {"name": "prr", "type": "number", "description": "PRR value", "required": true},
+        {"name": "naranjo_score", "type": "integer", "description": "Naranjo score", "required": true},
+        {"name": "is_serious", "type": "boolean", "description": "Seriousness flag", "required": true},
+        {"name": "therapeutic_benefit", "type": "string", "description": "Benefit level: high, moderate, low", "required": false},
+        {"name": "nnh", "type": "number", "description": "Number needed to harm", "required": false}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "final_output": {"type": "object"},
+          "steps": {"type": "array"},
+          "total_duration_us": {"type": "integer"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-prr-signal",
+      "description": "Classify a PRR value as signal/no-signal using Evans (2001) criteria. PRR >= 2.0 = signal.",
+      "parameters": [
+        {"name": "prr", "type": "number", "description": "PRR value to classify", "required": true}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "output": {"type": "object", "properties": {"signal_detected": {"type": "boolean"}, "classification": {"type": "string"}}}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-naranjo-quick",
+      "description": "Quick Naranjo causality assessment from a score. Returns causality category (DEFINITE/PROBABLE/POSSIBLE/DOUBTFUL) with confidence and recommended action.",
+      "parameters": [
+        {"name": "naranjo_score", "type": "integer", "description": "Naranjo score (0-13)", "required": true}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "output": {"type": "object", "properties": {"causality": {"type": "string"}, "confidence": {"type": "integer"}, "action": {"type": "string"}}}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-case-seriousness",
+      "description": "Classify case seriousness per ICH E2A criteria. Returns seriousness category, expedited reporting requirement, and deadline.",
+      "parameters": [
+        {"name": "is_serious", "type": "boolean", "description": "Meets ICH E2A seriousness criteria", "required": true},
+        {"name": "is_fatal", "type": "boolean", "description": "Resulted in death", "required": false},
+        {"name": "is_life_threatening", "type": "boolean", "description": "Life-threatening event", "required": false},
+        {"name": "requires_hospitalization", "type": "boolean", "description": "Required or prolonged hospitalization", "required": false}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "output": {"type": "object"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-workflow-router",
+      "description": "Route a PV case to the appropriate workflow based on case characteristics. Returns workflow type, priority, and first action.",
+      "parameters": [
+        {"name": "prr", "type": "number", "description": "PRR value", "required": false},
+        {"name": "naranjo_score", "type": "integer", "description": "Naranjo score", "required": false},
+        {"name": "is_serious", "type": "boolean", "description": "Seriousness flag", "required": true},
+        {"name": "signal_detected", "type": "boolean", "description": "Signal detection result", "required": false}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "output": {"type": "object"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "list-micrograms",
+      "description": "List all available micrograms with their descriptions and test counts.",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {"type": "string"},
+          "micrograms": {"type": "integer"},
+          "catalog": {"type": "array"}
+        },
+        "required": ["status"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "list-chains",
+      "description": "List all available microgram chains with their step sequences.",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {"type": "string"},
+          "chains": {"type": "array"}
+        },
+        "required": ["status"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+name: ic-signal
+description: Information Component (IC) Bayesian disproportionality signal gate. Uses IC025 (lower 95% credibility interval) as the conservative threshold.
+version: 0.1.0
+interface:
+  inputs:
+    ic025:
+      type: float
+      required: false
+  outputs:
+    confidence:
+      type: string
+    note:
+      type: string
+    signal:
+      type: string
+    signal_detected:
+      type: bool
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: ic025
+      operator: is_null
+      value: null
+      true_next: unknown_return
+      false_next: check_strong
+    unknown_return:
+      type: return
+      value:
+        signal: NONE
+        signal_detected: false
+        note: No IC data available
+    check_strong:
+      type: condition
+      variable: ic025
+      operator: gte
+      value: 2.0
+      true_next: strong_signal
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: ic025
+      operator: gte
+      value: 1.0
+      true_next: moderate_signal
+      false_next: check_weak
+    check_weak:
+      type: condition
+      variable: ic025
+      operator: gte
+      value: 0.5
+      true_next: weak_signal
+      false_next: check_positive
+    check_positive:
+      type: condition
+      variable: ic025
+      operator: gte
+      value: 0.0
+      true_next: no_signal_positive
+      false_next: no_signal_negative
+    strong_signal:
+      type: return
+      value:
+        signal: STRONG
+        confidence: HIGH
+        signal_detected: true
+    moderate_signal:
+      type: return
+      value:
+        signal: MODERATE
+        confidence: MODERATE
+        signal_detected: true
+    weak_signal:
+      type: return
+      value:
+        signal: WEAK
+        confidence: LOW
+        signal_detected: true
+    no_signal_positive:
+      type: return
+      value:
+        signal: NONE
+        signal_detected: false
+        note: IC positive but IC025 below threshold
+    no_signal_negative:
+      type: return
+      value:
+        signal: NONE
+        signal_detected: false
+        note: IC negative -- no disproportionality
+tests:
+- input:
+    ic025: 3.0
+  expect:
+    signal: STRONG
+    confidence: HIGH
+    signal_detected: true
+- input:
+    ic025: 2.0
+  expect:
+    signal: STRONG
+    confidence: HIGH
+    signal_detected: true
+- input:
+    ic025: 1.9
+  expect:
+    signal: MODERATE
+    confidence: MODERATE
+    signal_detected: true
+- input:
+    ic025: 1.0
+  expect:
+    signal: MODERATE
+    confidence: MODERATE
+    signal_detected: true
+- input:
+    ic025: 0.9
+  expect:
+    signal: WEAK
+    confidence: LOW
+    signal_detected: true
+- input:
+    ic025: 0.5
+  expect:
+    signal: WEAK
+    confidence: LOW
+    signal_detected: true
+- input:
+    ic025: 0.4
+  expect:
+    signal: NONE
+    signal_detected: false
+    note: IC positive but IC025 below threshold
+- input:
+    ic025: 0.0
+  expect:
+    signal: NONE
+    signal_detected: false
+    note: IC positive but IC025 below threshold
+- input:
+    ic025: -0.1
+  expect:
+    signal: NONE
+    signal_detected: false
+    note: IC negative -- no disproportionality
+- input:
+    ic025: -2.5
+  expect:
+    signal: NONE
+    signal_detected: false
+    note: IC negative -- no disproportionality
+- input:
+    ic025: 5.0
+  expect:
+    signal: STRONG
+    confidence: HIGH
+    signal_detected: true
+- input: {}
+  expect:
+    signal: NONE
+    signal_detected: false
+    note: No IC data available

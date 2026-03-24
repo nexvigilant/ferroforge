@@ -1,0 +1,130 @@
+name: loop-governor
+description: 'Loop Governor: transforms scorecard-compound governor signals into loop control. Maps HALT/CONSOLIDATE/CONTINUE to loop-compatible halt decisions. Designed to be the feedback node in a looped chain — it reads the compound verdict and decides whether to keep iterating.'
+version: 0.1.0
+primitive_signature:
+  dominant: '∂'
+  expression: '∂(ν(Σ)) — boundary gate on the frequency of aggregation'
+  primes: ['∂', 'ν', 'κ']
+  arguments: ['governor_signal']
+  chain_prediction: 'ρ(∂(ν(Σ))) — self-governing loop: the governor governs the governor'
+interface:
+  inputs:
+    governor_signal:
+      type: string
+      required: false
+      description: 'Governor signal from scorecard-compound: starts with HALT, CONSOLIDATE, or CONTINUE'
+    compound_verdict:
+      type: string
+      required: false
+      description: 'Compound verdict from scorecard-compound'
+    persistence_ratio:
+      type: float
+      required: false
+      description: 'Fraction of sessions reaching L4+'
+    iteration:
+      type: int
+      required: false
+      description: 'Current loop iteration (injected by looper)'
+  outputs:
+    loop_action:
+      type: string
+      description: 'HALT or CONTINUE'
+    reason:
+      type: string
+      description: 'Why the loop is halting or continuing'
+    prescription:
+      type: string
+      description: 'What to do next based on the governor signal'
+tree:
+  start: check_governor
+  nodes:
+    check_governor:
+      type: condition
+      variable: governor_signal
+      operator: is_not_null
+      value: ''
+      true_next: parse_halt
+      false_next: no_governor
+
+    no_governor:
+      type: return
+      value:
+        loop_action: CONTINUE
+        reason: 'No governor signal present — no basis to halt'
+        prescription: 'Feed session data to produce a governor signal'
+
+    parse_halt:
+      type: condition
+      variable: governor_signal
+      operator: contains
+      value: 'HALT'
+      true_next: halt_action
+      false_next: parse_consolidate
+
+    halt_action:
+      type: return
+      value:
+        loop_action: HALT
+        reason: 'Governor signal is HALT — heat accumulation detected'
+        prescription: 'Stop new work. Commit existing uncommitted changes. Every session is producing sparks (L3). The flywheel is generating heat, not momentum.'
+
+    parse_consolidate:
+      type: condition
+      variable: governor_signal
+      operator: contains
+      value: 'CONSOLIDATE'
+      true_next: consolidate_action
+      false_next: continue_action
+
+    consolidate_action:
+      type: return
+      value:
+        loop_action: CONTINUE
+        reason: 'Governor signal is CONSOLIDATE — persistence ratio below 0.5'
+        prescription: 'One consolidation session per two production sessions. Commit sparks before starting new chains.'
+
+    continue_action:
+      type: return
+      value:
+        loop_action: CONTINUE
+        reason: 'Governor signal is CONTINUE — shipping is happening'
+        prescription: 'Maintain current cadence. Clear remaining sparks between production sessions.'
+
+tests:
+# HALT signal → loop halts
+- input:
+    governor_signal: 'HALT — every session is producing sparks.'
+    compound_verdict: heat_accumulation
+  expect:
+    loop_action: HALT
+    reason: 'Governor signal is HALT — heat accumulation detected'
+
+# CONSOLIDATE signal → continue but warn
+- input:
+    governor_signal: 'CONSOLIDATE — persistence ratio below 0.5.'
+    compound_verdict: consolidation_needed
+  expect:
+    loop_action: CONTINUE
+
+# CONTINUE signal → keep going
+- input:
+    governor_signal: 'CONTINUE — shipping is happening.'
+    compound_verdict: healthy_with_sparks
+  expect:
+    loop_action: CONTINUE
+    reason: 'Governor signal is CONTINUE — shipping is happening'
+
+# No governor signal → continue by default
+- input: {}
+  expect:
+    loop_action: CONTINUE
+    reason: 'No governor signal present — no basis to halt'
+
+# HALT with full context
+- input:
+    governor_signal: 'HALT — every session is producing sparks. Stop new work.'
+    compound_verdict: heat_accumulation
+    persistence_ratio: 0.0
+    iteration: 3
+  expect:
+    loop_action: HALT

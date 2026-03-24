@@ -1,0 +1,75 @@
+name: signal-drift-monitoring
+description: "Detect trend direction, measure drift magnitude, check if signal is converging despite drift. Pipeline: signal-trend-detector → smi-drift-detector → algo-converge-signal."
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - signal-trend-detector     # Detect trend direction from pre-computed PRR change
+  - smi-drift-detector        # Measure drift magnitude against σ thresholds
+  - algo-converge-signal      # Check if signal is converging despite drift
+tests:
+- name: rising_critical_drift_diverging
+  input:
+    prr_current: 8.5
+    pct_change: 165.6
+    drift_sigma: 3.5
+    drift_direction: increasing
+    measurement_count: 100
+    delta: 5.0
+    tolerance_met: false
+    iteration_count: 3
+    max_iterations: 20
+  expect:
+    trend: RISING
+    velocity: RAPID
+    alert_level: CRITICAL
+    verdict: CONTINUE
+
+- name: stable_no_drift_converged
+  input:
+    prr_current: 2.5
+    pct_change: -2.0
+    drift_sigma: 0.3
+    drift_direction: stable
+    measurement_count: 200
+    delta: 0.01
+    tolerance_met: true
+    iteration_count: 5
+    max_iterations: 20
+  expect:
+    trend: STABLE
+    alert_level: NONE
+    verdict: CONVERGED
+
+- name: declining_warning_improving_converged
+  input:
+    prr_current: 4.0
+    pct_change: -25.0
+    drift_sigma: 2.1
+    drift_direction: decreasing
+    measurement_count: 80
+    delta: 0.02
+    tolerance_met: true
+    iteration_count: 8
+    max_iterations: 20
+  expect:
+    trend: DECLINING
+    alert_level: WARNING
+    verdict: CONVERGED
+
+- name: rising_alert_small_baseline_diverging
+  input:
+    prr_current: 6.0
+    pct_change: 55.0
+    drift_sigma: 2.8
+    drift_direction: increasing
+    measurement_count: 15
+    delta: 15.0
+    tolerance_met: false
+    iteration_count: 2
+    max_iterations: 20
+  expect:
+    trend: RISING
+    velocity: GRADUAL
+    alert_level: WARNING
+    verdict: DIVERGE

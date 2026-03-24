@@ -1,0 +1,251 @@
+name: smm-integration-disposition
+description: "Terminal node in SMM chain. Combines study type, integration weight, and fatal status into a final disposition for K-state integration. Fatal overrides first, then weight-based routing."
+version: 0.1.0
+interface:
+  inputs:
+    study_type:
+      type: string
+      required: false
+    integration_weight:
+      type: string
+      required: false
+    has_fatal_violation:
+      type: bool
+      required: false
+    score_band:
+      type: string
+      required: false
+  outputs:
+    disposition:
+      type: string
+    weight_in_synthesis:
+      type: string
+    required_action:
+      type: string
+    can_cite:
+      type: bool
+    requires_sensitivity_analysis:
+      type: bool
+tree:
+  start: check_fatal
+  nodes:
+    # Fatal overrides everything
+    check_fatal:
+      type: condition
+      variable: has_fatal_violation
+      operator: eq
+      value: true
+      true_next: check_fatal_type
+      false_next: check_weight_full
+    check_fatal_type:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: empirical
+      true_next: fatal_empirical_disposition
+      false_next: fatal_pre_empirical_disposition
+    fatal_empirical_disposition:
+      type: return
+      value:
+        disposition: EXCLUDE
+        weight_in_synthesis: "0.00"
+        required_action: "Initiate CAPA. Qualified review required before reconsideration. Evidence SUSPENDED."
+        can_cite: false
+        requires_sensitivity_analysis: false
+    fatal_pre_empirical_disposition:
+      type: return
+      value:
+        disposition: FLAG_FOR_REVIEW
+        weight_in_synthesis: "0.05"
+        required_action: "Return to workshop. Framework requires maturation before protocol development. May cite as emerging concept only."
+        can_cite: true
+        requires_sensitivity_analysis: true
+    # Weight-based routing for non-fatal
+    check_weight_full:
+      type: condition
+      variable: integration_weight
+      operator: eq
+      value: full
+      true_next: include_full
+      false_next: check_weight_high
+    check_weight_high:
+      type: condition
+      variable: integration_weight
+      operator: eq
+      value: high
+      true_next: include_with_caveats
+      false_next: check_weight_conditional
+    check_weight_conditional:
+      type: condition
+      variable: integration_weight
+      operator: eq
+      value: conditional
+      true_next: include_conditional
+      false_next: check_weight_low
+    check_weight_low:
+      type: condition
+      variable: integration_weight
+      operator: eq
+      value: low
+      true_next: flag_for_review
+      false_next: exclude_disposition
+    include_full:
+      type: return
+      value:
+        disposition: INCLUDE
+        weight_in_synthesis: "1.00"
+        required_action: "Integrate at full weight. No additional review required."
+        can_cite: true
+        requires_sensitivity_analysis: false
+    include_with_caveats:
+      type: return
+      value:
+        disposition: INCLUDE_WITH_CAVEATS
+        weight_in_synthesis: "0.80"
+        required_action: "Integrate with advisory notes. Minor limitations documented."
+        can_cite: true
+        requires_sensitivity_analysis: false
+    include_conditional:
+      type: return
+      value:
+        disposition: INCLUDE_CONDITIONAL
+        weight_in_synthesis: "0.60"
+        required_action: "Integrate at reduced weight. Include in sensitivity analysis. Violation summary appended."
+        can_cite: true
+        requires_sensitivity_analysis: true
+    flag_for_review:
+      type: return
+      value:
+        disposition: FLAG_FOR_REVIEW
+        weight_in_synthesis: "0.25"
+        required_action: "Low-weight integration. Requires corroboration from independent sources. Mandatory sensitivity analysis."
+        can_cite: true
+        requires_sensitivity_analysis: true
+    exclude_disposition:
+      type: return
+      value:
+        disposition: EXCLUDE
+        weight_in_synthesis: "0.00"
+        required_action: "Exclude from synthesis. Structural integrity insufficient."
+        can_cite: false
+        requires_sensitivity_analysis: false
+tests:
+# === FATAL OVERRIDE TESTS ===
+# Fatal empirical = hard exclude
+- input:
+    study_type: empirical
+    has_fatal_violation: true
+    integration_weight: full
+    score_band: FATAL_ZERO
+  expect:
+    disposition: EXCLUDE
+    weight_in_synthesis: "0.00"
+    can_cite: false
+    requires_sensitivity_analysis: false
+# Fatal pre-empirical = soft flag (return to workshop)
+- input:
+    study_type: pre_empirical
+    has_fatal_violation: true
+    integration_weight: low
+    score_band: FATAL_FLOOR
+  expect:
+    disposition: FLAG_FOR_REVIEW
+    weight_in_synthesis: "0.05"
+    can_cite: true
+    requires_sensitivity_analysis: true
+# === WEIGHT-BASED ROUTING ===
+# Full weight
+- input:
+    study_type: empirical
+    integration_weight: full
+    has_fatal_violation: false
+    score_band: CLEAN
+  expect:
+    disposition: INCLUDE
+    weight_in_synthesis: "1.00"
+    can_cite: true
+    requires_sensitivity_analysis: false
+# High weight
+- input:
+    study_type: empirical
+    integration_weight: high
+    has_fatal_violation: false
+  expect:
+    disposition: INCLUDE_WITH_CAVEATS
+    weight_in_synthesis: "0.80"
+    can_cite: true
+# Conditional weight
+- input:
+    study_type: pre_empirical
+    integration_weight: conditional
+    has_fatal_violation: false
+  expect:
+    disposition: INCLUDE_CONDITIONAL
+    weight_in_synthesis: "0.60"
+    can_cite: true
+    requires_sensitivity_analysis: true
+# Low weight
+- input:
+    study_type: empirical
+    integration_weight: low
+    has_fatal_violation: false
+  expect:
+    disposition: FLAG_FOR_REVIEW
+    weight_in_synthesis: "0.25"
+    requires_sensitivity_analysis: true
+# Exclude weight
+- input:
+    study_type: empirical
+    integration_weight: exclude
+    has_fatal_violation: false
+  expect:
+    disposition: EXCLUDE
+    weight_in_synthesis: "0.00"
+    can_cite: false
+# === SELF-AUDIT VALIDATION (Phase 3) ===
+# SMM-001: pre_empirical, has_fatal=true (H-extraction absent), score_band=FATAL_FLOOR
+- input:
+    study_type: pre_empirical
+    has_fatal_violation: true
+    integration_weight: exclude
+    score_band: FATAL_FLOOR
+  expect:
+    disposition: FLAG_FOR_REVIEW
+    weight_in_synthesis: "0.05"
+    can_cite: true
+    requires_sensitivity_analysis: true
+# SMM-002: pre_empirical, has_fatal=false, integration_weight=exclude (VERY_LOW severity)
+- input:
+    study_type: pre_empirical
+    has_fatal_violation: false
+    integration_weight: exclude
+    score_band: CLEAN
+  expect:
+    disposition: EXCLUDE
+    weight_in_synthesis: "0.00"
+    can_cite: false
+# === EDGE CASES ===
+# Empty input = exclude
+- input: {}
+  expect:
+    disposition: EXCLUDE
+    weight_in_synthesis: "0.00"
+    can_cite: false
+# Fatal overrides even full weight
+- input:
+    study_type: empirical
+    has_fatal_violation: true
+    integration_weight: full
+  expect:
+    disposition: EXCLUDE
+    weight_in_synthesis: "0.00"
+    can_cite: false
+# Pre-empirical full weight (mature framework)
+- input:
+    study_type: pre_empirical
+    integration_weight: full
+    has_fatal_violation: false
+  expect:
+    disposition: INCLUDE
+    weight_in_synthesis: "1.00"
+    can_cite: true

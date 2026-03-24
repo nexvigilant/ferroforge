@@ -1,0 +1,196 @@
+name: crate-fitness
+description: 'Crate architectural fitness classifier. Checks LOC, module count, dependency count, and estimated compile time against thresholds. FIT (all under limits), REVIEW (1 threshold crossed), SPLIT (2+ thresholds crossed). Prevents monolith accumulation.'
+version: 0.1.0
+interface:
+  inputs:
+    loc:
+      type: int
+      required: true
+    module_count:
+      type: int
+      required: true
+    dep_count:
+      type: int
+      required: true
+    compile_seconds:
+      type: int
+      required: false
+  outputs:
+    fitness:
+      type: string
+    violations:
+      type: int
+    action:
+      type: string
+tree:
+  start: check_loc
+  nodes:
+    check_loc:
+      type: condition
+      variable: loc
+      operator: gte
+      value: 50000
+      true_next: loc_violated
+      false_next: check_modules_clean
+    loc_violated:
+      type: condition
+      variable: module_count
+      operator: gte
+      value: 30
+      true_next: two_violations_check_deps
+      false_next: check_deps_one
+    check_modules_clean:
+      type: condition
+      variable: module_count
+      operator: gte
+      value: 30
+      true_next: check_deps_one
+      false_next: check_deps_clean
+    two_violations_check_deps:
+      type: condition
+      variable: dep_count
+      operator: gte
+      value: 40
+      true_next: split_three
+      false_next: split_two
+    check_deps_one:
+      type: condition
+      variable: dep_count
+      operator: gte
+      value: 40
+      true_next: split_two_alt
+      false_next: review_one
+    check_deps_clean:
+      type: condition
+      variable: dep_count
+      operator: gte
+      value: 40
+      true_next: review_deps
+      false_next: check_compile
+    check_compile:
+      type: condition
+      variable: compile_seconds
+      operator: gte
+      value: 300
+      true_next: review_slow
+      false_next: fit
+    split_three:
+      type: return
+      value:
+        fitness: split
+        violations: 3
+        action: immediate_decomposition
+    split_two:
+      type: return
+      value:
+        fitness: split
+        violations: 2
+        action: plan_decomposition
+    split_two_alt:
+      type: return
+      value:
+        fitness: split
+        violations: 2
+        action: plan_decomposition
+    review_one:
+      type: return
+      value:
+        fitness: review
+        violations: 1
+        action: architecture_review
+    review_deps:
+      type: return
+      value:
+        fitness: review
+        violations: 1
+        action: reduce_dependencies
+    review_slow:
+      type: return
+      value:
+        fitness: review
+        violations: 1
+        action: optimize_compile
+    fit:
+      type: return
+      value:
+        fitness: fit
+        violations: 0
+        action: none
+tests:
+- input:
+    loc: 5000
+    module_count: 8
+    dep_count: 10
+    compile_seconds: 30
+  expect:
+    fitness: fit
+    violations: 0
+    action: none
+- input:
+    loc: 125000
+    module_count: 61
+    dep_count: 70
+    compile_seconds: 600
+  expect:
+    fitness: split
+    violations: 3
+    action: immediate_decomposition
+- input:
+    loc: 60000
+    module_count: 35
+    dep_count: 20
+    compile_seconds: 120
+  expect:
+    fitness: split
+    violations: 2
+    action: plan_decomposition
+- input:
+    loc: 60000
+    module_count: 10
+    dep_count: 20
+    compile_seconds: 120
+  expect:
+    fitness: review
+    violations: 1
+    action: architecture_review
+- input:
+    loc: 10000
+    module_count: 10
+    dep_count: 45
+    compile_seconds: 60
+  expect:
+    fitness: review
+    violations: 1
+    action: reduce_dependencies
+- input:
+    loc: 10000
+    module_count: 10
+    dep_count: 10
+    compile_seconds: 400
+  expect:
+    fitness: review
+    violations: 1
+    action: optimize_compile
+- input:
+    loc: 49000
+    module_count: 29
+    dep_count: 39
+    compile_seconds: 200
+  expect:
+    fitness: fit
+    violations: 0
+    action: none
+- input:
+    loc: 30000
+    module_count: 35
+    dep_count: 50
+    compile_seconds: 60
+  expect:
+    fitness: split
+    violations: 2
+    action: plan_decomposition
+- input: {}
+  expect:
+    action: none
+    fitness: fit
+    violations: 0

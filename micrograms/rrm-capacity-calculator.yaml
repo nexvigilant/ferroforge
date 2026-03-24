@@ -1,0 +1,309 @@
+name: rrm-capacity-calculator
+description: "Railway Reference Model capacity calculator. Computes system throughput from headway components using the railway capacity formula: capacity = 3600 / headway_seconds. Headway decomposes into braking distance, sighting distance, safety margin, and block length. Maps to PV throughput: cases processed per hour given review constraints."
+version: 0.1.0
+interface:
+  inputs:
+    headway_seconds:
+      type: float
+      required: false
+    braking_distance_seconds:
+      type: float
+      required: false
+    sighting_distance_seconds:
+      type: float
+      required: false
+    safety_margin_seconds:
+      type: float
+      required: false
+    block_length_seconds:
+      type: float
+      required: false
+    monitoring_level:
+      type: int
+      required: false
+    etcs_level:
+      type: int
+      required: false
+  outputs:
+    headway_seconds:
+      type: float
+    trains_per_hour:
+      type: float
+    capacity_class:
+      type: string
+    bottleneck:
+      type: string
+    pv_interpretation:
+      type: string
+  aliases: {}
+tree:
+  start: check_direct_headway
+  nodes:
+    check_direct_headway:
+      type: condition
+      variable: headway_seconds
+      operator: gt
+      value: 0
+      true_next: classify_direct
+      false_next: check_components
+    check_components:
+      type: condition
+      variable: braking_distance_seconds
+      operator: is_not_null
+      value: true
+      true_next: compute_from_components
+      false_next: check_monitoring_only
+    check_monitoring_only:
+      type: condition
+      variable: monitoring_level
+      operator: is_not_null
+      value: true
+      true_next: estimate_from_level
+      false_next: check_etcs_level
+    check_etcs_level:
+      type: condition
+      variable: etcs_level
+      operator: is_not_null
+      value: true
+      true_next: estimate_from_etcs
+      false_next: no_input
+    estimate_from_etcs:
+      type: condition
+      variable: etcs_level
+      operator: gte
+      value: 3
+      true_next: level_3_capacity
+      false_next: estimate_etcs_2
+    estimate_etcs_2:
+      type: condition
+      variable: etcs_level
+      operator: gte
+      value: 2
+      true_next: level_2_capacity
+      false_next: estimate_etcs_1
+    estimate_etcs_1:
+      type: condition
+      variable: etcs_level
+      operator: gte
+      value: 1
+      true_next: level_1_capacity
+      false_next: level_0_capacity
+    compute_from_components:
+      type: condition
+      variable: braking_distance_seconds
+      operator: gt
+      value: 0
+      true_next: check_braking_dominant
+      false_next: no_input
+    check_braking_dominant:
+      type: condition
+      variable: braking_distance_seconds
+      operator: gte
+      value: 120
+      true_next: high_headway
+      false_next: check_moderate_braking
+    check_moderate_braking:
+      type: condition
+      variable: braking_distance_seconds
+      operator: gte
+      value: 60
+      true_next: moderate_headway
+      false_next: low_headway
+    classify_direct:
+      type: condition
+      variable: headway_seconds
+      operator: gt
+      value: 300
+      true_next: very_low_capacity
+      false_next: classify_direct_2
+    classify_direct_2:
+      type: condition
+      variable: headway_seconds
+      operator: gt
+      value: 180
+      true_next: low_capacity_direct
+      false_next: classify_direct_3
+    classify_direct_3:
+      type: condition
+      variable: headway_seconds
+      operator: gt
+      value: 90
+      true_next: moderate_capacity_direct
+      false_next: high_capacity_direct
+    estimate_from_level:
+      type: condition
+      variable: monitoring_level
+      operator: gte
+      value: 3
+      true_next: level_3_capacity
+      false_next: estimate_level_2
+    estimate_level_2:
+      type: condition
+      variable: monitoring_level
+      operator: gte
+      value: 2
+      true_next: level_2_capacity
+      false_next: estimate_level_1
+    estimate_level_1:
+      type: condition
+      variable: monitoring_level
+      operator: gte
+      value: 1
+      true_next: level_1_capacity
+      false_next: level_0_capacity
+    very_low_capacity:
+      type: return
+      value:
+        headway_seconds: 360
+        trains_per_hour: 10.0
+        capacity_class: "Very Low"
+        bottleneck: "Excessive headway — time-interval operation"
+        pv_interpretation: "Less than 10 cases/hour — manual review with no automation, spontaneous reporting only"
+    low_capacity_direct:
+      type: return
+      value:
+        headway_seconds: 240
+        trains_per_hour: 15.0
+        capacity_class: "Low"
+        bottleneck: "Long headway — limited by sighting or safety margin"
+        pv_interpretation: "15 cases/hour — periodic batch review with basic triage"
+    moderate_capacity_direct:
+      type: return
+      value:
+        headway_seconds: 120
+        trains_per_hour: 30.0
+        capacity_class: "Moderate"
+        bottleneck: "Standard headway — balanced braking and block length"
+        pv_interpretation: "30 cases/hour — structured ICSR processing with automated pre-screening"
+    high_capacity_direct:
+      type: return
+      value:
+        headway_seconds: 90
+        trains_per_hour: 40.0
+        capacity_class: "High"
+        bottleneck: "Short headway — requires continuous supervision"
+        pv_interpretation: "40+ cases/hour — real-time streaming with automated signal detection"
+    high_headway:
+      type: return
+      value:
+        headway_seconds: 300
+        trains_per_hour: 12.0
+        capacity_class: "Low"
+        bottleneck: "Braking distance dominates — heavy trains or steep gradients"
+        pv_interpretation: "12 cases/hour — complex cases requiring extended causality assessment (Naranjo full)"
+    moderate_headway:
+      type: return
+      value:
+        headway_seconds: 150
+        trains_per_hour: 24.0
+        capacity_class: "Moderate"
+        bottleneck: "Braking distance significant but manageable"
+        pv_interpretation: "24 cases/hour — standard ICSR processing with automated seriousness classification"
+    low_headway:
+      type: return
+      value:
+        headway_seconds: 90
+        trains_per_hour: 40.0
+        capacity_class: "High"
+        bottleneck: "Short braking distance — light vehicles or flat terrain"
+        pv_interpretation: "40 cases/hour — rapid triage with ML-assisted coding"
+    level_3_capacity:
+      type: return
+      value:
+        headway_seconds: 60
+        trains_per_hour: 60.0
+        capacity_class: "Maximum"
+        bottleneck: "Moving block — headway shrinks to braking distance"
+        pv_interpretation: "60+ cases/hour — predictive PV with dynamic thresholds, no fixed review intervals"
+    level_2_capacity:
+      type: return
+      value:
+        headway_seconds: 90
+        trains_per_hour: 40.0
+        capacity_class: "High"
+        bottleneck: "Continuous supervision — fixed blocks with real-time updates"
+        pv_interpretation: "40 cases/hour — real-time FAERS monitoring with continuous signal detection"
+    level_1_capacity:
+      type: return
+      value:
+        headway_seconds: 180
+        trains_per_hour: 20.0
+        capacity_class: "Moderate"
+        bottleneck: "Spot transmission — state updates only at discrete points"
+        pv_interpretation: "20 cases/hour — periodic PSUR/PBRER review at regulatory intervals"
+    level_0_capacity:
+      type: return
+      value:
+        headway_seconds: 360
+        trains_per_hour: 10.0
+        capacity_class: "Very Low"
+        bottleneck: "Time interval — no track state knowledge"
+        pv_interpretation: "10 cases/hour — spontaneous reporting only, no systematic monitoring"
+    no_input:
+      type: return
+      value:
+        headway_seconds: 0
+        trains_per_hour: 0
+        capacity_class: "Unknown"
+        bottleneck: "Insufficient input — provide headway_seconds, braking components, or monitoring_level"
+        pv_interpretation: "Cannot compute — need headway data or monitoring level"
+tests:
+- input:
+    headway_seconds: 120
+  expect:
+    capacity_class: "Moderate"
+    trains_per_hour: 30.0
+- input:
+    headway_seconds: 60
+  expect:
+    capacity_class: "High"
+    trains_per_hour: 40.0
+- input:
+    headway_seconds: 400
+  expect:
+    capacity_class: "Very Low"
+    trains_per_hour: 10.0
+- input:
+    headway_seconds: 200
+  expect:
+    capacity_class: "Low"
+    trains_per_hour: 15.0
+- input:
+    braking_distance_seconds: 150
+  expect:
+    capacity_class: "Low"
+    bottleneck: "Braking distance dominates — heavy trains or steep gradients"
+- input:
+    braking_distance_seconds: 80
+  expect:
+    capacity_class: "Moderate"
+    trains_per_hour: 24.0
+- input:
+    braking_distance_seconds: 30
+  expect:
+    capacity_class: "High"
+    trains_per_hour: 40.0
+- input:
+    monitoring_level: 3
+  expect:
+    capacity_class: "Maximum"
+    trains_per_hour: 60.0
+- input:
+    monitoring_level: 2
+  expect:
+    capacity_class: "High"
+    trains_per_hour: 40.0
+- input:
+    monitoring_level: 1
+  expect:
+    capacity_class: "Moderate"
+    trains_per_hour: 20.0
+- input:
+    monitoring_level: 0
+  expect:
+    capacity_class: "Very Low"
+    trains_per_hour: 10.0
+- input: {}
+  expect:
+    capacity_class: "Unknown"
+    trains_per_hour: 0

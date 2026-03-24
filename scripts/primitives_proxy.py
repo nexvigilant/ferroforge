@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 """
+DEPRECATED — All 15 tools handled natively in Rust by crates/station/src/primitives/
+Router intercept: router.rs:181 via primitives::try_handle()
+Safe to delete after confirming zero calls in station-telemetry.jsonl
+
+---
 Primitives Proxy — T1 Lex Primitiva concept analysis tools.
 
 Usage:

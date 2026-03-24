@@ -1,0 +1,80 @@
+name: drug-differential
+description: 'Classify whether one drug adverse event rate is meaningfully higher than another using a 1.2x threshold on pre-computed ratio'
+version: 0.1.0
+interface:
+  inputs:
+    ratio:
+      type: float
+      required: true
+  outputs:
+    differential:
+      type: string
+    label:
+      type: string
+tree:
+  start: check_a_higher
+  nodes:
+    check_a_higher:
+      type: condition
+      variable: ratio
+      operator: gt
+      value: 1.2
+      true_next: a_higher
+      false_next: check_b_higher
+    check_b_higher:
+      type: condition
+      variable: ratio
+      operator: lt
+      value: 0.833
+      true_next: b_higher
+      false_next: equal
+    a_higher:
+      type: return
+      value:
+        differential: A
+        label: Drug A has higher rate
+    b_higher:
+      type: return
+      value:
+        differential: B
+        label: Drug B has higher rate
+    equal:
+      type: return
+      value:
+        differential: equal
+        label: Rates are comparable
+tests:
+- input:
+    ratio: 1.5
+  expect:
+    differential: A
+    label: Drug A has higher rate
+- input:
+    ratio: 1.2
+  expect:
+    differential: equal
+    label: Rates are comparable
+- input:
+    ratio: 1.0
+  expect:
+    differential: equal
+    label: Rates are comparable
+- input:
+    ratio: 0.8
+  expect:
+    differential: B
+    label: Drug B has higher rate
+- input:
+    ratio: 0.5
+  expect:
+    differential: B
+    label: Drug B has higher rate
+- input:
+    ratio: 0.833
+  expect:
+    differential: equal
+    label: Rates are comparable
+- input: {}
+  expect:
+    differential: equal
+    label: Rates are comparable

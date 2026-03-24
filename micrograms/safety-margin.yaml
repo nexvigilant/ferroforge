@@ -1,0 +1,104 @@
+name: safety-margin
+description: 'Classify a safety margin distance value (d) into DANGER/CAUTION/SAFE zones with corresponding score ranges'
+version: 0.1.0
+interface:
+  inputs:
+    d:
+      type: float
+      required: true
+  outputs:
+    zone:
+      type: string
+    color:
+      type: string
+    score_min:
+      type: int
+    score_max:
+      type: int
+tree:
+  start: check_danger
+  nodes:
+    check_danger:
+      type: condition
+      variable: d
+      operator: lte
+      value: 0
+      true_next: danger
+      false_next: check_caution
+    check_caution:
+      type: condition
+      variable: d
+      operator: lte
+      value: 1
+      true_next: caution
+      false_next: safe
+    danger:
+      type: return
+      value:
+        zone: DANGER
+        color: red
+        score_min: 0
+        score_max: 33
+    caution:
+      type: return
+      value:
+        zone: CAUTION
+        color: yellow
+        score_min: 33
+        score_max: 66
+    safe:
+      type: return
+      value:
+        zone: SAFE
+        color: green
+        score_min: 66
+        score_max: 100
+tests:
+- input:
+    d: -0.5
+  expect:
+    zone: DANGER
+    color: red
+    score_min: 0
+    score_max: 33
+- input:
+    d: 0
+  expect:
+    zone: DANGER
+    color: red
+    score_min: 0
+    score_max: 33
+- input:
+    d: 0.5
+  expect:
+    zone: CAUTION
+    color: yellow
+    score_min: 33
+    score_max: 66
+- input:
+    d: 1.0
+  expect:
+    zone: CAUTION
+    color: yellow
+    score_min: 33
+    score_max: 66
+- input:
+    d: 1.5
+  expect:
+    zone: SAFE
+    color: green
+    score_min: 66
+    score_max: 100
+- input:
+    d: 3.0
+  expect:
+    zone: SAFE
+    color: green
+    score_min: 66
+    score_max: 100
+- input: {}
+  expect:
+    color: green
+    score_max: 100
+    score_min: 66
+    zone: SAFE

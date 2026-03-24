@@ -1,0 +1,121 @@
+name: search-strategy
+description: "Domain 15: Route to search strategy approach by urgency, comprehensiveness requirement, and available resources."
+version: 0.1.0
+interface:
+  inputs:
+    is_ongoing_monitoring:
+      type: bool
+      required: false
+    is_urgent:
+      type: bool
+      required: false
+    requires_systematic:
+      type: bool
+      required: false
+  outputs:
+    ai_assist:
+      type: string
+    approach:
+      type: string
+    databases:
+      type: string
+    documentation:
+      type: string
+    strategy:
+      type: string
+    timeline:
+      type: string
+    use_for:
+      type: string
+tree:
+  start: check_urgency
+  nodes:
+    check_urgency:
+      type: condition
+      variable: is_urgent
+      operator: eq
+      value: true
+      true_next: rapid_search
+      false_next: check_systematic
+    check_systematic:
+      type: condition
+      variable: requires_systematic
+      operator: eq
+      value: true
+      true_next: systematic_review
+      false_next: check_monitoring
+    check_monitoring:
+      type: condition
+      variable: is_ongoing_monitoring
+      operator: eq
+      value: true
+      true_next: continuous_monitoring
+      false_next: targeted_search
+    rapid_search:
+      type: return
+      value:
+        strategy: RAPID
+        timeline: "hours to 1-2 days"
+        approach: "focused search of key databases, AI-assisted relevance ranking"
+        databases: "PubMed (clinical queries filter), FAERS quick search, known expert consultation"
+        documentation: "brief search log, results summary, limitations acknowledged"
+        ai_assist: "real-time relevance scoring, automated extraction, rapid summarization"
+        use_for: "safety emergencies, urgent regulatory queries, crisis response"
+    systematic_review:
+      type: return
+      value:
+        strategy: SYSTEMATIC
+        timeline: "weeks to months"
+        approach: "comprehensive, pre-specified protocol, reproducible, bias-minimized"
+        databases: "PubMed + Embase + Cochrane + grey literature + trial registries"
+        documentation: "PRISMA flow, registered protocol, full search strategy, quality assessment"
+        ai_assist: "automated screening, data extraction, quality scoring, meta-analysis support"
+        use_for: "regulatory submissions, PSUR/PBRER, signal validation, evidence-based decisions"
+    continuous_monitoring:
+      type: return
+      value:
+        strategy: CONTINUOUS
+        timeline: "ongoing, automated"
+        approach: "AI-powered surveillance with human review of flagged items"
+        databases: "all relevant databases with automated alerts and RSS feeds"
+        documentation: "monitoring log, alert review records, escalation documentation"
+        ai_assist: "automated alerts, trend detection, relevance filtering, priority ranking"
+        use_for: "routine pharmacovigilance, signal detection, regulatory intelligence"
+    targeted_search:
+      type: return
+      value:
+        strategy: TARGETED
+        timeline: "days to weeks"
+        approach: "focused search addressing specific safety question with defined scope"
+        databases: "selected based on question type — clinical, regulatory, epidemiological"
+        documentation: "search strategy, database selection rationale, results summary"
+        ai_assist: "semantic search, citation networking, automated summarization"
+        use_for: "specific safety questions, case-level literature, topic reviews"
+tests:
+- input:
+    is_urgent: true
+  expect:
+    strategy: RAPID
+    timeline: "hours to 1-2 days"
+- input:
+    requires_systematic: true
+    is_urgent: false
+  expect:
+    strategy: SYSTEMATIC
+    timeline: "weeks to months"
+- input:
+    is_ongoing_monitoring: true
+    is_urgent: false
+    requires_systematic: false
+  expect:
+    strategy: CONTINUOUS
+    timeline: "ongoing, automated"
+- input:
+    is_urgent: false
+    requires_systematic: false
+    is_ongoing_monitoring: false
+  expect:
+    strategy: TARGETED
+- input: {}
+  expect:
+    strategy: TARGETED

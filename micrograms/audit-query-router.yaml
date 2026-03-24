@@ -1,0 +1,131 @@
+name: audit-query-router
+description: 'PVOS audit subsystem: routes audit log queries to the correct operation scope (ingest/detect/triage/report/all)'
+version: 0.1.0
+interface:
+  inputs:
+    operation:
+      type: string
+      required: false
+  outputs:
+    description:
+      type: string
+    scope:
+      type: string
+    table:
+      type: string
+tree:
+  start: check_all
+  nodes:
+    check_all:
+      type: condition
+      variable: operation
+      operator: eq
+      value: all
+      true_next: route_all
+      false_next: check_ingest
+    check_ingest:
+      type: condition
+      variable: operation
+      operator: eq
+      value: ingest
+      true_next: route_ingest
+      false_next: check_detect
+    check_detect:
+      type: condition
+      variable: operation
+      operator: eq
+      value: detect
+      true_next: route_detect
+      false_next: check_triage
+    check_triage:
+      type: condition
+      variable: operation
+      operator: eq
+      value: triage
+      true_next: route_triage
+      false_next: check_report
+    check_report:
+      type: condition
+      variable: operation
+      operator: eq
+      value: report
+      true_next: route_report
+      false_next: unknown_operation
+    route_all:
+      type: return
+      value:
+        scope: all
+        table: audit_log
+        description: Full audit trail - query all operations across the PVOS lifecycle
+    route_ingest:
+      type: return
+      value:
+        scope: ingest
+        table: audit_log
+        description: Ingest audit - query case ingestion and validation events
+    route_detect:
+      type: return
+      value:
+        scope: detect
+        table: audit_log
+        description: Detection audit - query signal detection algorithm runs and results
+    route_triage:
+      type: return
+      value:
+        scope: triage
+        table: audit_log
+        description: Triage audit - query signal triage decisions and reviewer actions
+    route_report:
+      type: return
+      value:
+        scope: report
+        table: audit_log
+        description: Report audit - query regulatory submission events and deadlines
+    unknown_operation:
+      type: return
+      value:
+        scope: error
+        table: none
+        description: Unknown operation type - choose ingest/detect/triage/report/all
+tests:
+- input:
+    operation: all
+  expect:
+    scope: all
+    table: audit_log
+    description: Full audit trail - query all operations across the PVOS lifecycle
+- input:
+    operation: ingest
+  expect:
+    scope: ingest
+    table: audit_log
+    description: Ingest audit - query case ingestion and validation events
+- input:
+    operation: detect
+  expect:
+    scope: detect
+    table: audit_log
+    description: Detection audit - query signal detection algorithm runs and results
+- input:
+    operation: triage
+  expect:
+    scope: triage
+    table: audit_log
+    description: Triage audit - query signal triage decisions and reviewer actions
+- input:
+    operation: report
+  expect:
+    scope: report
+    table: audit_log
+    description: Report audit - query regulatory submission events and deadlines
+- input:
+    operation: unknown_op
+  expect:
+    scope: error
+    table: none
+    description: Unknown operation type - choose ingest/detect/triage/report/all
+- input: {}
+  expect:
+    description: Unknown operation type - choose ingest/detect/triage/report/all
+    scope: error
+    table: none

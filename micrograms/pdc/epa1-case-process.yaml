@@ -1,0 +1,170 @@
+name: epa1-case-process
+description: "EPA 1: Process ICSR — triage, collect, assess, code, narrate, submit. Routes by case seriousness and completeness."
+version: 0.1.0
+interface:
+  inputs:
+    involves_death:
+      type: bool
+      required: false
+    involves_hospitalization:
+      type: bool
+      required: false
+    is_reportable:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    life_threatening:
+      type: bool
+      required: false
+  outputs:
+    ai_assist:
+      type: string
+    deadline_days:
+      type: int
+    priority:
+      type: string
+    requires_followup:
+      type: string
+    seriousness:
+      type: string
+    steps:
+      type: string
+    workflow:
+      type: string
+tree:
+  start: check_reportable
+  nodes:
+    check_reportable:
+      type: condition
+      variable: is_reportable
+      operator: eq
+      value: true
+      true_next: check_serious
+      false_next: not_reportable
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_death
+      false_next: routine_case
+    check_death:
+      type: condition
+      variable: involves_death
+      operator: eq
+      value: true
+      true_next: expedited_fatal
+      false_next: check_hospitalization
+    check_hospitalization:
+      type: condition
+      variable: involves_hospitalization
+      operator: eq
+      value: true
+      true_next: expedited_serious
+      false_next: check_life_threatening
+    check_life_threatening:
+      type: condition
+      variable: life_threatening
+      operator: eq
+      value: true
+      true_next: expedited_serious
+      false_next: serious_non_expedited
+    expedited_fatal:
+      type: return
+      value:
+        workflow: EXPEDITED
+        priority: CRITICAL
+        deadline_days: 7
+        steps: "triage -> collect -> medical_assess -> code -> narrate -> qc -> submit_expedited"
+        seriousness: fatal
+        requires_followup: true
+        ai_assist: "auto-triage, coding suggestions, narrative draft, duplicate check"
+    expedited_serious:
+      type: return
+      value:
+        workflow: EXPEDITED
+        priority: HIGH
+        deadline_days: 15
+        steps: "triage -> collect -> medical_assess -> code -> narrate -> qc -> submit_expedited"
+        seriousness: serious
+        requires_followup: true
+        ai_assist: "auto-triage, coding suggestions, narrative draft"
+    serious_non_expedited:
+      type: return
+      value:
+        workflow: STANDARD
+        priority: MEDIUM
+        deadline_days: 90
+        steps: "triage -> collect -> medical_assess -> code -> narrate -> qc -> submit_periodic"
+        seriousness: serious_other
+        requires_followup: true
+    routine_case:
+      type: return
+      value:
+        workflow: STANDARD
+        priority: NORMAL
+        deadline_days: 90
+        steps: "triage -> collect -> assess -> code -> narrate -> qc -> submit_periodic"
+        seriousness: non_serious
+        requires_followup: false
+        ai_assist: "auto-code, quality check"
+    not_reportable:
+      type: return
+      value:
+        workflow: ARCHIVE
+        priority: LOW
+        deadline_days: 0
+        steps: "document -> archive"
+        seriousness: not_applicable
+tests:
+- input:
+    is_reportable: true
+    is_serious: true
+    involves_death: true
+  expect:
+    workflow: EXPEDITED
+    priority: CRITICAL
+    deadline_days: 7
+- input:
+    is_reportable: true
+    is_serious: true
+    involves_hospitalization: true
+    involves_death: false
+  expect:
+    workflow: EXPEDITED
+    deadline_days: 15
+- input:
+    is_reportable: true
+    is_serious: true
+    life_threatening: true
+    involves_death: false
+    involves_hospitalization: false
+  expect:
+    priority: HIGH
+- input:
+    is_reportable: true
+    is_serious: false
+  expect:
+    workflow: STANDARD
+    priority: NORMAL
+    deadline_days: 90
+- input:
+    is_reportable: false
+  expect:
+    workflow: ARCHIVE
+- input: {}
+  expect:
+    workflow: ARCHIVE
+- input:
+    is_reportable: true
+    is_serious: true
+    involves_death: false
+    involves_hospitalization: false
+    life_threatening: false
+  expect:
+    workflow: STANDARD
+    priority: MEDIUM
+    deadline_days: 90
+    seriousness: serious_other

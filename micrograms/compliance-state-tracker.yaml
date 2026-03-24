@@ -1,0 +1,204 @@
+name: compliance-state-tracker
+description: 'Case lifecycle FSM for compliance tracking: RECEIVED -> VALIDATED -> ASSESSED -> REPORTED -> CLOSED. Routes based on current state and gate conditions from upstream micrograms.'
+version: 0.1.0
+interface:
+  inputs:
+    assessed:
+      type: bool
+      required: false
+    current_state:
+      type: string
+      required: false
+    reported:
+      type: bool
+      required: false
+    valid_icsr:
+      type: bool
+      required: false
+  outputs:
+    action_required:
+      type: string
+    compliance_state:
+      type: string
+    ich_control:
+      type: string
+    next_state:
+      type: string
+tree:
+  start: check_state
+  nodes:
+    check_state:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: RECEIVED
+      true_next: validate_gate
+      false_next: check_validated
+    check_validated:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: VALIDATED
+      true_next: assess_gate
+      false_next: check_assessed
+    check_assessed:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: ASSESSED
+      true_next: report_gate
+      false_next: check_reported
+    check_reported:
+      type: condition
+      variable: current_state
+      operator: eq
+      value: REPORTED
+      true_next: close_gate
+      false_next: initial_state
+    validate_gate:
+      type: condition
+      variable: valid_icsr
+      operator: eq
+      value: true
+      true_next: advance_to_validated
+      false_next: blocked_validation
+    assess_gate:
+      type: condition
+      variable: assessed
+      operator: eq
+      value: true
+      true_next: advance_to_assessed
+      false_next: blocked_assessment
+    report_gate:
+      type: condition
+      variable: reported
+      operator: eq
+      value: true
+      true_next: advance_to_reported
+      false_next: blocked_reporting
+    close_gate:
+      type: return
+      value:
+        compliance_state: REPORTED
+        next_state: CLOSED
+        action_required: archive_case
+        ich_control: ICH-E2A-1
+    initial_state:
+      type: return
+      value:
+        compliance_state: RECEIVED
+        next_state: RECEIVED
+        action_required: run_e2a_minimum_criteria
+        ich_control: ICH-E2A-1
+    advance_to_validated:
+      type: return
+      value:
+        compliance_state: RECEIVED
+        next_state: VALIDATED
+        action_required: run_case_assessment_pipeline
+        ich_control: ICH-E2A-1
+    blocked_validation:
+      type: return
+      value:
+        compliance_state: RECEIVED
+        next_state: RECEIVED
+        action_required: collect_missing_icsr_elements
+        ich_control: ICH-E2A-1
+    advance_to_assessed:
+      type: return
+      value:
+        compliance_state: VALIDATED
+        next_state: ASSESSED
+        action_required: run_expedited_reporting_decision
+        ich_control: ICH-E2A-2
+    blocked_assessment:
+      type: return
+      value:
+        compliance_state: VALIDATED
+        next_state: VALIDATED
+        action_required: complete_seriousness_causality_assessment
+        ich_control: ICH-E2C-2
+    advance_to_reported:
+      type: return
+      value:
+        compliance_state: ASSESSED
+        next_state: REPORTED
+        action_required: monitor_for_followup
+        ich_control: ICH-E2A-2
+    blocked_reporting:
+      type: return
+      value:
+        compliance_state: ASSESSED
+        next_state: ASSESSED
+        action_required: submit_regulatory_report
+        ich_control: ICH-E2A-2
+tests:
+- name: new case enters at RECEIVED - needs validation
+  input:
+    current_state: RECEIVED
+    valid_icsr: false
+  expect:
+    compliance_state: RECEIVED
+    next_state: RECEIVED
+    action_required: collect_missing_icsr_elements
+    ich_control: ICH-E2A-1
+- name: RECEIVED with valid ICSR advances to VALIDATED
+  input:
+    current_state: RECEIVED
+    valid_icsr: true
+  expect:
+    compliance_state: RECEIVED
+    next_state: VALIDATED
+    action_required: run_case_assessment_pipeline
+    ich_control: ICH-E2A-1
+- name: VALIDATED with assessment advances to ASSESSED
+  input:
+    current_state: VALIDATED
+    assessed: true
+  expect:
+    compliance_state: VALIDATED
+    next_state: ASSESSED
+    action_required: run_expedited_reporting_decision
+    ich_control: ICH-E2A-2
+- name: VALIDATED without assessment stays blocked
+  input:
+    current_state: VALIDATED
+    assessed: false
+  expect:
+    compliance_state: VALIDATED
+    next_state: VALIDATED
+    action_required: complete_seriousness_causality_assessment
+    ich_control: ICH-E2C-2
+- name: ASSESSED with report advances to REPORTED
+  input:
+    current_state: ASSESSED
+    reported: true
+  expect:
+    compliance_state: ASSESSED
+    next_state: REPORTED
+    action_required: monitor_for_followup
+    ich_control: ICH-E2A-2
+- name: ASSESSED without report stays blocked
+  input:
+    current_state: ASSESSED
+    reported: false
+  expect:
+    compliance_state: ASSESSED
+    next_state: ASSESSED
+    action_required: submit_regulatory_report
+    ich_control: ICH-E2A-2
+- name: REPORTED advances to CLOSED
+  input:
+    current_state: REPORTED
+  expect:
+    compliance_state: REPORTED
+    next_state: CLOSED
+    action_required: archive_case
+    ich_control: ICH-E2A-1
+- name: null input defaults to initial state
+  input: {}
+  expect:
+    compliance_state: RECEIVED
+    next_state: RECEIVED
+    action_required: run_e2a_minimum_criteria
+    ich_control: ICH-E2A-1

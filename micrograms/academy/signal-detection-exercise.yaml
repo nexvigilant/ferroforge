@@ -1,0 +1,77 @@
+name: signal-detection-exercise
+description: "Academy L2: Given pre-computed disproportionality metrics (PRR, chi-squared, case count), determine if Evans (2001) signal criteria are met: PRR >= 2.0, chi-squared >= 4.0, N >= 3."
+version: 0.1.0
+
+tree:
+  start: check_n
+  nodes:
+    check_n:
+      type: condition
+      variable: case_count
+      operator: gte
+      value: 3
+      true_next: check_prr
+      false_next: insufficient_cases
+
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: check_chi2
+      false_next: no_signal
+
+    check_chi2:
+      type: condition
+      variable: chi_squared
+      operator: gte
+      value: 4.0
+      true_next: signal_detected
+      false_next: no_signal
+
+    signal_detected:
+      type: return
+      value:
+        verdict: signal_detected
+        explanation: "Evans criteria met: PRR >= 2.0, chi-squared >= 4.0, N >= 3. This drug-event pair warrants further investigation."
+        next_step: "Proceed to causality assessment (Naranjo or WHO-UMC)"
+
+    no_signal:
+      type: return
+      value:
+        verdict: no_signal
+        explanation: "Evans criteria NOT met. PRR < 2.0 or chi-squared < 4.0. No disproportionality signal detected."
+        next_step: "Continue routine monitoring"
+
+    insufficient_cases:
+      type: return
+      value:
+        verdict: insufficient_data
+        explanation: "Fewer than 3 cases. Cannot apply disproportionality analysis."
+        next_step: "Accumulate more reports before re-evaluating"
+
+tests:
+  - name: "Semaglutide pancreatitis — strong signal"
+    input: { case_count: 2068, prr: 6.93, chi_squared: 10245.1 }
+    expect: { verdict: signal_detected }
+  - name: "Liraglutide pancreatitis — very strong signal"
+    input: { case_count: 3219, prr: 17.39, chi_squared: 47846.3 }
+    expect: { verdict: signal_detected }
+  - name: "Metformin lactic acidosis — extreme signal"
+    input: { case_count: 18417, prr: 71.42, chi_squared: 499469.5 }
+    expect: { verdict: signal_detected }
+  - name: "Atorvastatin rhabdomyolysis — moderate signal"
+    input: { case_count: 2226, prr: 4.79, chi_squared: 6312.6 }
+    expect: { verdict: signal_detected }
+  - name: "Weak association — PRR below threshold"
+    input: { case_count: 50, prr: 1.2, chi_squared: 2.1 }
+    expect: { verdict: no_signal }
+  - name: "PRR above but chi2 below — no signal"
+    input: { case_count: 5, prr: 3.5, chi_squared: 2.8 }
+    expect: { verdict: no_signal }
+  - name: "Only 2 cases — insufficient"
+    input: { case_count: 2, prr: 8.0, chi_squared: 15.0 }
+    expect: { verdict: insufficient_data }
+  - name: "Borderline PRR exactly 2.0 — signal"
+    input: { case_count: 100, prr: 2.0, chi_squared: 12.5 }
+    expect: { verdict: signal_detected }

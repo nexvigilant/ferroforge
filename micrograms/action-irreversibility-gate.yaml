@@ -1,0 +1,138 @@
+name: action-irreversibility-gate
+description: Gates irreversible regulatory actions against evidence strength. Fills the ∝ (Irreversibility) primitive gap. Evaluates whether proposed actions can be undone, and if not, requires either imminent patient safety risk or strong evidence before proceeding.
+version: 0.1.0
+tree:
+  start: check_reversibility
+  nodes:
+    check_imminent_risk:
+      type: condition
+      variable: patient_risk_imminent
+      operator: eq
+      value: true
+      true_next: imminent_proceed_urgent
+      false_next: check_evidence_strength
+    check_evidence_strength:
+      type: condition
+      variable: evidence_strong
+      operator: eq
+      value: true
+      true_next: strong_evidence_proceed
+      false_next: block_weak_evidence
+    check_reversibility:
+      type: condition
+      variable: action_reversible
+      operator: eq
+      value: true
+      true_next: reversible_proceed
+      false_next: check_imminent_risk
+    imminent_proceed_urgent:
+      type: return
+      value:
+        chemistry_analog: rapid exothermic reaction requiring immediate containment
+        action: Proceed with irreversible action — patient safety risk overrides evidence requirement
+        requires_expert_review: true
+        irreversibility_primitive: ∝ — imminent danger bypasses evidence gate
+        gate_decision: PROCEED_URGENT
+    reversible_proceed:
+      type: return
+      value:
+        irreversibility_primitive: ∝ — can this action be undone
+        chemistry_analog: reversible reaction — can be driven backward
+        requires_expert_review: false
+        gate_decision: PROCEED
+        action: Proceed with reversible action (can be undone if needed)
+    strong_evidence_proceed:
+      type: return
+      value:
+        action: Proceed with irreversible action — strong evidence supports decision
+        irreversibility_primitive: ∝ — irreversible action with strong evidence foundation
+        chemistry_analog: controlled combustion with proper ventilation — entropy committed but understood
+        requires_expert_review: true
+        gate_decision: PROCEED_WITH_REVIEW
+    block_weak_evidence:
+      type: return
+      value:
+        action: Block irreversible action — no imminent risk and evidence insufficient. Escalate to expert review.
+        gate_decision: BLOCK_ESCALATE
+        irreversibility_primitive: ∝ — irreversible action blocked without strong evidence
+        chemistry_analog: denaturation prevented — protein integrity preserved pending better data
+        requires_expert_review: true
+tests:
+- input:
+    evidence_strong: true
+    patient_risk_imminent: false
+    action_reversible: true
+  expect:
+    gate_decision: PROCEED
+    requires_expert_review: false
+- input:
+    action_reversible: true
+    patient_risk_imminent: false
+    evidence_strong: false
+  expect:
+    requires_expert_review: false
+    gate_decision: PROCEED
+- input:
+    patient_risk_imminent: true
+    evidence_strong: false
+    action_reversible: true
+  expect:
+    requires_expert_review: false
+    gate_decision: PROCEED
+- input:
+    patient_risk_imminent: true
+    action_reversible: false
+    evidence_strong: false
+  expect:
+    gate_decision: PROCEED_URGENT
+    requires_expert_review: true
+- input:
+    evidence_strong: true
+    action_reversible: false
+    patient_risk_imminent: true
+  expect:
+    requires_expert_review: true
+    gate_decision: PROCEED_URGENT
+- input:
+    patient_risk_imminent: false
+    evidence_strong: true
+    action_reversible: false
+  expect:
+    gate_decision: PROCEED_WITH_REVIEW
+    requires_expert_review: true
+- input:
+    evidence_strong: false
+    patient_risk_imminent: false
+    action_reversible: false
+  expect:
+    requires_expert_review: true
+    gate_decision: BLOCK_ESCALATE
+- input:
+    patient_risk_imminent: false
+    evidence_strong: false
+    action_reversible: false
+  expect:
+    gate_decision: BLOCK_ESCALATE
+    requires_expert_review: true
+- input: {}
+  expect:
+    irreversibility_primitive: ∝ — irreversible action blocked without strong evidence
+    chemistry_analog: denaturation prevented — protein integrity preserved pending better data
+    requires_expert_review: true
+    gate_decision: BLOCK_ESCALATE
+    action: Block irreversible action — no imminent risk and evidence insufficient. Escalate to expert review.
+- input: {}
+  expect:
+    chemistry_analog: denaturation prevented — protein integrity preserved pending better data
+    irreversibility_primitive: ∝ — irreversible action blocked without strong evidence
+    action: Block irreversible action — no imminent risk and evidence insufficient. Escalate to expert review.
+    requires_expert_review: true
+    gate_decision: BLOCK_ESCALATE
+- input: {}
+  expect:
+    action: Block irreversible action — no imminent risk and evidence insufficient. Escalate to expert review.
+    gate_decision: BLOCK_ESCALATE
+    irreversibility_primitive: ∝ — irreversible action blocked without strong evidence
+    chemistry_analog: denaturation prevented — protein integrity preserved pending better data
+    requires_expert_review: true
+interface: null

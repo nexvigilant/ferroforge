@@ -1,0 +1,246 @@
+name: trajectory-centroid
+description: "ALG-2025-022: Trajectory Centroid Calculator. Gates pre-computed safety profile centroid values to classify trajectory shape. centroid_velocity = centroid_current - centroid_previous (positive = worsening). centroid_acceleration = rate of velocity change (positive = speeding up). Prefixed with centroid_ to avoid collision with signal-trend-detector velocity output in chains."
+version: 0.1.0
+tree:
+  start: check_velocity_not_null
+  nodes:
+    check_velocity_not_null:
+      type: condition
+      variable: centroid_velocity
+      operator: is_not_null
+      value: true
+      true_next: check_acceleration_not_null
+      false_next: insufficient_data
+
+    check_acceleration_not_null:
+      type: condition
+      variable: centroid_acceleration
+      operator: is_not_null
+      value: true
+      true_next: check_velocity_positive
+      false_next: insufficient_data
+
+    check_velocity_positive:
+      type: condition
+      variable: centroid_velocity
+      operator: gt
+      value: 0
+      true_next: check_accel_positive_for_drift
+      false_next: check_oscillating
+
+    check_accel_positive_for_drift:
+      type: condition
+      variable: centroid_acceleration
+      operator: gt
+      value: 0
+      true_next: accelerating_drift
+      false_next: decelerating_drift
+
+    check_oscillating:
+      type: condition
+      variable: centroid_current
+      operator: is_not_null
+      value: true
+      true_next: check_centroid_previous_for_oscillation
+      false_next: stable_or_improving
+
+    check_centroid_previous_for_oscillation:
+      type: condition
+      variable: centroid_previous
+      operator: is_not_null
+      value: true
+      true_next: check_centroid_delta_positive
+      false_next: stable_or_improving
+
+    check_centroid_delta_positive:
+      type: condition
+      variable: centroid_delta
+      operator: is_not_null
+      value: true
+      true_next: check_delta_sign
+      false_next: stable_or_improving
+
+    check_delta_sign:
+      type: condition
+      variable: centroid_delta
+      operator: gt
+      value: 0
+      true_next: oscillating
+      false_next: stable_or_improving
+
+    accelerating_drift:
+      type: return
+      value:
+        trajectory_class: ACCELERATING_DRIFT
+        monitoring_action: "Safety profile worsening at increasing rate. Escalate to immediate signal committee review."
+        algorithm: "ALG-2025-022 Trajectory Centroid Calculator — centroid_velocity > 0 AND centroid_acceleration > 0 indicates centroid moving away from baseline at increasing speed"
+
+    decelerating_drift:
+      type: return
+      value:
+        trajectory_class: DECELERATING_DRIFT
+        monitoring_action: "Safety profile worsening but rate of change is slowing. May converge — schedule follow-up assessment at next reporting period."
+        algorithm: "ALG-2025-022 Trajectory Centroid Calculator — centroid_velocity > 0 AND centroid_acceleration <= 0 indicates drift that may be converging"
+
+    oscillating:
+      type: return
+      value:
+        trajectory_class: OSCILLATING
+        monitoring_action: "Safety profile bouncing — velocity non-positive but centroid higher than previous. Investigate periodic or seasonal confounders."
+        algorithm: "ALG-2025-022 Trajectory Centroid Calculator — centroid_velocity <= 0 AND centroid_delta > 0 indicates oscillatory behavior"
+
+    stable_or_improving:
+      type: return
+      value:
+        trajectory_class: STABLE_OR_IMPROVING
+        monitoring_action: "Safety profile stable or improving. Continue routine monitoring."
+        algorithm: "ALG-2025-022 Trajectory Centroid Calculator — centroid_velocity <= 0 AND centroid not rising indicates stable or improving trajectory"
+
+    insufficient_data:
+      type: return
+      value:
+        trajectory_class: INSUFFICIENT_DATA
+        monitoring_action: "centroid_velocity and centroid_acceleration required for trajectory classification. Compute from centroid time series before calling."
+        algorithm: "ALG-2025-022 Trajectory Centroid Calculator — insufficient inputs for classification"
+
+tests:
+# 1. ACCELERATING_DRIFT: centroid_velocity > 0, centroid_acceleration > 0
+- input:
+    centroid_current: 4.5
+    centroid_previous: 3.2
+    centroid_velocity: 1.3
+    centroid_acceleration: 0.4
+    centroid_delta: 1.3
+  expect:
+    trajectory_class: ACCELERATING_DRIFT
+    monitoring_action: "Safety profile worsening at increasing rate. Escalate to immediate signal committee review."
+
+# 2. DECELERATING_DRIFT: centroid_velocity > 0, centroid_acceleration <= 0
+- input:
+    centroid_current: 4.5
+    centroid_previous: 3.8
+    centroid_velocity: 0.7
+    centroid_acceleration: -0.3
+    centroid_delta: 0.7
+  expect:
+    trajectory_class: DECELERATING_DRIFT
+    monitoring_action: "Safety profile worsening but rate of change is slowing. May converge — schedule follow-up assessment at next reporting period."
+
+# 3. OSCILLATING: centroid_velocity <= 0, centroid_delta > 0
+- input:
+    centroid_current: 3.8
+    centroid_previous: 3.5
+    centroid_velocity: -0.2
+    centroid_acceleration: 0.1
+    centroid_delta: 0.3
+  expect:
+    trajectory_class: OSCILLATING
+    monitoring_action: "Safety profile bouncing — velocity non-positive but centroid higher than previous. Investigate periodic or seasonal confounders."
+
+# 4. STABLE_OR_IMPROVING: centroid_velocity <= 0, centroid_delta <= 0
+- input:
+    centroid_current: 2.1
+    centroid_previous: 3.0
+    centroid_velocity: -0.9
+    centroid_acceleration: -0.1
+    centroid_delta: -0.9
+  expect:
+    trajectory_class: STABLE_OR_IMPROVING
+    monitoring_action: "Safety profile stable or improving. Continue routine monitoring."
+
+# 5. Null safety: empty input
+- input: {}
+  expect:
+    trajectory_class: INSUFFICIENT_DATA
+    monitoring_action: "centroid_velocity and centroid_acceleration required for trajectory classification. Compute from centroid time series before calling."
+    algorithm: "ALG-2025-022 Trajectory Centroid Calculator — insufficient inputs for classification"
+
+# 6. Null safety: centroid_velocity present but centroid_acceleration missing
+- input:
+    centroid_velocity: 0.5
+  expect:
+    trajectory_class: INSUFFICIENT_DATA
+
+# 7. Boundary: centroid_velocity = 0 exactly, centroid_acceleration > 0, centroid_delta > 0 → OSCILLATING
+- input:
+    centroid_current: 5.0
+    centroid_previous: 4.8
+    centroid_velocity: 0
+    centroid_acceleration: 0.5
+    centroid_delta: 0.2
+  expect:
+    trajectory_class: OSCILLATING
+
+# 8. Boundary: centroid_velocity = 0, centroid_acceleration = 0, centroid_delta <= 0 → STABLE_OR_IMPROVING
+- input:
+    centroid_current: 3.0
+    centroid_previous: 3.0
+    centroid_velocity: 0
+    centroid_acceleration: 0
+    centroid_delta: 0
+  expect:
+    trajectory_class: STABLE_OR_IMPROVING
+
+# 9. Large accelerating drift (extreme values)
+- input:
+    centroid_current: 25.0
+    centroid_previous: 5.0
+    centroid_velocity: 20.0
+    centroid_acceleration: 8.0
+    centroid_delta: 20.0
+  expect:
+    trajectory_class: ACCELERATING_DRIFT
+
+# 10. Decelerating drift at boundary: centroid_acceleration = 0 exactly
+- input:
+    centroid_current: 5.0
+    centroid_previous: 4.0
+    centroid_velocity: 1.0
+    centroid_acceleration: 0
+    centroid_delta: 1.0
+  expect:
+    trajectory_class: DECELERATING_DRIFT
+
+# 11. Negative centroid_velocity, no centroid_delta provided → STABLE_OR_IMPROVING (missing delta)
+- input:
+    centroid_current: 2.0
+    centroid_previous: 3.0
+    centroid_velocity: -1.0
+    centroid_acceleration: 0.0
+  expect:
+    trajectory_class: STABLE_OR_IMPROVING
+
+# 12. Only centroid_acceleration provided, no centroid_velocity → INSUFFICIENT_DATA
+- input:
+    centroid_acceleration: 0.5
+  expect:
+    trajectory_class: INSUFFICIENT_DATA
+
+interface:
+  inputs:
+    centroid_current:
+      type: float
+      required: false
+    centroid_previous:
+      type: float
+      required: false
+    centroid_velocity:
+      type: float
+      required: true
+    centroid_acceleration:
+      type: float
+      required: true
+    centroid_delta:
+      type: float
+      required: false
+  outputs:
+    trajectory_class:
+      type: string
+      required: true
+    monitoring_action:
+      type: string
+      required: true
+    algorithm:
+      type: string
+      required: false
+  aliases: {}

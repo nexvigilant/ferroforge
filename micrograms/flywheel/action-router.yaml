@@ -1,0 +1,189 @@
+name: action-router
+description: 'Route flywheel composite health actions to specific remediation strategies. GREEN→no-op, YELLOW→monitor path, RED→intervention cascade.'
+version: 0.1.0
+interface:
+  inputs:
+    action:
+      type: string
+      required: false
+    degraded_dimension:
+      type: string
+      required: false
+  outputs:
+    steps:
+      type: string
+    strategy:
+      type: string
+tree:
+  start: check_action
+  nodes:
+    check_action:
+      type: condition
+      variable: action
+      operator: eq
+      value: none
+      true_next: no_op
+      false_next: check_monitor
+    check_monitor:
+      type: condition
+      variable: action
+      operator: eq
+      value: monitor
+      true_next: monitor_classify
+      false_next: intervene_classify
+    monitor_classify:
+      type: condition
+      variable: degraded_dimension
+      operator: eq
+      value: velocity
+      true_next: monitor_velocity
+      false_next: check_monitor_events
+    check_monitor_events:
+      type: condition
+      variable: degraded_dimension
+      operator: eq
+      value: events
+      true_next: monitor_events
+      false_next: monitor_coverage
+    monitor_velocity:
+      type: return
+      value:
+        strategy: MONITOR_VELOCITY
+        steps:
+          - check_bottleneck_crates
+          - review_session_velocity_trend
+          - adjust_wiring_priority
+    monitor_events:
+      type: return
+      value:
+        strategy: MONITOR_EVENTS
+        steps:
+          - drain_pending_events
+          - verify_consumer_health
+          - check_bus_backlog
+    monitor_coverage:
+      type: return
+      value:
+        strategy: MONITOR_COVERAGE
+        steps:
+          - identify_dormant_nodes
+          - wire_missing_emitters
+          - promote_ready_nodes
+    intervene_classify:
+      type: condition
+      variable: degraded_dimension
+      operator: eq
+      value: velocity
+      true_next: intervene_velocity
+      false_next: check_intervene_events
+    check_intervene_events:
+      type: condition
+      variable: degraded_dimension
+      operator: eq
+      value: events
+      true_next: intervene_events
+      false_next: intervene_coverage
+    intervene_velocity:
+      type: return
+      value:
+        strategy: INTERVENE_VELOCITY
+        steps:
+          - escalate_to_session_lead
+          - identify_stalled_chains
+          - emergency_scope_reduction
+    intervene_events:
+      type: return
+      value:
+        strategy: INTERVENE_EVENTS
+        steps:
+          - verify_mcp_server_health
+          - restart_flywheel_bus
+          - rewire_dead_emitters
+    intervene_coverage:
+      type: return
+      value:
+        strategy: INTERVENE_COVERAGE
+        steps:
+          - audit_node_registry
+          - rebuild_missing_bridges
+          - force_promote_if_emitters_exist
+    no_op:
+      type: return
+      value:
+        strategy: NO_OP
+        steps: []
+tests:
+# GREEN path
+- input:
+    action: none
+    degraded_dimension: none
+  expect:
+    strategy: NO_OP
+    steps: []
+# YELLOW: velocity degradation
+- input:
+    action: monitor
+    degraded_dimension: velocity
+  expect:
+    strategy: MONITOR_VELOCITY
+    steps:
+      - check_bottleneck_crates
+      - review_session_velocity_trend
+      - adjust_wiring_priority
+# YELLOW: event health degradation
+- input:
+    action: monitor
+    degraded_dimension: events
+  expect:
+    strategy: MONITOR_EVENTS
+    steps:
+      - drain_pending_events
+      - verify_consumer_health
+      - check_bus_backlog
+# YELLOW: coverage degradation
+- input:
+    action: monitor
+    degraded_dimension: coverage
+  expect:
+    strategy: MONITOR_COVERAGE
+    steps:
+      - identify_dormant_nodes
+      - wire_missing_emitters
+      - promote_ready_nodes
+# RED: velocity critical
+- input:
+    action: intervene
+    degraded_dimension: velocity
+  expect:
+    strategy: INTERVENE_VELOCITY
+    steps:
+      - escalate_to_session_lead
+      - identify_stalled_chains
+      - emergency_scope_reduction
+# RED: events critical
+- input:
+    action: intervene
+    degraded_dimension: events
+  expect:
+    strategy: INTERVENE_EVENTS
+    steps:
+      - verify_mcp_server_health
+      - restart_flywheel_bus
+      - rewire_dead_emitters
+# RED: coverage critical
+- input:
+    action: intervene
+    degraded_dimension: coverage
+  expect:
+    strategy: INTERVENE_COVERAGE
+    steps:
+      - audit_node_registry
+      - rebuild_missing_bridges
+      - force_promote_if_emitters_exist
+- input: {}
+  expect:
+    steps:
+      - audit_node_registry
+      - rebuild_missing_bridges
+      - force_promote_if_emitters_exist
+    strategy: INTERVENE_COVERAGE

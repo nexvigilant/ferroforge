@@ -1,0 +1,877 @@
+name: appe-portfolio-tracker
+description: 'APPE Ch7.2/7.6: Portfolio completeness tracker — assesses evidence collection progress across domains. Caller must pre-compute total_collected = d1+d2+d3+d14+reflection_count. Thresholds assume total_required=20 (90%=18, 75%=15, 50%=10).'
+version: 0.1.0
+tree:
+  start: check_comprehensive
+  nodes:
+    adeq_refl_t_gap_d1:
+      type: return
+      value:
+        ready_for_final: true
+        status: ADEQUATE
+        gap_domain: domain_1
+        next_action: Prioritize domain_1 evidence collection to close gap
+        reflection_adequate: true
+        completeness_note: 75-89% evidence collected
+    check_gap_adeq_rt:
+      type: condition
+      variable: d1_evidence_count
+      operator: lt
+      value: 3
+      true_next: adeq_refl_t_gap_d1
+      false_next: adeq_refl_t_gap_none
+    insuf_refl_t_gap_d1:
+      type: return
+      value:
+        status: INSUFFICIENT
+        ready_for_final: false
+        completeness_note: <50% evidence collected
+        reflection_adequate: true
+        next_action: Immediate action — focus on domain_1 and all evidence collection
+        gap_domain: domain_1
+    check_gap_comp_rt:
+      type: condition
+      variable: d1_evidence_count
+      operator: lt
+      value: 3
+      true_next: comp_refl_t_gap_d1
+      false_next: comp_refl_t_gap_none
+    check_comprehensive:
+      type: condition
+      variable: total_collected
+      operator: gte
+      value: 18
+      true_next: check_refl_comp
+      false_next: check_adequate
+    adeq_refl_t_gap_none:
+      type: return
+      value:
+        next_action: Complete remaining evidence to reach comprehensive level
+        status: ADEQUATE
+        ready_for_final: true
+        reflection_adequate: true
+        completeness_note: 75-89% evidence collected
+        gap_domain: none
+    insuf_refl_f_gap_d1:
+      type: return
+      value:
+        ready_for_final: false
+        completeness_note: <50% evidence collected
+        reflection_adequate: false
+        status: INSUFFICIENT
+        gap_domain: domain_1
+        next_action: Immediate preceptor consultation — address domain_1 gap and all evidence collection
+    check_gap_inprog_rt:
+      type: condition
+      variable: d1_evidence_count
+      operator: lt
+      value: 3
+      true_next: inprog_refl_t_gap_d1
+      false_next: inprog_refl_t_gap_none
+    inprog_refl_f_gap_d1:
+      type: return
+      value:
+        reflection_adequate: false
+        completeness_note: 50-74% evidence collected
+        ready_for_final: false
+        status: IN_PROGRESS
+        gap_domain: domain_1
+        next_action: Prioritize domain_1 activities and add reflections immediately
+    check_gap_adeq_rf:
+      type: condition
+      variable: d1_evidence_count
+      operator: lt
+      value: 3
+      true_next: adeq_refl_f_gap_d1
+      false_next: adeq_refl_f_gap_none
+    check_refl_adeq:
+      type: condition
+      variable: reflection_count
+      operator: gte
+      value: 3
+      true_next: check_gap_adeq_rt
+      false_next: check_gap_adeq_rf
+    check_refl_inprog:
+      type: condition
+      variable: reflection_count
+      operator: gte
+      value: 3
+      true_next: check_gap_inprog_rt
+      false_next: check_gap_inprog_rf
+    adeq_refl_f_gap_none:
+      type: return
+      value:
+        reflection_adequate: false
+        status: ADEQUATE
+        gap_domain: none
+        completeness_note: 75-89% evidence collected
+        next_action: Add reflections and continue evidence collection
+        ready_for_final: true
+    inprog_refl_f_gap_none:
+      type: return
+      value:
+        ready_for_final: false
+        reflection_adequate: false
+        next_action: Increase evidence collection and add weekly reflections
+        status: IN_PROGRESS
+        gap_domain: none
+        completeness_note: 50-74% evidence collected
+    check_refl_comp:
+      type: condition
+      variable: reflection_count
+      operator: gte
+      value: 3
+      true_next: check_gap_comp_rt
+      false_next: check_gap_comp_rf
+    insuf_refl_f_gap_none:
+      type: return
+      value:
+        completeness_note: <50% evidence collected
+        status: INSUFFICIENT
+        next_action: Immediate preceptor consultation — intensive remediation plan required
+        ready_for_final: false
+        reflection_adequate: false
+        gap_domain: none
+    inprog_refl_t_gap_none:
+      type: return
+      value:
+        next_action: Accelerate evidence collection — target 15+ items before midpoint review
+        reflection_adequate: true
+        gap_domain: none
+        completeness_note: 50-74% evidence collected
+        ready_for_final: false
+        status: IN_PROGRESS
+    inprog_refl_t_gap_d1:
+      type: return
+      value:
+        ready_for_final: false
+        reflection_adequate: true
+        completeness_note: 50-74% evidence collected
+        gap_domain: domain_1
+        next_action: Focus domain_1 activities to address portfolio gap
+        status: IN_PROGRESS
+    check_refl_insuf:
+      type: condition
+      variable: reflection_count
+      operator: gte
+      value: 3
+      true_next: check_gap_insuf_rt
+      false_next: check_gap_insuf_rf
+    check_gap_inprog_rf:
+      type: condition
+      variable: d1_evidence_count
+      operator: lt
+      value: 3
+      true_next: inprog_refl_f_gap_d1
+      false_next: inprog_refl_f_gap_none
+    check_gap_insuf_rf:
+      type: condition
+      variable: d1_evidence_count
+      operator: lt
+      value: 3
+      true_next: insuf_refl_f_gap_d1
+      false_next: insuf_refl_f_gap_none
+    check_gap_insuf_rt:
+      type: condition
+      variable: d1_evidence_count
+      operator: lt
+      value: 3
+      true_next: insuf_refl_t_gap_d1
+      false_next: insuf_refl_t_gap_none
+    comp_refl_f_gap_d1:
+      type: return
+      value:
+        gap_domain: domain_1
+        next_action: Add reflections and strengthen domain_1 evidence
+        ready_for_final: true
+        status: COMPREHENSIVE
+        completeness_note: '>=90% evidence collected'
+        reflection_adequate: false
+    insuf_refl_t_gap_none:
+      type: return
+      value:
+        reflection_adequate: true
+        completeness_note: <50% evidence collected
+        next_action: Immediate action required — consult preceptor and intensify evidence collection
+        ready_for_final: false
+        gap_domain: none
+        status: INSUFFICIENT
+    check_in_progress:
+      type: condition
+      variable: total_collected
+      operator: gte
+      value: 10
+      true_next: check_refl_inprog
+      false_next: check_refl_insuf
+    adeq_refl_f_gap_d1:
+      type: return
+      value:
+        status: ADEQUATE
+        ready_for_final: true
+        gap_domain: domain_1
+        next_action: Add reflections and strengthen domain_1 evidence
+        reflection_adequate: false
+        completeness_note: 75-89% evidence collected
+    comp_refl_t_gap_none:
+      type: return
+      value:
+        completeness_note: '>=90% evidence collected'
+        reflection_adequate: true
+        next_action: Proceed to final bridge assessment
+        status: COMPREHENSIVE
+        gap_domain: none
+        ready_for_final: true
+    check_adequate:
+      type: condition
+      variable: total_collected
+      operator: gte
+      value: 15
+      true_next: check_refl_adeq
+      false_next: check_in_progress
+    check_gap_comp_rf:
+      type: condition
+      variable: d1_evidence_count
+      operator: lt
+      value: 3
+      true_next: comp_refl_f_gap_d1
+      false_next: comp_refl_f_gap_none
+    comp_refl_f_gap_none:
+      type: return
+      value:
+        next_action: Add at least 3 reflections before final submission
+        status: COMPREHENSIVE
+        gap_domain: none
+        reflection_adequate: false
+        completeness_note: '>=90% evidence collected'
+        ready_for_final: true
+    comp_refl_t_gap_d1:
+      type: return
+      value:
+        status: COMPREHENSIVE
+        ready_for_final: true
+        gap_domain: domain_1
+        completeness_note: '>=90% evidence collected'
+        reflection_adequate: true
+        next_action: Proceed to bridge assessment — strengthen domain_1 evidence before submission
+tests:
+- input:
+    reflection_count: 5
+    total_collected: 25
+    d2_evidence_count: 5
+    d3_evidence_count: 5
+    d1_evidence_count: 5
+    total_required: 20
+    d14_evidence_count: 5
+  expect:
+    ready_for_final: true
+    status: COMPREHENSIVE
+    reflection_adequate: true
+- input:
+    d3_evidence_count: 4
+    total_collected: 18
+    d14_evidence_count: 4
+    reflection_count: 2
+    d1_evidence_count: 4
+    total_required: 20
+    d2_evidence_count: 4
+  expect:
+    status: COMPREHENSIVE
+    ready_for_final: true
+    reflection_adequate: false
+- input:
+    total_collected: 20
+    d3_evidence_count: 5
+    d14_evidence_count: 5
+    reflection_count: 3
+    total_required: 20
+    d2_evidence_count: 5
+    d1_evidence_count: 2
+  expect:
+    ready_for_final: true
+    gap_domain: domain_1
+    reflection_adequate: true
+    status: COMPREHENSIVE
+- input:
+    total_collected: 16
+    d1_evidence_count: 4
+    d3_evidence_count: 4
+    d14_evidence_count: 2
+    reflection_count: 2
+    total_required: 20
+    d2_evidence_count: 4
+  expect:
+    reflection_adequate: false
+    ready_for_final: true
+    status: ADEQUATE
+- input:
+    d2_evidence_count: 4
+    d14_evidence_count: 4
+    reflection_count: 4
+    d1_evidence_count: 3
+    d3_evidence_count: 4
+    total_required: 20
+    total_collected: 15
+  expect:
+    reflection_adequate: true
+    status: ADEQUATE
+    ready_for_final: true
+- input:
+    d2_evidence_count: 3
+    d3_evidence_count: 3
+    total_required: 20
+    total_collected: 12
+    d1_evidence_count: 3
+    d14_evidence_count: 3
+    reflection_count: 3
+  expect:
+    ready_for_final: false
+    status: IN_PROGRESS
+    reflection_adequate: true
+- input:
+    d1_evidence_count: 2
+    total_required: 20
+    total_collected: 10
+    d3_evidence_count: 3
+    reflection_count: 0
+    d2_evidence_count: 3
+    d14_evidence_count: 2
+  expect:
+    status: IN_PROGRESS
+    ready_for_final: false
+    reflection_adequate: false
+- input:
+    total_required: 20
+    d3_evidence_count: 2
+    d14_evidence_count: 2
+    reflection_count: 1
+    d2_evidence_count: 2
+    total_collected: 9
+    d1_evidence_count: 2
+  expect:
+    reflection_adequate: false
+    status: INSUFFICIENT
+    ready_for_final: false
+- input:
+    d3_evidence_count: 0
+    total_collected: 0
+    reflection_count: 0
+    d14_evidence_count: 0
+    d2_evidence_count: 0
+    d1_evidence_count: 0
+    total_required: 20
+  expect:
+    ready_for_final: false
+    reflection_adequate: false
+    status: INSUFFICIENT
+- input:
+    total_collected: 7
+    reflection_count: 4
+    d3_evidence_count: 2
+    d2_evidence_count: 2
+    d14_evidence_count: 2
+    d1_evidence_count: 1
+    total_required: 20
+  expect:
+    reflection_adequate: true
+    gap_domain: domain_1
+    status: INSUFFICIENT
+    ready_for_final: false
+- input:
+    d2_evidence_count: 4
+    total_required: 20
+    total_collected: 14
+    d3_evidence_count: 4
+    d14_evidence_count: 3
+    d1_evidence_count: 3
+    reflection_count: 0
+  expect:
+    ready_for_final: false
+    status: IN_PROGRESS
+- input:
+    d1_evidence_count: -1
+  expect:
+    ready_for_final: false
+    reflection_adequate: false
+    status: INSUFFICIENT
+    gap_domain: domain_1
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — address domain_1 gap and all evidence collection
+- input:
+    d1_evidence_count: 300
+  expect:
+    gap_domain: none
+    status: INSUFFICIENT
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    ready_for_final: false
+    reflection_adequate: false
+- input: {}
+  expect:
+    status: INSUFFICIENT
+    reflection_adequate: false
+    gap_domain: none
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    completeness_note: <50% evidence collected
+    ready_for_final: false
+- input:
+    d1_evidence_count: -1
+  expect:
+    next_action: Immediate preceptor consultation — address domain_1 gap and all evidence collection
+    status: INSUFFICIENT
+    gap_domain: domain_1
+    completeness_note: <50% evidence collected
+    ready_for_final: false
+    reflection_adequate: false
+- input:
+    d1_evidence_count: 300
+  expect:
+    gap_domain: none
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    ready_for_final: false
+    reflection_adequate: false
+    status: INSUFFICIENT
+- input: {}
+  expect:
+    ready_for_final: false
+    reflection_adequate: false
+    gap_domain: none
+    status: INSUFFICIENT
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+- input:
+    total_collected: -1
+  expect:
+    reflection_adequate: false
+    gap_domain: none
+    completeness_note: <50% evidence collected
+    status: INSUFFICIENT
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    ready_for_final: false
+- input:
+    total_collected: 17
+  expect:
+    ready_for_final: true
+    next_action: Add reflections and continue evidence collection
+    completeness_note: 75-89% evidence collected
+    gap_domain: none
+    reflection_adequate: false
+    status: ADEQUATE
+- input:
+    total_collected: 19
+  expect:
+    completeness_note: '>=90% evidence collected'
+    reflection_adequate: false
+    next_action: Add at least 3 reflections before final submission
+    gap_domain: none
+    status: COMPREHENSIVE
+    ready_for_final: true
+- input:
+    total_collected: 1800
+  expect:
+    reflection_adequate: false
+    status: COMPREHENSIVE
+    ready_for_final: true
+    gap_domain: none
+    completeness_note: '>=90% evidence collected'
+    next_action: Add at least 3 reflections before final submission
+- input: {}
+  expect:
+    completeness_note: <50% evidence collected
+    reflection_adequate: false
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    status: INSUFFICIENT
+    ready_for_final: false
+    gap_domain: none
+- input:
+    d1_evidence_count: -1
+  expect:
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — address domain_1 gap and all evidence collection
+    gap_domain: domain_1
+    ready_for_final: false
+    status: INSUFFICIENT
+    reflection_adequate: false
+- input:
+    d1_evidence_count: 300
+  expect:
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    reflection_adequate: false
+    gap_domain: none
+    status: INSUFFICIENT
+    ready_for_final: false
+- input: {}
+  expect:
+    status: INSUFFICIENT
+    ready_for_final: false
+    reflection_adequate: false
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    gap_domain: none
+    completeness_note: <50% evidence collected
+- input:
+    d1_evidence_count: -1
+  expect:
+    ready_for_final: false
+    reflection_adequate: false
+    next_action: Immediate preceptor consultation — address domain_1 gap and all evidence collection
+    status: INSUFFICIENT
+    gap_domain: domain_1
+    completeness_note: <50% evidence collected
+- input:
+    d1_evidence_count: 300
+  expect:
+    reflection_adequate: false
+    gap_domain: none
+    status: INSUFFICIENT
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    completeness_note: <50% evidence collected
+    ready_for_final: false
+- input: {}
+  expect:
+    reflection_adequate: false
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    status: INSUFFICIENT
+    gap_domain: none
+    ready_for_final: false
+- input:
+    reflection_count: -1
+  expect:
+    ready_for_final: false
+    reflection_adequate: false
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    gap_domain: none
+    completeness_note: <50% evidence collected
+    status: INSUFFICIENT
+- input:
+    reflection_count: 300
+  expect:
+    ready_for_final: false
+    gap_domain: none
+    status: INSUFFICIENT
+    reflection_adequate: true
+    completeness_note: <50% evidence collected
+    next_action: Immediate action required — consult preceptor and intensify evidence collection
+- input: {}
+  expect:
+    status: INSUFFICIENT
+    gap_domain: none
+    completeness_note: <50% evidence collected
+    reflection_adequate: false
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    ready_for_final: false
+- input:
+    reflection_count: -1
+  expect:
+    gap_domain: none
+    status: INSUFFICIENT
+    ready_for_final: false
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    reflection_adequate: false
+- input:
+    reflection_count: 300
+  expect:
+    ready_for_final: false
+    completeness_note: <50% evidence collected
+    gap_domain: none
+    reflection_adequate: true
+    status: INSUFFICIENT
+    next_action: Immediate action required — consult preceptor and intensify evidence collection
+- input: {}
+  expect:
+    completeness_note: <50% evidence collected
+    status: INSUFFICIENT
+    reflection_adequate: false
+    ready_for_final: false
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    gap_domain: none
+- input:
+    reflection_count: -1
+  expect:
+    ready_for_final: false
+    reflection_adequate: false
+    status: INSUFFICIENT
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    completeness_note: <50% evidence collected
+    gap_domain: none
+- input:
+    reflection_count: 300
+  expect:
+    reflection_adequate: true
+    completeness_note: <50% evidence collected
+    next_action: Immediate action required — consult preceptor and intensify evidence collection
+    ready_for_final: false
+    status: INSUFFICIENT
+    gap_domain: none
+- input: {}
+  expect:
+    ready_for_final: false
+    status: INSUFFICIENT
+    completeness_note: <50% evidence collected
+    gap_domain: none
+    reflection_adequate: false
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+- input:
+    reflection_count: -1
+  expect:
+    completeness_note: <50% evidence collected
+    reflection_adequate: false
+    gap_domain: none
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    status: INSUFFICIENT
+    ready_for_final: false
+- input:
+    reflection_count: 300
+  expect:
+    gap_domain: none
+    status: INSUFFICIENT
+    ready_for_final: false
+    reflection_adequate: true
+    completeness_note: <50% evidence collected
+    next_action: Immediate action required — consult preceptor and intensify evidence collection
+- input: {}
+  expect:
+    status: INSUFFICIENT
+    reflection_adequate: false
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    gap_domain: none
+    ready_for_final: false
+- input:
+    d1_evidence_count: -1
+  expect:
+    ready_for_final: false
+    status: INSUFFICIENT
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — address domain_1 gap and all evidence collection
+    gap_domain: domain_1
+    reflection_adequate: false
+- input:
+    d1_evidence_count: 300
+  expect:
+    status: INSUFFICIENT
+    ready_for_final: false
+    reflection_adequate: false
+    completeness_note: <50% evidence collected
+    gap_domain: none
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+- input: {}
+  expect:
+    gap_domain: none
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    completeness_note: <50% evidence collected
+    status: INSUFFICIENT
+    ready_for_final: false
+    reflection_adequate: false
+- input:
+    d1_evidence_count: -1
+  expect:
+    status: INSUFFICIENT
+    next_action: Immediate preceptor consultation — address domain_1 gap and all evidence collection
+    completeness_note: <50% evidence collected
+    gap_domain: domain_1
+    ready_for_final: false
+    reflection_adequate: false
+- input:
+    d1_evidence_count: 300
+  expect:
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    ready_for_final: false
+    reflection_adequate: false
+    gap_domain: none
+    status: INSUFFICIENT
+- input: {}
+  expect:
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    reflection_adequate: false
+    status: INSUFFICIENT
+    ready_for_final: false
+    completeness_note: <50% evidence collected
+    gap_domain: none
+- input:
+    d1_evidence_count: -1
+  expect:
+    completeness_note: <50% evidence collected
+    status: INSUFFICIENT
+    ready_for_final: false
+    reflection_adequate: false
+    next_action: Immediate preceptor consultation — address domain_1 gap and all evidence collection
+    gap_domain: domain_1
+- input:
+    d1_evidence_count: 300
+  expect:
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    completeness_note: <50% evidence collected
+    status: INSUFFICIENT
+    reflection_adequate: false
+    gap_domain: none
+    ready_for_final: false
+- input: {}
+  expect:
+    ready_for_final: false
+    completeness_note: <50% evidence collected
+    status: INSUFFICIENT
+    reflection_adequate: false
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    gap_domain: none
+- input:
+    total_collected: -1
+  expect:
+    gap_domain: none
+    ready_for_final: false
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    completeness_note: <50% evidence collected
+    reflection_adequate: false
+    status: INSUFFICIENT
+- input:
+    total_collected: 11
+  expect:
+    next_action: Increase evidence collection and add weekly reflections
+    reflection_adequate: false
+    status: IN_PROGRESS
+    gap_domain: none
+    ready_for_final: false
+    completeness_note: 50-74% evidence collected
+- input:
+    total_collected: 1000
+  expect:
+    reflection_adequate: false
+    ready_for_final: true
+    next_action: Add at least 3 reflections before final submission
+    completeness_note: '>=90% evidence collected'
+    gap_domain: none
+    status: COMPREHENSIVE
+- input: {}
+  expect:
+    reflection_adequate: false
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    gap_domain: none
+    status: INSUFFICIENT
+    ready_for_final: false
+    completeness_note: <50% evidence collected
+- input:
+    total_collected: -1
+  expect:
+    completeness_note: <50% evidence collected
+    reflection_adequate: false
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    gap_domain: none
+    status: INSUFFICIENT
+    ready_for_final: false
+- input:
+    total_collected: 1500
+  expect:
+    ready_for_final: true
+    gap_domain: none
+    next_action: Add at least 3 reflections before final submission
+    reflection_adequate: false
+    completeness_note: '>=90% evidence collected'
+    status: COMPREHENSIVE
+- input: {}
+  expect:
+    gap_domain: none
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    completeness_note: <50% evidence collected
+    ready_for_final: false
+    status: INSUFFICIENT
+    reflection_adequate: false
+- input:
+    d1_evidence_count: -1
+  expect:
+    ready_for_final: false
+    completeness_note: <50% evidence collected
+    reflection_adequate: false
+    next_action: Immediate preceptor consultation — address domain_1 gap and all evidence collection
+    status: INSUFFICIENT
+    gap_domain: domain_1
+- input:
+    d1_evidence_count: 300
+  expect:
+    status: INSUFFICIENT
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    completeness_note: <50% evidence collected
+    ready_for_final: false
+    gap_domain: none
+    reflection_adequate: false
+- input: {}
+  expect:
+    ready_for_final: false
+    reflection_adequate: false
+    status: INSUFFICIENT
+    completeness_note: <50% evidence collected
+    next_action: Immediate preceptor consultation — intensive remediation plan required
+    gap_domain: none
+# comp_refl_f_gap_d1: comprehensive but no reflections and d1 gap
+- input:
+    total_collected: 20
+    reflection_count: 1
+    d1_evidence_count: 1
+  expect:
+    status: COMPREHENSIVE
+    ready_for_final: true
+    reflection_adequate: false
+    gap_domain: domain_1
+# adeq_refl_t_gap_d1: adequate with reflections but d1 gap
+- input:
+    total_collected: 16
+    reflection_count: 4
+    d1_evidence_count: 2
+  expect:
+    status: ADEQUATE
+    ready_for_final: true
+    reflection_adequate: true
+    gap_domain: domain_1
+# adeq_refl_f_gap_d1: adequate, no reflections, d1 gap
+- input:
+    total_collected: 15
+    reflection_count: 1
+    d1_evidence_count: 2
+  expect:
+    status: ADEQUATE
+    ready_for_final: true
+    reflection_adequate: false
+    gap_domain: domain_1
+# inprog_refl_t_gap_d1: in progress with reflections, d1 gap
+- input:
+    total_collected: 12
+    reflection_count: 4
+    d1_evidence_count: 1
+  expect:
+    status: IN_PROGRESS
+    ready_for_final: false
+    reflection_adequate: true
+    gap_domain: domain_1
+interface:
+  inputs:
+    d1_evidence_count:
+      type: int
+      required: false
+    reflection_count:
+      type: int
+      required: false
+    total_collected:
+      type: int
+      required: false
+  outputs:
+    ready_for_final:
+      type: bool
+      required: false
+    next_action:
+      type: string
+      required: false
+    completeness_note:
+      type: string
+      required: false
+    gap_domain:
+      type: string
+      required: false
+    reflection_adequate:
+      type: bool
+      required: false
+    status:
+      type: string
+      required: false
+  aliases: {}

@@ -1,0 +1,253 @@
+name: incidence-verifier
+description: "NexCore incidence rate verification gate: determines whether a computed incidence rate meets NexCore verification standards based on denominator confidence, boundary level, and stream count"
+version: 0.1.0
+interface:
+  inputs:
+    numerator_source:
+      type: string
+      required: true
+    denominator_confidence:
+      type: string
+      required: true
+    boundary_level:
+      type: string
+      required: true
+    stream_count:
+      type: int
+      required: false
+    has_upward_reconciliation:
+      type: bool
+      required: false
+  outputs:
+    verification_status:
+      type: string
+    rate_class:
+      type: string
+    publishable:
+      type: bool
+    regulatory_submittable:
+      type: bool
+    action:
+      type: string
+    nexcore_stamp:
+      type: string
+tree:
+  start: check_denominator
+  nodes:
+    check_denominator:
+      type: condition
+      variable: denominator_confidence
+      operator: eq
+      value: census
+      true_next: census_denom
+      false_next: check_high
+    check_high:
+      type: condition
+      variable: denominator_confidence
+      operator: eq
+      value: high
+      true_next: high_denom
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: denominator_confidence
+      operator: eq
+      value: moderate
+      true_next: moderate_denom
+      false_next: check_low
+    check_low:
+      type: condition
+      variable: denominator_confidence
+      operator: eq
+      value: low
+      true_next: low_denom
+      false_next: unusable_denom
+    census_denom:
+      type: condition
+      variable: has_upward_reconciliation
+      operator: eq
+      value: true
+      true_next: nexcore_verified
+      false_next: nexcore_counted
+    nexcore_verified:
+      type: return
+      value:
+        verification_status: nexcore_verified
+        rate_class: "true incidence rate — counted denominator, reconciled across boundary hierarchy"
+        publishable: true
+        regulatory_submittable: true
+        action: "Rate is NexCore-verified. Suitable for regulatory submission, publication, and clinical decision-making."
+        nexcore_stamp: "NV-VERIFIED"
+    nexcore_counted:
+      type: return
+      value:
+        verification_status: nexcore_counted
+        rate_class: "counted incidence rate — census denominator, not yet reconciled"
+        publishable: true
+        regulatory_submittable: false
+        action: "Rate is counted but unreconciled. Add upward reconciliation for regulatory grade."
+        nexcore_stamp: "NV-COUNTED"
+    high_denom:
+      type: condition
+      variable: stream_count
+      operator: gte
+      value: 2
+      true_next: high_multi
+      false_next: high_single
+    high_multi:
+      type: return
+      value:
+        verification_status: nexcore_estimated
+        rate_class: "high-confidence estimated rate — multiple streams, deduplicated"
+        publishable: true
+        regulatory_submittable: false
+        action: "Rate is publication-grade but estimated. Upgrade to census denominator for regulatory submission."
+        nexcore_stamp: "NV-ESTIMATED-HIGH"
+    high_single:
+      type: return
+      value:
+        verification_status: nexcore_estimated
+        rate_class: "estimated rate — single high-confidence stream"
+        publishable: false
+        regulatory_submittable: false
+        action: "Add a second stream for cross-verification before publication."
+        nexcore_stamp: "NV-ESTIMATED"
+    moderate_denom:
+      type: return
+      value:
+        verification_status: screening_only
+        rate_class: "screening rate — moderate denominator, not verified"
+        publishable: false
+        regulatory_submittable: false
+        action: "Rate is suitable for internal signal screening only. Do not cite as incidence."
+        nexcore_stamp: "NV-SCREENING"
+    low_denom:
+      type: return
+      value:
+        verification_status: hypothesis_only
+        rate_class: "modeled rate — low denominator confidence, hypothesis generation only"
+        publishable: false
+        regulatory_submittable: false
+        action: "Do not compute a rate. Use only for hypothesis generation. Seek better denominator."
+        nexcore_stamp: "NV-HYPOTHESIS"
+    unusable_denom:
+      type: return
+      value:
+        verification_status: rejected
+        rate_class: "no rate — denominator unknown, FAERS-class uncertainty"
+        publishable: false
+        regulatory_submittable: false
+        action: "BLOCKED. This is the FAERS paradigm. NexCore cannot verify. Acquire a counted denominator."
+        nexcore_stamp: "NV-REJECTED"
+tests:
+- name: gold_standard_verified
+  input:
+    numerator_source: faers
+    denominator_confidence: census
+    boundary_level: pharmacy
+    has_upward_reconciliation: true
+    stream_count: 3
+  expect:
+    verification_status: nexcore_verified
+    publishable: true
+    regulatory_submittable: true
+    nexcore_stamp: "NV-VERIFIED"
+- name: census_no_reconciliation
+  input:
+    numerator_source: faers
+    denominator_confidence: census
+    boundary_level: zip
+    has_upward_reconciliation: false
+  expect:
+    verification_status: nexcore_counted
+    publishable: true
+    regulatory_submittable: false
+    nexcore_stamp: "NV-COUNTED"
+- name: high_multi_stream
+  input:
+    numerator_source: faers
+    denominator_confidence: high
+    boundary_level: state
+    stream_count: 3
+  expect:
+    verification_status: nexcore_estimated
+    publishable: true
+    regulatory_submittable: false
+    nexcore_stamp: "NV-ESTIMATED-HIGH"
+- name: high_single_stream
+  input:
+    numerator_source: faers
+    denominator_confidence: high
+    boundary_level: state
+    stream_count: 1
+  expect:
+    verification_status: nexcore_estimated
+    publishable: false
+    nexcore_stamp: "NV-ESTIMATED"
+- name: moderate_screening
+  input:
+    numerator_source: faers
+    denominator_confidence: moderate
+    boundary_level: national
+    stream_count: 1
+  expect:
+    verification_status: screening_only
+    publishable: false
+    regulatory_submittable: false
+    nexcore_stamp: "NV-SCREENING"
+- name: low_hypothesis
+  input:
+    numerator_source: faers
+    denominator_confidence: low
+    boundary_level: national
+  expect:
+    verification_status: hypothesis_only
+    publishable: false
+    nexcore_stamp: "NV-HYPOTHESIS"
+- name: faers_rejected
+  input:
+    numerator_source: faers
+    denominator_confidence: unusable
+    boundary_level: national
+  expect:
+    verification_status: rejected
+    publishable: false
+    regulatory_submittable: false
+    nexcore_stamp: "NV-REJECTED"
+- name: pharmacy_level_multi_stream
+  input:
+    numerator_source: ehr
+    denominator_confidence: census
+    boundary_level: pharmacy
+    has_upward_reconciliation: true
+    stream_count: 2
+  expect:
+    verification_status: nexcore_verified
+    nexcore_stamp: "NV-VERIFIED"
+- name: chain_estimated
+  input:
+    numerator_source: claims
+    denominator_confidence: high
+    boundary_level: chain
+    stream_count: 2
+  expect:
+    verification_status: nexcore_estimated
+    publishable: true
+    nexcore_stamp: "NV-ESTIMATED-HIGH"
+- name: custom_moderate
+  input:
+    numerator_source: survey
+    denominator_confidence: moderate
+    boundary_level: custom
+  expect:
+    verification_status: screening_only
+    nexcore_stamp: "NV-SCREENING"
+- name: null_input_safety
+  input: {}
+  expect:
+    action: BLOCKED. This is the FAERS paradigm. NexCore cannot verify. Acquire a counted denominator.
+    nexcore_stamp: NV-REJECTED
+    publishable: false
+    rate_class: "no rate — denominator unknown, FAERS-class uncertainty"
+    regulatory_submittable: false
+    verification_status: rejected

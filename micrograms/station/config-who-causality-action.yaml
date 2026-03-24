@@ -1,0 +1,242 @@
+name: config-who-causality-action
+description: "Route WHO-UMC causality assessment categories to PV actions. Maps certain/probable/possible/unlikely/conditional/unassessable to concrete next steps."
+version: 0.1.0
+
+interface:
+  inputs:
+    causality_category:
+      type: string
+      required: false
+      description: "WHO-UMC category: certain, probable, possible, unlikely, conditional, unassessable"
+    is_serious:
+      type: bool
+      required: false
+      description: "The adverse event is serious per ICH E2A criteria"
+    is_expected:
+      type: bool
+      required: false
+      description: "The reaction is listed in the reference safety information"
+  outputs:
+    action:
+      type: string
+    reporting_obligation:
+      type: string
+      description: "expedited, periodic, none"
+    escalation_level:
+      type: int
+      description: "1=immediate, 2=urgent, 3=routine, 4=monitor, 5=archive"
+
+tree:
+  start: check_category
+  nodes:
+    check_category:
+      type: condition
+      variable: causality_category
+      operator: is_null
+      true_next: unassessable_action
+      false_next: check_certain
+
+    check_certain:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: "certain"
+      true_next: check_certain_serious
+      false_next: check_probable
+
+    check_certain_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: certain_serious
+      false_next: check_certain_expected
+
+    check_certain_expected:
+      type: condition
+      variable: is_expected
+      operator: eq
+      value: true
+      true_next: certain_expected
+      false_next: certain_unexpected
+
+    check_probable:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: "probable"
+      true_next: check_probable_serious
+      false_next: check_possible
+
+    check_probable_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: probable_serious
+      false_next: probable_routine
+
+    check_possible:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: "possible"
+      true_next: possible_action
+      false_next: check_unlikely
+
+    check_unlikely:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: "unlikely"
+      true_next: unlikely_action
+      false_next: check_conditional
+
+    check_conditional:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: "conditional"
+      true_next: conditional_action
+      false_next: unassessable_action
+
+    certain_serious:
+      type: return
+      value:
+        action: expedited_report_and_signal_review
+        reporting_obligation: expedited
+        escalation_level: 1
+
+    certain_unexpected:
+      type: return
+      value:
+        action: expedited_report_new_signal
+        reporting_obligation: expedited
+        escalation_level: 1
+
+    certain_expected:
+      type: return
+      value:
+        action: periodic_report_update_rsi
+        reporting_obligation: periodic
+        escalation_level: 3
+
+    probable_serious:
+      type: return
+      value:
+        action: expedited_report_investigate
+        reporting_obligation: expedited
+        escalation_level: 2
+
+    probable_routine:
+      type: return
+      value:
+        action: periodic_report
+        reporting_obligation: periodic
+        escalation_level: 3
+
+    possible_action:
+      type: return
+      value:
+        action: document_and_monitor
+        reporting_obligation: periodic
+        escalation_level: 4
+
+    unlikely_action:
+      type: return
+      value:
+        action: document_only
+        reporting_obligation: none
+        escalation_level: 5
+
+    conditional_action:
+      type: return
+      value:
+        action: request_followup_data
+        reporting_obligation: none
+        escalation_level: 4
+
+    unassessable_action:
+      type: return
+      value:
+        action: request_missing_information
+        reporting_obligation: none
+        escalation_level: 4
+
+tests:
+  - input:
+      causality_category: "certain"
+      is_serious: true
+      is_expected: false
+    expect:
+      action: expedited_report_and_signal_review
+      reporting_obligation: expedited
+      escalation_level: 1
+
+  - input:
+      causality_category: "certain"
+      is_serious: false
+      is_expected: false
+    expect:
+      action: expedited_report_new_signal
+      reporting_obligation: expedited
+      escalation_level: 1
+
+  - input:
+      causality_category: "certain"
+      is_serious: false
+      is_expected: true
+    expect:
+      action: periodic_report_update_rsi
+      reporting_obligation: periodic
+      escalation_level: 3
+
+  - input:
+      causality_category: "probable"
+      is_serious: true
+    expect:
+      action: expedited_report_investigate
+      reporting_obligation: expedited
+      escalation_level: 2
+
+  - input:
+      causality_category: "probable"
+      is_serious: false
+    expect:
+      action: periodic_report
+      reporting_obligation: periodic
+      escalation_level: 3
+
+  - input:
+      causality_category: "possible"
+    expect:
+      action: document_and_monitor
+      reporting_obligation: periodic
+      escalation_level: 4
+
+  - input:
+      causality_category: "unlikely"
+    expect:
+      action: document_only
+      reporting_obligation: none
+      escalation_level: 5
+
+  - input:
+      causality_category: "conditional"
+    expect:
+      action: request_followup_data
+      reporting_obligation: none
+      escalation_level: 4
+
+  - input:
+      causality_category: "unassessable"
+    expect:
+      action: request_missing_information
+      reporting_obligation: none
+      escalation_level: 4
+
+  - input: {}
+    expect:
+      action: request_missing_information
+      reporting_obligation: none
+      escalation_level: 4

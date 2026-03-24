@@ -1,0 +1,143 @@
+name: signal-to-causality
+description: 'Bridge: routes signal detection results to causality assessment recommendation. Chains from prr-signal output.'
+version: 0.2.0
+primitive_signature:
+  dominant: 'μ'
+  expression: 'μ(κ → →) — mapping from correlation domain to causation domain'
+  primes: ['μ', '→', 'κ']
+  arguments: ['signal_detected', 'prr']
+  chain_prediction: 'Detects that → has collapsed to κ (missing temporal ordering + boundary). Routes to the tool that restores them. This IS the failure mode table read as a routing decision: if → = κ, then dispatch to Naranjo/WHO-UMC.'
+interface:
+  inputs:
+    signal_detected:
+      type: bool
+      required: true
+    prr:
+      type: float
+      required: false
+  outputs:
+    next_step:
+      type: string
+    priority:
+      type: string
+    recommended_tool:
+      type: string
+    reason:
+      type: string
+tree:
+  start: check_signal
+  nodes:
+    check_signal:
+      type: condition
+      variable: signal_detected
+      operator: eq
+      value: true
+      true_next: check_strength
+      false_next: no_assessment
+    check_strength:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5
+      true_next: urgent_causality
+      false_next: standard_causality
+    urgent_causality:
+      type: return
+      value:
+        next_step: causality_assessment
+        priority: URGENT
+        recommended_tool: naranjo_scale
+        reason: Strong signal detected (PRR >= 5.0) requires immediate causality assessment
+    standard_causality:
+      type: return
+      value:
+        next_step: causality_assessment
+        priority: STANDARD
+        recommended_tool: naranjo_scale
+        reason: Signal detected (PRR >= 2.0) warrants causality assessment
+    no_assessment:
+      type: return
+      value:
+        next_step: continue_monitoring
+        priority: LOW
+        recommended_tool: none
+        reason: No signal detected - continue routine monitoring
+tests:
+- input:
+    signal_detected: true
+    prr: 8.5
+  expect:
+    next_step: causality_assessment
+    priority: URGENT
+    recommended_tool: naranjo_scale
+    reason: Strong signal detected (PRR >= 5.0) requires immediate causality assessment
+- input:
+    signal_detected: true
+    prr: 5.0
+  expect:
+    next_step: causality_assessment
+    priority: URGENT
+    recommended_tool: naranjo_scale
+    reason: Strong signal detected (PRR >= 5.0) requires immediate causality assessment
+- input:
+    signal_detected: true
+    prr: 3.2
+  expect:
+    next_step: causality_assessment
+    priority: STANDARD
+    recommended_tool: naranjo_scale
+    reason: Signal detected (PRR >= 2.0) warrants causality assessment
+- input:
+    signal_detected: true
+    prr: 2.0
+  expect:
+    next_step: causality_assessment
+    priority: STANDARD
+    recommended_tool: naranjo_scale
+    reason: Signal detected (PRR >= 2.0) warrants causality assessment
+- input:
+    signal_detected: false
+    prr: 1.5
+  expect:
+    next_step: continue_monitoring
+    priority: LOW
+    recommended_tool: none
+    reason: No signal detected - continue routine monitoring
+- input:
+    signal_detected: false
+    prr: 0.5
+  expect:
+    next_step: continue_monitoring
+    priority: LOW
+    recommended_tool: none
+    reason: No signal detected - continue routine monitoring
+- input: {}
+  expect:
+    next_step: continue_monitoring
+    priority: LOW
+    recommended_tool: none
+    reason: No signal detected - continue routine monitoring
+- input:
+    signal_detected: true
+    prr: 15.0
+  expect:
+    next_step: causality_assessment
+    priority: URGENT
+    recommended_tool: naranjo_scale
+    reason: Strong signal detected (PRR >= 5.0) requires immediate causality assessment
+- input:
+    signal_detected: true
+    prr: 4.9
+  expect:
+    next_step: causality_assessment
+    priority: STANDARD
+    recommended_tool: naranjo_scale
+    reason: Signal detected (PRR >= 2.0) warrants causality assessment
+- input:
+    signal_detected: false
+    prr: 10.0
+  expect:
+    next_step: continue_monitoring
+    priority: LOW
+    recommended_tool: none
+    reason: No signal detected - continue routine monitoring

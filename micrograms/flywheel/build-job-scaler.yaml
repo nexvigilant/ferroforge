@@ -1,0 +1,150 @@
+name: build-job-scaler
+description: 'Adaptive build parallelism scaler. Reads available_mb and cpu_cores, outputs optimal CARGO_BUILD_JOBS. Scales down under memory pressure, scales up when headroom exists. Closed-loop with build-memory-gate: gate decides GO/WARN/BLOCK, scaler decides HOW FAST.'
+version: 0.1.0
+interface:
+  inputs:
+    available_mb:
+      type: int
+      required: true
+    cpu_cores:
+      type: int
+      required: true
+    crate_tier:
+      type: string
+      required: false
+  outputs:
+    jobs:
+      type: int
+    strategy:
+      type: string
+tree:
+  start: check_tier
+  nodes:
+    check_tier:
+      type: condition
+      variable: crate_tier
+      operator: eq
+      value: heavy
+      true_next: heavy_high_mem
+      false_next: normal_high_mem
+    heavy_high_mem:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 8000
+      true_next: heavy_full
+      false_next: heavy_medium_mem
+    heavy_medium_mem:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 4000
+      true_next: heavy_half
+      false_next: heavy_low_mem
+    heavy_low_mem:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 2000
+      true_next: heavy_minimal
+      false_next: heavy_serial
+    normal_high_mem:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 4000
+      true_next: normal_full
+      false_next: normal_medium_mem
+    normal_medium_mem:
+      type: condition
+      variable: available_mb
+      operator: gte
+      value: 2000
+      true_next: normal_half
+      false_next: normal_minimal
+    heavy_full:
+      type: return
+      value:
+        jobs: 8
+        strategy: full_parallel
+    heavy_half:
+      type: return
+      value:
+        jobs: 4
+        strategy: half_parallel
+    heavy_minimal:
+      type: return
+      value:
+        jobs: 2
+        strategy: minimal_parallel
+    heavy_serial:
+      type: return
+      value:
+        jobs: 1
+        strategy: serial
+    normal_full:
+      type: return
+      value:
+        jobs: 12
+        strategy: full_parallel
+    normal_half:
+      type: return
+      value:
+        jobs: 6
+        strategy: half_parallel
+    normal_minimal:
+      type: return
+      value:
+        jobs: 2
+        strategy: minimal_parallel
+tests:
+- input:
+    available_mb: 10000
+    cpu_cores: 20
+    crate_tier: heavy
+  expect:
+    jobs: 8
+    strategy: full_parallel
+- input:
+    available_mb: 5000
+    cpu_cores: 20
+    crate_tier: heavy
+  expect:
+    jobs: 4
+    strategy: half_parallel
+- input:
+    available_mb: 3000
+    cpu_cores: 20
+    crate_tier: heavy
+  expect:
+    jobs: 2
+    strategy: minimal_parallel
+- input:
+    available_mb: 1500
+    cpu_cores: 20
+    crate_tier: heavy
+  expect:
+    jobs: 1
+    strategy: serial
+- input:
+    available_mb: 8000
+    cpu_cores: 20
+  expect:
+    jobs: 12
+    strategy: full_parallel
+- input:
+    available_mb: 3000
+    cpu_cores: 20
+  expect:
+    jobs: 6
+    strategy: half_parallel
+- input:
+    available_mb: 1000
+    cpu_cores: 20
+  expect:
+    jobs: 2
+    strategy: minimal_parallel
+- input: {}
+  expect:
+    jobs: 2
+    strategy: minimal_parallel

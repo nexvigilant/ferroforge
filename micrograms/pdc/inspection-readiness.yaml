@@ -1,0 +1,134 @@
+name: inspection-readiness
+description: "Domain 12: Assess inspection readiness and route to preparation action by finding risk level and timeline."
+version: 0.1.0
+interface:
+  inputs:
+    has_critical_gaps:
+      type: bool
+      required: false
+    inspection_imminent:
+      type: bool
+      required: false
+    months_since_last_inspection:
+      type: int
+      required: false
+    readiness_score_pct:
+      type: int
+      required: false
+  outputs:
+    action:
+      type: string
+    ai_assist:
+      type: string
+    escalation:
+      type: string
+    focus:
+      type: string
+    status:
+      type: string
+    timeline:
+      type: string
+tree:
+  start: check_imminent
+  nodes:
+    check_imminent:
+      type: condition
+      variable: inspection_imminent
+      operator: eq
+      value: true
+      true_next: check_readiness_score
+      false_next: check_routine
+    check_readiness_score:
+      type: condition
+      variable: readiness_score_pct
+      operator: gte
+      value: 80
+      true_next: ready
+      false_next: check_critical_gaps
+    check_critical_gaps:
+      type: condition
+      variable: has_critical_gaps
+      operator: eq
+      value: true
+      true_next: critical_remediation
+      false_next: gap_remediation
+    check_routine:
+      type: condition
+      variable: months_since_last_inspection
+      operator: gte
+      value: 24
+      true_next: proactive_preparation
+      false_next: maintenance_mode
+    ready:
+      type: return
+      value:
+        status: READY
+        action: "final review of back room, SME preparation, document accessibility verification"
+        timeline: "1-2 days final preparation"
+        focus: "SME confidence, document retrieval speed, front/back room coordination"
+        ai_assist: "automated document retrieval, gap scan, SME briefing generation"
+    critical_remediation:
+      type: return
+      value:
+        status: CRITICAL_GAPS
+        action: "immediate CAPA for critical findings, resource reallocation, executive escalation"
+        timeline: "7-14 days intensive remediation"
+        focus: "critical compliance gaps, data integrity issues, systemic process failures"
+        ai_assist: "gap prioritization, CAPA tracking, compliance risk modeling"
+        escalation: "executive oversight required, regulatory counsel engagement"
+    gap_remediation:
+      type: return
+      value:
+        status: GAPS_IDENTIFIED
+        action: "targeted remediation plan, training refresh, document update"
+        timeline: "14-30 days focused preparation"
+        focus: "non-critical gaps, documentation completeness, staff training"
+        ai_assist: "training needs analysis, document completeness check, mock inspection"
+    proactive_preparation:
+      type: return
+      value:
+        status: PROACTIVE
+        action: "self-inspection program, mock inspection, compliance health check"
+        timeline: "60-90 days comprehensive preparation"
+        focus: "systematic readiness assessment, continuous improvement, culture reinforcement"
+        ai_assist: "predictive risk assessment, trend analysis, best practice benchmarking"
+    maintenance_mode:
+      type: return
+      value:
+        status: MAINTENANCE
+        action: "routine compliance monitoring, quarterly self-assessment, continuous training"
+        timeline: "ongoing"
+        focus: "compliance culture maintenance, proactive monitoring, continuous improvement"
+        ai_assist: "automated compliance monitoring, deviation trending, training optimization"
+tests:
+- input:
+    inspection_imminent: true
+    readiness_score_pct: 90
+  expect:
+    status: READY
+- input:
+    inspection_imminent: true
+    readiness_score_pct: 60
+    has_critical_gaps: true
+  expect:
+    status: CRITICAL_GAPS
+    escalation: "executive oversight required, regulatory counsel engagement"
+- input:
+    inspection_imminent: true
+    readiness_score_pct: 70
+    has_critical_gaps: false
+  expect:
+    status: GAPS_IDENTIFIED
+- input:
+    inspection_imminent: false
+    months_since_last_inspection: 30
+  expect:
+    status: PROACTIVE
+- input:
+    inspection_imminent: false
+    months_since_last_inspection: 12
+  expect:
+    status: MAINTENANCE
+- input: {}
+  expect:
+    status: MAINTENANCE

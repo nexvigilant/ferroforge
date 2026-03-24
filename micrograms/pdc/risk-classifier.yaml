@@ -1,0 +1,213 @@
+name: risk-classifier
+description: "PDC: Classify detected risk by category and severity, route to response team and protocol"
+version: 0.1.0
+interface:
+  inputs:
+    deviation_pct:
+      type: int
+      required: false
+    risk_category:
+      type: string
+      required: false
+  outputs:
+    governance_tier:
+      type: string
+    oversight:
+      type: string
+    protocol:
+      type: string
+    response_team:
+      type: string
+    severity:
+      type: string
+    sla_hours:
+      type: int
+    thresholds:
+      type: string
+tree:
+  start: check_deviation
+  nodes:
+    check_deviation:
+      type: condition
+      variable: deviation_pct
+      operator: gte
+      value: 15
+      true_next: check_category_critical
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: deviation_pct
+      operator: gte
+      value: 10
+      true_next: check_category_moderate
+      false_next: check_low
+    check_low:
+      type: condition
+      variable: deviation_pct
+      operator: gte
+      value: 5
+      true_next: watch_risk
+      false_next: nominal
+    check_category_critical:
+      type: condition
+      variable: risk_category
+      operator: eq
+      value: ai_gateway
+      true_next: ai_crisis
+      false_next: check_global_critical
+    check_global_critical:
+      type: condition
+      variable: risk_category
+      operator: eq
+      value: global_consistency
+      true_next: consistency_crisis
+      false_next: educational_crisis
+    check_category_moderate:
+      type: condition
+      variable: risk_category
+      operator: eq
+      value: ai_gateway
+      true_next: ai_alert
+      false_next: check_global_moderate
+    check_global_moderate:
+      type: condition
+      variable: risk_category
+      operator: eq
+      value: global_consistency
+      true_next: consistency_alert
+      false_next: educational_alert
+    ai_crisis:
+      type: return
+      value:
+        severity: CRITICAL
+        response_team: AI_INNOVATION_TEAM
+        oversight: EXECUTIVE_OVERSIGHT
+        governance_tier: 1
+        protocol: crisis_management
+        sla_hours: 24
+        thresholds: "CPA8 completion < 80%, innovation success < 70%"
+    consistency_crisis:
+      type: return
+      value:
+        severity: CRITICAL
+        response_team: GLOBAL_IMPLEMENTATION_TEAM
+        oversight: PROGRAM_MANAGEMENT
+        governance_tier: 2
+        protocol: calibration_crisis
+        sla_hours: 24
+        thresholds: "15% regional variation"
+    educational_crisis:
+      type: return
+      value:
+        severity: CRITICAL
+        response_team: COMPETENCY_DEVELOPMENT_TEAM
+        oversight: PROGRAM_MANAGEMENT
+        governance_tier: 2
+        protocol: quality_recovery
+        sla_hours: 24
+        thresholds: "15% baseline deviation"
+    ai_alert:
+      type: return
+      value:
+        severity: MODERATE
+        response_team: AI_INNOVATION_TEAM
+        oversight: PROGRAM_MANAGEMENT
+        governance_tier: 2
+        protocol: enhanced_monitoring
+        sla_hours: 72
+    consistency_alert:
+      type: return
+      value:
+        severity: MODERATE
+        response_team: GLOBAL_IMPLEMENTATION_TEAM
+        oversight: FUNCTIONAL_EXCELLENCE
+        governance_tier: 3
+        protocol: targeted_calibration
+        sla_hours: 72
+    educational_alert:
+      type: return
+      value:
+        severity: MODERATE
+        response_team: COMPETENCY_DEVELOPMENT_TEAM
+        oversight: FUNCTIONAL_EXCELLENCE
+        governance_tier: 3
+        protocol: enhanced_support
+        sla_hours: 72
+    watch_risk:
+      type: return
+      value:
+        severity: LOW
+        response_team: FUNCTIONAL_EXCELLENCE
+        oversight: none
+        governance_tier: 3
+        protocol: monitoring
+        sla_hours: 168
+    nominal:
+      type: return
+      value:
+        severity: NOMINAL
+        response_team: none
+        oversight: none
+        governance_tier: 0
+        protocol: standard_operations
+        sla_hours: 0
+tests:
+- input:
+    deviation_pct: 20
+    risk_category: ai_gateway
+  expect:
+    severity: CRITICAL
+    response_team: AI_INNOVATION_TEAM
+    oversight: EXECUTIVE_OVERSIGHT
+    sla_hours: 24
+- input:
+    deviation_pct: 18
+    risk_category: global_consistency
+  expect:
+    severity: CRITICAL
+    response_team: GLOBAL_IMPLEMENTATION_TEAM
+    sla_hours: 24
+- input:
+    deviation_pct: 16
+    risk_category: educational
+  expect:
+    severity: CRITICAL
+    response_team: COMPETENCY_DEVELOPMENT_TEAM
+- input:
+    deviation_pct: 12
+    risk_category: ai_gateway
+  expect:
+    severity: MODERATE
+    response_team: AI_INNOVATION_TEAM
+    sla_hours: 72
+- input:
+    deviation_pct: 10
+    risk_category: global_consistency
+  expect:
+    severity: MODERATE
+    response_team: GLOBAL_IMPLEMENTATION_TEAM
+- input:
+    deviation_pct: 11
+    risk_category: educational
+  expect:
+    severity: MODERATE
+    protocol: enhanced_support
+- input:
+    deviation_pct: 7
+    risk_category: ai_gateway
+  expect:
+    severity: LOW
+    protocol: monitoring
+- input:
+    deviation_pct: 3
+    risk_category: any
+  expect:
+    severity: NOMINAL
+    protocol: standard_operations
+- input:
+    deviation_pct: 0
+  expect:
+    severity: NOMINAL
+- input: {}
+  expect:
+    severity: NOMINAL

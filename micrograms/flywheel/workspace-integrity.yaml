@@ -1,0 +1,156 @@
+name: workspace-integrity
+description: 'Workspace health classifier: checks orphan_dirs, broken_members, and cache_gb against thresholds. HEALTHY (all zero, cache < 15GB), DEGRADED (1-2 issues), UNHEALTHY (3+). Prevents build-breaking workspace state from accumulating silently.'
+version: 0.1.0
+interface:
+  inputs:
+    orphan_dirs:
+      type: int
+      required: true
+    broken_members:
+      type: int
+      required: true
+    cache_gb:
+      type: int
+      required: true
+  outputs:
+    state:
+      type: string
+    issues:
+      type: int
+    action:
+      type: string
+tree:
+  start: count_issues
+  nodes:
+    count_issues:
+      type: condition
+      variable: orphan_dirs
+      operator: gte
+      value: 1
+      true_next: has_orphans
+      false_next: check_members
+    has_orphans:
+      type: condition
+      variable: broken_members
+      operator: gte
+      value: 1
+      true_next: check_cache_multi
+      false_next: check_cache_single
+    check_members:
+      type: condition
+      variable: broken_members
+      operator: gte
+      value: 1
+      true_next: check_cache_single
+      false_next: check_cache_clean
+    check_cache_multi:
+      type: condition
+      variable: cache_gb
+      operator: gte
+      value: 15
+      true_next: unhealthy
+      false_next: degraded_multi
+    check_cache_single:
+      type: condition
+      variable: cache_gb
+      operator: gte
+      value: 15
+      true_next: degraded_cache
+      false_next: degraded_single
+    check_cache_clean:
+      type: condition
+      variable: cache_gb
+      operator: gte
+      value: 15
+      true_next: degraded_cache_only
+      false_next: healthy
+    unhealthy:
+      type: return
+      value:
+        state: unhealthy
+        issues: 3
+        action: run_cleanup
+    degraded_multi:
+      type: return
+      value:
+        state: degraded
+        issues: 2
+        action: fix_workspace
+    degraded_cache:
+      type: return
+      value:
+        state: degraded
+        issues: 2
+        action: prune_and_fix
+    degraded_single:
+      type: return
+      value:
+        state: degraded
+        issues: 1
+        action: fix_workspace
+    degraded_cache_only:
+      type: return
+      value:
+        state: degraded
+        issues: 1
+        action: prune_cache
+    healthy:
+      type: return
+      value:
+        state: healthy
+        issues: 0
+        action: none
+tests:
+- input:
+    orphan_dirs: 0
+    broken_members: 0
+    cache_gb: 5
+  expect:
+    state: healthy
+    issues: 0
+    action: none
+- input:
+    orphan_dirs: 2
+    broken_members: 1
+    cache_gb: 20
+  expect:
+    state: unhealthy
+    issues: 3
+    action: run_cleanup
+- input:
+    orphan_dirs: 1
+    broken_members: 0
+    cache_gb: 5
+  expect:
+    state: degraded
+    issues: 1
+    action: fix_workspace
+- input:
+    orphan_dirs: 0
+    broken_members: 0
+    cache_gb: 20
+  expect:
+    state: degraded
+    issues: 1
+    action: prune_cache
+- input:
+    orphan_dirs: 0
+    broken_members: 1
+    cache_gb: 18
+  expect:
+    state: degraded
+    issues: 2
+    action: prune_and_fix
+- input:
+    orphan_dirs: 1
+    broken_members: 1
+    cache_gb: 5
+  expect:
+    state: degraded
+    issues: 2
+    action: fix_workspace
+- input: {}
+  expect:
+    action: none
+    issues: 0
+    state: healthy

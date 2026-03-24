@@ -1,0 +1,128 @@
+name: epa-classifier
+description: "PDC: Classify EPA (1-20) into Core/Executive tier with AI gateway detection"
+version: 0.1.0
+interface:
+  inputs:
+    epa_id:
+      type: int
+      required: false
+  outputs:
+    classification:
+      type: string
+    description:
+      type: string
+    error:
+      type: string
+    is_gateway:
+      type: bool
+    min_level_for_cpa8:
+      type: int
+    phases:
+      type: string
+    tier:
+      type: string
+    unlocks_cpa8:
+      type: bool
+tree:
+  start: check_valid
+  nodes:
+    check_valid:
+      type: condition
+      variable: epa_id
+      operator: gte
+      value: 1
+      true_next: check_upper
+      false_next: invalid_epa
+    check_upper:
+      type: condition
+      variable: epa_id
+      operator: lte
+      value: 20
+      true_next: check_ai_gateway
+      false_next: invalid_epa
+    check_ai_gateway:
+      type: condition
+      variable: epa_id
+      operator: eq
+      value: 10
+      true_next: ai_gateway
+      false_next: check_core
+    check_core:
+      type: condition
+      variable: epa_id
+      operator: lte
+      value: 10
+      true_next: core_epa
+      false_next: executive_epa
+    ai_gateway:
+      type: return
+      value:
+        tier: CORE
+        classification: AI_GATEWAY
+        is_gateway: true
+        unlocks_cpa8: true
+        min_level_for_cpa8: 4
+        description: "Implement and Validate AI Tools for Pharmacovigilance"
+        phases: "Foundation, Application, Integration, Innovation"
+    core_epa:
+      type: return
+      value:
+        tier: CORE
+        classification: PRACTICE
+        is_gateway: false
+        unlocks_cpa8: false
+    executive_epa:
+      type: return
+      value:
+        tier: EXECUTIVE
+        classification: LEADERSHIP
+        is_gateway: false
+        unlocks_cpa8: false
+    invalid_epa:
+      type: return
+      value:
+        tier: INVALID
+        classification: UNKNOWN
+        error: "EPA ID must be 1-20"
+tests:
+- input:
+    epa_id: 1
+  expect:
+    tier: CORE
+    classification: PRACTICE
+    is_gateway: false
+- input:
+    epa_id: 9
+  expect:
+    tier: CORE
+    classification: PRACTICE
+    is_gateway: false
+- input:
+    epa_id: 10
+  expect:
+    tier: CORE
+    classification: AI_GATEWAY
+    is_gateway: true
+    unlocks_cpa8: true
+    min_level_for_cpa8: 4
+- input:
+    epa_id: 11
+  expect:
+    tier: EXECUTIVE
+    classification: LEADERSHIP
+- input:
+    epa_id: 20
+  expect:
+    tier: EXECUTIVE
+    classification: LEADERSHIP
+- input:
+    epa_id: 0
+  expect:
+    tier: INVALID
+- input:
+    epa_id: 21
+  expect:
+    tier: INVALID
+- input: {}
+  expect:
+    tier: INVALID

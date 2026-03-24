@@ -1,0 +1,414 @@
+name: case-report-to-icsr
+description: Evaluates case report completeness against ICSR criteria
+version: 0.1.0
+tree:
+  start: check_all_present
+  nodes:
+    patient_reporter_ok_drug_missing:
+      type: condition
+      variable: has_event
+      operator: eq
+      value: true
+      true_next: three_present_drug_missing
+      false_next: two_present_drug_event_missing
+    check_drug_event_no_patient_no_reporter:
+      type: condition
+      variable: has_drug
+      operator: eq
+      value: true
+      true_next: check_event_drug_only
+      false_next: check_event_none
+    three_present_drug_missing:
+      type: return
+      value:
+        missing_fields: &id003
+        - drug
+        meets_icsr_criteria: false
+        completeness_score: 75
+    patient_missing:
+      type: condition
+      variable: has_reporter
+      operator: eq
+      value: true
+      true_next: check_drug_reporter_ok
+      false_next: check_drug_event_no_patient_no_reporter
+    check_event_drug_only:
+      type: condition
+      variable: has_event
+      operator: eq
+      value: true
+      true_next: two_present_patient_reporter_missing
+      false_next: one_present_drug_only
+    two_present_reporter_drug_missing:
+      type: return
+      value:
+        completeness_score: 50
+        meets_icsr_criteria: false
+        missing_fields: &id007
+        - reporter
+        - drug
+    all_present:
+      type: return
+      value:
+        meets_icsr_criteria: true
+        missing_fields: &id001 []
+        completeness_score: 100
+    two_present_patient_event_missing:
+      type: return
+      value:
+        meets_icsr_criteria: false
+        completeness_score: 50
+        missing_fields: &id010
+        - patient
+        - event
+    check_event_patient_only:
+      type: condition
+      variable: has_event
+      operator: eq
+      value: true
+      true_next: two_present_reporter_drug_missing
+      false_next: one_present_patient_only
+    two_present_patient_reporter_missing:
+      type: return
+      value:
+        missing_fields: &id013
+        - patient
+        - reporter
+        meets_icsr_criteria: false
+        completeness_score: 50
+    check_event_none:
+      type: condition
+      variable: has_event
+      operator: eq
+      value: true
+      true_next: one_present_event_only
+      false_next: all_missing
+    check_reporter_all:
+      type: condition
+      variable: has_reporter
+      operator: eq
+      value: true
+      true_next: check_drug_all
+      false_next: patient_ok_reporter_missing
+    check_event_all:
+      type: condition
+      variable: has_event
+      operator: eq
+      value: true
+      true_next: all_present
+      false_next: three_present_event_missing
+    one_present_reporter_only:
+      type: return
+      value:
+        completeness_score: 25
+        missing_fields: &id012
+        - patient
+        - drug
+        - event
+        meets_icsr_criteria: false
+    one_present_patient_only:
+      type: return
+      value:
+        missing_fields: &id008
+        - reporter
+        - drug
+        - event
+        completeness_score: 25
+        meets_icsr_criteria: false
+    one_present_drug_only:
+      type: return
+      value:
+        meets_icsr_criteria: false
+        completeness_score: 25
+        missing_fields: &id014
+        - patient
+        - reporter
+        - event
+    check_event_reporter_only:
+      type: condition
+      variable: has_event
+      operator: eq
+      value: true
+      true_next: two_present_patient_drug_missing
+      false_next: one_present_reporter_only
+    patient_ok_reporter_missing:
+      type: condition
+      variable: has_drug
+      operator: eq
+      value: true
+      true_next: check_event_patient_drug_ok
+      false_next: check_event_patient_only
+    check_event_patient_drug_ok:
+      type: condition
+      variable: has_event
+      operator: eq
+      value: true
+      true_next: three_present_reporter_missing
+      false_next: two_present_reporter_event_missing
+    check_drug_all:
+      type: condition
+      variable: has_drug
+      operator: eq
+      value: true
+      true_next: check_event_all
+      false_next: patient_reporter_ok_drug_missing
+    two_present_reporter_event_missing:
+      type: return
+      value:
+        missing_fields: &id006
+        - reporter
+        - event
+        meets_icsr_criteria: false
+        completeness_score: 50
+    three_present_reporter_missing:
+      type: return
+      value:
+        meets_icsr_criteria: false
+        missing_fields: &id005
+        - reporter
+        completeness_score: 75
+    check_event_reporter_drug_ok:
+      type: condition
+      variable: has_event
+      operator: eq
+      value: true
+      true_next: three_present_patient_missing
+      false_next: two_present_patient_event_missing
+    three_present_patient_missing:
+      type: return
+      value:
+        missing_fields: &id009
+        - patient
+        completeness_score: 75
+        meets_icsr_criteria: false
+    one_present_event_only:
+      type: return
+      value:
+        meets_icsr_criteria: false
+        completeness_score: 25
+        missing_fields: &id015
+        - patient
+        - reporter
+        - drug
+    three_present_event_missing:
+      type: return
+      value:
+        meets_icsr_criteria: false
+        missing_fields: &id002
+        - event
+        completeness_score: 75
+    two_present_drug_event_missing:
+      type: return
+      value:
+        missing_fields: &id004
+        - drug
+        - event
+        meets_icsr_criteria: false
+        completeness_score: 50
+    all_missing:
+      type: return
+      value:
+        meets_icsr_criteria: false
+        completeness_score: 0
+        missing_fields: &id016
+        - patient
+        - reporter
+        - drug
+        - event
+    two_present_patient_drug_missing:
+      type: return
+      value:
+        meets_icsr_criteria: false
+        missing_fields: &id011
+        - patient
+        - drug
+        completeness_score: 50
+    check_all_present:
+      type: condition
+      variable: has_patient
+      operator: eq
+      value: true
+      true_next: check_reporter_all
+      false_next: patient_missing
+    check_drug_reporter_ok:
+      type: condition
+      variable: has_drug
+      operator: eq
+      value: true
+      true_next: check_event_reporter_drug_ok
+      false_next: check_event_reporter_only
+tests:
+- input:
+    has_patient: true
+    has_reporter: true
+    has_drug: true
+    has_event: true
+  expect:
+    meets_icsr_criteria: true
+    missing_fields: *id001
+    completeness_score: 100
+- input:
+    has_patient: true
+    has_reporter: true
+    has_drug: true
+    has_event: false
+  expect:
+    meets_icsr_criteria: false
+    missing_fields: *id002
+    completeness_score: 75
+- input:
+    has_patient: true
+    has_reporter: true
+    has_drug: false
+    has_event: true
+  expect:
+    missing_fields: *id003
+    meets_icsr_criteria: false
+    completeness_score: 75
+- input:
+    has_patient: true
+    has_reporter: true
+    has_drug: false
+    has_event: false
+  expect:
+    missing_fields: *id004
+    meets_icsr_criteria: false
+    completeness_score: 50
+- input:
+    has_patient: true
+    has_reporter: false
+    has_drug: true
+    has_event: true
+  expect:
+    meets_icsr_criteria: false
+    missing_fields: *id005
+    completeness_score: 75
+- input:
+    has_patient: true
+    has_reporter: false
+    has_drug: true
+    has_event: false
+  expect:
+    missing_fields: *id006
+    meets_icsr_criteria: false
+    completeness_score: 50
+- input:
+    has_patient: true
+    has_reporter: false
+    has_drug: false
+    has_event: true
+  expect:
+    completeness_score: 50
+    meets_icsr_criteria: false
+    missing_fields: *id007
+- input:
+    has_patient: true
+    has_reporter: false
+    has_drug: false
+    has_event: false
+  expect:
+    missing_fields: *id008
+    completeness_score: 25
+    meets_icsr_criteria: false
+- input:
+    has_patient: false
+    has_reporter: true
+    has_drug: true
+    has_event: true
+  expect:
+    missing_fields: *id009
+    completeness_score: 75
+    meets_icsr_criteria: false
+- input:
+    has_patient: false
+    has_reporter: true
+    has_drug: true
+    has_event: false
+  expect:
+    meets_icsr_criteria: false
+    completeness_score: 50
+    missing_fields: *id010
+- input:
+    has_patient: false
+    has_reporter: true
+    has_drug: false
+    has_event: true
+  expect:
+    meets_icsr_criteria: false
+    missing_fields: *id011
+    completeness_score: 50
+- input:
+    has_patient: false
+    has_reporter: true
+    has_drug: false
+    has_event: false
+  expect:
+    completeness_score: 25
+    missing_fields: *id012
+    meets_icsr_criteria: false
+- input:
+    has_patient: false
+    has_reporter: false
+    has_drug: true
+    has_event: true
+  expect:
+    missing_fields: *id013
+    meets_icsr_criteria: false
+    completeness_score: 50
+- input:
+    has_patient: false
+    has_reporter: false
+    has_drug: true
+    has_event: false
+  expect:
+    meets_icsr_criteria: false
+    completeness_score: 25
+    missing_fields: *id014
+- input:
+    has_patient: false
+    has_reporter: false
+    has_drug: false
+    has_event: true
+  expect:
+    meets_icsr_criteria: false
+    completeness_score: 25
+    missing_fields: *id015
+- input:
+    has_patient: false
+    has_reporter: false
+    has_drug: false
+    has_event: false
+  expect:
+    meets_icsr_criteria: false
+    completeness_score: 0
+    missing_fields: *id016
+- input: {}
+  expect:
+    meets_icsr_criteria: false
+    completeness_score: 0
+    missing_fields: *id016
+interface:
+  inputs:
+    has_reporter:
+      type: boolean
+      required: true
+    has_drug:
+      type: boolean
+      required: true
+    has_event:
+      type: boolean
+      required: true
+    has_patient:
+      type: boolean
+      required: true
+  outputs:
+    meets_icsr_criteria:
+      type: boolean
+      required: false
+    missing_fields:
+      type: array
+      required: false
+    completeness_score:
+      type: integer
+      required: false
+  aliases: {}

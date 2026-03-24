@@ -1,0 +1,41 @@
+name: station-pubmed-pipeline
+description: "PubMed signal literature → evidence strength → causality routing. From search-signal-literature output to investigation decision."
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - config-pubmed-signal-strength
+  - adapt-evidence-to-signal
+  - signal-to-causality
+tests:
+- name: strong evidence (systematic reviews + regulatory) → urgent
+  input:
+    total_articles: 30
+    case_report_count: 8
+    systematic_review_count: 2
+    recent_count: 10
+    has_regulatory_citation: true
+  expect:
+    evidence_strength: strong
+    signal_detected: true
+    priority: URGENT
+    next_step: causality_assessment
+- name: moderate evidence (5+ articles, recent) → standard
+  input:
+    total_articles: 12
+    case_report_count: 4
+    recent_count: 5
+    has_regulatory_citation: false
+  expect:
+    evidence_strength: moderate
+    signal_detected: true
+    priority: STANDARD
+    next_step: causality_assessment
+- name: absent evidence → continue monitoring
+  input:
+    total_articles: 0
+  expect:
+    evidence_strength: absent
+    signal_detected: false
+    priority: LOW
+    next_step: continue_monitoring

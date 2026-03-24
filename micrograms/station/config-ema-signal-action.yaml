@@ -1,0 +1,238 @@
+name: config-ema-signal-action
+description: "Classify EMA PRAC safety signal output into action priority. Routes based on signal status and recommended action type."
+version: 0.1.0
+
+interface:
+  inputs:
+    signal_status:
+      type: string
+      required: false
+      description: "confirmed, under_review, closed_no_action, new"
+    recommended_action:
+      type: string
+      required: false
+      description: "label_change, referral, suspension, dhpc, routine, none"
+    substances_affected:
+      type: int
+      required: false
+      description: "Number of substances/products affected by the signal"
+  outputs:
+    priority:
+      type: string
+      description: "urgent, high, medium, low"
+    nex_action:
+      type: string
+    track_in_rmp:
+      type: bool
+
+tree:
+  start: check_status
+  nodes:
+    check_status:
+      type: condition
+      variable: signal_status
+      operator: is_null
+      true_next: no_data
+      false_next: check_confirmed
+
+    check_confirmed:
+      type: condition
+      variable: signal_status
+      operator: eq
+      value: "confirmed"
+      true_next: check_action_type
+      false_next: check_under_review
+
+    check_action_type:
+      type: condition
+      variable: recommended_action
+      operator: eq
+      value: "suspension"
+      true_next: urgent_priority
+      false_next: check_referral
+
+    check_referral:
+      type: condition
+      variable: recommended_action
+      operator: eq
+      value: "referral"
+      true_next: urgent_priority
+      false_next: check_dhpc
+
+    check_dhpc:
+      type: condition
+      variable: recommended_action
+      operator: eq
+      value: "dhpc"
+      true_next: high_priority
+      false_next: check_label_change
+
+    check_label_change:
+      type: condition
+      variable: recommended_action
+      operator: eq
+      value: "label_change"
+      true_next: high_priority
+      false_next: medium_confirmed
+
+    check_under_review:
+      type: condition
+      variable: signal_status
+      operator: eq
+      value: "under_review"
+      true_next: check_multi_substance
+      false_next: check_new
+
+    check_multi_substance:
+      type: condition
+      variable: substances_affected
+      operator: is_null
+      true_next: medium_review
+      false_next: check_substance_count
+
+    check_substance_count:
+      type: condition
+      variable: substances_affected
+      operator: gte
+      value: 3
+      true_next: high_priority
+      false_next: medium_review
+
+    check_new:
+      type: condition
+      variable: signal_status
+      operator: eq
+      value: "new"
+      true_next: medium_new
+      false_next: low_priority
+
+    urgent_priority:
+      type: return
+      value:
+        priority: urgent
+        nex_action: immediate_impact_assessment
+        track_in_rmp: true
+
+    high_priority:
+      type: return
+      value:
+        priority: high
+        nex_action: update_safety_profile
+        track_in_rmp: true
+
+    medium_confirmed:
+      type: return
+      value:
+        priority: medium
+        nex_action: routine_update
+        track_in_rmp: true
+
+    medium_review:
+      type: return
+      value:
+        priority: medium
+        nex_action: monitor_prac_outcome
+        track_in_rmp: false
+
+    medium_new:
+      type: return
+      value:
+        priority: medium
+        nex_action: evaluate_signal_validity
+        track_in_rmp: false
+
+    low_priority:
+      type: return
+      value:
+        priority: low
+        nex_action: archive
+        track_in_rmp: false
+
+    no_data:
+      type: return
+      value:
+        priority: low
+        nex_action: no_signal_data
+        track_in_rmp: false
+
+tests:
+  - input:
+      signal_status: "confirmed"
+      recommended_action: "suspension"
+      substances_affected: 1
+    expect:
+      priority: urgent
+      nex_action: immediate_impact_assessment
+      track_in_rmp: true
+
+  - input:
+      signal_status: "confirmed"
+      recommended_action: "referral"
+      substances_affected: 2
+    expect:
+      priority: urgent
+      nex_action: immediate_impact_assessment
+      track_in_rmp: true
+
+  - input:
+      signal_status: "confirmed"
+      recommended_action: "label_change"
+      substances_affected: 1
+    expect:
+      priority: high
+      nex_action: update_safety_profile
+      track_in_rmp: true
+
+  - input:
+      signal_status: "confirmed"
+      recommended_action: "dhpc"
+      substances_affected: 1
+    expect:
+      priority: high
+      nex_action: update_safety_profile
+      track_in_rmp: true
+
+  - input:
+      signal_status: "confirmed"
+      recommended_action: "routine"
+      substances_affected: 1
+    expect:
+      priority: medium
+      nex_action: routine_update
+      track_in_rmp: true
+
+  - input:
+      signal_status: "under_review"
+      substances_affected: 5
+    expect:
+      priority: high
+      nex_action: update_safety_profile
+      track_in_rmp: true
+
+  - input:
+      signal_status: "under_review"
+      substances_affected: 1
+    expect:
+      priority: medium
+      nex_action: monitor_prac_outcome
+      track_in_rmp: false
+
+  - input:
+      signal_status: "new"
+    expect:
+      priority: medium
+      nex_action: evaluate_signal_validity
+      track_in_rmp: false
+
+  - input:
+      signal_status: "closed_no_action"
+    expect:
+      priority: low
+      nex_action: archive
+      track_in_rmp: false
+
+  - input: {}
+    expect:
+      priority: low
+      nex_action: no_signal_data
+      track_in_rmp: false

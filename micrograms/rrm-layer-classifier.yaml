@@ -1,0 +1,242 @@
+name: rrm-layer-classifier
+description: "Railway Reference Model (RRM) layer classifier. Given attributes of a system component, classify it into one of 6 RRM layers: Formation (L1), Way (L2), Traction (L3), Signaling (L4), Operations (L5), Enterprise (L6). Based on the principle that safety-critical systems decompose into layers with strict interface contracts, analogous to OSI for networking."
+version: 0.1.0
+interface:
+  inputs:
+    is_passive_substrate:
+      type: bool
+      required: false
+    defines_physical_constraints:
+      type: bool
+      required: false
+    converts_energy_to_motion:
+      type: bool
+      required: false
+    processes_safety_critical_state:
+      type: bool
+      required: false
+    coordinates_multiple_entities:
+      type: bool
+      required: false
+    sets_strategy_or_policy:
+      type: bool
+      required: false
+    has_real_time_requirement:
+      type: bool
+      required: false
+    failure_consequence:
+      type: string
+      required: false
+  outputs:
+    layer_number:
+      type: int
+    layer_name:
+      type: string
+    layer_function:
+      type: string
+    sil_range:
+      type: string
+    information_bandwidth:
+      type: string
+    pv_equivalent:
+      type: string
+    computing_equivalent:
+      type: string
+tree:
+  start: check_safety_critical
+  nodes:
+    check_safety_critical:
+      type: condition
+      variable: processes_safety_critical_state
+      operator: eq
+      value: true
+      true_next: layer_4_signaling
+      false_next: check_substrate
+    check_substrate:
+      type: condition
+      variable: is_passive_substrate
+      operator: eq
+      value: true
+      true_next: layer_1_formation
+      false_next: check_constraints
+    check_constraints:
+      type: condition
+      variable: defines_physical_constraints
+      operator: eq
+      value: true
+      true_next: layer_2_way
+      false_next: check_energy
+    check_energy:
+      type: condition
+      variable: converts_energy_to_motion
+      operator: eq
+      value: true
+      true_next: layer_3_traction
+      false_next: check_coordination
+    check_coordination:
+      type: condition
+      variable: coordinates_multiple_entities
+      operator: eq
+      value: true
+      true_next: layer_5_operations
+      false_next: check_strategy
+    check_strategy:
+      type: condition
+      variable: sets_strategy_or_policy
+      operator: eq
+      value: true
+      true_next: layer_6_enterprise
+      false_next: check_realtime
+    check_realtime:
+      type: condition
+      variable: has_real_time_requirement
+      operator: eq
+      value: true
+      true_next: layer_4_signaling
+      false_next: check_consequence
+    check_consequence:
+      type: condition
+      variable: failure_consequence
+      operator: eq
+      value: "catastrophic"
+      true_next: layer_4_signaling
+      false_next: unclassified
+    layer_1_formation:
+      type: return
+      value:
+        layer_number: 1
+        layer_name: "Formation"
+        layer_function: "Passive substrate providing load-bearing foundation for all layers above"
+        sil_range: "SIL 0-1"
+        information_bandwidth: "~0 bits/sec (passive)"
+        pv_equivalent: "Patient population — the substrate on which all safety signals exist"
+        computing_equivalent: "Hardware, power supply, data center physical infrastructure"
+    layer_2_way:
+      type: return
+      value:
+        layer_number: 2
+        layer_name: "Way"
+        layer_function: "Fixed infrastructure defining physical constraints all entities must conform to"
+        sil_range: "SIL 1-2"
+        information_bandwidth: "~0.001 bits/sec (static geometry changes slowly)"
+        pv_equivalent: "Regulatory framework — ICH guidelines, FDA regulations, fixed rules of the system"
+        computing_equivalent: "Operating system, network stack, protocol standards"
+    layer_3_traction:
+      type: return
+      value:
+        layer_number: 3
+        layer_name: "Traction"
+        layer_function: "Active entities converting energy to motion within infrastructure constraints"
+        sil_range: "SIL 2-3"
+        information_bandwidth: "~10 bits/sec (vehicle telemetry)"
+        pv_equivalent: "Drug product — the active entity moving through the regulatory system"
+        computing_equivalent: "Application runtime, process execution, containers"
+    layer_4_signaling:
+      type: return
+      value:
+        layer_number: 4
+        layer_name: "Signaling"
+        layer_function: "Safety-critical information processing — wrong state here causes catastrophe"
+        sil_range: "SIL 4"
+        information_bandwidth: "~1000 bits/sec (continuous state monitoring)"
+        pv_equivalent: "Signal detection — PRR, ROR, IC, EBGM disproportionality analysis"
+        computing_equivalent: "API middleware, message broker, safety-critical data pipeline"
+    layer_5_operations:
+      type: return
+      value:
+        layer_number: 5
+        layer_name: "Operations"
+        layer_function: "Orchestration of multiple entities within safety constraints to maximize throughput"
+        sil_range: "SIL 1-2"
+        information_bandwidth: "~100 bits/sec (operational updates and decisions)"
+        pv_equivalent: "Case management, ICSR processing, regulatory reporting coordination"
+        computing_equivalent: "Workflow orchestration, job scheduling, CI/CD pipelines"
+    layer_6_enterprise:
+      type: return
+      value:
+        layer_number: 6
+        layer_name: "Enterprise"
+        layer_function: "Strategic governance — policy, investment, regulatory compliance, organizational culture"
+        sil_range: "SIL 0"
+        information_bandwidth: "~0.01 bits/sec (strategic decisions change slowly)"
+        pv_equivalent: "PV department governance, QPPV oversight, pharmacovigilance system master file"
+        computing_equivalent: "Business strategy, architecture decisions, technology roadmap"
+    unclassified:
+      type: return
+      value:
+        layer_number: 0
+        layer_name: "Unclassified"
+        layer_function: "Component does not clearly map to a single RRM layer — may span multiple layers or be a cross-cutting concern"
+        sil_range: "Assess per component"
+        information_bandwidth: "Varies"
+        pv_equivalent: "Cross-cutting: quality systems, training, documentation"
+        computing_equivalent: "Cross-cutting: logging, monitoring, security"
+tests:
+- input:
+    is_passive_substrate: true
+  expect:
+    layer_number: 1
+    layer_name: "Formation"
+- input:
+    defines_physical_constraints: true
+  expect:
+    layer_number: 2
+    layer_name: "Way"
+- input:
+    converts_energy_to_motion: true
+  expect:
+    layer_number: 3
+    layer_name: "Traction"
+- input:
+    processes_safety_critical_state: true
+  expect:
+    layer_number: 4
+    layer_name: "Signaling"
+    sil_range: "SIL 4"
+- input:
+    coordinates_multiple_entities: true
+  expect:
+    layer_number: 5
+    layer_name: "Operations"
+- input:
+    sets_strategy_or_policy: true
+  expect:
+    layer_number: 6
+    layer_name: "Enterprise"
+- input:
+    has_real_time_requirement: true
+  expect:
+    layer_number: 4
+    layer_name: "Signaling"
+- input:
+    failure_consequence: "catastrophic"
+  expect:
+    layer_number: 4
+    layer_name: "Signaling"
+- input: {}
+  expect:
+    layer_number: 0
+    layer_name: "Unclassified"
+- input:
+    is_passive_substrate: false
+    defines_physical_constraints: false
+    converts_energy_to_motion: false
+    processes_safety_critical_state: false
+    coordinates_multiple_entities: false
+    sets_strategy_or_policy: false
+    has_real_time_requirement: false
+  expect:
+    layer_number: 0
+    layer_name: "Unclassified"
+- input:
+    processes_safety_critical_state: true
+    coordinates_multiple_entities: true
+  expect:
+    layer_number: 4
+    layer_name: "Signaling"
+- input:
+    defines_physical_constraints: true
+    is_passive_substrate: false
+  expect:
+    layer_number: 2
+    layer_name: "Way"

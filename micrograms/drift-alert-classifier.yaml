@@ -1,0 +1,141 @@
+name: drift-alert-classifier
+description: 'PVOS drift alerting: classifies signal drift severity based on PRR change magnitude and time window'
+version: 0.1.0
+interface:
+  inputs:
+    prr_change_pct:
+      type: int
+      required: false
+    time_window_days:
+      type: int
+      required: false
+  outputs:
+    alert_level:
+      type: string
+    description:
+      type: string
+    severity:
+      type: string
+tree:
+  start: check_critical
+  nodes:
+    check_critical:
+      type: condition
+      variable: prr_change_pct
+      operator: gt
+      value: 50
+      true_next: critical_time_check
+      false_next: check_moderate
+    critical_time_check:
+      type: condition
+      variable: time_window_days
+      operator: lt
+      value: 7
+      true_next: critical_drift
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: prr_change_pct
+      operator: gt
+      value: 25
+      true_next: moderate_time_check
+      false_next: check_minor
+    moderate_time_check:
+      type: condition
+      variable: time_window_days
+      operator: lt
+      value: 14
+      true_next: moderate_drift
+      false_next: check_minor
+    check_minor:
+      type: condition
+      variable: prr_change_pct
+      operator: gt
+      value: 10
+      true_next: minor_time_check
+      false_next: stable
+    minor_time_check:
+      type: condition
+      variable: time_window_days
+      operator: lt
+      value: 30
+      true_next: minor_drift
+      false_next: stable
+    critical_drift:
+      type: return
+      value:
+        severity: CRITICAL_DRIFT
+        alert_level: P1
+        description: Rapid signal drift (>50% PRR change in <7 days) - immediate investigation required
+    moderate_drift:
+      type: return
+      value:
+        severity: MODERATE_DRIFT
+        alert_level: P2
+        description: Significant signal drift (>25% PRR change in <14 days) - schedule review
+    minor_drift:
+      type: return
+      value:
+        severity: MINOR_DRIFT
+        alert_level: P3
+        description: Gradual signal drift (>10% PRR change in <30 days) - add to monitoring queue
+    stable:
+      type: return
+      value:
+        severity: STABLE
+        alert_level: NONE
+        description: Signal within normal variation - no drift alert needed
+tests:
+- input:
+    prr_change_pct: 75
+    signal_count_change: 50
+    time_window_days: 3
+  expect:
+    severity: CRITICAL_DRIFT
+    alert_level: P1
+    description: Rapid signal drift (>50% PRR change in <7 days) - immediate investigation required
+- input:
+    prr_change_pct: 60
+    signal_count_change: 20
+    time_window_days: 10
+  expect:
+    severity: MODERATE_DRIFT
+    alert_level: P2
+    description: Significant signal drift (>25% PRR change in <14 days) - schedule review
+- input:
+    prr_change_pct: 30
+    signal_count_change: 10
+    time_window_days: 8
+  expect:
+    severity: MODERATE_DRIFT
+    alert_level: P2
+    description: Significant signal drift (>25% PRR change in <14 days) - schedule review
+- input:
+    prr_change_pct: 15
+    signal_count_change: 5
+    time_window_days: 20
+  expect:
+    severity: MINOR_DRIFT
+    alert_level: P3
+    description: Gradual signal drift (>10% PRR change in <30 days) - add to monitoring queue
+- input:
+    prr_change_pct: 5
+    signal_count_change: 2
+    time_window_days: 45
+  expect:
+    severity: STABLE
+    alert_level: NONE
+    description: Signal within normal variation - no drift alert needed
+- input:
+    prr_change_pct: 55
+    signal_count_change: 30
+    time_window_days: 13
+  expect:
+    severity: MODERATE_DRIFT
+    alert_level: P2
+    description: Significant signal drift (>25% PRR change in <14 days) - schedule review
+- input: {}
+  expect:
+    alert_level: NONE
+    description: Signal within normal variation - no drift alert needed
+    severity: STABLE

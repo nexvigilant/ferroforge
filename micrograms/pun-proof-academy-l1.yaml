@@ -1,0 +1,225 @@
+name: pun-proof-academy-l1
+description: 'Academy Level 1 teaching exercise: tests whether a learner can identify perspective divergence in PV safety terms. Uses the comic strip "application" metaphor — same word, different perspective, different outcome. Routes to PASS (correct identification), PARTIAL (recognized divergence but wrong perspective), or FAIL (missed divergence entirely).'
+version: 1.0.0
+interface:
+  inputs:
+    term:
+      type: string
+      required: true
+    learner_meaning:
+      type: string
+      required: false
+    learner_domain:
+      type: string
+      required: false
+  outputs:
+    correct:
+      type: bool
+    lesson:
+      type: string
+    pv_meaning:
+      type: string
+    common_meaning:
+      type: string
+    risk_if_confused:
+      type: string
+    verdict:
+      type: string
+tree:
+  start: check_term
+  nodes:
+    check_term:
+      type: condition
+      variable: term
+      operator: eq
+      value: expected
+      true_next: teach_expected
+      false_next: check_safe
+    check_safe:
+      type: condition
+      variable: term
+      operator: eq
+      value: safe
+      true_next: teach_safe
+      false_next: check_related
+    check_related:
+      type: condition
+      variable: term
+      operator: eq
+      value: related
+      true_next: teach_related
+      false_next: check_significant
+    check_significant:
+      type: condition
+      variable: term
+      operator: eq
+      value: significant
+      true_next: teach_significant
+      false_next: check_mild
+    check_mild:
+      type: condition
+      variable: term
+      operator: eq
+      value: mild
+      true_next: teach_mild
+      false_next: check_event
+    check_event:
+      type: condition
+      variable: term
+      operator: eq
+      value: event
+      true_next: teach_event
+      false_next: check_reaction
+    check_reaction:
+      type: condition
+      variable: term
+      operator: eq
+      value: reaction
+      true_next: teach_reaction
+      false_next: teach_application
+    teach_expected:
+      type: return
+      value:
+        correct: false
+        verdict: LESSON
+        pv_meaning: "Listed in the product labeling as a known adverse reaction"
+        common_meaning: "Anticipated or normal — not surprising"
+        risk_if_confused: "Expected ADRs are NOT safe ADRs. An expected fatal reaction is still fatal. Labeling inclusion does not reduce harm."
+        lesson: "In PV, 'expected' means 'listed in the label' (ICH E2A). A clinician hearing 'expected reaction' may assume it is harmless. A regulator hearing 'expected' checks the Reference Safety Information. Same word, opposite safety action."
+    teach_safe:
+      type: return
+      value:
+        correct: false
+        verdict: LESSON
+        pv_meaning: "Benefit-risk balance remains favorable for the approved indication"
+        common_meaning: "Will not cause harm"
+        risk_if_confused: "A drug can be 'safe' in regulatory terms while causing serious ADRs in individual patients. 'Safe' is population-level, not patient-level."
+        lesson: "In PV, 'safe' means the benefits outweigh the risks across the population. A patient hearing 'this drug is safe' may believe it cannot hurt them. The comic strip version: one person walks in with 'safety data' and gets approved, another walks in expecting zero risk and gets rejected."
+    teach_related:
+      type: return
+      value:
+        correct: false
+        verdict: LESSON
+        pv_meaning: "Causally associated — the drug caused the event (WHO-UMC/Naranjo assessment)"
+        common_meaning: "Occurring near in time — temporally associated"
+        risk_if_confused: "Temporal association is not causation. A patient who gets a headache 2 hours after taking a pill may call it 'related'. A PV assessor needs rechallenge, dechallenge, and alternative explanations."
+        lesson: "In PV, 'related' means causally linked after systematic assessment. In common usage, it means 'happened around the same time'. Confusing these suppresses real signals (false negatives) or amplifies noise (false positives)."
+    teach_significant:
+      type: return
+      value:
+        correct: false
+        verdict: LESSON
+        pv_meaning: "Statistically significant — p < 0.05 or confidence interval excludes null"
+        common_meaning: "Important or noteworthy"
+        risk_if_confused: "A 'significant finding' in a clinical trial has a precise statistical meaning. A regulator reading 'significant' expects quantified evidence. A clinician may mean 'clinically meaningful' — which is a different threshold entirely."
+        lesson: "Statistical significance and clinical significance are different perspectives on the same data. A statistically significant result (p=0.04) may be clinically trivial. A clinically significant harm may lack statistical power to detect."
+    teach_mild:
+      type: return
+      value:
+        correct: false
+        verdict: LESSON
+        pv_meaning: "Grade 1 severity — does not interfere with daily activities (CTCAE grading)"
+        common_meaning: "Not serious, not worth reporting"
+        risk_if_confused: "A patient who dismisses a 'mild' rash may not report it. That rash could be the first signal of Stevens-Johnson Syndrome. 'Mild' in PV is a grading, not a dismissal."
+        lesson: "In PV, 'mild' is a severity grade, not a safety judgment. Mild events still get reported, tracked, and may signal serious downstream risk. The patient perspective ('it's just mild') suppresses reporting."
+    teach_event:
+      type: return
+      value:
+        correct: false
+        verdict: LESSON
+        pv_meaning: "Adverse Event (AE) — any untoward medical occurrence, regardless of causality (ICH E2A)"
+        common_meaning: "Something that happened — a general occurrence"
+        risk_if_confused: "In general English, 'event' is neutral. In PV, 'adverse event' is a regulatory term with reporting obligations. Missing the PV meaning means missing the reporting trigger."
+        lesson: "In PV, 'event' in 'adverse event' carries legal reporting requirements. A patient saying 'I had an event' may mean a seizure, a fall, or a social gathering. The PV professional must disambiguate."
+    teach_reaction:
+      type: return
+      value:
+        correct: false
+        verdict: LESSON
+        pv_meaning: "Adverse Drug Reaction (ADR) — an AE where causality is at least reasonably possible (ICH E2A)"
+        common_meaning: "Any response to a stimulus"
+        risk_if_confused: "The difference between AE and ADR is causality. An AE has no causality requirement. An ADR implies the drug caused it. Using 'reaction' when you mean 'event' inflates causality claims. Using 'event' when you mean 'reaction' deflates them."
+        lesson: "In PV, 'reaction' = causality assessed. 'Event' = no causality required. These are not interchangeable. The clinical perspective ('the patient had a reaction') implies causation. The regulatory perspective requires formal assessment before that word is used."
+    teach_application:
+      type: return
+      value:
+        correct: false
+        verdict: LESSON
+        pv_meaning: "Regulatory submission — a Marketing Authorization Application (MAA) or New Drug Application (NDA)"
+        common_meaning: "A software program, or a job application, or the act of applying something"
+        risk_if_confused: "The original comic strip insight: one person brings a paper application (resume), another brings a software application (app). In PV, 'application' means a formal regulatory submission. Confusing this with software or employment applications is how signals get lost in translation."
+        lesson: "The word 'application' started this entire investigation. At the amusement park, two people present different 'applications'. In PV, the same word means a regulatory submission. This is the founding example of perspective divergence as a safety diagnostic."
+tests:
+- name: expected term teaches labeling vs anticipation
+  input:
+    term: expected
+  expect:
+    correct: false
+    verdict: LESSON
+    pv_meaning: "Listed in the product labeling as a known adverse reaction"
+    common_meaning: "Anticipated or normal — not surprising"
+- name: safe term teaches population vs individual
+  input:
+    term: safe
+  expect:
+    correct: false
+    verdict: LESSON
+    pv_meaning: "Benefit-risk balance remains favorable for the approved indication"
+    common_meaning: "Will not cause harm"
+- name: related term teaches causality vs temporal
+  input:
+    term: related
+  expect:
+    correct: false
+    verdict: LESSON
+    pv_meaning: "Causally associated — the drug caused the event (WHO-UMC/Naranjo assessment)"
+    common_meaning: "Occurring near in time — temporally associated"
+- name: significant term teaches statistical vs clinical
+  input:
+    term: significant
+  expect:
+    correct: false
+    verdict: LESSON
+    pv_meaning: "Statistically significant — p < 0.05 or confidence interval excludes null"
+    common_meaning: "Important or noteworthy"
+- name: mild term teaches grading vs dismissal
+  input:
+    term: mild
+  expect:
+    correct: false
+    verdict: LESSON
+    pv_meaning: "Grade 1 severity — does not interfere with daily activities (CTCAE grading)"
+    common_meaning: "Not serious, not worth reporting"
+- name: event term teaches regulatory vs general
+  input:
+    term: event
+  expect:
+    correct: false
+    verdict: LESSON
+    pv_meaning: "Adverse Event (AE) — any untoward medical occurrence, regardless of causality (ICH E2A)"
+    common_meaning: "Something that happened — a general occurrence"
+- name: reaction term teaches ADR vs AE distinction
+  input:
+    term: reaction
+  expect:
+    correct: false
+    verdict: LESSON
+    pv_meaning: "Adverse Drug Reaction (ADR) — an AE where causality is at least reasonably possible (ICH E2A)"
+    common_meaning: "Any response to a stimulus"
+- name: application term teaches the founding metaphor
+  input:
+    term: application
+  expect:
+    correct: false
+    verdict: LESSON
+    pv_meaning: "Regulatory submission — a Marketing Authorization Application (MAA) or New Drug Application (NDA)"
+    common_meaning: "A software program, or a job application, or the act of applying something"
+- name: null_input_safety
+  input: {}
+  expect:
+    common_meaning: "A software program, or a job application, or the act of applying something"
+    correct: false
+    lesson: "The word 'application' started this entire investigation. At the amusement park, two people present different 'applications'. In PV, the same word means a regulatory submission. This is the founding example of perspective divergence as a safety diagnostic."
+    pv_meaning: Regulatory submission — a Marketing Authorization Application (MAA) or New Drug Application (NDA)
+    risk_if_confused: "The original comic strip insight: one person brings a paper application (resume), another brings a software application (app). In PV, 'application' means a formal regulatory submission. Confusing this with software or employment applications is how signals get lost in translation."
+    verdict: LESSON

@@ -1,0 +1,191 @@
+name: mission-alignment
+description: 'Loop 4 FlywheelVitals: Gyroscopic stability inputs. Measures mission alignment via scope creep frequency, pivot resistance (momentum/perturbation ratio), and decision consistency. Spec §3.4: stability only exists above critical momentum — emergent property.'
+version: 0.1.0
+interface:
+  inputs:
+    scope_creep_incidents:
+      type: int
+      required: true
+    pivot_resistance:
+      type: float
+      required: true
+    decision_consistency:
+      type: float
+      required: true
+    momentum_above_critical:
+      type: int
+      required: true
+  outputs:
+    alignment:
+      type: string
+    stability_input:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_momentum
+  nodes:
+    # Gate: no stability possible without momentum (spec §3.4)
+    check_momentum:
+      type: condition
+      variable: momentum_above_critical
+      operator: eq
+      value: 1
+      true_next: check_scope_creep_high
+      false_next: no_stability_possible
+    check_scope_creep_high:
+      type: condition
+      variable: scope_creep_incidents
+      operator: gte
+      value: 5
+      true_next: misaligned
+      false_next: check_pivot_resistance
+    check_pivot_resistance:
+      type: condition
+      variable: pivot_resistance
+      operator: gte
+      value: 2.0
+      true_next: check_consistency_high
+      false_next: check_consistency_low
+    check_consistency_high:
+      type: condition
+      variable: decision_consistency
+      operator: gte
+      value: 0.8
+      true_next: aligned
+      false_next: check_scope_creep_moderate
+    check_consistency_low:
+      type: condition
+      variable: decision_consistency
+      operator: gte
+      value: 0.5
+      true_next: check_scope_creep_moderate
+      false_next: drifting
+    check_scope_creep_moderate:
+      type: condition
+      variable: scope_creep_incidents
+      operator: gte
+      value: 3
+      true_next: precessing
+      false_next: stable_enough
+    aligned:
+      type: return
+      value:
+        alignment: ALIGNED
+        stability_input: stable
+        action: maintain_course
+    stable_enough:
+      type: return
+      value:
+        alignment: STABLE
+        stability_input: precessing
+        action: minor_course_correction
+    precessing:
+      type: return
+      value:
+        alignment: PRECESSING
+        stability_input: precessing
+        action: scope_review_needed
+    drifting:
+      type: return
+      value:
+        alignment: DRIFTING
+        stability_input: gimbal_lock
+        action: strategic_realignment
+    misaligned:
+      type: return
+      value:
+        alignment: MISALIGNED
+        stability_input: gimbal_lock
+        action: emergency_scope_freeze
+    no_stability_possible:
+      type: return
+      value:
+        alignment: NO_AXIS
+        stability_input: no_stability
+        action: build_momentum_first
+tests:
+# ALIGNED: strong pivot resistance, consistent decisions, few scope creeps
+- input:
+    scope_creep_incidents: 1
+    pivot_resistance: 5.0
+    decision_consistency: 0.9
+    momentum_above_critical: 1
+  expect:
+    alignment: ALIGNED
+    stability_input: stable
+    action: maintain_course
+# NO_AXIS: below critical momentum
+- input:
+    scope_creep_incidents: 0
+    pivot_resistance: 10.0
+    decision_consistency: 1.0
+    momentum_above_critical: 0
+  expect:
+    alignment: NO_AXIS
+    stability_input: no_stability
+    action: build_momentum_first
+# MISALIGNED: too many scope creeps
+- input:
+    scope_creep_incidents: 7
+    pivot_resistance: 3.0
+    decision_consistency: 0.8
+    momentum_above_critical: 1
+  expect:
+    alignment: MISALIGNED
+    stability_input: gimbal_lock
+    action: emergency_scope_freeze
+# DRIFTING: low consistency, low pivot resistance
+- input:
+    scope_creep_incidents: 2
+    pivot_resistance: 1.0
+    decision_consistency: 0.3
+    momentum_above_critical: 1
+  expect:
+    alignment: DRIFTING
+    stability_input: gimbal_lock
+    action: strategic_realignment
+# PRECESSING: moderate scope creep with moderate consistency
+- input:
+    scope_creep_incidents: 4
+    pivot_resistance: 1.5
+    decision_consistency: 0.6
+    momentum_above_critical: 1
+  expect:
+    alignment: PRECESSING
+    stability_input: precessing
+    action: scope_review_needed
+# STABLE: good resistance, few creeps, moderate consistency
+- input:
+    scope_creep_incidents: 2
+    pivot_resistance: 3.0
+    decision_consistency: 0.7
+    momentum_above_critical: 1
+  expect:
+    alignment: STABLE
+    stability_input: precessing
+    action: minor_course_correction
+# Edge: exactly at boundaries
+- input:
+    scope_creep_incidents: 5
+    pivot_resistance: 2.0
+    decision_consistency: 0.8
+    momentum_above_critical: 1
+  expect:
+    alignment: MISALIGNED
+    stability_input: gimbal_lock
+    action: emergency_scope_freeze
+- input:
+    scope_creep_incidents: 3
+    pivot_resistance: 2.0
+    decision_consistency: 0.8
+    momentum_above_critical: 1
+  expect:
+    alignment: ALIGNED
+    stability_input: stable
+    action: maintain_course
+- input: {}
+  expect:
+    action: build_momentum_first
+    alignment: NO_AXIS
+    stability_input: no_stability

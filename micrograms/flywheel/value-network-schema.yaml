@@ -1,0 +1,205 @@
+name: value-network-schema
+description: 'Component: Rim (Value Network) — Spec §2.1. Schema validator for value
+  network data completeness. Instead of classifying state (no equation yet), validates
+  that sufficient data exists to COMPUTE rim health. Returns data_complete=true when
+  all required metrics are present and non-zero.'
+version: 0.1.0
+tree:
+  start: check_members
+  nodes:
+    check_members:
+      type: condition
+      variable: member_count
+      operator: gt
+      value: 0
+      true_next: check_content
+      false_next: missing_members
+    missing_churn:
+      type: return
+      value:
+        data_complete: false
+        missing_fields: churn_exits_30d
+        can_compute_rim: false
+    missing_alternatives:
+      type: return
+      value:
+        missing_fields: alternatives_known
+        data_complete: false
+        can_compute_rim: false
+    complete:
+      type: return
+      value:
+        can_compute_rim: true
+        data_complete: true
+        missing_fields: none
+    check_churn:
+      type: condition
+      variable: churn_exits_30d
+      operator: is_not_null
+      value: true
+      true_next: check_alternatives
+      false_next: missing_churn
+    check_content:
+      type: condition
+      variable: content_items
+      operator: gt
+      value: 0
+      true_next: check_engagement
+      false_next: missing_content
+    missing_identity:
+      type: return
+      value:
+        can_compute_rim: false
+        missing_fields: has_identity_signal
+        data_complete: false
+    missing_engagement:
+      type: return
+      value:
+        data_complete: false
+        missing_fields: engagement_events_30d
+        can_compute_rim: false
+    check_alternatives:
+      type: condition
+      variable: alternatives_known
+      operator: is_not_null
+      value: true
+      true_next: check_identity
+      false_next: missing_alternatives
+    check_engagement:
+      type: condition
+      variable: engagement_events_30d
+      operator: gt
+      value: 0
+      true_next: check_churn
+      false_next: missing_engagement
+    check_identity:
+      type: condition
+      variable: has_identity_signal
+      operator: eq
+      value: 1
+      true_next: complete
+      false_next: missing_identity
+    missing_members:
+      type: return
+      value:
+        can_compute_rim: false
+        data_complete: false
+        missing_fields: member_count
+    missing_content:
+      type: return
+      value:
+        can_compute_rim: false
+        missing_fields: content_items
+        data_complete: false
+tests:
+- input:
+    alternatives_known: false
+    churn_exits_30d: false
+    content_items: -0.5
+    engagement_events_30d: -0.5
+    has_identity_signal: 0
+    member_count: -0.5
+  expect:
+    can_compute_rim: false
+    data_complete: false
+    missing_fields: member_count
+- input:
+    alternatives_known: false
+    churn_exits_30d: false
+    content_items: -0.5
+    engagement_events_30d: -0.5
+    has_identity_signal: 0
+    member_count: 0.5
+  expect:
+    can_compute_rim: false
+    missing_fields: content_items
+    data_complete: false
+- input:
+    alternatives_known: false
+    churn_exits_30d: false
+    content_items: 0.5
+    engagement_events_30d: -0.5
+    has_identity_signal: 0
+    member_count: 0.5
+  expect:
+    data_complete: false
+    missing_fields: engagement_events_30d
+    can_compute_rim: false
+- input:
+    alternatives_known: false
+    churn_exits_30d: false
+    content_items: 0.5
+    engagement_events_30d: 0.5
+    has_identity_signal: 0
+    member_count: 0.5
+  expect:
+    can_compute_rim: false
+    missing_fields: has_identity_signal
+    data_complete: false
+- input:
+    alternatives_known: false
+    churn_exits_30d: false
+    content_items: 0.5
+    engagement_events_30d: 0.5
+    has_identity_signal: 1
+    member_count: 0.5
+  expect:
+    can_compute_rim: true
+    data_complete: true
+    missing_fields: none
+- input:
+    alternatives_known: false
+    content_items: 0.5
+    engagement_events_30d: 0.5
+    has_identity_signal: 0
+    member_count: 0.5
+  expect:
+    data_complete: false
+    missing_fields: churn_exits_30d
+    can_compute_rim: false
+- input:
+    churn_exits_30d: false
+    content_items: 0.5
+    engagement_events_30d: 0.5
+    has_identity_signal: 0
+    member_count: 0.5
+  expect:
+    missing_fields: alternatives_known
+    data_complete: false
+    can_compute_rim: false
+- input: {}
+  expect:
+    can_compute_rim: false
+    data_complete: false
+    missing_fields: member_count
+interface:
+  inputs:
+    member_count:
+      type: int
+      required: false
+    has_identity_signal:
+      type: int
+      required: false
+    churn_exits_30d:
+      type: int
+      required: false
+    alternatives_known:
+      type: int
+      required: false
+    content_items:
+      type: int
+      required: false
+    engagement_events_30d:
+      type: int
+      required: false
+  outputs:
+    data_complete:
+      type: bool
+      required: false
+    missing_fields:
+      type: string
+      required: false
+    can_compute_rim:
+      type: bool
+      required: false
+  aliases: {}

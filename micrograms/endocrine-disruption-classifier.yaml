@@ -1,0 +1,126 @@
+name: endocrine-disruption-classifier
+description: 'Endocrine disruption classifier: maps hormonal and endocrine adverse reactions to severity grades for thyroid, adrenal, and metabolic disorders'
+version: 0.1.0
+interface:
+  inputs:
+    reaction_pt:
+      type: string
+      required: true
+      description: MedDRA preferred term for the endocrine reaction
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    soc:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_adrenal_crisis
+  nodes:
+    check_adrenal_crisis:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: ADRENAL CRISIS
+      true_next: critical
+      false_next: check_dka
+    check_dka:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: DIABETIC KETOACIDOSIS
+      true_next: critical
+      false_next: check_thyroid_storm
+    check_thyroid_storm:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: THYROID STORM
+      true_next: critical
+      false_next: check_adrenal_insuff
+    check_adrenal_insuff:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: ADRENAL INSUFFICIENCY
+      true_next: serious
+      false_next: check_hypothyroidism
+    check_hypothyroidism:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: HYPOTHYROIDISM
+      true_next: moderate
+      false_next: check_hyperglycaemia
+    check_hyperglycaemia:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: HYPERGLYCAEMIA
+      true_next: moderate
+      false_next: mild
+    critical:
+      type: return
+      value:
+        severity: critical
+        soc: Endocrine disorders
+        action: immediate_expedited_report
+    serious:
+      type: return
+      value:
+        severity: serious
+        soc: Endocrine disorders
+        action: expedited_report
+    moderate:
+      type: return
+      value:
+        severity: moderate
+        soc: Endocrine disorders
+        action: monitor_and_assess
+    mild:
+      type: return
+      value:
+        severity: mild
+        soc: Endocrine disorders
+        action: routine_surveillance
+tests:
+  - name: adrenal_crisis
+    input:
+      reaction_pt: ADRENAL CRISIS
+    expect:
+      severity: critical
+  - name: dka
+    input:
+      reaction_pt: DIABETIC KETOACIDOSIS
+    expect:
+      severity: critical
+  - name: thyroid_storm
+    input:
+      reaction_pt: THYROID STORM
+    expect:
+      severity: critical
+  - name: adrenal_insufficiency
+    input:
+      reaction_pt: ADRENAL INSUFFICIENCY
+    expect:
+      severity: serious
+  - name: hypothyroidism
+    input:
+      reaction_pt: HYPOTHYROIDISM
+    expect:
+      severity: moderate
+  - name: hyperglycaemia
+    input:
+      reaction_pt: HYPERGLYCAEMIA
+    expect:
+      severity: moderate
+  - name: mild_weight_gain
+    input:
+      reaction_pt: WEIGHT INCREASED
+    expect:
+      severity: mild
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild

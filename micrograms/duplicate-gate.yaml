@@ -1,0 +1,287 @@
+name: duplicate-gate
+description: 'Duplicate case detection: classifies case pairs as CONFIRMED/PROBABLE/POSSIBLE/UNLIKELY duplicate based on matching criteria and time window'
+version: 1.0.0
+interface:
+  inputs:
+    same_drug:
+      type: bool
+      required: false
+    same_event:
+      type: bool
+      required: false
+    same_patient:
+      type: bool
+      required: false
+    same_reporter:
+      type: bool
+      required: false
+    time_window_days:
+      type: int
+      required: false
+  outputs:
+    action:
+      type: string
+    confidence:
+      type: string
+    duplicate:
+      type: string
+    review_rationale:
+      type: string
+tree:
+  start: check_same_patient
+  nodes:
+    # --- Require same_patient as baseline for all duplicate paths ---
+    check_same_patient:
+      type: condition
+      variable: same_patient
+      operator: eq
+      value: true
+      true_next: check_same_drug
+      false_next: return_unlikely
+
+    check_same_drug:
+      type: condition
+      variable: same_drug
+      operator: eq
+      value: true
+      true_next: check_same_event_for_confirmed
+      false_next: check_same_event_diff_drug
+
+    # --- Path: same_patient + same_drug + same_event → CONFIRMED or PROBABLE ---
+    check_same_event_for_confirmed:
+      type: condition
+      variable: same_event
+      operator: eq
+      value: true
+      true_next: check_reporter_for_confirmed
+      false_next: check_time_possible
+
+    check_reporter_for_confirmed:
+      type: condition
+      variable: same_reporter
+      operator: eq
+      value: true
+      true_next: check_time_confirmed
+      false_next: check_time_probable
+
+    check_time_confirmed:
+      type: condition
+      variable: time_window_days
+      operator: lte
+      value: 7
+      true_next: return_confirmed
+      false_next: check_time_probable
+
+    check_time_probable:
+      type: condition
+      variable: time_window_days
+      operator: lte
+      value: 30
+      true_next: return_probable
+      false_next: return_unlikely
+
+    # --- Path: same_patient + same_drug + NOT same_event → POSSIBLE by time ---
+    check_time_possible:
+      type: condition
+      variable: time_window_days
+      operator: lte
+      value: 90
+      true_next: return_possible
+      false_next: return_unlikely
+
+    # --- Path: same_patient + NOT same_drug + check same_event ---
+    check_same_event_diff_drug:
+      type: condition
+      variable: same_event
+      operator: eq
+      value: true
+      true_next: check_time_possible_diff_drug
+      false_next: return_unlikely
+
+    check_time_possible_diff_drug:
+      type: condition
+      variable: time_window_days
+      operator: lte
+      value: 30
+      true_next: return_possible_different_drug
+      false_next: return_unlikely
+
+    # --- Return nodes ---
+    return_confirmed:
+      type: return
+      value:
+        duplicate: CONFIRMED
+        action: merge_cases
+        confidence: HIGH
+        review_rationale: All four matching criteria met within 7-day window — same patient, drug, event, and reporter
+
+    return_probable:
+      type: return
+      value:
+        duplicate: PROBABLE
+        action: manual_review
+        confidence: MODERATE
+        review_rationale: Same patient, drug, and event within 30-day window — reporter differs or time window 8-30 days
+
+    return_possible:
+      type: return
+      value:
+        duplicate: POSSIBLE
+        action: flag_for_review
+        confidence: LOW
+        review_rationale: Same patient and drug within 90-day window but event differs — may represent follow-up report
+
+    return_possible_different_drug:
+      type: return
+      value:
+        duplicate: POSSIBLE_DIFFERENT_DRUG
+        action: review_concomitants
+        confidence: LOW
+        review_rationale: Same patient and event but different drug within 30 days — review concomitant medications for misattribution
+
+    return_unlikely:
+      type: return
+      value:
+        duplicate: UNLIKELY
+        action: process_as_new
+        confidence: HIGH
+        review_rationale: Insufficient matching criteria to classify as duplicate
+
+tests:
+- input:
+    same_patient: true
+    same_drug: true
+    same_event: true
+    same_reporter: true
+    time_window_days: 5
+  expect:
+    duplicate: CONFIRMED
+    action: merge_cases
+    confidence: HIGH
+
+- input:
+    same_patient: true
+    same_drug: true
+    same_event: true
+    same_reporter: true
+    time_window_days: 7
+  expect:
+    duplicate: CONFIRMED
+    action: merge_cases
+    confidence: HIGH
+
+- input:
+    same_patient: true
+    same_drug: true
+    same_event: true
+    same_reporter: true
+    time_window_days: 8
+  expect:
+    duplicate: PROBABLE
+    action: manual_review
+    confidence: MODERATE
+
+- input:
+    same_patient: true
+    same_drug: true
+    same_event: true
+    same_reporter: false
+    time_window_days: 14
+  expect:
+    duplicate: PROBABLE
+    action: manual_review
+    confidence: MODERATE
+
+- input:
+    same_patient: true
+    same_drug: true
+    same_event: true
+    same_reporter: false
+    time_window_days: 30
+  expect:
+    duplicate: PROBABLE
+    action: manual_review
+    confidence: MODERATE
+
+- input:
+    same_patient: true
+    same_drug: true
+    same_event: true
+    same_reporter: false
+    time_window_days: 31
+  expect:
+    duplicate: UNLIKELY
+    action: process_as_new
+    confidence: HIGH
+
+- input:
+    same_patient: true
+    same_drug: true
+    same_event: false
+    same_reporter: false
+    time_window_days: 45
+  expect:
+    duplicate: POSSIBLE
+    action: flag_for_review
+    confidence: LOW
+
+- input:
+    same_patient: true
+    same_drug: true
+    same_event: false
+    same_reporter: false
+    time_window_days: 90
+  expect:
+    duplicate: POSSIBLE
+    action: flag_for_review
+    confidence: LOW
+
+- input:
+    same_patient: true
+    same_drug: true
+    same_event: false
+    same_reporter: false
+    time_window_days: 91
+  expect:
+    duplicate: UNLIKELY
+    action: process_as_new
+    confidence: HIGH
+
+- input:
+    same_patient: true
+    same_drug: false
+    same_event: true
+    same_reporter: false
+    time_window_days: 20
+  expect:
+    duplicate: POSSIBLE_DIFFERENT_DRUG
+    action: review_concomitants
+    confidence: LOW
+
+- input:
+    same_patient: true
+    same_drug: false
+    same_event: true
+    same_reporter: false
+    time_window_days: 31
+  expect:
+    duplicate: UNLIKELY
+    action: process_as_new
+    confidence: HIGH
+
+- input:
+    same_patient: false
+    same_drug: true
+    same_event: true
+    same_reporter: true
+    time_window_days: 5
+  expect:
+    duplicate: UNLIKELY
+    action: process_as_new
+    confidence: HIGH
+
+- input: {}
+  expect:
+    duplicate: UNLIKELY
+    action: process_as_new
+    confidence: HIGH

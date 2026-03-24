@@ -1,0 +1,143 @@
+name: ai-gateway
+description: "PDC: EPA 10 AI Gateway typestate — route phase by current level to next phase and CPA 8 unlock"
+version: 0.1.0
+interface:
+  inputs:
+    epa10_level:
+      type: int
+      required: false
+  outputs:
+    activities:
+      type: string
+    cpa8_unlocked:
+      type: bool
+    description:
+      type: string
+    next_phase:
+      type: string
+    phase:
+      type: string
+    supervision:
+      type: string
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: epa10_level
+      operator: is_null
+      value: null
+      true_next: foundation_phase
+      false_next: check_level
+    check_level:
+      type: condition
+      variable: epa10_level
+      operator: lte
+      value: 1
+      true_next: foundation_phase
+      false_next: check_application
+    check_application:
+      type: condition
+      variable: epa10_level
+      operator: eq
+      value: 2
+      true_next: application_phase
+      false_next: check_integration
+    check_integration:
+      type: condition
+      variable: epa10_level
+      operator: eq
+      value: 3
+      true_next: integration_phase
+      false_next: check_innovation
+    check_innovation:
+      type: condition
+      variable: epa10_level
+      operator: eq
+      value: 4
+      true_next: innovation_phase
+      false_next: mastery_achieved
+    foundation_phase:
+      type: return
+      value:
+        phase: FOUNDATION
+        description: "AI tool exposure and basic competency development"
+        supervision: direct
+        cpa8_unlocked: false
+        next_phase: APPLICATION
+        activities: "observe AI tools, understand capabilities, basic terminology"
+    application_phase:
+      type: return
+      value:
+        phase: APPLICATION
+        description: "Supervised AI implementation with validation training"
+        supervision: supervised
+        cpa8_unlocked: false
+        next_phase: INTEGRATION
+        activities: "apply AI under guidance, validate outputs, learn limitations"
+    integration_phase:
+      type: return
+      value:
+        phase: INTEGRATION
+        description: "Independent AI workflow design and optimization"
+        supervision: consultative
+        cpa8_unlocked: false
+        next_phase: INNOVATION
+        activities: "design AI workflows, optimize processes, cross-functional integration"
+    innovation_phase:
+      type: return
+      value:
+        phase: INNOVATION
+        description: "AI solution development and transformation leadership"
+        supervision: autonomous
+        cpa8_unlocked: true
+        next_phase: MASTERY
+        activities: "develop AI solutions, lead transformation, industry contribution"
+    mastery_achieved:
+      type: return
+      value:
+        phase: MASTERY
+        description: "Full CPA 8 capability — AI-Enhanced Pharmacovigilance leadership"
+        supervision: none
+        cpa8_unlocked: true
+        next_phase: null
+        activities: "cross-functional AI integration, thought leadership, paradigm creation"
+tests:
+- input:
+    epa10_level: 1
+  expect:
+    phase: FOUNDATION
+    cpa8_unlocked: false
+    next_phase: APPLICATION
+- input:
+    epa10_level: 2
+  expect:
+    phase: APPLICATION
+    cpa8_unlocked: false
+    next_phase: INTEGRATION
+- input:
+    epa10_level: 3
+  expect:
+    phase: INTEGRATION
+    cpa8_unlocked: false
+    next_phase: INNOVATION
+- input:
+    epa10_level: 4
+  expect:
+    phase: INNOVATION
+    cpa8_unlocked: true
+    next_phase: MASTERY
+- input:
+    epa10_level: 5
+  expect:
+    phase: MASTERY
+    cpa8_unlocked: true
+- input:
+    epa10_level: 0
+  expect:
+    phase: FOUNDATION
+    cpa8_unlocked: false
+- input: {}
+  expect:
+    phase: FOUNDATION
+    cpa8_unlocked: false

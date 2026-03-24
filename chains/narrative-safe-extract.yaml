@@ -1,0 +1,79 @@
+name: narrative-safe-extract
+description: "Additive boundary filtration pipeline for ICSR narrative extraction. Passes narrative through 5 gates (PHI, Site, Inference, Redaction Decision, Completeness) — only narratives clearing ALL gates are safe to extract. Mirrors the OSS export gate methodology applied to patient safety data."
+version: 0.1.0
+accumulate: true
+steps:
+  - name: narrative-phi-detector
+    description: "Gate 1: Detect direct PHI per HIPAA Safe Harbor 18 identifiers"
+  - name: narrative-site-filter
+    description: "Gate 2: Detect site/institution identifiers that could compromise blinding"
+  - name: narrative-inference-risk
+    description: "Gate 3: Assess re-identification risk from quasi-identifier combinations"
+  - name: narrative-redaction-router
+    description: "Gate 4: Route through redaction decision based on combined risk levels"
+  - name: narrative-completeness-gate
+    description: "Gate 5: Verify redacted narrative retains regulatory value"
+tests:
+  - name: "Clean narrative — all gates pass"
+    input:
+      has_patient_name: false
+      has_date_of_birth: false
+      has_address: false
+      has_phone: false
+      has_mrn: false
+      has_ssn: false
+      has_email: false
+      phi_field_count: 0
+      has_site_number: false
+      has_institution_name: false
+      has_investigator_name: false
+      has_irb_identifier: false
+      has_protocol_number: false
+      is_blinded_study: false
+      is_rare_disease: false
+      has_exact_age: false
+      has_geographic_detail: false
+      has_temporal_detail: false
+      has_occupation: false
+      unique_drug_combination: false
+      quasi_identifier_count: 0
+      has_adverse_event_term: true
+      has_suspect_drug: true
+      has_temporal_relationship: true
+      has_outcome: true
+      word_count: 100
+    expect:
+      gate_pass: true
+      can_extract: true
+  - name: "PHI detected — blocked at Gate 1"
+    input:
+      has_ssn: true
+      has_adverse_event_term: true
+      has_suspect_drug: true
+    expect:
+      phi_detected: true
+      phi_severity: CRITICAL
+  - name: "Blinded study site leak — blocked at Gate 2"
+    input:
+      is_blinded_study: true
+      has_site_number: true
+      has_adverse_event_term: true
+      has_suspect_drug: true
+    expect:
+      site_id_detected: true
+      risk_level: CRITICAL
+  - name: "Rare disease + age + geography — blocked at Gate 3"
+    input:
+      is_rare_disease: true
+      has_exact_age: true
+      has_geographic_detail: true
+      has_adverse_event_term: true
+      has_suspect_drug: true
+    expect:
+      inference_risk: CRITICAL
+  - name: "Redacted too aggressively — fails Gate 5"
+    input:
+      has_adverse_event_term: false
+    expect:
+      regulatory_value: NONE
+      completeness_score: 0

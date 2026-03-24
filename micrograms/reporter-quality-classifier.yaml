@@ -1,0 +1,220 @@
+name: reporter-quality-classifier
+description: 'Classify FAERS reporter type into quality weight for signal assessment. HCP reports carry higher evidentiary weight per ICH E2D.'
+version: 0.1.0
+interface:
+  inputs:
+    reporter_type:
+      type: string
+      required: false
+      description: 'Reporter qualification code from FAERS: 1=physician, 2=pharmacist, 3=other_hcp, 4=lawyer, 5=consumer'
+    hcp_count:
+      type: int
+      required: false
+      description: 'Number of HCP-sourced reports (for batch classification)'
+    total_count:
+      type: int
+      required: false
+      description: 'Total reports in batch'
+  outputs:
+    quality_tier:
+      type: string
+    weight:
+      type: float
+    rationale:
+      type: string
+tree:
+  start: check_batch_mode
+  nodes:
+    check_batch_mode:
+      type: condition
+      variable: hcp_count
+      operator: is_not_null
+      true_next: check_total
+      false_next: check_reporter
+
+    check_total:
+      type: condition
+      variable: total_count
+      operator: is_not_null
+      true_next: check_hcp_dominant
+      false_next: missing_batch
+
+    check_hcp_dominant:
+      type: condition
+      variable: hcp_count
+      operator: gte
+      value: 50
+      true_next: check_hcp_pct_high
+      false_next: check_hcp_any
+
+    check_hcp_pct_high:
+      type: condition
+      variable: total_count
+      operator: lte
+      value: 100
+      true_next: batch_high_quality
+      false_next: batch_mixed
+
+    check_hcp_any:
+      type: condition
+      variable: hcp_count
+      operator: gte
+      value: 1
+      true_next: batch_mixed
+      false_next: batch_low_quality
+
+    check_reporter:
+      type: condition
+      variable: reporter_type
+      operator: is_not_null
+      true_next: check_physician
+      false_next: unknown_reporter
+
+    check_physician:
+      type: condition
+      variable: reporter_type
+      operator: matches
+      value: "(?i)^(1|physician|md)$"
+      true_next: tier_physician
+      false_next: check_pharmacist
+
+    check_pharmacist:
+      type: condition
+      variable: reporter_type
+      operator: matches
+      value: "(?i)^(2|pharmacist|pharmd|rph)$"
+      true_next: tier_pharmacist
+      false_next: check_other_hcp
+
+    check_other_hcp:
+      type: condition
+      variable: reporter_type
+      operator: matches
+      value: "(?i)^(3|other_hcp|nurse|rn|np|pa)$"
+      true_next: tier_other_hcp
+      false_next: check_consumer
+
+    check_consumer:
+      type: condition
+      variable: reporter_type
+      operator: matches
+      value: "(?i)^(5|consumer|patient)$"
+      true_next: tier_consumer
+      false_next: check_lawyer
+
+    check_lawyer:
+      type: condition
+      variable: reporter_type
+      operator: matches
+      value: "(?i)^(4|lawyer|attorney)$"
+      true_next: tier_lawyer
+      false_next: unknown_reporter
+
+    tier_physician:
+      type: return
+      value:
+        quality_tier: TIER_1
+        weight: 1.0
+        rationale: "Physician report — highest evidentiary weight for causality assessment"
+
+    tier_pharmacist:
+      type: return
+      value:
+        quality_tier: TIER_1
+        weight: 1.0
+        rationale: "Pharmacist report — clinical expertise in drug-event assessment"
+
+    tier_other_hcp:
+      type: return
+      value:
+        quality_tier: TIER_2
+        weight: 0.85
+        rationale: "Other HCP report — clinical context available but may lack prescribing expertise"
+
+    tier_consumer:
+      type: return
+      value:
+        quality_tier: TIER_3
+        weight: 0.6
+        rationale: "Consumer report — valuable signal but may lack clinical detail"
+
+    tier_lawyer:
+      type: return
+      value:
+        quality_tier: TIER_4
+        weight: 0.3
+        rationale: "Lawyer report — potential litigation bias reduces evidentiary weight"
+
+    unknown_reporter:
+      type: return
+      value:
+        quality_tier: TIER_3
+        weight: 0.5
+        rationale: "Unknown reporter type — default to conservative weight"
+
+    batch_high_quality:
+      type: return
+      value:
+        quality_tier: BATCH_HIGH
+        weight: 0.9
+        rationale: "Majority HCP reporters — high-quality signal batch"
+
+    batch_mixed:
+      type: return
+      value:
+        quality_tier: BATCH_MIXED
+        weight: 0.7
+        rationale: "Mixed reporter pool — moderate signal quality"
+
+    batch_low_quality:
+      type: return
+      value:
+        quality_tier: BATCH_LOW
+        weight: 0.5
+        rationale: "No HCP reporters — lower evidentiary weight for batch"
+
+    missing_batch:
+      type: return
+      value:
+        quality_tier: null
+        weight: 0.5
+        rationale: "Missing total_count for batch classification"
+
+tests:
+# Single reporter tests
+- input: { reporter_type: "1" }
+  expect: { quality_tier: TIER_1, weight: 1.0, rationale: "Physician report — highest evidentiary weight for causality assessment" }
+- input: { reporter_type: "physician" }
+  expect: { quality_tier: TIER_1, weight: 1.0 }
+- input: { reporter_type: "2" }
+  expect: { quality_tier: TIER_1, weight: 1.0, rationale: "Pharmacist report — clinical expertise in drug-event assessment" }
+- input: { reporter_type: "pharmacist" }
+  expect: { quality_tier: TIER_1, weight: 1.0 }
+- input: { reporter_type: "3" }
+  expect: { quality_tier: TIER_2, weight: 0.85 }
+- input: { reporter_type: "nurse" }
+  expect: { quality_tier: TIER_2, weight: 0.85 }
+- input: { reporter_type: "5" }
+  expect: { quality_tier: TIER_3, weight: 0.6, rationale: "Consumer report — valuable signal but may lack clinical detail" }
+- input: { reporter_type: "consumer" }
+  expect: { quality_tier: TIER_3, weight: 0.6 }
+- input: { reporter_type: "4" }
+  expect: { quality_tier: TIER_4, weight: 0.3 }
+- input: { reporter_type: "lawyer" }
+  expect: { quality_tier: TIER_4, weight: 0.3 }
+- input: { reporter_type: null }
+  expect: { quality_tier: TIER_3, weight: 0.5, rationale: "Unknown reporter type — default to conservative weight" }
+# Batch mode tests
+- input: { hcp_count: 80, total_count: 100 }
+  expect: { quality_tier: BATCH_HIGH, weight: 0.9 }
+- input: { hcp_count: 50, total_count: 100 }
+  expect: { quality_tier: BATCH_HIGH, weight: 0.9 }
+- input: { hcp_count: 25, total_count: 200 }
+  expect: { quality_tier: BATCH_MIXED, weight: 0.7 }
+- input: { hcp_count: 0, total_count: 50 }
+  expect: { quality_tier: BATCH_LOW, weight: 0.5 }
+- input: { hcp_count: 10 }
+  expect: { quality_tier: null, weight: 0.5, rationale: "Missing total_count for batch classification" }
+# Null safety
+- input: {}
+  expect: { quality_tier: TIER_3, weight: 0.5, rationale: "Unknown reporter type — default to conservative weight" }

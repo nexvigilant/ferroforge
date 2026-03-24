@@ -1,0 +1,178 @@
+name: site-dev-strategy-router
+description: 'NexVigilant site development strategy router. Checks 4 prerequisite gates in dependency order (Academy→Glass bridge, Microgram→Station wiring, Worked example, External traffic) and routes to the first unmet gate. Source: 20Q Scramble game session 2026-03-22.'
+version: 0.1.0
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(→(∅₁, ∅₂, ∅₃, ∅₄)) at ∂(strategy) — sequential dependency chain where each void must be filled before the next'
+  primes: ['σ', '→', '∅', '∂', 'μ', 'N']
+  arguments: ['academy_glass_ready', 'microgram_station_wired', 'worked_example_published', 'external_traffic_measured']
+  chain_prediction: 'σ + →. This is a strategy sequencer, not a signal detector. Each gate is a prerequisite for the next. Skipping order breaks the conservation law: ∃(external) = ∂(×(ς(wiring + example), ∅(academy))).'
+interface:
+  inputs:
+    academy_glass_ready:
+      type: bool
+      required: false
+      description: 'Academy-to-Glass bridge operational: L1→L2→L3 pathway connects learners to Station tools'
+    microgram_station_wired:
+      type: bool
+      required: false
+      description: 'Micrograms exposed through Station MCP tools: decision trees callable by any agent'
+    worked_example_published:
+      type: bool
+      required: false
+      description: 'Semaglutide worked example published: complete reproducible signal investigation'
+    external_traffic_measured:
+      type: bool
+      required: false
+      description: 'External agent traffic measured and nonzero at mcp.nexvigilant.com'
+  outputs:
+    current_move:
+      type: string
+    move_number:
+      type: int
+    action:
+      type: string
+    dependency:
+      type: string
+    primitive_composition:
+      type: string
+    conservation_status:
+      type: string
+tree:
+  start: check_academy_glass
+  nodes:
+    check_academy_glass:
+      type: condition
+      variable: academy_glass_ready
+      operator: eq
+      value: true
+      true_next: check_microgram_wiring
+      false_next: move_zero
+    move_zero:
+      type: return
+      value:
+        current_move: academy_glass_bridge
+        move_number: 0
+        action: 'Build L1→L2→L3 educational pathway connecting PV learners to Station tools. 11.2x HOMA leverage.'
+        dependency: none
+        primitive_composition: 'μ + ∂ + ∅ + σ + ∃'
+        conservation_status: '∃[✗] — bridge does not exist. Highest leverage void.'
+    check_microgram_wiring:
+      type: condition
+      variable: microgram_station_wired
+      operator: eq
+      value: true
+      true_next: check_worked_example
+      false_next: move_one
+    move_one:
+      type: return
+      value:
+        current_move: microgram_station_wiring
+        move_number: 1
+        action: 'Wire 448 microgram decision trees to Station as callable MCP tools. Zero currently exposed.'
+        dependency: academy_glass_bridge
+        primitive_composition: 'μ + ∅ + ∂ + σ + →'
+        conservation_status: '∃[✗] — 448 programs, 0 exposed. Pure void at Physiology→Nervous boundary.'
+    check_worked_example:
+      type: condition
+      variable: worked_example_published
+      operator: eq
+      value: true
+      true_next: check_external_traffic
+      false_next: move_two
+    move_two:
+      type: return
+      value:
+        current_move: worked_example_publish
+        move_number: 2
+        action: 'Publish semaglutide signal investigation (B+/85.4). Full pipeline: RxNav→FAERS→PRR/ROR→DailyMed→PubMed→verdict.'
+        dependency: microgram_station_wiring
+        primitive_composition: '∃ + ∂ + λ + N + σ + κ'
+        conservation_status: '∃[✗] — capability unproven to outside world.'
+    check_external_traffic:
+      type: condition
+      variable: external_traffic_measured
+      operator: eq
+      value: true
+      true_next: all_complete
+      false_next: move_three
+    move_three:
+      type: return
+      value:
+        current_move: external_agent_traffic
+        move_number: 3
+        action: 'Measure external agent traffic at mcp.nexvigilant.com. Network effects x 0 = 0. This is the existential metric.'
+        dependency: worked_example_publish
+        primitive_composition: 'ν + ∅ + σ + → + N + ∂'
+        conservation_status: '∃[✗] — external traffic does not exist. Conservation law collapses at outermost ∂.'
+    all_complete:
+      type: return
+      value:
+        current_move: complete
+        move_number: 4
+        action: 'All four development gates passed. The railway has external trains. Flywheel engaged.'
+        dependency: all_prior_moves
+        primitive_composition: '∃ = ∂(×(ς, ∅)) — conservation holds'
+        conservation_status: '∃[✓] ς[✓] ∂[✓] ∅[✓] — full conservation'
+tests:
+- description: 'No gates met — route to Move 0 (Academy→Glass)'
+  input: {}
+  expect:
+    current_move: academy_glass_bridge
+    move_number: 0
+- description: 'Only academy ready — route to Move 1 (Microgram wiring)'
+  input:
+    academy_glass_ready: true
+  expect:
+    current_move: microgram_station_wiring
+    move_number: 1
+- description: 'Academy + wiring ready — route to Move 2 (Worked example)'
+  input:
+    academy_glass_ready: true
+    microgram_station_wired: true
+  expect:
+    current_move: worked_example_publish
+    move_number: 2
+- description: 'First three ready — route to Move 3 (External traffic)'
+  input:
+    academy_glass_ready: true
+    microgram_station_wired: true
+    worked_example_published: true
+  expect:
+    current_move: external_agent_traffic
+    move_number: 3
+- description: 'All four gates passed — complete'
+  input:
+    academy_glass_ready: true
+    microgram_station_wired: true
+    worked_example_published: true
+    external_traffic_measured: true
+  expect:
+    current_move: complete
+    move_number: 4
+- description: 'Skip ahead without prerequisites — still routes to first unmet'
+  input:
+    academy_glass_ready: false
+    microgram_station_wired: true
+    worked_example_published: true
+  expect:
+    current_move: academy_glass_bridge
+    move_number: 0
+- description: 'Partial progress — respects dependency order'
+  input:
+    academy_glass_ready: true
+    microgram_station_wired: false
+    worked_example_published: true
+    external_traffic_measured: true
+  expect:
+    current_move: microgram_station_wiring
+    move_number: 1
+- description: 'Explicit false on all gates'
+  input:
+    academy_glass_ready: false
+    microgram_station_wired: false
+    worked_example_published: false
+    external_traffic_measured: false
+  expect:
+    current_move: academy_glass_bridge
+    move_number: 0

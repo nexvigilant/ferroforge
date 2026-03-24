@@ -1,0 +1,290 @@
+name: signal-trend-detector
+description: Detects signal trend direction from pre-computed change percentage. Caller computes pct_change = (current - previous) / previous * 100. Chains into signal-priority.
+version: 0.2.0
+tree:
+  start: check_has_change
+  nodes:
+    stable:
+      type: return
+      value:
+        trend: STABLE
+        monitoring_action: Continue current monitoring frequency
+        velocity: NONE
+    strong_no_trend:
+      type: return
+      value:
+        monitoring_action: Strong current signal — collect prior data for trend assessment
+        velocity: NONE
+        trend: UNKNOWN
+    rapid_rise:
+      type: return
+      value:
+        velocity: RAPID
+        trend: RISING
+        monitoring_action: Escalate to immediate signal validation — PRR acceleration detected
+    check_declining:
+      type: condition
+      variable: pct_change
+      operator: lt
+      value: -20
+      true_next: declining
+      false_next: stable
+    insufficient_data:
+      type: return
+      value:
+        monitoring_action: Collect additional data points for trend assessment
+        velocity: NONE
+        trend: UNKNOWN
+    gradual_rise:
+      type: return
+      value:
+        trend: RISING
+        velocity: GRADUAL
+        monitoring_action: Schedule enhanced signal review at next detection cycle
+    check_rising:
+      type: condition
+      variable: pct_change
+      operator: gt
+      value: 10
+      true_next: gradual_rise
+      false_next: check_declining
+    declining:
+      type: return
+      value:
+        monitoring_action: Continue routine monitoring — signal weakening
+        velocity: GRADUAL
+        trend: DECLINING
+    check_current_for_rapid:
+      type: condition
+      variable: prr_current
+      operator: gte
+      value: 5.0
+      true_next: rapid_rise
+      false_next: gradual_rise
+    check_rapid_rise:
+      type: condition
+      variable: pct_change
+      operator: gte
+      value: 50
+      true_next: check_current_for_rapid
+      false_next: check_rising
+    check_has_change:
+      type: condition
+      variable: pct_change
+      operator: is_not_null
+      value: true
+      true_next: check_rapid_rise
+      false_next: check_current_strong
+    check_current_strong:
+      type: condition
+      variable: prr_current
+      operator: gte
+      value: 5.0
+      true_next: strong_no_trend
+      false_next: insufficient_data
+tests:
+- input:
+    prr_current: 8.5
+    pct_change: 165.6
+  expect:
+    monitoring_action: Escalate to immediate signal validation — PRR acceleration detected
+    trend: RISING
+    velocity: RAPID
+- input:
+    prr_current: 3.5
+    pct_change: 25.0
+  expect:
+    trend: RISING
+    velocity: GRADUAL
+    monitoring_action: Schedule enhanced signal review at next detection cycle
+- input:
+    pct_change: -52.0
+    prr_current: 1.2
+  expect:
+    velocity: GRADUAL
+    monitoring_action: Continue routine monitoring — signal weakening
+    trend: DECLINING
+- input:
+    prr_current: 2.5
+    pct_change: -10.7
+  expect:
+    trend: STABLE
+    monitoring_action: Continue current monitoring frequency
+    velocity: NONE
+- input:
+    prr_current: 4.0
+  expect:
+    velocity: NONE
+    monitoring_action: Collect additional data points for trend assessment
+    trend: UNKNOWN
+- input:
+    prr_current: 12.0
+    pct_change: 1100.0
+  expect:
+    velocity: RAPID
+    trend: RISING
+- input:
+    pct_change: -90.0
+    prr_current: 0.5
+  expect:
+    velocity: GRADUAL
+    trend: DECLINING
+- input:
+    pct_change: 5.0
+    prr_current: 2.0
+  expect:
+    trend: STABLE
+- input:
+    prr_current: 7.0
+  expect:
+    trend: UNKNOWN
+    monitoring_action: Strong current signal — collect prior data for trend assessment
+- input:
+    prr_current: 3.0
+    pct_change: 60.0
+  expect:
+    trend: RISING
+    velocity: GRADUAL
+- input:
+    pct_change: 0
+  expect:
+    monitoring_action: Continue current monitoring frequency
+    velocity: NONE
+    trend: STABLE
+- input:
+    pct_change: -1
+  expect:
+    velocity: NONE
+    trend: STABLE
+    monitoring_action: Continue current monitoring frequency
+- input:
+    pct_change: -21
+  expect:
+    monitoring_action: Continue routine monitoring — signal weakening
+    trend: DECLINING
+    velocity: GRADUAL
+- input:
+    pct_change: -19
+  expect:
+    velocity: NONE
+    monitoring_action: Continue current monitoring frequency
+    trend: STABLE
+- input:
+    pct_change: -2000
+  expect:
+    monitoring_action: Continue routine monitoring — signal weakening
+    trend: DECLINING
+    velocity: GRADUAL
+- input:
+    pct_change: 0
+  expect:
+    monitoring_action: Continue current monitoring frequency
+    trend: STABLE
+    velocity: NONE
+- input:
+    pct_change: -1
+  expect:
+    monitoring_action: Continue current monitoring frequency
+    trend: STABLE
+    velocity: NONE
+- input:
+    pct_change: 9
+  expect:
+    velocity: NONE
+    trend: STABLE
+    monitoring_action: Continue current monitoring frequency
+- input:
+    pct_change: 11
+  expect:
+    trend: RISING
+    monitoring_action: Schedule enhanced signal review at next detection cycle
+    velocity: GRADUAL
+- input:
+    pct_change: 1000
+  expect:
+    velocity: GRADUAL
+    trend: RISING
+    monitoring_action: Schedule enhanced signal review at next detection cycle
+- input:
+    prr_current: 4.999
+  expect:
+    monitoring_action: Collect additional data points for trend assessment
+    trend: UNKNOWN
+    velocity: NONE
+- input:
+    prr_current: 5.001
+  expect:
+    trend: UNKNOWN
+    monitoring_action: Strong current signal — collect prior data for trend assessment
+    velocity: NONE
+- input: {}
+  expect:
+    velocity: NONE
+    trend: UNKNOWN
+    monitoring_action: Collect additional data points for trend assessment
+- input:
+    pct_change: 0
+  expect:
+    trend: STABLE
+    velocity: NONE
+    monitoring_action: Continue current monitoring frequency
+- input:
+    pct_change: -1
+  expect:
+    trend: STABLE
+    monitoring_action: Continue current monitoring frequency
+    velocity: NONE
+- input:
+    pct_change: 49
+  expect:
+    monitoring_action: Schedule enhanced signal review at next detection cycle
+    velocity: GRADUAL
+    trend: RISING
+- input:
+    pct_change: 51
+  expect:
+    trend: RISING
+    velocity: GRADUAL
+    monitoring_action: Schedule enhanced signal review at next detection cycle
+- input:
+    pct_change: 5000
+  expect:
+    velocity: GRADUAL
+    trend: RISING
+    monitoring_action: Schedule enhanced signal review at next detection cycle
+- input:
+    prr_current: 4.999
+  expect:
+    velocity: NONE
+    trend: UNKNOWN
+    monitoring_action: Collect additional data points for trend assessment
+- input:
+    prr_current: 5.001
+  expect:
+    velocity: NONE
+    trend: UNKNOWN
+    monitoring_action: Strong current signal — collect prior data for trend assessment
+- input: {}
+  expect:
+    velocity: NONE
+    trend: UNKNOWN
+    monitoring_action: Collect additional data points for trend assessment
+interface:
+  inputs:
+    prr_current:
+      type: float
+      required: true
+    pct_change:
+      type: float
+      required: false
+  outputs:
+    monitoring_action:
+      type: string
+      required: false
+    trend:
+      type: string
+      required: false
+    velocity:
+      type: string
+      required: false
+  aliases: {}

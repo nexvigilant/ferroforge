@@ -1,0 +1,134 @@
+name: ich-e2e-periodicity
+description: Determines PBRER/PSUR reporting period based on ICH E2E guideline. Assigns
+  reporting type and interval based on years since approval, safety concerns, and
+  NME status.
+version: 0.1.0
+tree:
+  start: check_approval_period
+  nodes:
+    check_nme_status:
+      type: condition
+      variable: is_new_molecular_entity
+      operator: eq
+      value: true
+      true_next: nme_check_safety
+      false_next: established_check_safety
+    nme_with_concern:
+      type: return
+      value:
+        period_months: 6
+        report_type: PBRER
+        next_due: in_6_months
+    established_check_safety:
+      type: condition
+      variable: has_safety_concern
+      operator: eq
+      value: true
+      true_next: established_with_concern
+      false_next: established_routine
+    nme_check_safety:
+      type: condition
+      variable: has_safety_concern
+      operator: eq
+      value: true
+      true_next: nme_with_concern
+      false_next: nme_routine
+    check_approval_period:
+      type: condition
+      variable: years_since_approval
+      operator: lt
+      value: 2
+      true_next: early_phase
+      false_next: check_nme_status
+    early_phase:
+      type: return
+      value:
+        next_due: in_6_months
+        period_months: 6
+        report_type: PBRER
+    established_with_concern:
+      type: return
+      value:
+        next_due: in_12_months
+        report_type: PSUR
+        period_months: 12
+    established_routine:
+      type: return
+      value:
+        report_type: PSUR
+        period_months: 24
+        next_due: in_24_months
+    nme_routine:
+      type: return
+      value:
+        report_type: PBRER
+        period_months: 12
+        next_due: in_12_months
+tests:
+- input:
+    has_safety_concern: false
+    is_new_molecular_entity: false
+    years_since_approval: 0
+  expect:
+    next_due: in_6_months
+    period_months: 6
+    report_type: PBRER
+- input:
+    has_safety_concern: false
+    is_new_molecular_entity: false
+    years_since_approval: 2
+  expect:
+    report_type: PSUR
+    period_months: 24
+    next_due: in_24_months
+- input:
+    has_safety_concern: false
+    is_new_molecular_entity: true
+    years_since_approval: 2
+  expect:
+    report_type: PBRER
+    period_months: 12
+    next_due: in_12_months
+- input:
+    has_safety_concern: true
+    is_new_molecular_entity: false
+    years_since_approval: 2
+  expect:
+    next_due: in_12_months
+    report_type: PSUR
+    period_months: 12
+- input:
+    has_safety_concern: true
+    is_new_molecular_entity: true
+    years_since_approval: 2
+  expect:
+    period_months: 6
+    report_type: PBRER
+    next_due: in_6_months
+- input: {}
+  expect:
+    report_type: PSUR
+    period_months: 24
+    next_due: in_24_months
+interface:
+  inputs:
+    is_new_molecular_entity:
+      type: bool
+      required: false
+    has_safety_concern:
+      type: bool
+      required: false
+    years_since_approval:
+      type: int
+      required: false
+  outputs:
+    next_due:
+      type: string
+      required: false
+    report_type:
+      type: string
+      required: false
+    period_months:
+      type: int
+      required: false
+  aliases: {}

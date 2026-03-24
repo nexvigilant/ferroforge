@@ -1,0 +1,264 @@
+name: station-fallback-router
+description: Route to fallback domain when primary is unavailable
+version: 0.1.0
+tree:
+  start: classify_primary
+  nodes:
+    fallback_ich:
+      type: return
+      value:
+        fallback_tool: ema_guidelines
+        degradation: significant
+        fallback_domain: ema.europa.eu
+    ema_to_pubmed:
+      type: return
+      value:
+        degradation: partial
+        fallback_domain: pubmed.ncbi.nlm.nih.gov
+        fallback_tool: pubmed_search_articles
+    fallback_eudravigilance:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: drug_safety
+      true_next: eudra_to_faers
+      false_next: eudra_to_vigiaccess
+    eudra_to_faers:
+      type: return
+      value:
+        fallback_domain: api.fda.gov
+        fallback_tool: faers_search_reports
+        degradation: partial
+    check_eudravigilance:
+      type: condition
+      variable: primary_domain
+      operator: eq
+      value: eudravigilance.ema.europa.eu
+      true_next: fallback_eudravigilance
+      false_next: check_vigiaccess
+    meddra_to_pubmed:
+      type: return
+      value:
+        fallback_tool: pubmed_search_articles
+        fallback_domain: pubmed.ncbi.nlm.nih.gov
+        degradation: significant
+    drugbank_to_rxnav:
+      type: return
+      value:
+        fallback_domain: rxnav.nlm.nih.gov
+        fallback_tool: rxnav_get_interactions
+        degradation: partial
+    eudra_to_vigiaccess:
+      type: return
+      value:
+        fallback_tool: vigiaccess_search
+        fallback_domain: vigiaccess.org
+        degradation: partial
+    classify_primary:
+      type: condition
+      variable: primary_domain
+      operator: eq
+      value: ema.europa.eu
+      true_next: fallback_ema
+      false_next: check_eudravigilance
+    vigiaccess_to_eudra:
+      type: return
+      value:
+        fallback_domain: eudravigilance.ema.europa.eu
+        fallback_tool: eudra_search
+        degradation: partial
+    fallback_vigiaccess:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: drug_safety
+      true_next: vigiaccess_to_faers
+      false_next: vigiaccess_to_eudra
+    check_vigiaccess:
+      type: condition
+      variable: primary_domain
+      operator: eq
+      value: vigiaccess.org
+      true_next: fallback_vigiaccess
+      false_next: check_meddra
+    ema_to_fda:
+      type: return
+      value:
+        fallback_domain: accessdata.fda.gov
+        fallback_tool: fda_regulatory_search
+        degradation: partial
+    drugbank_to_pubmed:
+      type: return
+      value:
+        fallback_tool: pubmed_search_articles
+        degradation: significant
+        fallback_domain: pubmed.ncbi.nlm.nih.gov
+    return_no_fallback:
+      type: return
+      value:
+        fallback_tool: unknown
+        fallback_domain: unknown
+        degradation: significant
+    fallback_meddra:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: drug_safety
+      true_next: meddra_to_faers
+      false_next: meddra_to_pubmed
+    meddra_to_faers:
+      type: return
+      value:
+        degradation: significant
+        fallback_domain: api.fda.gov
+        fallback_tool: faers_search_reports
+    vigiaccess_to_faers:
+      type: return
+      value:
+        fallback_domain: api.fda.gov
+        fallback_tool: faers_search_reports
+        degradation: none
+    fallback_drugbank:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: drug_interaction
+      true_next: drugbank_to_rxnav
+      false_next: drugbank_to_pubmed
+    check_drugbank:
+      type: condition
+      variable: primary_domain
+      operator: eq
+      value: drugbank.com
+      true_next: fallback_drugbank
+      false_next: check_ich
+    check_ich:
+      type: condition
+      variable: primary_domain
+      operator: eq
+      value: ich.org
+      true_next: fallback_ich
+      false_next: return_no_fallback
+    fallback_ema:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: regulatory
+      true_next: ema_to_fda
+      false_next: ema_to_pubmed
+    check_meddra:
+      type: condition
+      variable: primary_domain
+      operator: eq
+      value: meddra.org
+      true_next: fallback_meddra
+      false_next: check_drugbank
+tests:
+- input:
+    primary_domain: ''
+    question_type: ''
+  expect:
+    fallback_tool: unknown
+    fallback_domain: unknown
+    degradation: significant
+- input:
+    primary_domain: drugbank.com
+    question_type: ''
+  expect:
+    fallback_tool: pubmed_search_articles
+    degradation: significant
+    fallback_domain: pubmed.ncbi.nlm.nih.gov
+- input:
+    primary_domain: drugbank.com
+    question_type: drug_interaction
+  expect:
+    fallback_domain: rxnav.nlm.nih.gov
+    fallback_tool: rxnav_get_interactions
+    degradation: partial
+- input:
+    primary_domain: ema.europa.eu
+    question_type: ''
+  expect:
+    degradation: partial
+    fallback_domain: pubmed.ncbi.nlm.nih.gov
+    fallback_tool: pubmed_search_articles
+- input:
+    primary_domain: ema.europa.eu
+    question_type: regulatory
+  expect:
+    fallback_domain: accessdata.fda.gov
+    fallback_tool: fda_regulatory_search
+    degradation: partial
+- input:
+    primary_domain: eudravigilance.ema.europa.eu
+    question_type: ''
+  expect:
+    fallback_tool: vigiaccess_search
+    fallback_domain: vigiaccess.org
+    degradation: partial
+- input:
+    primary_domain: eudravigilance.ema.europa.eu
+    question_type: drug_safety
+  expect:
+    fallback_domain: api.fda.gov
+    fallback_tool: faers_search_reports
+    degradation: partial
+- input:
+    primary_domain: ich.org
+    question_type: ''
+  expect:
+    fallback_tool: ema_guidelines
+    degradation: significant
+    fallback_domain: ema.europa.eu
+- input:
+    primary_domain: meddra.org
+    question_type: ''
+  expect:
+    fallback_tool: pubmed_search_articles
+    fallback_domain: pubmed.ncbi.nlm.nih.gov
+    degradation: significant
+- input:
+    primary_domain: meddra.org
+    question_type: drug_safety
+  expect:
+    degradation: significant
+    fallback_domain: api.fda.gov
+    fallback_tool: faers_search_reports
+- input:
+    primary_domain: vigiaccess.org
+    question_type: ''
+  expect:
+    fallback_domain: eudravigilance.ema.europa.eu
+    fallback_tool: eudra_search
+    degradation: partial
+- input:
+    primary_domain: vigiaccess.org
+    question_type: drug_safety
+  expect:
+    fallback_domain: api.fda.gov
+    fallback_tool: faers_search_reports
+    degradation: none
+- input: {}
+  expect:
+    fallback_tool: unknown
+    fallback_domain: unknown
+    degradation: significant
+interface:
+  inputs:
+    primary_domain:
+      type: string
+      required: false
+    question_type:
+      type: string
+      required: false
+  outputs:
+    degradation:
+      type: string
+      required: false
+    fallback_domain:
+      type: string
+      required: false
+    fallback_tool:
+      type: string
+      required: false
+  aliases: {}

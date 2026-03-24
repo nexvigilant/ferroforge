@@ -1,0 +1,208 @@
+name: suspect-drug-classifier
+description: 'Classify drug characterization from FAERS into causality weight. Suspect drugs (PS) carry full weight; concomitant (C) and interacting (I) are discounted.'
+version: 0.1.0
+interface:
+  inputs:
+    drug_characterization:
+      type: string
+      required: false
+      description: 'FAERS drugcharacterization code: 1=suspect, 2=concomitant, 3=interacting. Also accepts PS/C/I/SS.'
+    suspect_count:
+      type: int
+      required: false
+      description: 'For batch mode: number of reports where drug is primary suspect'
+    total_count:
+      type: int
+      required: false
+      description: 'For batch mode: total reports mentioning the drug'
+  outputs:
+    role:
+      type: string
+    causality_weight:
+      type: float
+    include_in_signal:
+      type: bool
+    rationale:
+      type: string
+tree:
+  start: check_batch_mode
+  nodes:
+    check_batch_mode:
+      type: condition
+      variable: suspect_count
+      operator: is_not_null
+      true_next: check_batch_total
+      false_next: check_characterization
+
+    check_batch_total:
+      type: condition
+      variable: total_count
+      operator: is_not_null
+      true_next: check_suspect_dominant
+      false_next: missing_batch
+
+    check_suspect_dominant:
+      type: condition
+      variable: suspect_count
+      operator: gte
+      value: 50
+      true_next: batch_primarily_suspect
+      false_next: check_suspect_any
+
+    check_suspect_any:
+      type: condition
+      variable: suspect_count
+      operator: gte
+      value: 10
+      true_next: batch_mixed_role
+      false_next: batch_rarely_suspect
+
+    check_characterization:
+      type: condition
+      variable: drug_characterization
+      operator: is_not_null
+      true_next: check_primary_suspect
+      false_next: unknown_role
+
+    check_primary_suspect:
+      type: condition
+      variable: drug_characterization
+      operator: matches
+      value: "(?i)^(1|PS|primary.suspect|suspect)$"
+      true_next: role_suspect
+      false_next: check_secondary_suspect
+
+    check_secondary_suspect:
+      type: condition
+      variable: drug_characterization
+      operator: matches
+      value: "(?i)^(SS|secondary.suspect)$"
+      true_next: role_secondary
+      false_next: check_concomitant
+
+    check_concomitant:
+      type: condition
+      variable: drug_characterization
+      operator: matches
+      value: "(?i)^(2|C|concomitant)$"
+      true_next: role_concomitant
+      false_next: check_interacting
+
+    check_interacting:
+      type: condition
+      variable: drug_characterization
+      operator: matches
+      value: "(?i)^(3|I|interacting)$"
+      true_next: role_interacting
+      false_next: unknown_role
+
+    role_suspect:
+      type: return
+      value:
+        role: PRIMARY_SUSPECT
+        causality_weight: 1.0
+        include_in_signal: true
+        rationale: "Primary suspect drug — full weight in disproportionality calculation"
+
+    role_secondary:
+      type: return
+      value:
+        role: SECONDARY_SUSPECT
+        causality_weight: 0.8
+        include_in_signal: true
+        rationale: "Secondary suspect — include in signal but with reduced weight"
+
+    role_concomitant:
+      type: return
+      value:
+        role: CONCOMITANT
+        causality_weight: 0.2
+        include_in_signal: false
+        rationale: "Concomitant medication — low causality weight, exclude from primary signal"
+
+    role_interacting:
+      type: return
+      value:
+        role: INTERACTING
+        causality_weight: 0.5
+        include_in_signal: true
+        rationale: "Interacting drug — possible contributor via drug-drug interaction"
+
+    unknown_role:
+      type: return
+      value:
+        role: UNKNOWN
+        causality_weight: 0.5
+        include_in_signal: true
+        rationale: "Unknown characterization — default to moderate weight, include conservatively"
+
+    batch_primarily_suspect:
+      type: return
+      value:
+        role: BATCH_PRIMARILY_SUSPECT
+        causality_weight: 0.9
+        include_in_signal: true
+        rationale: "Drug is primary suspect in majority of reports — strong signal candidate"
+
+    batch_mixed_role:
+      type: return
+      value:
+        role: BATCH_MIXED
+        causality_weight: 0.6
+        include_in_signal: true
+        rationale: "Drug has mixed roles across reports — signal requires careful interpretation"
+
+    batch_rarely_suspect:
+      type: return
+      value:
+        role: BATCH_RARELY_SUSPECT
+        causality_weight: 0.3
+        include_in_signal: false
+        rationale: "Drug is rarely primary suspect — likely concomitant, weak signal candidate"
+
+    missing_batch:
+      type: return
+      value:
+        role: null
+        causality_weight: 0.5
+        include_in_signal: true
+        rationale: "Missing total_count for batch classification"
+
+tests:
+# Single report characterization
+- input: { drug_characterization: "1" }
+  expect: { role: PRIMARY_SUSPECT, causality_weight: 1.0, include_in_signal: true }
+- input: { drug_characterization: "PS" }
+  expect: { role: PRIMARY_SUSPECT, causality_weight: 1.0, include_in_signal: true }
+- input: { drug_characterization: "suspect" }
+  expect: { role: PRIMARY_SUSPECT, causality_weight: 1.0, include_in_signal: true }
+- input: { drug_characterization: "SS" }
+  expect: { role: SECONDARY_SUSPECT, causality_weight: 0.8, include_in_signal: true }
+- input: { drug_characterization: "2" }
+  expect: { role: CONCOMITANT, causality_weight: 0.2, include_in_signal: false }
+- input: { drug_characterization: "C" }
+  expect: { role: CONCOMITANT, causality_weight: 0.2, include_in_signal: false }
+- input: { drug_characterization: "concomitant" }
+  expect: { role: CONCOMITANT, causality_weight: 0.2, include_in_signal: false }
+- input: { drug_characterization: "3" }
+  expect: { role: INTERACTING, causality_weight: 0.5, include_in_signal: true }
+- input: { drug_characterization: "I" }
+  expect: { role: INTERACTING, causality_weight: 0.5, include_in_signal: true }
+- input: { drug_characterization: null }
+  expect: { role: UNKNOWN, causality_weight: 0.5, include_in_signal: true }
+# Batch mode
+- input: { suspect_count: 80, total_count: 100 }
+  expect: { role: BATCH_PRIMARILY_SUSPECT, causality_weight: 0.9, include_in_signal: true }
+- input: { suspect_count: 50, total_count: 200 }
+  expect: { role: BATCH_PRIMARILY_SUSPECT, causality_weight: 0.9, include_in_signal: true }
+- input: { suspect_count: 25, total_count: 200 }
+  expect: { role: BATCH_MIXED, causality_weight: 0.6, include_in_signal: true }
+- input: { suspect_count: 5, total_count: 500 }
+  expect: { role: BATCH_RARELY_SUSPECT, causality_weight: 0.3, include_in_signal: false }
+- input: { suspect_count: 0, total_count: 100 }
+  expect: { role: BATCH_RARELY_SUSPECT, causality_weight: 0.3, include_in_signal: false }
+- input: { suspect_count: 10 }
+  expect: { role: null, causality_weight: 0.5, include_in_signal: true }
+# Null safety
+- input: {}
+  expect: { role: UNKNOWN, causality_weight: 0.5, include_in_signal: true }

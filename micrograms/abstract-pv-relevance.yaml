@@ -1,0 +1,118 @@
+name: abstract-pv-relevance
+description: Assess PubMed abstract relevance to pharmacovigilance based on title
+  and keywords
+version: 0.1.0
+tree:
+  start: validate_title
+  nodes:
+    missing_input:
+      type: return
+      value:
+        relevance_score: 0
+        pv_relevant: false
+        recommended_action: request_complete_data
+    high_relevance:
+      type: return
+      value:
+        relevance_score: 9
+        pv_relevant: true
+        recommended_action: prioritize_review
+    medium_relevance:
+      type: return
+      value:
+        recommended_action: standard_review
+        pv_relevant: true
+        relevance_score: 6
+    check_pv_keywords:
+      type: condition
+      variable: title
+      operator: matches
+      value: (?i)(adverse|safety|toxicity|side effect|pharmacovigilance|signal|pharmacoepidemiology)
+      true_next: high_relevance
+      false_next: check_clinical_study
+    low_relevance:
+      type: return
+      value:
+        relevance_score: 3
+        pv_relevant: false
+        recommended_action: defer_or_skip
+    validate_keywords:
+      type: condition
+      variable: has_adverse_keyword
+      operator: is_not_null
+      value: null
+      true_next: validate_study_type
+      false_next: missing_input
+    check_clinical_study:
+      type: condition
+      variable: study_type
+      operator: matches
+      value: (?i)(trial|observational|cohort|case.report)
+      true_next: medium_relevance
+      false_next: low_relevance
+    validate_title:
+      type: condition
+      variable: title
+      operator: is_not_null
+      value: null
+      true_next: validate_keywords
+      false_next: missing_input
+    validate_study_type:
+      type: condition
+      variable: study_type
+      operator: is_not_null
+      value: null
+      true_next: check_pv_keywords
+      false_next: missing_input
+tests:
+- input:
+    has_adverse_keyword: ZZZZZ_NO_MATCH
+    study_type: ZZZZZ_NO_MATCH
+    title: ZZZZZ_NO_MATCH
+  expect:
+    relevance_score: 3
+    pv_relevant: false
+    recommended_action: defer_or_skip
+- input:
+    has_adverse_keyword: ZZZZZ_NO_MATCH
+    study_type: ZZZZZ_NO_MATCH
+    title: adverse
+  expect:
+    relevance_score: 9
+    pv_relevant: true
+    recommended_action: prioritize_review
+- input:
+    has_adverse_keyword: ZZZZZ_NO_MATCH
+    study_type: ZZZZZ_NO_MATCH
+  expect:
+    relevance_score: 0
+    pv_relevant: false
+    recommended_action: request_complete_data
+- input:
+    has_adverse_keyword: ZZZZZ_NO_MATCH
+    study_type: trial
+    title: ZZZZZ_NO_MATCH
+  expect:
+    recommended_action: standard_review
+    pv_relevant: true
+    relevance_score: 6
+- input:
+    has_adverse_keyword: ZZZZZ_NO_MATCH
+    title: ZZZZZ_NO_MATCH
+  expect:
+    relevance_score: 0
+    pv_relevant: false
+    recommended_action: request_complete_data
+- input:
+    study_type: ZZZZZ_NO_MATCH
+    title: ZZZZZ_NO_MATCH
+  expect:
+    relevance_score: 0
+    pv_relevant: false
+    recommended_action: request_complete_data
+- input: {}
+  expect:
+    relevance_score: 0
+    pv_relevant: false
+    recommended_action: request_complete_data
+interface: null

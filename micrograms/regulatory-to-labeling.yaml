@@ -1,0 +1,93 @@
+name: regulatory-to-labeling
+description: Routes regulatory decisions to corresponding label update actions
+version: 0.1.0
+
+interface:
+  inputs:
+    regulatory_decision:
+      type: string
+      required: true
+      description: "Regulatory action: restrict, warn, withdraw, monitor"
+  outputs:
+    labeling_action:
+      type: string
+      description: Type of label update required
+    section_affected:
+      type: string
+      description: Section of label to be updated
+    urgency_level:
+      type: string
+      description: "Urgency: immediate, routine, deferred"
+
+tree:
+  start: check_decision
+  nodes:
+    check_decision:
+      type: condition
+      variable: regulatory_decision
+      operator: eq
+      value: "restrict"
+      true_next: restrict_path
+      false_next: check_warn
+
+    restrict_path:
+      type: return
+      value:
+        labeling_action: "add_restriction"
+        section_affected: "contraindications_and_restrictions"
+        urgency_level: "immediate"
+
+    check_warn:
+      type: condition
+      variable: regulatory_decision
+      operator: eq
+      value: "warn"
+      true_next: warn_path
+      false_next: check_withdraw
+
+    warn_path:
+      type: return
+      value:
+        labeling_action: "add_warning"
+        section_affected: "warnings_and_precautions"
+        urgency_level: "immediate"
+
+    check_withdraw:
+      type: condition
+      variable: regulatory_decision
+      operator: eq
+      value: "withdraw"
+      true_next: withdraw_path
+      false_next: monitor_path
+
+    withdraw_path:
+      type: return
+      value:
+        labeling_action: "remove_indication"
+        section_affected: "indications_and_usage"
+        urgency_level: "immediate"
+
+    monitor_path:
+      type: return
+      value:
+        labeling_action: "add_monitoring_requirement"
+        section_affected: "patient_monitoring"
+        urgency_level: "routine"
+
+tests:
+  - input: { regulatory_decision: "restrict" }
+    expect: { labeling_action: "add_restriction", section_affected: "contraindications_and_restrictions", urgency_level: "immediate" }
+
+  - input: { regulatory_decision: "warn" }
+    expect: { labeling_action: "add_warning", section_affected: "warnings_and_precautions", urgency_level: "immediate" }
+
+  - input: { regulatory_decision: "withdraw" }
+    expect: { labeling_action: "remove_indication", section_affected: "indications_and_usage", urgency_level: "immediate" }
+
+  - input: { regulatory_decision: "monitor" }
+    expect: { labeling_action: "add_monitoring_requirement", section_affected: "patient_monitoring", urgency_level: "routine" }
+  - input: {}
+    expect:
+      labeling_action: add_monitoring_requirement
+      section_affected: patient_monitoring
+      urgency_level: routine

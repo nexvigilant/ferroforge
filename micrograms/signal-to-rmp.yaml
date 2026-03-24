@@ -1,0 +1,130 @@
+name: signal-to-rmp
+description: Routes signal detection results to Risk Minimization Plan update decisions
+version: 0.1.0
+tree:
+  start: check_strength
+  nodes:
+    moderate_unconfirmed:
+      type: return
+      value:
+        rationale: Moderate unconfirmed signal requires further evaluation before
+          RMP update
+        measure_type: further_evaluation
+        rmp_update_needed: false
+    check_confirmed_strong:
+      type: condition
+      variable: confirmed
+      operator: eq
+      value: true
+      true_next: strong_confirmed
+      false_next: strong_unconfirmed
+    weak_signal:
+      type: return
+      value:
+        rationale: Weak signal maintained under routine surveillance, no RMP update
+          needed
+        rmp_update_needed: false
+        measure_type: surveillance
+    strong_confirmed:
+      type: return
+      value:
+        measure_type: restrictive_distribution
+        rationale: Strong confirmed signal requires immediate RMP update with restrictive
+          measures
+        rmp_update_needed: true
+    check_moderate:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: moderate
+      true_next: check_confirmed_moderate
+      false_next: weak_signal
+    check_strength:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: strong
+      true_next: check_confirmed_strong
+      false_next: check_moderate
+    strong_unconfirmed:
+      type: return
+      value:
+        rationale: Strong signal even if unconfirmed requires RMP enhancement with
+          education
+        rmp_update_needed: true
+        measure_type: educational_material
+    check_confirmed_moderate:
+      type: condition
+      variable: confirmed
+      operator: eq
+      value: true
+      true_next: moderate_confirmed
+      false_next: moderate_unconfirmed
+    moderate_confirmed:
+      type: return
+      value:
+        measure_type: enhanced_monitoring
+        rationale: Moderate confirmed signal requires enhanced monitoring in RMP
+        rmp_update_needed: true
+tests:
+- input:
+    confirmed: false
+    signal_strength: ''
+  expect:
+    rationale: Weak signal maintained under routine surveillance, no RMP update needed
+    rmp_update_needed: false
+    measure_type: surveillance
+- input:
+    confirmed: false
+    signal_strength: moderate
+  expect:
+    rationale: Moderate unconfirmed signal requires further evaluation before RMP
+      update
+    measure_type: further_evaluation
+    rmp_update_needed: false
+- input:
+    confirmed: false
+    signal_strength: strong
+  expect:
+    rationale: Strong signal even if unconfirmed requires RMP enhancement with education
+    rmp_update_needed: true
+    measure_type: educational_material
+- input:
+    confirmed: true
+    signal_strength: moderate
+  expect:
+    measure_type: enhanced_monitoring
+    rationale: Moderate confirmed signal requires enhanced monitoring in RMP
+    rmp_update_needed: true
+- input:
+    confirmed: true
+    signal_strength: strong
+  expect:
+    measure_type: restrictive_distribution
+    rationale: Strong confirmed signal requires immediate RMP update with restrictive
+      measures
+    rmp_update_needed: true
+- input: {}
+  expect:
+    rationale: Weak signal maintained under routine surveillance, no RMP update needed
+    rmp_update_needed: false
+    measure_type: surveillance
+interface:
+  inputs:
+    confirmed:
+      type: boolean
+      required: true
+    signal_strength:
+      type: string
+      required: true
+  outputs:
+    rmp_update_needed:
+      type: boolean
+      required: false
+    measure_type:
+      type: string
+      required: false
+    rationale:
+      type: string
+      required: false
+  aliases: {}

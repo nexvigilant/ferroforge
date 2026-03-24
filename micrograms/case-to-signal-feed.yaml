@@ -1,0 +1,135 @@
+name: case-to-signal-feed
+description: Transforms case data into standardized signal feed record for PRR computation
+version: 0.1.0
+interface:
+  inputs:
+    drug_name:
+      type: string
+      required: true
+      description: Name of the drug
+    event_term:
+      type: string
+      required: true
+      description: Medical event term (MedDRA or plain text)
+    patient_age:
+      type: integer
+      required: false
+      description: Age in years
+    outcome:
+      type: string
+      required: false
+      description: Outcome classification
+  outputs:
+    signal_feed_record:
+      type: object
+      description: Standardized record with fields for PRR input
+tree:
+  start: validate_drug
+  nodes:
+    validate_drug:
+      type: condition
+      variable: drug_name
+      operator: is_not_null
+      true_next: validate_event
+      false_next: missing_drug
+    validate_event:
+      type: condition
+      variable: event_term
+      operator: is_not_null
+      true_next: check_age
+      false_next: missing_event
+    check_age:
+      type: condition
+      variable: patient_age
+      operator: is_not_null
+      true_next: with_age
+      false_next: without_age
+    with_age:
+      type: return
+      value:
+        signal_feed_record:
+          drug: '{{ drug_name }}'
+          event: '{{ event_term }}'
+          age_group: adult
+          outcome: '{{ outcome }}'
+          complete: true
+          data_quality: high
+    without_age:
+      type: return
+      value:
+        signal_feed_record:
+          drug: '{{ drug_name }}'
+          event: '{{ event_term }}'
+          age_group: unknown
+          outcome: '{{ outcome }}'
+          complete: false
+          data_quality: medium
+    missing_drug:
+      type: return
+      value:
+        signal_feed_record:
+          drug: null
+          event: '{{ event_term }}'
+          age_group: null
+          outcome: '{{ outcome }}'
+          complete: false
+          data_quality: low
+    missing_event:
+      type: return
+      value:
+        signal_feed_record:
+          drug: '{{ drug_name }}'
+          event: null
+          age_group: null
+          outcome: '{{ outcome }}'
+          complete: false
+          data_quality: low
+tests:
+# Path: validate_drug(T) -> validate_event(T) -> check_age(T) -> with_age
+- input:
+    drug_name: metformin
+    event_term: lactic acidosis
+    patient_age: 55
+    outcome: recovered
+  expect:
+    signal_feed_record:
+      drug: metformin
+      event: lactic acidosis
+      age_group: adult
+      outcome: recovered
+      complete: true
+      data_quality: high
+# Path: validate_drug(T) -> validate_event(T) -> check_age(F) -> without_age
+- input:
+    drug_name: metformin
+    event_term: lactic acidosis
+    outcome: fatal
+  expect:
+    signal_feed_record:
+      drug: metformin
+      event: lactic acidosis
+      age_group: unknown
+      outcome: fatal
+      complete: false
+      data_quality: medium
+# Path: validate_drug(T) -> validate_event(F) -> missing_event
+- input:
+    drug_name: metformin
+  expect:
+    signal_feed_record:
+      drug: metformin
+      event: null
+      age_group: null
+      outcome: "null"
+      complete: false
+      data_quality: low
+# Path: validate_drug(F) -> missing_drug
+- input: {}
+  expect:
+    signal_feed_record:
+      drug: null
+      event: "null"
+      age_group: null
+      outcome: "null"
+      complete: false
+      data_quality: low

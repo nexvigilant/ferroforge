@@ -1,0 +1,65 @@
+name: refinery-recycle-ratio
+description: "Compute recycle ratio (recycled/(recycled+products)). Lower is better — high recycle means signals need reprocessing."
+version: 0.1.0
+tree:
+  start: check_total
+  nodes:
+    check_total:
+      type: condition
+      variable: total_output
+      operator: gt
+      value: 0
+      true_next: classify_recycle
+      false_next: return_no_output
+    classify_recycle:
+      type: condition
+      variable: recycle_pct
+      operator: lte
+      value: 10
+      true_next: return_minimal_recycle
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: recycle_pct
+      operator: lte
+      value: 30
+      true_next: return_moderate_recycle
+      false_next: return_excessive_recycle
+    return_minimal_recycle:
+      type: return
+      value:
+        recycle_class: MINIMAL
+        action: "Low reprocessing; unit processes converting efficiently"
+        refinery_analog: "Single-pass conversion; recycle stream negligible"
+    return_moderate_recycle:
+      type: return
+      value:
+        recycle_class: MODERATE
+        action: "Acceptable recycle; some signals need second pass"
+        refinery_analog: "Normal recycle ratio; unconverted material returns to reactor"
+    return_excessive_recycle:
+      type: return
+      value:
+        recycle_class: EXCESSIVE
+        action: "High reprocessing load; unit processes underperforming"
+        refinery_analog: "Excessive recycle; catalyst deactivation or wrong operating conditions"
+    return_no_output:
+      type: return
+      value:
+        recycle_class: NO_OUTPUT
+        action: "No output to evaluate"
+        refinery_analog: "No reaction products or recycle"
+tests:
+  - input: { total_output: 100, recycle_pct: 5 }
+    expect: { recycle_class: MINIMAL }
+  - input: { total_output: 100, recycle_pct: 20 }
+    expect: { recycle_class: MODERATE }
+  - input: { total_output: 100, recycle_pct: 50 }
+    expect: { recycle_class: EXCESSIVE }
+  - input: { total_output: 0, recycle_pct: 0 }
+    expect: { recycle_class: NO_OUTPUT }
+  - input: {}
+    expect:
+      action: No output to evaluate
+      recycle_class: NO_OUTPUT
+      refinery_analog: No reaction products or recycle

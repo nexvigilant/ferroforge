@@ -1,0 +1,212 @@
+name: founder-health
+description: 'Loop 5 FlywheelVitals: Founder elastic equilibrium health classifier. Combines current stress ratio (stress/yield_point), fatigue accumulation (cycles/limit), and recovery trajectory. GREEN (sustainable), YELLOW (approaching limits), ORANGE (recovery stalling), RED (burnout imminent). Spec §3.5: fatigue is INVISIBLE until catastrophic — this MCG makes it visible.'
+version: 0.1.0
+interface:
+  inputs:
+    stress_ratio:
+      type: float
+      required: true
+    fatigue_ratio:
+      type: float
+      required: true
+    recovery_days:
+      type: float
+      required: true
+    recovery_trend:
+      type: string
+      required: true
+  outputs:
+    health:
+      type: string
+    risk_factor:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_fatigue_critical
+  nodes:
+    # Fatigue is checked FIRST — invisible degradation takes priority (spec §3.5)
+    check_fatigue_critical:
+      type: condition
+      variable: fatigue_ratio
+      operator: gte
+      value: 0.8
+      true_next: red_fatigue
+      false_next: check_stress_critical
+    check_stress_critical:
+      type: condition
+      variable: stress_ratio
+      operator: gte
+      value: 0.9
+      true_next: red_stress
+      false_next: check_recovery_stalling
+    check_recovery_stalling:
+      type: condition
+      variable: recovery_trend
+      operator: eq
+      value: increasing
+      true_next: check_recovery_days
+      false_next: check_fatigue_warning
+    check_recovery_days:
+      type: condition
+      variable: recovery_days
+      operator: gte
+      value: 7.0
+      true_next: orange_recovery
+      false_next: check_fatigue_warning
+    check_fatigue_warning:
+      type: condition
+      variable: fatigue_ratio
+      operator: gte
+      value: 0.5
+      true_next: yellow_fatigue
+      false_next: check_stress_elevated
+    check_stress_elevated:
+      type: condition
+      variable: stress_ratio
+      operator: gte
+      value: 0.6
+      true_next: yellow_stress
+      false_next: green
+    red_fatigue:
+      type: return
+      value:
+        health: RED
+        risk_factor: fatigue_accumulation
+        action: immediate_load_reduction
+    red_stress:
+      type: return
+      value:
+        health: RED
+        risk_factor: acute_overload
+        action: emergency_scope_cut
+    orange_recovery:
+      type: return
+      value:
+        health: ORANGE
+        risk_factor: recovery_stalling
+        action: enforce_recovery_period
+    yellow_fatigue:
+      type: return
+      value:
+        health: YELLOW
+        risk_factor: fatigue_building
+        action: reduce_cycle_frequency
+    yellow_stress:
+      type: return
+      value:
+        health: YELLOW
+        risk_factor: elevated_stress
+        action: delegate_or_defer
+    green:
+      type: return
+      value:
+        health: GREEN
+        risk_factor: none
+        action: maintain_pace
+tests:
+# GREEN: low stress, low fatigue, fast recovery
+- input:
+    stress_ratio: 0.3
+    fatigue_ratio: 0.2
+    recovery_days: 2.0
+    recovery_trend: stable
+  expect:
+    health: GREEN
+    risk_factor: none
+    action: maintain_pace
+# RED: fatigue critical (invisible degradation — the dangerous one)
+- input:
+    stress_ratio: 0.5
+    fatigue_ratio: 0.85
+    recovery_days: 3.0
+    recovery_trend: stable
+  expect:
+    health: RED
+    risk_factor: fatigue_accumulation
+    action: immediate_load_reduction
+# RED: acute stress overload
+- input:
+    stress_ratio: 0.95
+    fatigue_ratio: 0.3
+    recovery_days: 2.0
+    recovery_trend: stable
+  expect:
+    health: RED
+    risk_factor: acute_overload
+    action: emergency_scope_cut
+# ORANGE: recovery time increasing (early warning)
+- input:
+    stress_ratio: 0.5
+    fatigue_ratio: 0.4
+    recovery_days: 10.0
+    recovery_trend: increasing
+  expect:
+    health: ORANGE
+    risk_factor: recovery_stalling
+    action: enforce_recovery_period
+# YELLOW: fatigue building
+- input:
+    stress_ratio: 0.4
+    fatigue_ratio: 0.6
+    recovery_days: 3.0
+    recovery_trend: stable
+  expect:
+    health: YELLOW
+    risk_factor: fatigue_building
+    action: reduce_cycle_frequency
+# YELLOW: stress elevated but not critical
+- input:
+    stress_ratio: 0.7
+    fatigue_ratio: 0.3
+    recovery_days: 2.0
+    recovery_trend: stable
+  expect:
+    health: YELLOW
+    risk_factor: elevated_stress
+    action: delegate_or_defer
+# Edge: both fatigue and stress high — fatigue wins (invisible > visible)
+- input:
+    stress_ratio: 0.95
+    fatigue_ratio: 0.9
+    recovery_days: 14.0
+    recovery_trend: increasing
+  expect:
+    health: RED
+    risk_factor: fatigue_accumulation
+    action: immediate_load_reduction
+# Edge: recovery increasing but short days and low ratios — green
+- input:
+    stress_ratio: 0.4
+    fatigue_ratio: 0.4
+    recovery_days: 3.0
+    recovery_trend: increasing
+  expect:
+    health: GREEN
+    risk_factor: none
+    action: maintain_pace
+# Edge: zero everything
+- input:
+    stress_ratio: 0.0
+    fatigue_ratio: 0.0
+    recovery_days: 0.0
+    recovery_trend: stable
+  expect:
+    health: GREEN
+    risk_factor: none
+    action: maintain_pace
+# Edge: at fatigue boundary (0.5 exactly)
+- input:
+    stress_ratio: 0.3
+    fatigue_ratio: 0.5
+    recovery_days: 2.0
+    recovery_trend: stable
+  expect:
+    health: YELLOW
+    risk_factor: fatigue_building
+    action: reduce_cycle_frequency
+- input: {}
+  expect:
+    action: maintain_pace
+    health: GREEN
+    risk_factor: none

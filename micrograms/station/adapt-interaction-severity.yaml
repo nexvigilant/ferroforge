@@ -1,0 +1,126 @@
+name: adapt-interaction-severity
+description: "Adapter: convert interaction severity from RxNav/DrugBank configmigrams to signal pipeline inputs"
+version: 0.1.0
+
+interface:
+  inputs:
+    severity:
+      type: string
+      required: false
+      description: "From config-rxnav: contraindicated, major, moderate, minor, none"
+    risk_class:
+      type: string
+      required: false
+      description: "From config-drugbank: high_risk, moderate_risk, low_risk, minimal"
+  outputs:
+    signal_detected:
+      type: bool
+    is_serious:
+      type: bool
+    prr:
+      type: float
+
+tree:
+  start: check_severity
+  nodes:
+    check_severity:
+      type: condition
+      variable: severity
+      operator: is_null
+      true_next: check_risk_class
+      false_next: check_contraindicated
+
+    check_contraindicated:
+      type: condition
+      variable: severity
+      operator: eq
+      value: "contraindicated"
+      true_next: critical_out
+      false_next: check_major
+
+    check_major:
+      type: condition
+      variable: severity
+      operator: eq
+      value: "major"
+      true_next: serious_out
+      false_next: check_moderate_sev
+
+    check_moderate_sev:
+      type: condition
+      variable: severity
+      operator: eq
+      value: "moderate"
+      true_next: moderate_out
+      false_next: low_out
+
+    check_risk_class:
+      type: condition
+      variable: risk_class
+      operator: is_null
+      true_next: low_out
+      false_next: check_high_risk
+
+    check_high_risk:
+      type: condition
+      variable: risk_class
+      operator: eq
+      value: "high_risk"
+      true_next: serious_out
+      false_next: check_moderate_risk
+
+    check_moderate_risk:
+      type: condition
+      variable: risk_class
+      operator: eq
+      value: "moderate_risk"
+      true_next: moderate_out
+      false_next: low_out
+
+    critical_out:
+      type: return
+      value:
+        signal_detected: true
+        is_serious: true
+        prr: 10.0
+
+    serious_out:
+      type: return
+      value:
+        signal_detected: true
+        is_serious: true
+        prr: 6.0
+
+    moderate_out:
+      type: return
+      value:
+        signal_detected: true
+        is_serious: false
+        prr: 2.5
+
+    low_out:
+      type: return
+      value:
+        signal_detected: false
+        is_serious: false
+        prr: 0.5
+
+tests:
+  - input: { severity: "contraindicated" }
+    expect: { signal_detected: true, is_serious: true, prr: 10.0 }
+  - input: { severity: "major" }
+    expect: { signal_detected: true, is_serious: true, prr: 6.0 }
+  - input: { severity: "moderate" }
+    expect: { signal_detected: true, is_serious: false, prr: 2.5 }
+  - input: { severity: "minor" }
+    expect: { signal_detected: false, is_serious: false, prr: 0.5 }
+  - input: { severity: "none" }
+    expect: { signal_detected: false, is_serious: false, prr: 0.5 }
+  - input: { risk_class: "high_risk" }
+    expect: { signal_detected: true, is_serious: true, prr: 6.0 }
+  - input: { risk_class: "moderate_risk" }
+    expect: { signal_detected: true, is_serious: false, prr: 2.5 }
+  - input: { risk_class: "low_risk" }
+    expect: { signal_detected: false, is_serious: false, prr: 0.5 }
+  - input: {}
+    expect: { signal_detected: false, is_serious: false, prr: 0.5 }

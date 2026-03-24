@@ -1,0 +1,205 @@
+name: system-vitals
+description: 'System resource health classifier: RAM, swap, disk, cache. GREEN (all healthy), YELLOW (1 metric stressed), RED (2+ stressed or any critical). Feeds Guardian homeostasis for automated resource management.'
+version: 0.1.0
+interface:
+  inputs:
+    ram_available_mb:
+      type: int
+      required: true
+    swap_free_mb:
+      type: int
+      required: true
+    disk_free_gb:
+      type: int
+      required: true
+    cache_gb:
+      type: int
+      required: true
+    active_rustc:
+      type: int
+      required: false
+  outputs:
+    state:
+      type: string
+    stressed_count:
+      type: int
+    action:
+      type: string
+tree:
+  start: check_ram
+  nodes:
+    check_ram:
+      type: condition
+      variable: ram_available_mb
+      operator: gte
+      value: 2000
+      true_next: check_swap
+      false_next: ram_stressed
+    ram_stressed:
+      type: condition
+      variable: swap_free_mb
+      operator: gte
+      value: 4000
+      true_next: yellow_ram
+      false_next: check_critical
+    check_swap:
+      type: condition
+      variable: swap_free_mb
+      operator: gte
+      value: 4000
+      true_next: check_disk
+      false_next: swap_stressed
+    swap_stressed:
+      type: condition
+      variable: disk_free_gb
+      operator: gte
+      value: 50
+      true_next: yellow_swap
+      false_next: red_swap_disk
+    check_disk:
+      type: condition
+      variable: disk_free_gb
+      operator: gte
+      value: 50
+      true_next: check_cache
+      false_next: yellow_disk
+    check_cache:
+      type: condition
+      variable: cache_gb
+      operator: lt
+      value: 15
+      true_next: green
+      false_next: yellow_cache
+    check_critical:
+      type: condition
+      variable: ram_available_mb
+      operator: gte
+      value: 500
+      true_next: red_memory
+      false_next: red_critical
+    green:
+      type: return
+      value:
+        state: green
+        stressed_count: 0
+        action: none
+    yellow_ram:
+      type: return
+      value:
+        state: yellow
+        stressed_count: 1
+        action: reduce_build_jobs
+    yellow_swap:
+      type: return
+      value:
+        state: yellow
+        stressed_count: 1
+        action: close_sessions
+    yellow_disk:
+      type: return
+      value:
+        state: yellow
+        stressed_count: 1
+        action: prune_target
+    yellow_cache:
+      type: return
+      value:
+        state: yellow
+        stressed_count: 1
+        action: prune_cache
+    red_swap_disk:
+      type: return
+      value:
+        state: red
+        stressed_count: 2
+        action: emergency_prune
+    red_memory:
+      type: return
+      value:
+        state: red
+        stressed_count: 2
+        action: pause_builds
+    red_critical:
+      type: return
+      value:
+        state: red
+        stressed_count: 3
+        action: emergency_stop
+tests:
+- input:
+    ram_available_mb: 4000
+    swap_free_mb: 8000
+    disk_free_gb: 200
+    cache_gb: 6
+  expect:
+    state: green
+    stressed_count: 0
+    action: none
+- input:
+    ram_available_mb: 1500
+    swap_free_mb: 8000
+    disk_free_gb: 200
+    cache_gb: 6
+  expect:
+    state: yellow
+    stressed_count: 1
+    action: reduce_build_jobs
+- input:
+    ram_available_mb: 4000
+    swap_free_mb: 2000
+    disk_free_gb: 200
+    cache_gb: 6
+  expect:
+    state: yellow
+    stressed_count: 1
+    action: close_sessions
+- input:
+    ram_available_mb: 4000
+    swap_free_mb: 8000
+    disk_free_gb: 200
+    cache_gb: 20
+  expect:
+    state: yellow
+    stressed_count: 1
+    action: prune_cache
+- input:
+    ram_available_mb: 1000
+    swap_free_mb: 1000
+    disk_free_gb: 200
+    cache_gb: 6
+  expect:
+    state: red
+    stressed_count: 2
+    action: pause_builds
+- input:
+    ram_available_mb: 300
+    swap_free_mb: 100
+    disk_free_gb: 200
+    cache_gb: 6
+  expect:
+    state: red
+    stressed_count: 3
+    action: emergency_stop
+- input:
+    ram_available_mb: 4000
+    swap_free_mb: 2000
+    disk_free_gb: 30
+    cache_gb: 6
+  expect:
+    state: red
+    stressed_count: 2
+    action: emergency_prune
+- input:
+    ram_available_mb: 4000
+    swap_free_mb: 8000
+    disk_free_gb: 30
+    cache_gb: 6
+  expect:
+    state: yellow
+    stressed_count: 1
+    action: prune_target
+- input: {}
+  expect:
+    action: emergency_stop
+    state: red
+    stressed_count: 3

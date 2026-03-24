@@ -1,0 +1,781 @@
+name: smm-credibility-score
+description: 'NVG-SMM-001 Section 5: Compute Credibility Score from violation counts. CS = Base x Fatal x Critical x Major x Minor. Chemistry analog: rate law — CS = k[F]^0 x [C]^n x [M]^m where Fatal is a kill switch.'
+version: 0.1.0
+tree:
+  start: check_fatal
+  nodes:
+    check_fatal:
+      type: condition
+      variable: fatal_count
+      operator: gt
+      value: 0
+      true_next: suspended
+      false_next: check_critical
+    minor_low:
+      type: return
+      value:
+        rating: GREEN
+        cs: 0.96
+        suspended: false
+        formula: CS = 1.0 - 0.02 x n_minor
+        chemistry_analog: Background noise — minimal perturbation
+    major_low:
+      type: condition
+      variable: major_count
+      operator: eq
+      value: 1
+      true_next: major_1
+      false_next: major_2
+    suspended:
+      type: return
+      value:
+        rating: SUSPENDED
+        cs: 0.0
+        chemistry_analog: Activation energy infinite — no reaction possible (Arrhenius k=0)
+        suspended: true
+        formula: CS = 0.00 [SUSPENDED] — Fatal violation present
+    check_minor_only:
+      type: condition
+      variable: minor_count
+      operator: gt
+      value: 0
+      true_next: minor_scale
+      false_next: perfect
+    check_major:
+      type: condition
+      variable: major_count
+      operator: gt
+      value: 0
+      true_next: apply_major
+      false_next: check_minor_only
+    both_moderate_heavy_major:
+      type: return
+      value:
+        cs: 0.44
+        chemistry_analog: Competitive and uncompetitive inhibition combined
+        formula: CS = 1.0 x CritMult x 0.72 (4+ majors)
+        suspended: false
+        rating: RED
+    minor_floor:
+      type: return
+      value:
+        cs: 0.85
+        suspended: false
+        rating: GREEN
+        chemistry_analog: Thermal noise at saturation — floor reached
+        formula: CS = 1.0 - 0.02 x 8+ = 0.85 (floor)
+    apply_major:
+      type: condition
+      variable: major_count
+      operator: gte
+      value: 7
+      true_next: major_floor
+      false_next: major_scale
+    major_floor:
+      type: return
+      value:
+        chemistry_analog: Side reactions dominate — half the product lost
+        formula: CS = 1.0 x (1.0 - 0.07 x 7+) = 0.50 (floor)
+        rating: RED
+        cs: 0.5
+        suspended: false
+    apply_critical:
+      type: condition
+      variable: critical_count
+      operator: gte
+      value: 5
+      true_next: critical_floor
+      false_next: check_critical_with_major
+    major_scale:
+      type: condition
+      variable: major_count
+      operator: gte
+      value: 3
+      true_next: major_3plus
+      false_next: major_low
+    check_critical:
+      type: condition
+      variable: critical_count
+      operator: gt
+      value: 0
+      true_next: apply_critical
+      false_next: check_major
+    critical_only:
+      type: condition
+      variable: critical_count
+      operator: gte
+      value: 3
+      true_next: critical_3plus
+      false_next: critical_low
+    both_moderate_light:
+      type: return
+      value:
+        chemistry_analog: Partial inhibition — reduced but measurable yield
+        cs: 0.6
+        suspended: false
+        formula: CS = 1.0 x CritMult x MajMult (moderate combined)
+        rating: AMBER
+    critical_1:
+      type: return
+      value:
+        chemistry_analog: Single inhibitor — mild rate reduction
+        rating: GREEN
+        formula: CS = 1.0 x (1.0 - 0.20 x 1) = 0.80
+        suspended: false
+        cs: 0.8
+    check_critical_with_major:
+      type: condition
+      variable: major_count
+      operator: gt
+      value: 0
+      true_next: both_violations
+      false_next: critical_only
+    major_3plus:
+      type: return
+      value:
+        formula: CS = 1.0 x (1.0 - 0.07 x 3) = 0.79
+        chemistry_analog: Multiple side reactions — yield reduced
+        rating: AMBER
+        cs: 0.79
+        suspended: false
+    minor_scale:
+      type: condition
+      variable: minor_count
+      operator: gte
+      value: 8
+      true_next: minor_floor
+      false_next: minor_low
+    critical_low:
+      type: condition
+      variable: critical_count
+      operator: eq
+      value: 1
+      true_next: critical_1
+      false_next: critical_2
+    major_2:
+      type: return
+      value:
+        suspended: false
+        chemistry_analog: Two side reactions — small yield reduction
+        cs: 0.86
+        rating: GREEN
+        formula: CS = 1.0 x (1.0 - 0.07 x 2) = 0.86
+    critical_floor:
+      type: return
+      value:
+        suspended: false
+        cs: 0.1
+        rating: RED
+        chemistry_analog: Complete inhibition — reaction at minimum rate
+        formula: CS = 1.0 x (1.0 - 0.20 x 5+) = 0.10 (floor)
+    critical_2:
+      type: return
+      value:
+        chemistry_analog: Dual inhibition — noticeable yield loss
+        formula: CS = 1.0 x (1.0 - 0.20 x 2) = 0.60
+        rating: AMBER
+        suspended: false
+        cs: 0.6
+    perfect:
+      type: return
+      value:
+        suspended: false
+        formula: CS = 1.00 (no violations)
+        rating: GREEN
+        chemistry_analog: Clean reaction — quantitative yield
+        cs: 1.0
+    major_1:
+      type: return
+      value:
+        cs: 0.93
+        chemistry_analog: Minor side reaction — negligible yield loss
+        formula: CS = 1.0 x (1.0 - 0.07 x 1) = 0.93
+        suspended: false
+        rating: GREEN
+    both_heavy:
+      type: return
+      value:
+        cs: 0.2
+        rating: RED
+        suspended: false
+        chemistry_analog: Multiple inhibitors — product near zero
+        formula: CS = 1.0 x 0.40 x 0.50 = 0.20 (heavy combined)
+    both_violations:
+      type: condition
+      variable: critical_count
+      operator: gte
+      value: 3
+      true_next: both_heavy
+      false_next: both_moderate
+    both_moderate:
+      type: condition
+      variable: major_count
+      operator: gte
+      value: 4
+      true_next: both_moderate_heavy_major
+      false_next: both_moderate_light
+    critical_3plus:
+      type: return
+      value:
+        rating: RED
+        chemistry_analog: Three-fold inhibition — rate severely reduced
+        suspended: false
+        formula: CS = 1.0 x (1.0 - 0.20 x 3) = 0.40
+        cs: 0.4
+tests:
+- input:
+    fatal_count: 1
+    minor_count: 0
+    critical_count: 0
+    major_count: 0
+  expect:
+    cs: 0.0
+    suspended: true
+    rating: SUSPENDED
+- input:
+    fatal_count: 0
+    major_count: 0
+    critical_count: 1
+    minor_count: 0
+  expect:
+    rating: GREEN
+    cs: 0.8
+- input:
+    minor_count: 0
+    critical_count: 2
+    fatal_count: 0
+    major_count: 0
+  expect:
+    cs: 0.6
+    rating: AMBER
+- input:
+    minor_count: 0
+    critical_count: 0
+    fatal_count: 0
+    major_count: 1
+  expect:
+    rating: GREEN
+    cs: 0.93
+- input:
+    fatal_count: 0
+    minor_count: 0
+    major_count: 3
+    critical_count: 0
+  expect:
+    cs: 0.79
+    rating: AMBER
+- input:
+    fatal_count: 0
+    minor_count: 2
+    critical_count: 0
+    major_count: 0
+  expect:
+    cs: 0.96
+    rating: GREEN
+- input:
+    critical_count: 0
+    major_count: 0
+    fatal_count: 0
+    minor_count: 0
+  expect:
+    rating: GREEN
+    cs: 1.0
+- input:
+    fatal_count: 0
+    major_count: 0
+    minor_count: 0
+    critical_count: 5
+  expect:
+    rating: RED
+    cs: 0.1
+- input:
+    minor_count: 0
+    critical_count: 0
+    fatal_count: 0
+    major_count: 7
+  expect:
+    rating: RED
+    cs: 0.5
+- input:
+    fatal_count: -1
+  expect:
+    formula: CS = 1.00 (no violations)
+    chemistry_analog: Clean reaction — quantitative yield
+    rating: GREEN
+    cs: 1.0
+    suspended: false
+- input:
+    fatal_count: -1
+  expect:
+    suspended: false
+    rating: GREEN
+    chemistry_analog: Clean reaction — quantitative yield
+    cs: 1.0
+    formula: CS = 1.00 (no violations)
+- input: {}
+  expect:
+    rating: GREEN
+    chemistry_analog: Clean reaction — quantitative yield
+    formula: CS = 1.00 (no violations)
+    suspended: false
+    cs: 1.0
+- input:
+    major_count: -1
+  expect:
+    suspended: false
+    formula: CS = 1.00 (no violations)
+    rating: GREEN
+    chemistry_analog: Clean reaction — quantitative yield
+    cs: 1.0
+- input:
+    major_count: 2
+  expect:
+    rating: GREEN
+    cs: 0.86
+    suspended: false
+    chemistry_analog: Two side reactions — small yield reduction
+    formula: CS = 1.0 x (1.0 - 0.07 x 2) = 0.86
+- input:
+    major_count: 100
+  expect:
+    suspended: false
+    chemistry_analog: Side reactions dominate — half the product lost
+    formula: CS = 1.0 x (1.0 - 0.07 x 7+) = 0.50 (floor)
+    rating: RED
+    cs: 0.5
+- input: {}
+  expect:
+    rating: GREEN
+    suspended: false
+    formula: CS = 1.00 (no violations)
+    chemistry_analog: Clean reaction — quantitative yield
+    cs: 1.0
+- input:
+    minor_count: -1
+  expect:
+    chemistry_analog: Clean reaction — quantitative yield
+    cs: 1.0
+    rating: GREEN
+    suspended: false
+    formula: CS = 1.00 (no violations)
+- input:
+    minor_count: -1
+  expect:
+    suspended: false
+    chemistry_analog: Clean reaction — quantitative yield
+    rating: GREEN
+    formula: CS = 1.00 (no violations)
+    cs: 1.0
+- input:
+    minor_count: 1
+  expect:
+    formula: CS = 1.0 - 0.02 x n_minor
+    chemistry_analog: Background noise — minimal perturbation
+    rating: GREEN
+    cs: 0.96
+    suspended: false
+- input: {}
+  expect:
+    formula: CS = 1.00 (no violations)
+    chemistry_analog: Clean reaction — quantitative yield
+    rating: GREEN
+    suspended: false
+    cs: 1.0
+- input:
+    major_count: -1
+  expect:
+    rating: GREEN
+    chemistry_analog: Clean reaction — quantitative yield
+    formula: CS = 1.00 (no violations)
+    cs: 1.0
+    suspended: false
+- input:
+    major_count: -1
+  expect:
+    formula: CS = 1.00 (no violations)
+    cs: 1.0
+    rating: GREEN
+    suspended: false
+    chemistry_analog: Clean reaction — quantitative yield
+- input: {}
+  expect:
+    cs: 1.0
+    formula: CS = 1.00 (no violations)
+    rating: GREEN
+    chemistry_analog: Clean reaction — quantitative yield
+    suspended: false
+- input:
+    major_count: -1
+  expect:
+    chemistry_analog: Clean reaction — quantitative yield
+    rating: GREEN
+    cs: 1.0
+    suspended: false
+    formula: CS = 1.00 (no violations)
+- input:
+    major_count: 6
+  expect:
+    formula: CS = 1.0 x (1.0 - 0.07 x 3) = 0.79
+    chemistry_analog: Multiple side reactions — yield reduced
+    rating: AMBER
+    cs: 0.79
+    suspended: false
+- input:
+    major_count: 8
+  expect:
+    suspended: false
+    rating: RED
+    cs: 0.5
+    chemistry_analog: Side reactions dominate — half the product lost
+    formula: CS = 1.0 x (1.0 - 0.07 x 7+) = 0.50 (floor)
+- input:
+    major_count: 700
+  expect:
+    formula: CS = 1.0 x (1.0 - 0.07 x 7+) = 0.50 (floor)
+    suspended: false
+    cs: 0.5
+    chemistry_analog: Side reactions dominate — half the product lost
+    rating: RED
+- input: {}
+  expect:
+    rating: GREEN
+    formula: CS = 1.00 (no violations)
+    suspended: false
+    chemistry_analog: Clean reaction — quantitative yield
+    cs: 1.0
+- input:
+    critical_count: -1
+  expect:
+    cs: 1.0
+    suspended: false
+    rating: GREEN
+    formula: CS = 1.00 (no violations)
+    chemistry_analog: Clean reaction — quantitative yield
+- input:
+    critical_count: 4
+  expect:
+    formula: CS = 1.0 x (1.0 - 0.20 x 3) = 0.40
+    rating: RED
+    chemistry_analog: Three-fold inhibition — rate severely reduced
+    cs: 0.4
+    suspended: false
+- input:
+    critical_count: 6
+  expect:
+    chemistry_analog: Complete inhibition — reaction at minimum rate
+    cs: 0.1
+    formula: CS = 1.0 x (1.0 - 0.20 x 5+) = 0.10 (floor)
+    suspended: false
+    rating: RED
+- input:
+    critical_count: 500
+  expect:
+    formula: CS = 1.0 x (1.0 - 0.20 x 5+) = 0.10 (floor)
+    rating: RED
+    cs: 0.1
+    suspended: false
+    chemistry_analog: Complete inhibition — reaction at minimum rate
+- input: {}
+  expect:
+    suspended: false
+    cs: 1.0
+    rating: GREEN
+    chemistry_analog: Clean reaction — quantitative yield
+    formula: CS = 1.00 (no violations)
+- input:
+    major_count: -1
+  expect:
+    suspended: false
+    formula: CS = 1.00 (no violations)
+    cs: 1.0
+    rating: GREEN
+    chemistry_analog: Clean reaction — quantitative yield
+- input:
+    major_count: 2
+  expect:
+    suspended: false
+    rating: GREEN
+    formula: CS = 1.0 x (1.0 - 0.07 x 2) = 0.86
+    chemistry_analog: Two side reactions — small yield reduction
+    cs: 0.86
+- input:
+    major_count: 4
+  expect:
+    suspended: false
+    rating: AMBER
+    cs: 0.79
+    formula: CS = 1.0 x (1.0 - 0.07 x 3) = 0.79
+    chemistry_analog: Multiple side reactions — yield reduced
+- input:
+    major_count: 300
+  expect:
+    chemistry_analog: Side reactions dominate — half the product lost
+    formula: CS = 1.0 x (1.0 - 0.07 x 7+) = 0.50 (floor)
+    suspended: false
+    rating: RED
+    cs: 0.5
+- input: {}
+  expect:
+    chemistry_analog: Clean reaction — quantitative yield
+    cs: 1.0
+    formula: CS = 1.00 (no violations)
+    suspended: false
+    rating: GREEN
+- input:
+    critical_count: -1
+  expect:
+    cs: 1.0
+    suspended: false
+    chemistry_analog: Clean reaction — quantitative yield
+    formula: CS = 1.00 (no violations)
+    rating: GREEN
+- input:
+    critical_count: -1
+  expect:
+    rating: GREEN
+    formula: CS = 1.00 (no violations)
+    suspended: false
+    cs: 1.0
+    chemistry_analog: Clean reaction — quantitative yield
+- input: {}
+  expect:
+    formula: CS = 1.00 (no violations)
+    cs: 1.0
+    suspended: false
+    chemistry_analog: Clean reaction — quantitative yield
+    rating: GREEN
+- input:
+    critical_count: -1
+  expect:
+    suspended: false
+    cs: 1.0
+    rating: GREEN
+    chemistry_analog: Clean reaction — quantitative yield
+    formula: CS = 1.00 (no violations)
+- input:
+    critical_count: 4
+  expect:
+    suspended: false
+    chemistry_analog: Three-fold inhibition — rate severely reduced
+    formula: CS = 1.0 x (1.0 - 0.20 x 3) = 0.40
+    cs: 0.4
+    rating: RED
+- input:
+    critical_count: 300
+  expect:
+    suspended: false
+    chemistry_analog: Complete inhibition — reaction at minimum rate
+    cs: 0.1
+    formula: CS = 1.0 x (1.0 - 0.20 x 5+) = 0.10 (floor)
+    rating: RED
+- input: {}
+  expect:
+    chemistry_analog: Clean reaction — quantitative yield
+    suspended: false
+    formula: CS = 1.00 (no violations)
+    cs: 1.0
+    rating: GREEN
+- input:
+    major_count: -1
+  expect:
+    suspended: false
+    rating: GREEN
+    cs: 1.0
+    formula: CS = 1.00 (no violations)
+    chemistry_analog: Clean reaction — quantitative yield
+- input:
+    major_count: -1
+  expect:
+    formula: CS = 1.00 (no violations)
+    rating: GREEN
+    cs: 1.0
+    suspended: false
+    chemistry_analog: Clean reaction — quantitative yield
+- input: {}
+  expect:
+    cs: 1.0
+    suspended: false
+    rating: GREEN
+    chemistry_analog: Clean reaction — quantitative yield
+    formula: CS = 1.00 (no violations)
+- input:
+    minor_count: -1
+  expect:
+    cs: 1.0
+    chemistry_analog: Clean reaction — quantitative yield
+    formula: CS = 1.00 (no violations)
+    suspended: false
+    rating: GREEN
+- input:
+    minor_count: 7
+  expect:
+    chemistry_analog: Background noise — minimal perturbation
+    rating: GREEN
+    suspended: false
+    formula: CS = 1.0 - 0.02 x n_minor
+    cs: 0.96
+- input:
+    minor_count: 9
+  expect:
+    rating: GREEN
+    cs: 0.85
+    suspended: false
+    formula: CS = 1.0 - 0.02 x 8+ = 0.85 (floor)
+    chemistry_analog: Thermal noise at saturation — floor reached
+- input:
+    minor_count: 800
+  expect:
+    formula: CS = 1.0 - 0.02 x 8+ = 0.85 (floor)
+    chemistry_analog: Thermal noise at saturation — floor reached
+    suspended: false
+    rating: GREEN
+    cs: 0.85
+- input: {}
+  expect:
+    formula: CS = 1.00 (no violations)
+    chemistry_analog: Clean reaction — quantitative yield
+    suspended: false
+    rating: GREEN
+    cs: 1.0
+- input:
+    critical_count: -1
+  expect:
+    rating: GREEN
+    suspended: false
+    cs: 1.0
+    chemistry_analog: Clean reaction — quantitative yield
+    formula: CS = 1.00 (no violations)
+- input:
+    critical_count: 100
+  expect:
+    suspended: false
+    rating: RED
+    chemistry_analog: Complete inhibition — reaction at minimum rate
+    cs: 0.1
+    formula: CS = 1.0 x (1.0 - 0.20 x 5+) = 0.10 (floor)
+- input: {}
+  expect:
+    chemistry_analog: Clean reaction — quantitative yield
+    cs: 1.0
+    formula: CS = 1.00 (no violations)
+    suspended: false
+    rating: GREEN
+- input:
+    critical_count: -1
+  expect:
+    chemistry_analog: Clean reaction — quantitative yield
+    formula: CS = 1.00 (no violations)
+    suspended: false
+    rating: GREEN
+    cs: 1.0
+- input:
+    critical_count: 4
+  expect:
+    suspended: false
+    formula: CS = 1.0 x (1.0 - 0.20 x 3) = 0.40
+    cs: 0.4
+    chemistry_analog: Three-fold inhibition — rate severely reduced
+    rating: RED
+- input:
+    critical_count: 300
+  expect:
+    chemistry_analog: Complete inhibition — reaction at minimum rate
+    formula: CS = 1.0 x (1.0 - 0.20 x 5+) = 0.10 (floor)
+    cs: 0.1
+    suspended: false
+    rating: RED
+- input: {}
+  expect:
+    suspended: false
+    chemistry_analog: Clean reaction — quantitative yield
+    cs: 1.0
+    formula: CS = 1.00 (no violations)
+    rating: GREEN
+- input:
+    major_count: -1
+  expect:
+    rating: GREEN
+    chemistry_analog: Clean reaction — quantitative yield
+    cs: 1.0
+    formula: CS = 1.00 (no violations)
+    suspended: false
+- input:
+    major_count: 5
+  expect:
+    suspended: false
+    cs: 0.79
+    chemistry_analog: Multiple side reactions — yield reduced
+    rating: AMBER
+    formula: CS = 1.0 x (1.0 - 0.07 x 3) = 0.79
+- input:
+    major_count: 400
+  expect:
+    cs: 0.5
+    rating: RED
+    suspended: false
+    formula: CS = 1.0 x (1.0 - 0.07 x 7+) = 0.50 (floor)
+    chemistry_analog: Side reactions dominate — half the product lost
+- input: {}
+  expect:
+    cs: 1.0
+    formula: CS = 1.00 (no violations)
+    rating: GREEN
+    chemistry_analog: Clean reaction — quantitative yield
+    suspended: false
+# Multi-variable combination tests (both_violations paths)
+- input: { fatal_count: 0, critical_count: 3, major_count: 1, minor_count: 0 }
+  expect:
+    cs: 0.2
+    rating: RED
+    suspended: false
+- input: { fatal_count: 0, critical_count: 1, major_count: 1, minor_count: 0 }
+  expect:
+    cs: 0.6
+    rating: AMBER
+    suspended: false
+- input: { fatal_count: 0, critical_count: 1, major_count: 5, minor_count: 0 }
+  expect:
+    cs: 0.44
+    rating: RED
+    suspended: false
+- input: { fatal_count: 0, critical_count: 2, major_count: 2, minor_count: 0 }
+  expect:
+    cs: 0.6
+    rating: AMBER
+    suspended: false
+- input: { fatal_count: 0, critical_count: 4, major_count: 1, minor_count: 0 }
+  expect:
+    cs: 0.2
+    rating: RED
+    suspended: false
+interface:
+  inputs:
+    major_count:
+      type: int
+      required: true
+    minor_count:
+      type: int
+      required: true
+    critical_count:
+      type: int
+      required: true
+    fatal_count:
+      type: int
+      required: true
+  outputs:
+    chemistry_analog:
+      type: string
+      required: false
+    suspended:
+      type: bool
+      required: false
+    cs:
+      type: float
+      required: false
+    rating:
+      type: string
+      required: false
+    formula:
+      type: string
+      required: false
+  aliases: {}

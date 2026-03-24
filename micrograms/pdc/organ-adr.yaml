@@ -1,0 +1,149 @@
+name: organ-adr
+description: "Domain 3: Route ADR by affected organ system — hepatic, cardiovascular, neurological, hematological, immunological. Returns patterns, biomarkers, AI detection approach."
+version: 0.1.0
+interface:
+  inputs:
+    organ_system:
+      type: string
+      required: false
+  outputs:
+    ai_detect:
+      type: string
+    critical_rule:
+      type: string
+    key_biomarkers:
+      type: string
+    monitoring:
+      type: string
+    patterns:
+      type: string
+    severity_tool:
+      type: string
+    system:
+      type: string
+tree:
+  start: check_hepatic
+  nodes:
+    check_hepatic:
+      type: condition
+      variable: organ_system
+      operator: eq
+      value: hepatic
+      true_next: hepatic
+      false_next: check_cardio
+    check_cardio:
+      type: condition
+      variable: organ_system
+      operator: eq
+      value: cardiovascular
+      true_next: cardiovascular
+      false_next: check_neuro
+    check_neuro:
+      type: condition
+      variable: organ_system
+      operator: eq
+      value: neurological
+      true_next: neurological
+      false_next: check_heme
+    check_heme:
+      type: condition
+      variable: organ_system
+      operator: eq
+      value: hematological
+      true_next: hematological
+      false_next: check_immuno
+    check_immuno:
+      type: condition
+      variable: organ_system
+      operator: eq
+      value: immunological
+      true_next: immunological
+      false_next: other_system
+    hepatic:
+      type: return
+      value:
+        system: HEPATIC
+        patterns: "hepatocellular, cholestatic, mixed, chronic, DILI"
+        key_biomarkers: "ALT, AST, ALP, bilirubin, INR"
+        critical_rule: "Hy's Law — ALT >3x ULN + bilirubin >2x ULN = 10% fatality risk"
+        severity_tool: "RUCAM score for causality, MELD for prognosis"
+        ai_detect: "biomarker trend analysis, pattern classification, Hy's Law screening"
+        monitoring: "LFTs baseline and periodic, imaging if progressive"
+    cardiovascular:
+      type: return
+      value:
+        system: CARDIOVASCULAR
+        patterns: "QT prolongation, arrhythmia, heart failure, MI, thromboembolism"
+        key_biomarkers: "QTc interval, troponin, BNP, D-dimer, BP"
+        critical_rule: "QTc >500ms or increase >60ms = high risk torsades de pointes"
+        severity_tool: "CTCAE grading, Fridericia correction for QTc"
+        ai_detect: "ECG analysis, continuous monitoring, risk factor modeling"
+        monitoring: "ECG baseline and periodic, cardiac biomarkers, hemodynamic monitoring"
+    neurological:
+      type: return
+      value:
+        system: NEUROLOGICAL
+        patterns: "seizures, movement disorders, cognitive impairment, psychiatric effects, neuropathy"
+        key_biomarkers: "EEG, nerve conduction, cognitive testing, psychiatric scales"
+        critical_rule: "new onset seizures or suicidal ideation = immediate drug review"
+        severity_tool: "CTCAE grading, specific neurological scales (AIMS, MMSE)"
+        ai_detect: "NLP for psychiatric symptom extraction, movement pattern analysis, cognitive trend tracking"
+        monitoring: "neurological exam, cognitive assessment, psychiatric evaluation"
+    hematological:
+      type: return
+      value:
+        system: HEMATOLOGICAL
+        patterns: "agranulocytosis, thrombocytopenia, anemia, pancytopenia, coagulation disorders"
+        key_biomarkers: "CBC, differential, reticulocytes, coagulation panel, bone marrow biopsy"
+        critical_rule: "ANC <500 = medical emergency, platelets <20K = high bleed risk"
+        severity_tool: "CTCAE grading, WHO bleeding scale"
+        ai_detect: "CBC trend analysis, early drop detection, population-based risk modeling"
+        monitoring: "CBC with differential weekly during risk period, coagulation monitoring"
+    immunological:
+      type: return
+      value:
+        system: IMMUNOLOGICAL
+        patterns: "SJS/TEN, anaphylaxis, DRESS, autoimmune syndromes, immunosuppression"
+        key_biomarkers: "IgE, tryptase, eosinophils, ANA, complement levels, skin biopsy"
+        critical_rule: "SJS/TEN BSA >30% = life-threatening, anaphylaxis = immediate epinephrine"
+        severity_tool: "SCORTEN for SJS/TEN prognosis, Sampson criteria for anaphylaxis"
+        ai_detect: "HLA association screening, image analysis for dermatological ADRs, pattern matching"
+        monitoring: "skin assessment, allergy testing, immune markers, HLA genotyping when indicated"
+    other_system:
+      type: return
+      value:
+        system: OTHER
+        patterns: "endocrine, metabolic, renal, respiratory, musculoskeletal, dermatological"
+        key_biomarkers: "organ-specific laboratory panels"
+        ai_detect: "general pattern recognition, multi-system screening"
+        monitoring: "organ-specific monitoring per clinical presentation"
+tests:
+- input:
+    organ_system: hepatic
+  expect:
+    system: HEPATIC
+    critical_rule: "Hy's Law — ALT >3x ULN + bilirubin >2x ULN = 10% fatality risk"
+- input:
+    organ_system: cardiovascular
+  expect:
+    system: CARDIOVASCULAR
+- input:
+    organ_system: neurological
+  expect:
+    system: NEUROLOGICAL
+- input:
+    organ_system: hematological
+  expect:
+    system: HEMATOLOGICAL
+    critical_rule: "ANC <500 = medical emergency, platelets <20K = high bleed risk"
+- input:
+    organ_system: immunological
+  expect:
+    system: IMMUNOLOGICAL
+- input:
+    organ_system: renal
+  expect:
+    system: OTHER
+- input: {}
+  expect:
+    system: OTHER

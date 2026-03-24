@@ -1,0 +1,177 @@
+name: label-section-router
+description: 'Routes DailyMed SPL label queries to the correct section ID, name, and PV relevance tier'
+version: 0.1.0
+interface:
+  inputs:
+    section_query:
+      type: string
+      required: false
+  outputs:
+    spl_section_id:
+      type: string
+    section_name:
+      type: string
+    relevance_tier:
+      type: string
+    pv_relevant:
+      type: bool
+tree:
+  start: check_boxed
+  nodes:
+    check_boxed:
+      type: condition
+      variable: section_query
+      operator: eq
+      value: boxed_warning
+      true_next: boxed_warning
+      false_next: check_adverse
+    check_adverse:
+      type: condition
+      variable: section_query
+      operator: eq
+      value: adverse_reactions
+      true_next: adverse_reactions
+      false_next: check_warnings
+    check_warnings:
+      type: condition
+      variable: section_query
+      operator: eq
+      value: warnings
+      true_next: warnings
+      false_next: check_contra
+    check_contra:
+      type: condition
+      variable: section_query
+      operator: eq
+      value: contraindications
+      true_next: contraindications
+      false_next: check_interactions
+    check_interactions:
+      type: condition
+      variable: section_query
+      operator: eq
+      value: drug_interactions
+      true_next: drug_interactions
+      false_next: check_dosage
+    check_dosage:
+      type: condition
+      variable: section_query
+      operator: eq
+      value: dosage
+      true_next: dosage
+      false_next: check_clinical
+    check_clinical:
+      type: condition
+      variable: section_query
+      operator: eq
+      value: clinical_pharmacology
+      true_next: clinical_pharmacology
+      false_next: unknown_section
+    boxed_warning:
+      type: return
+      value:
+        spl_section_id: "34066-1"
+        section_name: BOXED WARNING
+        relevance_tier: critical
+        pv_relevant: true
+    adverse_reactions:
+      type: return
+      value:
+        spl_section_id: "34084-4"
+        section_name: ADVERSE REACTIONS
+        relevance_tier: critical
+        pv_relevant: true
+    warnings:
+      type: return
+      value:
+        spl_section_id: "43685-7"
+        section_name: WARNINGS AND PRECAUTIONS
+        relevance_tier: critical
+        pv_relevant: true
+    contraindications:
+      type: return
+      value:
+        spl_section_id: "34070-3"
+        section_name: CONTRAINDICATIONS
+        relevance_tier: important
+        pv_relevant: true
+    drug_interactions:
+      type: return
+      value:
+        spl_section_id: "34073-7"
+        section_name: DRUG INTERACTIONS
+        relevance_tier: important
+        pv_relevant: true
+    dosage:
+      type: return
+      value:
+        spl_section_id: "34068-7"
+        section_name: DOSAGE AND ADMINISTRATION
+        relevance_tier: informational
+        pv_relevant: false
+    clinical_pharmacology:
+      type: return
+      value:
+        spl_section_id: "34090-1"
+        section_name: CLINICAL PHARMACOLOGY
+        relevance_tier: informational
+        pv_relevant: false
+    unknown_section:
+      type: return
+      value:
+        spl_section_id: "unknown"
+        section_name: UNKNOWN SECTION
+        relevance_tier: informational
+        pv_relevant: false
+tests:
+- input:
+    section_query: boxed_warning
+  expect:
+    spl_section_id: "34066-1"
+    section_name: BOXED WARNING
+    relevance_tier: critical
+    pv_relevant: true
+- input:
+    section_query: adverse_reactions
+  expect:
+    spl_section_id: "34084-4"
+    section_name: ADVERSE REACTIONS
+    relevance_tier: critical
+    pv_relevant: true
+- input:
+    section_query: warnings
+  expect:
+    spl_section_id: "43685-7"
+    relevance_tier: critical
+    pv_relevant: true
+- input:
+    section_query: contraindications
+  expect:
+    spl_section_id: "34070-3"
+    relevance_tier: important
+    pv_relevant: true
+- input:
+    section_query: drug_interactions
+  expect:
+    spl_section_id: "34073-7"
+    relevance_tier: important
+    pv_relevant: true
+- input:
+    section_query: dosage
+  expect:
+    relevance_tier: informational
+    pv_relevant: false
+- input:
+    section_query: clinical_pharmacology
+  expect:
+    relevance_tier: informational
+    pv_relevant: false
+- input:
+    section_query: some_unknown
+  expect:
+    spl_section_id: "unknown"
+    pv_relevant: false
+- input: {}
+  expect:
+    spl_section_id: "unknown"
+    pv_relevant: false

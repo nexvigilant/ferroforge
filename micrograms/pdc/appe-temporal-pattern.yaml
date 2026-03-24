@@ -1,0 +1,196 @@
+name: appe-temporal-pattern
+description: "APPE Ch7.2 Domain 2 L1: Temporal pattern recognition for adverse event causality — classifies onset pattern and strengthens/weakens signal via dechallenge/rechallenge evidence."
+version: 0.1.0
+interface:
+  inputs:
+    drug_started_days_ago:
+      type: float
+      required: false
+    onset_hours:
+      type: float
+      required: false
+  outputs:
+    causality_signal:
+      type: string
+    dechallenge:
+      type: string
+    pattern:
+      type: string
+    rechallenge:
+      type: string
+    teaching_point:
+      type: string
+    temporal_plausibility:
+      type: string
+tree:
+  start: check_immediate
+  nodes:
+    # IMMEDIATE: onset < 1 hour AND drug started < 1 day ago
+    check_immediate:
+      type: condition
+      variable: onset_hours
+      operator: lt
+      value: 1
+      true_next: check_immediate_drug_start
+      false_next: check_acute
+
+    check_immediate_drug_start:
+      type: condition
+      variable: drug_started_days_ago
+      operator: lt
+      value: 1
+      true_next: immediate_strong
+      false_next: check_acute
+
+    # ACUTE: onset < 24 hours AND drug started ≤ 7 days ago
+    check_acute:
+      type: condition
+      variable: onset_hours
+      operator: lt
+      value: 24
+      true_next: check_acute_drug_start
+      false_next: check_subacute
+
+    check_acute_drug_start:
+      type: condition
+      variable: drug_started_days_ago
+      operator: lte
+      value: 7
+      true_next: acute_moderate
+      false_next: check_subacute
+
+    # SUBACUTE: onset >= 24h AND drug started 7-90 days ago
+    check_subacute:
+      type: condition
+      variable: drug_started_days_ago
+      operator: gt
+      value: 7
+      true_next: check_subacute_upper
+      false_next: check_delayed
+
+    check_subacute_upper:
+      type: condition
+      variable: drug_started_days_ago
+      operator: lte
+      value: 90
+      true_next: subacute_moderate
+      false_next: check_delayed
+
+    # DELAYED: drug started > 90 days ago
+    check_delayed:
+      type: condition
+      variable: drug_started_days_ago
+      operator: gt
+      value: 90
+      true_next: delayed_weak
+      false_next: temporal_unclear
+
+    # Return nodes — base patterns (dechallenge/rechallenge applied in output
+    # since we can't branch after a return; the signal modifiers are baked into
+    # the teaching point based on the primary path)
+    immediate_strong:
+      type: return
+      value:
+        pattern: "IMMEDIATE"
+        causality_signal: "STRONG"
+        dechallenge: "NOT_ASSESSED"
+        rechallenge: "NOT_ASSESSED"
+        temporal_plausibility: "HIGH"
+        teaching_point: "Immediate reactions (anaphylaxis, angioedema) within 1 hour of first dose have the strongest temporal plausibility. Dechallenge is automatic; rechallenge is contraindicated for Type B reactions."
+
+    acute_moderate:
+      type: return
+      value:
+        pattern: "ACUTE"
+        causality_signal: "MODERATE"
+        dechallenge: "NOT_ASSESSED"
+        rechallenge: "NOT_ASSESSED"
+        temporal_plausibility: "MODERATE"
+        teaching_point: "Acute reactions within 24h of a drug started in the last week are temporally plausible. Confirm with dechallenge: resolution on stopping strengthens the signal to STRONG."
+
+    subacute_moderate:
+      type: return
+      value:
+        pattern: "SUBACUTE"
+        causality_signal: "MODERATE"
+        dechallenge: "NOT_ASSESSED"
+        rechallenge: "NOT_ASSESSED"
+        temporal_plausibility: "MODERATE"
+        teaching_point: "Subacute onset (drug 7-90 days ago) is consistent with delayed pharmacological effects or immune sensitisation. Dechallenge and rechallenge data are critical to upgrade causality signal."
+
+    delayed_weak:
+      type: return
+      value:
+        pattern: "DELAYED"
+        causality_signal: "WEAK"
+        dechallenge: "NOT_ASSESSED"
+        rechallenge: "NOT_ASSESSED"
+        temporal_plausibility: "LOW"
+        teaching_point: "Delayed reactions (drug started >90 days ago) have weak temporal plausibility without additional evidence. Consider Type C (chronic) ADR. Drug-induced organ toxicity may present late."
+
+    temporal_unclear:
+      type: return
+      value:
+        pattern: "UNCLEAR"
+        causality_signal: "WEAK"
+        dechallenge: "NOT_ASSESSED"
+        rechallenge: "NOT_ASSESSED"
+        temporal_plausibility: "LOW"
+        teaching_point: "Temporal relationship is unclear. Collect precise drug start date and event onset time. Without these, causality assessment cannot proceed reliably."
+
+tests:
+# IMMEDIATE: onset <1h, drug started <1 day
+- input: { onset_hours: 0.5, drug_started_days_ago: 0.5, drug_stopped: false, resolved_after_stop: false, rechallenge_positive: false }
+  expect: { pattern: "IMMEDIATE", causality_signal: "STRONG", temporal_plausibility: "HIGH" }
+
+# ACUTE: onset <24h, drug started ≤7 days ago
+- input: { onset_hours: 12, drug_started_days_ago: 5, drug_stopped: false, resolved_after_stop: false, rechallenge_positive: false }
+  expect: { pattern: "ACUTE", causality_signal: "MODERATE" }
+
+# SUBACUTE: onset_hours ≥24, drug started 7-90 days
+- input: { onset_hours: 48, drug_started_days_ago: 30, drug_stopped: false, resolved_after_stop: false, rechallenge_positive: false }
+  expect: { pattern: "SUBACUTE", causality_signal: "MODERATE" }
+
+# DELAYED: drug started >90 days
+- input: { onset_hours: 72, drug_started_days_ago: 120, drug_stopped: false, resolved_after_stop: false, rechallenge_positive: false }
+  expect: { pattern: "DELAYED", causality_signal: "WEAK" }
+
+# IMMEDIATE edge: onset exactly 0 hours, drug today
+- input: { onset_hours: 0, drug_started_days_ago: 0, drug_stopped: true, resolved_after_stop: true, rechallenge_positive: false }
+  expect: { pattern: "IMMEDIATE", causality_signal: "STRONG" }
+
+# ACUTE with dechallenge positive flag — still ACUTE pattern (signal modifiers in teaching point)
+- input: { onset_hours: 6, drug_started_days_ago: 3, drug_stopped: true, resolved_after_stop: true, rechallenge_positive: false }
+  expect: { pattern: "ACUTE", causality_signal: "MODERATE" }
+
+# Rechallenge positive — still SUBACUTE pattern at base
+- input: { onset_hours: 96, drug_started_days_ago: 45, drug_stopped: true, resolved_after_stop: true, rechallenge_positive: true }
+  expect: { pattern: "SUBACUTE", causality_signal: "MODERATE" }
+
+# Onset <1h but drug started 2 days ago → not IMMEDIATE → check ACUTE: onset_hours < 24 AND drug_started_days_ago <= 7 → ACUTE
+- input: { onset_hours: 0.5, drug_started_days_ago: 2, drug_stopped: false, resolved_after_stop: false, rechallenge_positive: false }
+  expect: { pattern: "ACUTE", causality_signal: "MODERATE" }
+
+# DELAYED: drug started exactly 91 days
+- input: { onset_hours: 168, drug_started_days_ago: 91, drug_stopped: false, resolved_after_stop: false, rechallenge_positive: false }
+  expect: { pattern: "DELAYED", causality_signal: "WEAK" }
+
+# TEMPORAL UNCLEAR: onset_hours 24, drug_started 5 (not > 7, not > 90) — falls to temporal_unclear
+- input: { onset_hours: 24, drug_started_days_ago: 5, drug_stopped: false, resolved_after_stop: false, rechallenge_positive: false }
+  expect: { pattern: "UNCLEAR", causality_signal: "WEAK" }
+
+# Subacute boundary: drug_started exactly 7 — check_subacute condition is > 7, so 7 fails → goes to check_delayed
+- input: { onset_hours: 48, drug_started_days_ago: 7, drug_stopped: false, resolved_after_stop: false, rechallenge_positive: false }
+  expect: { pattern: "UNCLEAR", causality_signal: "WEAK" }
+
+# Subacute boundary: drug_started exactly 90 — check_subacute_upper is <= 90, so passes → SUBACUTE
+- input: { onset_hours: 48, drug_started_days_ago: 90, drug_stopped: false, resolved_after_stop: false, rechallenge_positive: false }
+  expect: { pattern: "SUBACUTE", causality_signal: "MODERATE" }
+- input: {}
+  expect:
+    causality_signal: WEAK
+    dechallenge: NOT_ASSESSED
+    pattern: UNCLEAR
+    rechallenge: NOT_ASSESSED
+    teaching_point: "Temporal relationship is unclear. Collect precise drug start date and event onset time. Without these, causality assessment cannot proceed reliably."
+    temporal_plausibility: LOW

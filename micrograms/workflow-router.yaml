@@ -1,0 +1,137 @@
+name: workflow-router
+description: 'Routes users to the correct PV starting tool based on what data they have available'
+version: 0.1.0
+interface:
+  inputs:
+    has_drug_event_data:
+      type: bool
+      required: false
+    task_type:
+      type: string
+      required: false
+  outputs:
+    description:
+      type: string
+    first_tool:
+      type: string
+    next_steps:
+      type: string
+    start_with:
+      type: string
+tree:
+  start: check_task
+  nodes:
+    check_task:
+      type: condition
+      variable: task_type
+      operator: eq
+      value: signal_detection
+      true_next: signal_path
+      false_next: check_causality_task
+    check_causality_task:
+      type: condition
+      variable: task_type
+      operator: eq
+      value: causality_assessment
+      true_next: causality_path
+      false_next: check_case_task
+    check_case_task:
+      type: condition
+      variable: task_type
+      operator: eq
+      value: case_review
+      true_next: case_path
+      false_next: check_has_data
+    check_has_data:
+      type: condition
+      variable: has_drug_event_data
+      operator: eq
+      value: true
+      true_next: signal_path
+      false_next: getting_started
+    signal_path:
+      type: return
+      value:
+        start_with: signal_detection
+        first_tool: prr_calculator
+        description: Analyze drug-event pair frequencies to detect safety signals using PRR
+        next_steps: If signal found, proceed to causality assessment
+    causality_path:
+      type: return
+      value:
+        start_with: causality_assessment
+        first_tool: naranjo_scale
+        description: Score the likelihood that a drug caused an adverse event using Naranjo algorithm
+        next_steps: After scoring, review recommended regulatory action
+    case_path:
+      type: return
+      value:
+        start_with: case_review
+        first_tool: case_seriousness
+        description: Evaluate the seriousness of an individual case report using ICH E2A criteria
+        next_steps: After classification, check reporting deadlines
+    getting_started:
+      type: return
+      value:
+        start_with: data_collection
+        first_tool: none
+        description: You need drug-event data to begin. Collect adverse event reports or FAERS data first
+        next_steps: Once you have data, return and select signal detection
+tests:
+- input:
+    task_type: signal_detection
+  expect:
+    start_with: signal_detection
+    first_tool: prr_calculator
+    description: Analyze drug-event pair frequencies to detect safety signals using PRR
+    next_steps: If signal found, proceed to causality assessment
+- input:
+    task_type: causality_assessment
+  expect:
+    start_with: causality_assessment
+    first_tool: naranjo_scale
+    description: Score the likelihood that a drug caused an adverse event using Naranjo algorithm
+    next_steps: After scoring, review recommended regulatory action
+- input:
+    task_type: case_review
+  expect:
+    start_with: case_review
+    first_tool: case_seriousness
+    description: Evaluate the seriousness of an individual case report using ICH E2A criteria
+    next_steps: After classification, check reporting deadlines
+- input:
+    task_type: other
+    has_drug_event_data: true
+  expect:
+    start_with: signal_detection
+    first_tool: prr_calculator
+    description: Analyze drug-event pair frequencies to detect safety signals using PRR
+    next_steps: If signal found, proceed to causality assessment
+- input:
+    task_type: other
+    has_drug_event_data: false
+  expect:
+    start_with: data_collection
+    first_tool: none
+    description: You need drug-event data to begin. Collect adverse event reports or FAERS data first
+    next_steps: Once you have data, return and select signal detection
+- input: {}
+  expect:
+    start_with: data_collection
+    first_tool: none
+    description: You need drug-event data to begin. Collect adverse event reports or FAERS data first
+    next_steps: Once you have data, return and select signal detection
+- input:
+    has_drug_event_data: true
+  expect:
+    start_with: signal_detection
+    first_tool: prr_calculator
+    description: Analyze drug-event pair frequencies to detect safety signals using PRR
+    next_steps: If signal found, proceed to causality assessment
+- input:
+    has_drug_event_data: false
+  expect:
+    start_with: data_collection
+    first_tool: none
+    description: You need drug-event data to begin. Collect adverse event reports or FAERS data first
+    next_steps: Once you have data, return and select signal detection

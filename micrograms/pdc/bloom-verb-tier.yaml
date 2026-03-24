@@ -1,0 +1,159 @@
+name: bloom-verb-tier
+description: "PDC: Map observed behavioral verb category to Bloom taxonomy tier (1-7) for anchor validation"
+version: 0.1.0
+interface:
+  inputs:
+    verb_category:
+      type: string
+      required: false
+  outputs:
+    bloom_level:
+      type: string
+    pdc_level:
+      type: string
+    verb_tier:
+      type: int
+    verbs:
+      type: string
+tree:
+  start: check_recall
+  nodes:
+    check_recall:
+      type: condition
+      variable: verb_category
+      operator: eq
+      value: recall
+      true_next: tier_1
+      false_next: check_comprehend
+    check_comprehend:
+      type: condition
+      variable: verb_category
+      operator: eq
+      value: comprehension
+      true_next: tier_2
+      false_next: check_apply
+    check_apply:
+      type: condition
+      variable: verb_category
+      operator: eq
+      value: application
+      true_next: tier_3
+      false_next: check_create
+    check_create:
+      type: condition
+      variable: verb_category
+      operator: eq
+      value: creation
+      true_next: tier_4
+      false_next: check_synth
+    check_synth:
+      type: condition
+      variable: verb_category
+      operator: eq
+      value: synthesis
+      true_next: tier_5
+      false_next: check_transform
+    check_transform:
+      type: condition
+      variable: verb_category
+      operator: eq
+      value: institutional
+      true_next: tier_6
+      false_next: check_global
+    check_global:
+      type: condition
+      variable: verb_category
+      operator: eq
+      value: global
+      true_next: tier_7
+      false_next: tier_1
+    tier_1:
+      type: return
+      value:
+        verb_tier: 1
+        bloom_level: REMEMBER
+        pdc_level: "L1"
+        verbs: "uses, identifies, recognizes, lists, names, defines"
+    tier_2:
+      type: return
+      value:
+        verb_tier: 2
+        bloom_level: UNDERSTAND
+        pdc_level: "L2"
+        verbs: "explains, applies consistently, adapts, describes, interprets"
+    tier_3:
+      type: return
+      value:
+        verb_tier: 3
+        bloom_level: APPLY
+        pdc_level: "L3"
+        verbs: "integrates, conducts independently, develops strategies, implements"
+    tier_4:
+      type: return
+      value:
+        verb_tier: 4
+        bloom_level: ANALYZE_CREATE
+        pdc_level: "L4"
+        verbs: "influences, develops new approaches, creates innovative, designs"
+    tier_5:
+      type: return
+      value:
+        verb_tier: 5
+        bloom_level: EVALUATE_SYNTHESIZE
+        pdc_level: "L5"
+        verbs: "shapes, creates frameworks, pioneers, establishes standards"
+    tier_6:
+      type: return
+      value:
+        verb_tier: 6
+        bloom_level: TRANSFORM
+        pdc_level: "L5+"
+        verbs: "transforms organizational, establishes paradigms, influences culture"
+    tier_7:
+      type: return
+      value:
+        verb_tier: 7
+        bloom_level: REVOLUTIONIZE
+        pdc_level: "L5++"
+        verbs: "transforms global, revolutionizes, influences international policy"
+tests:
+- input:
+    verb_category: recall
+  expect:
+    verb_tier: 1
+    bloom_level: REMEMBER
+    pdc_level: "L1"
+- input:
+    verb_category: comprehension
+  expect:
+    verb_tier: 2
+    bloom_level: UNDERSTAND
+- input:
+    verb_category: application
+  expect:
+    verb_tier: 3
+    pdc_level: "L3"
+- input:
+    verb_category: creation
+  expect:
+    verb_tier: 4
+    bloom_level: ANALYZE_CREATE
+- input:
+    verb_category: synthesis
+  expect:
+    verb_tier: 5
+    pdc_level: "L5"
+- input:
+    verb_category: institutional
+  expect:
+    verb_tier: 6
+    pdc_level: "L5+"
+- input:
+    verb_category: global
+  expect:
+    verb_tier: 7
+    pdc_level: "L5++"
+- input: {}
+  expect:
+    verb_tier: 1
+    bloom_level: REMEMBER

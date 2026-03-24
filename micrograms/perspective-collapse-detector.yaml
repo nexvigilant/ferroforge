@@ -1,0 +1,226 @@
+name: perspective-collapse-detector
+description: 'Guardian wire for Failure Mode #7 (Perspective Collapse). Takes pun-proof-detector output and translates to Guardian-compatible signal parameters. Detects when perspective divergence in PV terminology creates patient safety risk. Chain position: pun-proof-detector -> perspective-collapse-detector -> Guardian.'
+version: 1.0.0
+interface:
+  inputs:
+    mismatch:
+      type: bool
+      required: false
+    route:
+      type: string
+      required: false
+    risk_score:
+      type: float
+      required: false
+    term:
+      type: string
+      required: false
+    author_domain:
+      type: string
+      required: false
+    reader_domain:
+      type: string
+      required: false
+  outputs:
+    guardian_source:
+      type: string
+    guardian_pattern:
+      type: string
+    guardian_severity:
+      type: float
+    guardian_context:
+      type: string
+    failure_mode:
+      type: string
+    action_required:
+      type: string
+tree:
+  start: check_mismatch
+  nodes:
+    check_mismatch:
+      type: condition
+      variable: mismatch
+      operator: eq
+      value: true
+      true_next: check_route_block
+      false_next: no_collapse
+    check_route_block:
+      type: condition
+      variable: route
+      operator: eq
+      value: BLOCK
+      true_next: critical_collapse
+      false_next: check_route_escalate
+    check_route_escalate:
+      type: condition
+      variable: route
+      operator: eq
+      value: ESCALATE
+      true_next: high_collapse
+      false_next: check_route_flag
+    check_route_flag:
+      type: condition
+      variable: route
+      operator: eq
+      value: FLAG
+      true_next: monitor_collapse
+      false_next: no_collapse
+    critical_collapse:
+      type: condition
+      variable: risk_score
+      operator: gte
+      value: 3.0
+      true_next: critical_with_high_risk
+      false_next: critical_standard
+    critical_with_high_risk:
+      type: return
+      value:
+        guardian_source: pun-proof
+        guardian_pattern: perspective_collapse_critical
+        guardian_severity: 0.95
+        guardian_context: "CRITICAL: Perspective collapse detected — high-risk term with multiple divergent perspectives. Signal suppression imminent."
+        failure_mode: "FM7-PERSPECTIVE-COLLAPSE"
+        action_required: "HALT signal assessment. Resolve term perspective before proceeding. Verify which domain boundary the author intended."
+    critical_standard:
+      type: return
+      value:
+        guardian_source: pun-proof
+        guardian_pattern: perspective_collapse_critical
+        guardian_severity: 0.85
+        guardian_context: "CRITICAL: Perspective collapse detected — term carries incompatible meanings across author and reader domains."
+        failure_mode: "FM7-PERSPECTIVE-COLLAPSE"
+        action_required: "HALT signal assessment. Disambiguate term meaning before proceeding."
+    high_collapse:
+      type: return
+      value:
+        guardian_source: pun-proof
+        guardian_pattern: perspective_collapse_high
+        guardian_severity: 0.65
+        guardian_context: "HIGH: Perspective divergence detected — term meaning shifts between author and reader domains. Signal may be misclassified."
+        failure_mode: "FM7-PERSPECTIVE-DIVERGENCE"
+        action_required: "Flag for reviewer attention. Verify term interpretation matches regulatory context."
+    monitor_collapse:
+      type: return
+      value:
+        guardian_source: pun-proof
+        guardian_pattern: perspective_collapse_monitor
+        guardian_severity: 0.30
+        guardian_context: "MONITOR: Minor perspective difference noted — term has domain-specific nuance that may affect interpretation."
+        failure_mode: "FM7-PERSPECTIVE-NUANCE"
+        action_required: "Note in review. No immediate action required."
+    no_collapse:
+      type: return
+      value:
+        guardian_source: pun-proof
+        guardian_pattern: perspective_aligned
+        guardian_severity: 0.0
+        guardian_context: "Perspectives aligned — no perspective collapse detected."
+        failure_mode: "NONE"
+        action_required: "No action required. Term interpretation consistent across domains."
+tests:
+- name: BLOCK route with high risk maps to critical severity 0.95
+  input:
+    mismatch: true
+    route: BLOCK
+    risk_score: 3.5
+    term: expected
+    author_domain: Clinical
+    reader_domain: Regulatory
+  expect:
+    guardian_source: pun-proof
+    guardian_pattern: perspective_collapse_critical
+    guardian_severity: 0.95
+    failure_mode: "FM7-PERSPECTIVE-COLLAPSE"
+- name: BLOCK route with standard risk maps to critical severity 0.85
+  input:
+    mismatch: true
+    route: BLOCK
+    risk_score: 2.5
+    term: safe
+    author_domain: Clinical trial
+    reader_domain: Post-market
+  expect:
+    guardian_source: pun-proof
+    guardian_pattern: perspective_collapse_critical
+    guardian_severity: 0.85
+    failure_mode: "FM7-PERSPECTIVE-COLLAPSE"
+- name: ESCALATE route maps to high severity 0.65
+  input:
+    mismatch: true
+    route: ESCALATE
+    risk_score: 2.0
+    term: significant
+    author_domain: Statistics
+    reader_domain: Regulatory
+  expect:
+    guardian_source: pun-proof
+    guardian_pattern: perspective_collapse_high
+    guardian_severity: 0.65
+    failure_mode: "FM7-PERSPECTIVE-DIVERGENCE"
+- name: FLAG route maps to monitor severity 0.30
+  input:
+    mismatch: true
+    route: FLAG
+    risk_score: 1.0
+    term: mild
+    author_domain: Patient
+    reader_domain: Signal
+  expect:
+    guardian_source: pun-proof
+    guardian_pattern: perspective_collapse_monitor
+    guardian_severity: 0.30
+    failure_mode: "FM7-PERSPECTIVE-NUANCE"
+- name: no mismatch maps to aligned
+  input:
+    mismatch: false
+    route: PASS
+    risk_score: 0.0
+    term: reaction
+    author_domain: PV
+    reader_domain: PV
+  expect:
+    guardian_source: pun-proof
+    guardian_pattern: perspective_aligned
+    guardian_severity: 0.0
+    failure_mode: "NONE"
+- name: null input defaults to no collapse
+  input: {}
+  expect:
+    guardian_source: pun-proof
+    guardian_pattern: perspective_aligned
+    guardian_severity: 0.0
+    failure_mode: "NONE"
+- name: mismatch true but PASS route defaults to no collapse
+  input:
+    mismatch: true
+    route: PASS
+    risk_score: 0.0
+  expect:
+    guardian_source: pun-proof
+    guardian_pattern: perspective_aligned
+    guardian_severity: 0.0
+    failure_mode: "NONE"
+- name: expected term Clinical to Regulatory BLOCK
+  input:
+    mismatch: true
+    route: BLOCK
+    risk_score: 4.0
+    term: expected
+    author_domain: Clinical
+    reader_domain: Regulatory
+  expect:
+    guardian_severity: 0.95
+    guardian_pattern: perspective_collapse_critical
+    action_required: "HALT signal assessment. Resolve term perspective before proceeding. Verify which domain boundary the author intended."
+- name: chain test - simulated pun-proof-detector output for related
+  input:
+    mismatch: true
+    route: ESCALATE
+    risk_score: 1.5
+    term: related
+    author_domain: Temporal
+    reader_domain: Causality
+  expect:
+    guardian_source: pun-proof
+    guardian_severity: 0.65
+    failure_mode: "FM7-PERSPECTIVE-DIVERGENCE"

@@ -1,0 +1,106 @@
+name: smm-empirical-eval
+description: 'SMM empirical evaluation chain (SMM-001 path). Routes through fatal screen → violation severity → credibility gate → integration disposition. For works with empirical data and statistical analysis.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - smm-fatal-screen
+  - smm-violation-severity
+  - smm-credibility-gate
+  - smm-integration-disposition
+tests:
+- name: clean empirical — full credibility
+  input:
+    study_type: empirical
+    has_fatal_violation: false
+    n_critical: 0
+    n_major: 0
+    n_minor: 0
+    severity_band: EXEMPLARY
+    integration_weight: full
+    score_band: CLEAN
+  expect:
+    fatal_detected: false
+    proceed_to_scoring: true
+    severity_band: EXEMPLARY
+    credibility_level: AUTHORITATIVE
+    disposition: INCLUDE
+    weight_in_synthesis: "1.00"
+    can_cite: true
+- name: minor violations — credible
+  input:
+    study_type: empirical
+    has_fatal_violation: false
+    n_critical: 0
+    n_major: 1
+    n_minor: 2
+    severity_band: HIGH
+    integration_weight: high
+    score_band: CLEAN
+  expect:
+    fatal_detected: false
+    severity_band: HIGH
+    credibility_level: CREDIBLE
+    disposition: INCLUDE_WITH_CAVEATS
+    weight_in_synthesis: "0.80"
+- name: moderate violations — conditional credibility
+  input:
+    study_type: empirical
+    has_fatal_violation: false
+    n_critical: 1
+    n_major: 2
+    n_minor: 0
+    severity_band: MODERATE
+    integration_weight: conditional
+    score_band: CLEAN
+  expect:
+    severity_band: MODERATE
+    credibility_level: CONDITIONAL
+    disposition: INCLUDE_CONDITIONAL
+    requires_sensitivity_analysis: true
+- name: heavy violations — weak credibility
+  input:
+    study_type: empirical
+    has_fatal_violation: false
+    n_critical: 2
+    n_major: 3
+    n_minor: 1
+    severity_band: LOW
+    integration_weight: low
+    score_band: CLEAN
+  expect:
+    severity_band: LOW
+    credibility_level: WEAK
+    disposition: FLAG_FOR_REVIEW
+    weight_in_synthesis: "0.25"
+- name: fatal empirical — excluded
+  input:
+    study_type: empirical
+    has_fatal_violation: true
+    n_critical: 3
+    n_major: 5
+    n_minor: 2
+    severity_band: VERY_LOW
+    integration_weight: exclude
+    score_band: FATAL_ZERO
+  expect:
+    fatal_detected: true
+    score_band: FATAL_ZERO
+    disposition: EXCLUDE
+    weight_in_synthesis: "0.00"
+    can_cite: false
+- name: 3+ critical no fatal — not credible
+  input:
+    study_type: empirical
+    has_fatal_violation: false
+    n_critical: 4
+    n_major: 2
+    n_minor: 1
+    severity_band: VERY_LOW
+    integration_weight: exclude
+    score_band: CLEAN
+  expect:
+    severity_band: VERY_LOW
+    credibility_level: NOT_CREDIBLE
+    disposition: EXCLUDE
+    can_cite: false

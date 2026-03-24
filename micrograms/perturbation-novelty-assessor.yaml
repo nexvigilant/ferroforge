@@ -1,0 +1,253 @@
+name: perturbation-novelty-assessor
+description: "Evaluates whether a safety analysis approach uses the three architectural innovations that distinguish the perturbation pattern framework from existing QSP/AOP/network pharmacology. Exercises κ (Comparison) — measures distance from conventional endpoint-specific modeling."
+version: 0.1.0
+interface:
+  inputs:
+    representation_decoupled:
+      type: bool
+      required: true
+    representation_learned:
+      type: bool
+      required: true
+    boundary_parameterized:
+      type: bool
+      required: true
+    num_boundaries_evaluated:
+      type: int
+      required: false
+    has_novel_boundary:
+      type: bool
+      required: false
+    baseline_approach:
+      type: string
+      required: false
+  outputs:
+    novelty_class:
+      type: string
+    innovation_count:
+      type: string
+    advantage_over_qsp:
+      type: string
+    falsifiability_test:
+      type: string
+    recommendation:
+      type: string
+tree:
+  start: check_decoupled
+  nodes:
+    check_decoupled:
+      type: condition
+      variable: representation_decoupled
+      operator: eq
+      value: true
+      true_next: check_learned
+      false_next: count_without_decoupling
+    check_learned:
+      type: condition
+      variable: representation_learned
+      operator: eq
+      value: true
+      true_next: check_boundary
+      false_next: count_decoupled_only
+    check_boundary:
+      type: condition
+      variable: boundary_parameterized
+      operator: eq
+      value: true
+      true_next: check_novel_boundary
+      false_next: two_of_three
+    check_novel_boundary:
+      type: condition
+      variable: has_novel_boundary
+      operator: eq
+      value: true
+      true_next: full_framework_with_novel
+      false_next: full_framework_known_boundaries
+    full_framework_with_novel:
+      type: return
+      value:
+        novelty_class: "FULL FRAMEWORK — novel boundary prediction"
+        innovation_count: "3"
+        advantage_over_qsp: "Predicts outcomes at boundaries that have no historical data. QSP cannot ask questions about unmeasured endpoints. This can."
+        falsifiability_test: "Compare predictions at the novel boundary against first empirical measurements when they become available. If QSP (built post-hoc for that boundary) outperforms the pre-existing projection, the framework adds nothing."
+        recommendation: "This is the strongest use case. Novel boundary prediction is where the framework is unfalsifiably better than endpoint-specific approaches — they literally cannot compete because they don't exist for unmeasured endpoints."
+    full_framework_known_boundaries:
+      type: return
+      value:
+        novelty_class: "FULL FRAMEWORK — known boundaries"
+        innovation_count: "3"
+        advantage_over_qsp: "Single representation evaluated at all boundaries simultaneously. Coverage advantage over building N separate QSP models. But each individual QSP model may outperform at its own boundary."
+        falsifiability_test: "Head-to-head: compare shared representation vs boundary-specific QSP at low-data boundaries (< 50 reports). If QSP wins even at low-data boundaries, the cross-boundary transfer property is not doing real work."
+        recommendation: "Focus evaluation on low-data and rare boundaries. The framework's value is coverage and transfer, not per-boundary accuracy where QSP has had decades of refinement."
+    two_of_three:
+      type: return
+      value:
+        novelty_class: "PARTIAL — decoupled + learned, boundary not parameterized"
+        innovation_count: "2"
+        advantage_over_qsp: "Learned representation discovers mechanisms humans didn't specify. But boundary is still structural — each evaluation requires model modification."
+        falsifiability_test: "Compare learned representation vs hand-specified QSP at the same boundaries. If the learned model captures no mechanisms that QSP misses, the learning adds nothing."
+        recommendation: "Parameterize the boundary. Without boundary-as-variable, you lose the coverage advantage and novel boundary prediction — the two most distinctive capabilities."
+    count_decoupled_only:
+      type: condition
+      variable: boundary_parameterized
+      operator: eq
+      value: true
+      true_next: decoupled_and_boundary
+      false_next: decoupled_only
+    decoupled_and_boundary:
+      type: return
+      value:
+        novelty_class: "PARTIAL — decoupled + boundary parameterized, representation specified"
+        innovation_count: "2"
+        advantage_over_qsp: "Multi-boundary projection from single model. But the model is hand-specified, so it only captures known mechanisms. Unknown mechanisms that cause unexpected AEs are invisible."
+        falsifiability_test: "Compare against standard multi-endpoint QSP. If hand-specified shared model doesn't outperform separate hand-specified models, decoupling adds nothing."
+        recommendation: "Consider learning the representation. Hand-specification limits you to known mechanisms — the very ones that QSP already handles well."
+    decoupled_only:
+      type: return
+      value:
+        novelty_class: "MINIMAL — decoupled only"
+        innovation_count: "1"
+        advantage_over_qsp: "Architectural separation of representation and evaluation, but without learning or boundary parameterization, this is essentially multi-output QSP with extra steps."
+        falsifiability_test: "Does the decoupled architecture produce identical results to coupled endpoint-specific models? If yes, the decoupling is notational, not functional."
+        recommendation: "Decoupling alone is a software engineering improvement, not a scientific one. Add either learning or boundary parameterization to gain genuine capability."
+    count_without_decoupling:
+      type: condition
+      variable: representation_learned
+      operator: eq
+      value: true
+      true_next: check_boundary_no_decoupling
+      false_next: check_boundary_alone
+    check_boundary_no_decoupling:
+      type: condition
+      variable: boundary_parameterized
+      operator: eq
+      value: true
+      true_next: learned_and_boundary
+      false_next: learned_only
+    learned_and_boundary:
+      type: return
+      value:
+        novelty_class: "PARTIAL — learned + boundary parameterized, not decoupled"
+        innovation_count: "2"
+        advantage_over_qsp: "Learns representations and projects to multiple boundaries. But without explicit decoupling, representation and evaluation may be entangled, limiting transfer."
+        falsifiability_test: "Test transfer: does the model generalize to held-out boundaries? If not, the boundary parameterization is nominal."
+        recommendation: "Decouple representation from evaluation explicitly. The learning + boundary combination is powerful but fragile without architectural separation."
+    learned_only:
+      type: return
+      value:
+        novelty_class: "CONVENTIONAL ML — learned representation, endpoint-specific"
+        innovation_count: "1"
+        advantage_over_qsp: "May discover mechanisms QSP misses. But each boundary requires separate evaluation, same as QSP. This is standard ML-for-safety-prediction."
+        falsifiability_test: "Standard ML benchmark: compare against QSP at the same endpoints. If QSP wins on interpretability with comparable accuracy, the learning adds cost without benefit."
+        recommendation: "This is what most ML-in-pharma papers do. The framework's innovations are specifically designed to go beyond this."
+    check_boundary_alone:
+      type: condition
+      variable: boundary_parameterized
+      operator: eq
+      value: true
+      true_next: boundary_only
+      false_next: no_innovations
+    boundary_only:
+      type: return
+      value:
+        novelty_class: "MINIMAL — boundary parameterized only"
+        innovation_count: "1"
+        advantage_over_qsp: "Multi-boundary evaluation, but with hand-specified coupled models. This is multi-task QSP."
+        falsifiability_test: "Does multi-task formulation outperform independent single-task models? Standard multi-task learning question."
+        recommendation: "Add learning (to discover unknown mechanisms) and decoupling (to separate what from where). Boundary parameterization alone is a UI improvement, not a scientific one."
+    no_innovations:
+      type: return
+      value:
+        novelty_class: "CONVENTIONAL — no framework innovations present"
+        innovation_count: "0"
+        advantage_over_qsp: "None. This is standard endpoint-specific safety modeling. QSP, AOP, or network pharmacology with different notation."
+        falsifiability_test: "N/A — no novel claims to falsify."
+        recommendation: "The perturbation pattern concept without the three architectural innovations is a repackaging with better notation. Implement at least two of: decouple, learn, parameterize boundary."
+tests:
+- name: full_framework_novel_boundary
+  input:
+    representation_decoupled: true
+    representation_learned: true
+    boundary_parameterized: true
+    has_novel_boundary: true
+  expect:
+    novelty_class: "FULL FRAMEWORK — novel boundary prediction"
+    innovation_count: "3"
+- name: full_framework_known_boundaries
+  input:
+    representation_decoupled: true
+    representation_learned: true
+    boundary_parameterized: true
+    has_novel_boundary: false
+  expect:
+    novelty_class: "FULL FRAMEWORK — known boundaries"
+    innovation_count: "3"
+- name: two_of_three_no_boundary
+  input:
+    representation_decoupled: true
+    representation_learned: true
+    boundary_parameterized: false
+  expect:
+    innovation_count: "2"
+    novelty_class: "PARTIAL — decoupled + learned, boundary not parameterized"
+- name: decoupled_and_boundary
+  input:
+    representation_decoupled: true
+    representation_learned: false
+    boundary_parameterized: true
+  expect:
+    innovation_count: "2"
+- name: learned_and_boundary
+  input:
+    representation_decoupled: false
+    representation_learned: true
+    boundary_parameterized: true
+  expect:
+    innovation_count: "2"
+- name: decoupled_only
+  input:
+    representation_decoupled: true
+    representation_learned: false
+    boundary_parameterized: false
+  expect:
+    innovation_count: "1"
+    novelty_class: "MINIMAL — decoupled only"
+- name: learned_only
+  input:
+    representation_decoupled: false
+    representation_learned: true
+    boundary_parameterized: false
+  expect:
+    innovation_count: "1"
+    novelty_class: "CONVENTIONAL ML — learned representation, endpoint-specific"
+- name: boundary_only
+  input:
+    representation_decoupled: false
+    representation_learned: false
+    boundary_parameterized: true
+  expect:
+    innovation_count: "1"
+    novelty_class: "MINIMAL — boundary parameterized only"
+- name: no_innovations
+  input:
+    representation_decoupled: false
+    representation_learned: false
+    boundary_parameterized: false
+  expect:
+    innovation_count: "0"
+    novelty_class: "CONVENTIONAL — no framework innovations present"
+- name: full_framework_default_no_novel
+  input:
+    representation_decoupled: true
+    representation_learned: true
+    boundary_parameterized: true
+  expect:
+    innovation_count: "3"
+- name: null_input_safety
+  input: {}
+  expect:
+    advantage_over_qsp: "None. This is standard endpoint-specific safety modeling. QSP, AOP, or network pharmacology with different notation."
+    falsifiability_test: N/A — no novel claims to falsify.
+    innovation_count: "0"
+    novelty_class: CONVENTIONAL — no framework innovations present
+    recommendation: "The perturbation pattern concept without the three architectural innovations is a repackaging with better notation. Implement at least two of: decouple, learn, parameterize boundary."

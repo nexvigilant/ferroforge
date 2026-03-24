@@ -1,0 +1,326 @@
+name: station-tool-selector
+description: Select specific tool name from domain and intent
+version: 0.1.0
+tree:
+  start: route_by_domain
+  nodes:
+    check_faers_detail:
+      type: condition
+      variable: intent
+      operator: eq
+      value: get_detail
+      true_next: return_faers_detail
+      false_next: check_faers_safety
+    check_dailymed:
+      type: condition
+      variable: domain
+      operator: eq
+      value: dailymed
+      true_next: dailymed_intent
+      false_next: check_clinical_trials
+    rxnav_intent:
+      type: condition
+      variable: intent
+      operator: eq
+      value: get_interactions
+      true_next: return_rxnav_interactions
+      false_next: check_rxnav_search
+    return_pubmed_detail:
+      type: return
+      value:
+        requires_id: true
+        tool_name: pubmed_get_abstract
+    return_rxnav_interactions:
+      type: return
+      value:
+        tool_name: rxnav_get_interactions
+        requires_id: true
+    return_dailymed_search:
+      type: return
+      value:
+        requires_id: false
+        tool_name: dailymed_search_drugs
+    check_dailymed_detail:
+      type: condition
+      variable: intent
+      operator: eq
+      value: get_detail
+      true_next: return_dailymed_detail
+      false_next: return_dailymed_default
+    return_dailymed_detail:
+      type: return
+      value:
+        requires_id: true
+        tool_name: dailymed_get_label
+    check_rxnav:
+      type: condition
+      variable: domain
+      operator: eq
+      value: rxnav
+      true_next: rxnav_intent
+      false_next: check_pubmed
+    return_rxnav_default:
+      type: return
+      value:
+        requires_id: false
+        tool_name: rxnav_search_drugs
+    pubmed_intent:
+      type: condition
+      variable: intent
+      operator: eq
+      value: search
+      true_next: return_pubmed_search
+      false_next: check_pubmed_detail
+    dailymed_intent:
+      type: condition
+      variable: intent
+      operator: eq
+      value: search
+      true_next: return_dailymed_search
+      false_next: check_dailymed_detail
+    return_trials_search:
+      type: return
+      value:
+        requires_id: false
+        tool_name: clinical_trials_search
+    trials_intent:
+      type: condition
+      variable: intent
+      operator: eq
+      value: search
+      true_next: return_trials_search
+      false_next: check_trials_detail
+    check_clinical_trials:
+      type: condition
+      variable: domain
+      operator: eq
+      value: clinical_trials
+      true_next: trials_intent
+      false_next: return_unknown_tool
+    route_by_domain:
+      type: condition
+      variable: domain
+      operator: eq
+      value: faers
+      true_next: faers_intent
+      false_next: check_rxnav
+    faers_intent:
+      type: condition
+      variable: intent
+      operator: eq
+      value: search
+      true_next: return_faers_search
+      false_next: check_faers_detail
+    return_faers_default:
+      type: return
+      value:
+        requires_id: false
+        tool_name: faers_search_reports
+    return_dailymed_default:
+      type: return
+      value:
+        tool_name: dailymed_search_drugs
+        requires_id: false
+    return_trials_default:
+      type: return
+      value:
+        requires_id: false
+        tool_name: clinical_trials_search
+    return_faers_safety:
+      type: return
+      value:
+        tool_name: faers_signal_detection
+        requires_id: false
+    return_unknown_tool:
+      type: return
+      value:
+        tool_name: unknown
+        requires_id: false
+    check_trials_detail:
+      type: condition
+      variable: intent
+      operator: eq
+      value: get_detail
+      true_next: return_trials_detail
+      false_next: return_trials_default
+    return_faers_search:
+      type: return
+      value:
+        requires_id: false
+        tool_name: faers_search_reports
+    return_faers_detail:
+      type: return
+      value:
+        tool_name: faers_get_report
+        requires_id: true
+    return_trials_detail:
+      type: return
+      value:
+        tool_name: clinical_trials_get_study
+        requires_id: true
+    return_pubmed_search:
+      type: return
+      value:
+        requires_id: false
+        tool_name: pubmed_search_articles
+    return_pubmed_default:
+      type: return
+      value:
+        requires_id: false
+        tool_name: pubmed_search_articles
+    check_rxnav_search:
+      type: condition
+      variable: intent
+      operator: eq
+      value: search
+      true_next: return_rxnav_search
+      false_next: return_rxnav_default
+    check_pubmed_detail:
+      type: condition
+      variable: intent
+      operator: eq
+      value: get_detail
+      true_next: return_pubmed_detail
+      false_next: return_pubmed_default
+    return_rxnav_search:
+      type: return
+      value:
+        requires_id: false
+        tool_name: rxnav_search_drugs
+    check_pubmed:
+      type: condition
+      variable: domain
+      operator: eq
+      value: pubmed
+      true_next: pubmed_intent
+      false_next: check_dailymed
+    check_faers_safety:
+      type: condition
+      variable: intent
+      operator: eq
+      value: get_safety
+      true_next: return_faers_safety
+      false_next: return_faers_default
+tests:
+- input:
+    domain: ''
+    intent: ''
+  expect:
+    tool_name: unknown
+    requires_id: false
+- input:
+    domain: clinical_trials
+    intent: ''
+  expect:
+    requires_id: false
+    tool_name: clinical_trials_search
+- input:
+    domain: clinical_trials
+    intent: get_detail
+  expect:
+    tool_name: clinical_trials_get_study
+    requires_id: true
+- input:
+    domain: clinical_trials
+    intent: search
+  expect:
+    requires_id: false
+    tool_name: clinical_trials_search
+- input:
+    domain: dailymed
+    intent: ''
+  expect:
+    tool_name: dailymed_search_drugs
+    requires_id: false
+- input:
+    domain: dailymed
+    intent: get_detail
+  expect:
+    requires_id: true
+    tool_name: dailymed_get_label
+- input:
+    domain: dailymed
+    intent: search
+  expect:
+    requires_id: false
+    tool_name: dailymed_search_drugs
+- input:
+    domain: faers
+    intent: ''
+  expect:
+    requires_id: false
+    tool_name: faers_search_reports
+- input:
+    domain: faers
+    intent: get_detail
+  expect:
+    tool_name: faers_get_report
+    requires_id: true
+- input:
+    domain: faers
+    intent: get_safety
+  expect:
+    tool_name: faers_signal_detection
+    requires_id: false
+- input:
+    domain: faers
+    intent: search
+  expect:
+    requires_id: false
+    tool_name: faers_search_reports
+- input:
+    domain: pubmed
+    intent: ''
+  expect:
+    requires_id: false
+    tool_name: pubmed_search_articles
+- input:
+    domain: pubmed
+    intent: get_detail
+  expect:
+    requires_id: true
+    tool_name: pubmed_get_abstract
+- input:
+    domain: pubmed
+    intent: search
+  expect:
+    requires_id: false
+    tool_name: pubmed_search_articles
+- input:
+    domain: rxnav
+    intent: ''
+  expect:
+    requires_id: false
+    tool_name: rxnav_search_drugs
+- input:
+    domain: rxnav
+    intent: get_interactions
+  expect:
+    tool_name: rxnav_get_interactions
+    requires_id: true
+- input:
+    domain: rxnav
+    intent: search
+  expect:
+    requires_id: false
+    tool_name: rxnav_search_drugs
+- input: {}
+  expect:
+    tool_name: unknown
+    requires_id: false
+interface:
+  inputs:
+    intent:
+      type: string
+      required: false
+    domain:
+      type: string
+      required: false
+  outputs:
+    tool_name:
+      type: string
+      required: false
+    requires_id:
+      type: bool
+      required: false
+  aliases: {}

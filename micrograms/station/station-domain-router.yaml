@@ -1,0 +1,175 @@
+name: station-domain-router
+description: "Route incoming question to correct regulatory/PV domain based on question type"
+version: 0.1.0
+
+interface:
+  inputs:
+    question_type:
+      type: string
+      description: "Category of question: drug_safety, drug_interaction, clinical_trial, literature, labeling, nomenclature, regulatory"
+  outputs:
+    domain:
+      type: string
+      description: "Target domain (e.g., api.fda.gov, clinicaltrials.gov, pubmed.ncbi.nlm.nih.gov)"
+    tool_prefix:
+      type: string
+      description: "Tool family prefix (e.g., faers, clinical_trials, pubmed)"
+    confidence:
+      type: string
+      description: "Route confidence: high, medium, low"
+
+tree:
+  start: classify_question
+  nodes:
+    classify_question:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: "drug_safety"
+      true_next: domain_drug_safety
+      false_next: check_interaction
+
+    domain_drug_safety:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: "drug_safety"
+      true_next: return_faers
+      false_next: check_interaction
+
+    return_faers:
+      type: return
+      value:
+        domain: "api.fda.gov"
+        tool_prefix: "faers"
+        confidence: "high"
+
+    check_interaction:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: "drug_interaction"
+      true_next: return_interaction
+      false_next: check_trial
+
+    return_interaction:
+      type: return
+      value:
+        domain: "rxnav.nlm.nih.gov"
+        tool_prefix: "rxnav"
+        confidence: "high"
+
+    check_trial:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: "clinical_trial"
+      true_next: return_trial
+      false_next: check_literature
+
+    return_trial:
+      type: return
+      value:
+        domain: "clinicaltrials.gov"
+        tool_prefix: "clinical_trials"
+        confidence: "high"
+
+    check_literature:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: "literature"
+      true_next: return_literature
+      false_next: check_labeling
+
+    return_literature:
+      type: return
+      value:
+        domain: "pubmed.ncbi.nlm.nih.gov"
+        tool_prefix: "pubmed"
+        confidence: "high"
+
+    check_labeling:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: "labeling"
+      true_next: return_labeling
+      false_next: check_nomenclature
+
+    return_labeling:
+      type: return
+      value:
+        domain: "dailymed.nlm.nih.gov"
+        tool_prefix: "dailymed"
+        confidence: "high"
+
+    check_nomenclature:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: "nomenclature"
+      true_next: return_nomenclature
+      false_next: check_regulatory
+
+    return_nomenclature:
+      type: return
+      value:
+        domain: "rxnav.nlm.nih.gov"
+        tool_prefix: "rxnav"
+        confidence: "high"
+
+    check_regulatory:
+      type: condition
+      variable: question_type
+      operator: eq
+      value: "regulatory"
+      true_next: return_regulatory
+      false_next: return_unknown
+
+    return_regulatory:
+      type: return
+      value:
+        domain: "accessdata.fda.gov"
+        tool_prefix: "fda_regulatory"
+        confidence: "high"
+
+    return_unknown:
+      type: return
+      value:
+        domain: "unknown"
+        tool_prefix: "unknown"
+        confidence: "low"
+
+tests:
+  - input: { question_type: "drug_safety" }
+    expect: { domain: "api.fda.gov", tool_prefix: "faers", confidence: "high" }
+
+  - input: { question_type: "drug_interaction" }
+    expect: { domain: "rxnav.nlm.nih.gov", tool_prefix: "rxnav", confidence: "high" }
+
+  - input: { question_type: "clinical_trial" }
+    expect: { domain: "clinicaltrials.gov", tool_prefix: "clinical_trials", confidence: "high" }
+
+  - input: { question_type: "literature" }
+    expect: { domain: "pubmed.ncbi.nlm.nih.gov", tool_prefix: "pubmed", confidence: "high" }
+
+  - input: { question_type: "labeling" }
+    expect: { domain: "dailymed.nlm.nih.gov", tool_prefix: "dailymed", confidence: "high" }
+
+  - input: { question_type: "nomenclature" }
+    expect: { domain: "rxnav.nlm.nih.gov", tool_prefix: "rxnav", confidence: "high" }
+
+  - input: { question_type: "regulatory" }
+    expect: { domain: "accessdata.fda.gov", tool_prefix: "fda_regulatory", confidence: "high" }
+
+  - input: { question_type: "unknown_type" }
+    expect: { domain: "unknown", tool_prefix: "unknown", confidence: "low" }
+
+  - input: { question_type: "" }
+    expect: { domain: "unknown", tool_prefix: "unknown", confidence: "low" }
+  - input: {}
+    expect:
+      confidence: low
+      domain: unknown
+      tool_prefix: unknown

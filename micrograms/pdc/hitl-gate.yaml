@@ -1,0 +1,181 @@
+name: hitl-gate
+description: "PDC: Human-in-the-Loop gate — classify actions as AUTO (agent decides), REVIEW (human reviews output), APPROVE (human must pre-approve)"
+version: 0.1.0
+interface:
+  inputs:
+    affects_patient_safety:
+      type: bool
+      required: false
+    affects_regulatory_compliance:
+      type: bool
+      required: false
+    crosses_cpa_boundary:
+      type: bool
+      required: false
+    is_ai_autonomous_decision:
+      type: bool
+      required: false
+    is_irreversible:
+      type: bool
+      required: false
+    scope:
+      type: string
+      required: false
+  outputs:
+    audit_required:
+      type: bool
+    flywheel_tier:
+      type: string
+    gate:
+      type: string
+    governance_tier_min:
+      type: int
+    human_action:
+      type: string
+    rationale:
+      type: string
+tree:
+  start: check_irreversible
+  nodes:
+    check_irreversible:
+      type: condition
+      variable: is_irreversible
+      operator: eq
+      value: true
+      true_next: human_approve
+      false_next: check_patient_safety
+    check_patient_safety:
+      type: condition
+      variable: affects_patient_safety
+      operator: eq
+      value: true
+      true_next: human_approve
+      false_next: check_regulatory
+    check_regulatory:
+      type: condition
+      variable: affects_regulatory_compliance
+      operator: eq
+      value: true
+      true_next: human_review
+      false_next: check_scope
+    check_scope:
+      type: condition
+      variable: scope
+      operator: eq
+      value: enterprise
+      true_next: human_review
+      false_next: check_scope_org
+    check_scope_org:
+      type: condition
+      variable: scope
+      operator: eq
+      value: organizational
+      true_next: human_review
+      false_next: check_cross_cpa
+    check_cross_cpa:
+      type: condition
+      variable: crosses_cpa_boundary
+      operator: eq
+      value: true
+      true_next: human_review
+      false_next: check_ai_decision
+    check_ai_decision:
+      type: condition
+      variable: is_ai_autonomous_decision
+      operator: eq
+      value: true
+      true_next: human_review
+      false_next: auto_approve
+    human_approve:
+      type: return
+      value:
+        gate: APPROVE
+        human_action: "pre-approve before execution"
+        flywheel_tier: DRAFT
+        rationale: "irreversible or patient-safety-affecting actions require human authorization"
+        audit_required: true
+        governance_tier_min: 1
+    human_review:
+      type: return
+      value:
+        gate: REVIEW
+        human_action: "review output before promotion to Live"
+        flywheel_tier: STAGING
+        rationale: "regulatory, organizational, cross-CPA, or AI decisions require human oversight"
+        audit_required: true
+        governance_tier_min: 2
+    auto_approve:
+      type: return
+      value:
+        gate: AUTO
+        human_action: "none — agent proceeds autonomously"
+        flywheel_tier: LIVE
+        rationale: "reversible, single-CPA, non-safety action within agent scope"
+        audit_required: false
+        governance_tier_min: 3
+tests:
+- input:
+    is_irreversible: true
+  expect:
+    gate: APPROVE
+    flywheel_tier: DRAFT
+    audit_required: true
+- input:
+    affects_patient_safety: true
+    is_irreversible: false
+  expect:
+    gate: APPROVE
+    governance_tier_min: 1
+- input:
+    affects_regulatory_compliance: true
+    is_irreversible: false
+    affects_patient_safety: false
+  expect:
+    gate: REVIEW
+    flywheel_tier: STAGING
+- input:
+    scope: enterprise
+    is_irreversible: false
+    affects_patient_safety: false
+    affects_regulatory_compliance: false
+  expect:
+    gate: REVIEW
+- input:
+    scope: organizational
+    is_irreversible: false
+    affects_patient_safety: false
+    affects_regulatory_compliance: false
+  expect:
+    gate: REVIEW
+- input:
+    crosses_cpa_boundary: true
+    scope: team
+    is_irreversible: false
+    affects_patient_safety: false
+    affects_regulatory_compliance: false
+  expect:
+    gate: REVIEW
+- input:
+    is_ai_autonomous_decision: true
+    crosses_cpa_boundary: false
+    scope: team
+    is_irreversible: false
+    affects_patient_safety: false
+    affects_regulatory_compliance: false
+  expect:
+    gate: REVIEW
+    rationale: "regulatory, organizational, cross-CPA, or AI decisions require human oversight"
+- input:
+    is_irreversible: false
+    affects_patient_safety: false
+    affects_regulatory_compliance: false
+    scope: team
+    crosses_cpa_boundary: false
+    is_ai_autonomous_decision: false
+  expect:
+    gate: AUTO
+    flywheel_tier: LIVE
+    audit_required: false
+- input: {}
+  expect:
+    gate: AUTO

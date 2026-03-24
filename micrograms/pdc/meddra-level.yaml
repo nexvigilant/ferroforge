@@ -1,0 +1,150 @@
+name: meddra-level
+description: "Domain 4: MedDRA hierarchy level router — SOC, HLGT, HLT, PT, LLT. Returns coding guidance and AI assist level."
+version: 0.1.0
+interface:
+  inputs:
+    coding_level:
+      type: string
+      required: false
+  outputs:
+    ai_role:
+      type: string
+    coding_rule:
+      type: string
+    count_approx:
+      type: int
+    description:
+      type: string
+    level:
+      type: string
+    name:
+      type: string
+    position:
+      type: int
+    use_for:
+      type: string
+tree:
+  start: check_level
+  nodes:
+    check_level:
+      type: condition
+      variable: coding_level
+      operator: eq
+      value: soc
+      true_next: soc
+      false_next: check_hlgt
+    check_hlgt:
+      type: condition
+      variable: coding_level
+      operator: eq
+      value: hlgt
+      true_next: hlgt
+      false_next: check_hlt
+    check_hlt:
+      type: condition
+      variable: coding_level
+      operator: eq
+      value: hlt
+      true_next: hlt
+      false_next: check_pt
+    check_pt:
+      type: condition
+      variable: coding_level
+      operator: eq
+      value: pt
+      true_next: pt
+      false_next: check_llt
+    check_llt:
+      type: condition
+      variable: coding_level
+      operator: eq
+      value: llt
+      true_next: llt
+      false_next: default_pt
+    soc:
+      type: return
+      value:
+        level: SOC
+        name: "System Organ Class"
+        position: 1
+        description: "broadest grouping — organ system or etiology"
+        count_approx: 27
+        use_for: "aggregate analysis, PSUR/PBRER sections, signal detection stratification"
+        ai_role: "auto-assignment from PT, grouping for analytics"
+    hlgt:
+      type: return
+      value:
+        level: HLGT
+        name: "High Level Group Term"
+        position: 2
+        description: "groups related HLTs within a SOC"
+        use_for: "intermediate grouping for analysis, signal management"
+        ai_role: "pathway analysis, related-term clustering"
+    hlt:
+      type: return
+      value:
+        level: HLT
+        name: "High Level Term"
+        position: 3
+        description: "groups related PTs by anatomy, pathology, or etiology"
+        use_for: "clinical grouping for signal review, SMQ support"
+        ai_role: "pattern detection across related PTs"
+    pt:
+      type: return
+      value:
+        level: PT
+        name: "Preferred Term"
+        position: 4
+        description: "primary coding level — single medical concept, distinct descriptor"
+        count_approx: 24000
+        use_for: "primary case coding, signal detection input, regulatory reporting"
+        coding_rule: "code to PT level for all regulatory submissions"
+        ai_role: "NLP-to-PT mapping, coding suggestion with confidence score"
+    llt:
+      type: return
+      value:
+        level: LLT
+        name: "Lowest Level Term"
+        position: 5
+        description: "most specific — synonyms, lexical variants, sub-types"
+        count_approx: 83000
+        use_for: "verbatim capture, source-level documentation, data entry"
+        coding_rule: "capture verbatim as LLT, system maps to PT automatically"
+        ai_role: "NLP verbatim extraction, synonym resolution, auto-mapping to PT"
+    default_pt:
+      type: return
+      value:
+        level: PT
+        name: "Preferred Term (default)"
+        position: 4
+        coding_rule: "when in doubt, code at PT level — regulatory standard"
+tests:
+- input:
+    coding_level: soc
+  expect:
+    level: SOC
+    position: 1
+- input:
+    coding_level: hlgt
+  expect:
+    level: HLGT
+    position: 2
+- input:
+    coding_level: hlt
+  expect:
+    level: HLT
+    position: 3
+- input:
+    coding_level: pt
+  expect:
+    level: PT
+    position: 4
+    count_approx: 24000
+- input:
+    coding_level: llt
+  expect:
+    level: LLT
+    position: 5
+- input: {}
+  expect:
+    level: PT

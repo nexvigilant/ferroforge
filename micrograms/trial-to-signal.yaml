@@ -1,0 +1,187 @@
+name: trial-to-signal
+description: Routes clinical trial safety data to signal detection and threshold evaluation
+version: 0.1.0
+tree:
+  start: check_phase
+  nodes:
+    phase2_signal:
+      type: return
+      value:
+        signal_flag: true
+        sae_rate: 5
+        threshold_exceeded: true
+    phase1_signal:
+      type: return
+      value:
+        signal_flag: true
+        sae_rate: 5
+        threshold_exceeded: true
+    phase3_check:
+      type: condition
+      variable: sae_count
+      operator: gte
+      value: 15
+      true_next: phase3_signal
+      false_next: phase3_no_signal
+    phase3_signal:
+      type: return
+      value:
+        sae_rate: 3
+        signal_flag: true
+        threshold_exceeded: true
+    phase4_path:
+      type: condition
+      variable: sae_count
+      operator: gte
+      value: 20
+      true_next: phase4_signal
+      false_next: phase4_no_signal
+    phase4_signal:
+      type: return
+      value:
+        signal_flag: true
+        threshold_exceeded: true
+        sae_rate: 2.5
+    check_phase2:
+      type: condition
+      variable: trial_phase
+      operator: eq
+      value: phase2
+      true_next: phase2_check
+      false_next: check_phase3
+    phase1_no_signal:
+      type: return
+      value:
+        signal_flag: false
+        sae_rate: 1
+        threshold_exceeded: false
+    phase2_check:
+      type: condition
+      variable: sae_count
+      operator: gte
+      value: 10
+      true_next: phase2_signal
+      false_next: phase2_no_signal
+    phase2_no_signal:
+      type: return
+      value:
+        sae_rate: 2
+        signal_flag: false
+        threshold_exceeded: false
+    check_phase3:
+      type: condition
+      variable: trial_phase
+      operator: eq
+      value: phase3
+      true_next: phase3_check
+      false_next: phase4_path
+    phase1_check:
+      type: condition
+      variable: sae_count
+      operator: gte
+      value: 5
+      true_next: phase1_signal
+      false_next: phase1_no_signal
+    check_phase:
+      type: condition
+      variable: trial_phase
+      operator: eq
+      value: phase1
+      true_next: phase1_check
+      false_next: check_phase2
+    phase4_no_signal:
+      type: return
+      value:
+        threshold_exceeded: false
+        sae_rate: 1
+        signal_flag: false
+    phase3_no_signal:
+      type: return
+      value:
+        sae_rate: 1.6
+        signal_flag: false
+        threshold_exceeded: false
+tests:
+- input:
+    sae_count: 0
+    trial_phase: ''
+  expect:
+    threshold_exceeded: false
+    sae_rate: 1
+    signal_flag: false
+- input:
+    sae_count: 0
+    trial_phase: phase1
+  expect:
+    signal_flag: false
+    sae_rate: 1
+    threshold_exceeded: false
+- input:
+    sae_count: 0
+    trial_phase: phase2
+  expect:
+    sae_rate: 2
+    signal_flag: false
+    threshold_exceeded: false
+- input:
+    sae_count: 0
+    trial_phase: phase3
+  expect:
+    sae_rate: 1.6
+    signal_flag: false
+    threshold_exceeded: false
+- input:
+    sae_count: 10
+    trial_phase: phase1
+  expect:
+    signal_flag: true
+    sae_rate: 5
+    threshold_exceeded: true
+- input:
+    sae_count: 10
+    trial_phase: phase2
+  expect:
+    signal_flag: true
+    sae_rate: 5
+    threshold_exceeded: true
+- input:
+    sae_count: 15
+    trial_phase: phase3
+  expect:
+    sae_rate: 3
+    signal_flag: true
+    threshold_exceeded: true
+- input:
+    sae_count: 20
+    trial_phase: ''
+  expect:
+    signal_flag: true
+    threshold_exceeded: true
+    sae_rate: 2.5
+- input: {}
+  expect:
+    threshold_exceeded: false
+    sae_rate: 1
+    signal_flag: false
+interface:
+  inputs:
+    trial_phase:
+      type: string
+      required: true
+    sample_size:
+      type: integer
+      required: true
+    sae_count:
+      type: integer
+      required: true
+  outputs:
+    sae_rate:
+      type: number
+      required: false
+    threshold_exceeded:
+      type: boolean
+      required: false
+    signal_flag:
+      type: boolean
+      required: false
+  aliases: {}

@@ -1,0 +1,109 @@
+name: rucam-causality
+description: RUCAM hepatotoxicity causality classification from total score
+version: 0.1.0
+interface:
+  inputs:
+    rucam_score:
+      type: int
+      required: true
+  outputs:
+    classification:
+      type: string
+    confidence:
+      type: int
+    next_action:
+      type: string
+tree:
+  start: highly_probable_check
+  nodes:
+    highly_probable_check:
+      type: condition
+      variable: rucam_score
+      operator: gte
+      value: 9
+      true_next: highly_probable
+      false_next: probable_check
+    probable_check:
+      type: condition
+      variable: rucam_score
+      operator: gte
+      value: 6
+      true_next: probable
+      false_next: possible_check
+    possible_check:
+      type: condition
+      variable: rucam_score
+      operator: gte
+      value: 3
+      true_next: possible
+      false_next: unlikely_check
+    unlikely_check:
+      type: condition
+      variable: rucam_score
+      operator: gte
+      value: 1
+      true_next: unlikely
+      false_next: excluded
+    highly_probable:
+      type: return
+      value:
+        classification: HIGHLY_PROBABLE
+        confidence: 95
+        next_action: confirm_hepatotoxicity
+    probable:
+      type: return
+      value:
+        classification: PROBABLE
+        confidence: 75
+        next_action: investigate_dechallenge
+    possible:
+      type: return
+      value:
+        classification: POSSIBLE
+        confidence: 50
+        next_action: monitor_collect_data
+    unlikely:
+      type: return
+      value:
+        classification: UNLIKELY
+        confidence: 25
+        next_action: evaluate_alternatives
+    excluded:
+      type: return
+      value:
+        classification: EXCLUDED
+        confidence: 95
+        next_action: rule_out_drug
+tests:
+- input:
+    rucam_score: 10
+  expect:
+    classification: HIGHLY_PROBABLE
+    confidence: 95
+- input:
+    rucam_score: 7
+  expect:
+    classification: PROBABLE
+    confidence: 75
+- input:
+    rucam_score: 4
+  expect:
+    classification: POSSIBLE
+    confidence: 50
+- input:
+    rucam_score: 2
+  expect:
+    classification: UNLIKELY
+    confidence: 25
+- input:
+    rucam_score: 0
+  expect:
+    classification: EXCLUDED
+    confidence: 95
+- input:
+    rucam_score: -3
+  expect:
+    classification: EXCLUDED
+- input: {}
+  expect:
+    classification: EXCLUDED

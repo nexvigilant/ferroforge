@@ -1,0 +1,132 @@
+name: reporter-qualification
+description: 'Classify reporter by type and derive qualification level, causality weight, and MedWatch submission eligibility. ICH E2A Section III.A.1 reporter classification.'
+version: 0.1.0
+interface:
+  inputs:
+    reporter_type:
+      type: string
+      required: true
+  outputs:
+    qualification_level:
+      type: string
+    weight_in_causality:
+      type: float
+    can_submit_medwatch:
+      type: bool
+    regulatory_reference:
+      type: string
+tree:
+  start: type_check
+  nodes:
+    type_check:
+      type: condition
+      variable: reporter_type
+      operator: eq
+      value: physician
+      true_next: healthcare_professional_result
+      false_next: pharmacist_check
+    pharmacist_check:
+      type: condition
+      variable: reporter_type
+      operator: eq
+      value: pharmacist
+      true_next: healthcare_professional_result
+      false_next: nurse_check
+    nurse_check:
+      type: condition
+      variable: reporter_type
+      operator: eq
+      value: nurse
+      true_next: healthcare_professional_result
+      false_next: consumer_check
+    consumer_check:
+      type: condition
+      variable: reporter_type
+      operator: eq
+      value: consumer
+      true_next: consumer_result
+      false_next: lawyer_check
+    lawyer_check:
+      type: condition
+      variable: reporter_type
+      operator: eq
+      value: lawyer
+      true_next: other_result
+      false_next: other_result
+    healthcare_professional_result:
+      type: return
+      value:
+        qualification_level: healthcare_professional
+        weight_in_causality: 1.0
+        can_submit_medwatch: true
+        regulatory_reference: ICH E2A Section III.A.1 (Healthcare Professional)
+    consumer_result:
+      type: return
+      value:
+        qualification_level: consumer
+        weight_in_causality: 0.5
+        can_submit_medwatch: true
+        regulatory_reference: ICH E2A Section III.A.1 (Consumer)
+    other_result:
+      type: return
+      value:
+        qualification_level: other
+        weight_in_causality: 0.3
+        can_submit_medwatch: true
+        regulatory_reference: ICH E2A Section III.A.1 (Other)
+tests:
+  # Healthcare professional - physician
+  - input:
+      reporter_type: physician
+    expect:
+      qualification_level: healthcare_professional
+      weight_in_causality: 1.0
+      can_submit_medwatch: true
+      regulatory_reference: ICH E2A Section III.A.1 (Healthcare Professional)
+  # Healthcare professional - pharmacist
+  - input:
+      reporter_type: pharmacist
+    expect:
+      qualification_level: healthcare_professional
+      weight_in_causality: 1.0
+      can_submit_medwatch: true
+      regulatory_reference: ICH E2A Section III.A.1 (Healthcare Professional)
+  # Healthcare professional - nurse
+  - input:
+      reporter_type: nurse
+    expect:
+      qualification_level: healthcare_professional
+      weight_in_causality: 1.0
+      can_submit_medwatch: true
+      regulatory_reference: ICH E2A Section III.A.1 (Healthcare Professional)
+  # Consumer
+  - input:
+      reporter_type: consumer
+    expect:
+      qualification_level: consumer
+      weight_in_causality: 0.5
+      can_submit_medwatch: true
+      regulatory_reference: ICH E2A Section III.A.1 (Consumer)
+  # Lawyer (other)
+  - input:
+      reporter_type: lawyer
+    expect:
+      qualification_level: other
+      weight_in_causality: 0.3
+      can_submit_medwatch: true
+      regulatory_reference: ICH E2A Section III.A.1 (Other)
+  # Unknown type (other)
+  - input:
+      reporter_type: unknown
+    expect:
+      qualification_level: other
+      weight_in_causality: 0.3
+      can_submit_medwatch: true
+      regulatory_reference: ICH E2A Section III.A.1 (Other)
+  # Empty input defaults to other
+  - input: {}
+    expect:
+      qualification_level: other
+      weight_in_causality: 0.3
+      can_submit_medwatch: true
+      regulatory_reference: ICH E2A Section III.A.1 (Other)

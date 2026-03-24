@@ -1,0 +1,173 @@
+name: next-step-router
+description: "Routes the next step in a PV investigation workflow based on current progress and blockers"
+version: 0.1.0
+
+interface:
+  inputs:
+    current_step:
+      type: string
+      description: "Current step: intake, signal_check, causality, assessment, action, complete"
+    step_complete:
+      type: bool
+      description: "Whether current step has been completed"
+    blocker_found:
+      type: bool
+      description: "Whether an unresolvable blocker was encountered"
+  outputs:
+    next_step:
+      type: string
+      description: "Next step in the workflow"
+    action:
+      type: string
+      description: "Action to take: proceed, retry, escalate, complete"
+    requires_human:
+      type: bool
+      description: "Whether human judgment is required"
+
+tree:
+  start: check_blocker
+  nodes:
+    check_blocker:
+      type: condition
+      variable: blocker_found
+      operator: eq
+      value: true
+      true_next: return_escalate
+      false_next: check_step_complete
+
+    return_escalate:
+      type: return
+      value:
+        next_step: "escalation"
+        action: "escalate"
+        requires_human: true
+
+    check_step_complete:
+      type: condition
+      variable: step_complete
+      operator: eq
+      value: false
+      true_next: return_retry
+      false_next: route_current_step
+
+    return_retry:
+      type: return
+      value:
+        next_step: "retry"
+        action: "retry"
+        requires_human: false
+
+    route_current_step:
+      type: condition
+      variable: current_step
+      operator: eq
+      value: "intake"
+      true_next: return_to_signal_check
+      false_next: check_signal_check
+
+    return_to_signal_check:
+      type: return
+      value:
+        next_step: "signal_check"
+        action: "proceed"
+        requires_human: false
+
+    check_signal_check:
+      type: condition
+      variable: current_step
+      operator: eq
+      value: "signal_check"
+      true_next: return_to_causality
+      false_next: check_causality
+
+    return_to_causality:
+      type: return
+      value:
+        next_step: "causality"
+        action: "proceed"
+        requires_human: false
+
+    check_causality:
+      type: condition
+      variable: current_step
+      operator: eq
+      value: "causality"
+      true_next: return_to_assessment
+      false_next: check_assessment
+
+    return_to_assessment:
+      type: return
+      value:
+        next_step: "assessment"
+        action: "proceed"
+        requires_human: true
+
+    check_assessment:
+      type: condition
+      variable: current_step
+      operator: eq
+      value: "assessment"
+      true_next: return_to_action
+      false_next: check_action
+
+    return_to_action:
+      type: return
+      value:
+        next_step: "action"
+        action: "proceed"
+        requires_human: true
+
+    check_action:
+      type: condition
+      variable: current_step
+      operator: eq
+      value: "action"
+      true_next: return_to_complete
+      false_next: return_default_retry
+
+    return_to_complete:
+      type: return
+      value:
+        next_step: "complete"
+        action: "complete"
+        requires_human: false
+
+    return_default_retry:
+      type: return
+      value:
+        next_step: "retry"
+        action: "retry"
+        requires_human: false
+
+tests:
+  - input: { current_step: "intake", step_complete: true, blocker_found: false }
+    expect: { next_step: "signal_check", action: "proceed", requires_human: false }
+
+  - input: { current_step: "signal_check", step_complete: true, blocker_found: false }
+    expect: { next_step: "causality", action: "proceed", requires_human: false }
+
+  - input: { current_step: "causality", step_complete: true, blocker_found: false }
+    expect: { next_step: "assessment", action: "proceed", requires_human: true }
+
+  - input: { current_step: "assessment", step_complete: true, blocker_found: false }
+    expect: { next_step: "action", action: "proceed", requires_human: true }
+
+  - input: { current_step: "action", step_complete: true, blocker_found: false }
+    expect: { next_step: "complete", action: "complete", requires_human: false }
+
+  - input: { current_step: "signal_check", step_complete: false, blocker_found: false }
+    expect: { next_step: "retry", action: "retry", requires_human: false }
+
+  - input: { current_step: "causality", step_complete: true, blocker_found: true }
+    expect: { next_step: "escalation", action: "escalate", requires_human: true }
+
+  - input: { current_step: "unknown", step_complete: true, blocker_found: false }
+    expect: { next_step: "retry", action: "retry", requires_human: false }
+
+  - input: { step_complete: false, blocker_found: false }
+    expect: { next_step: "retry", action: "retry", requires_human: false }
+  - input: {}
+    expect:
+      action: retry
+      next_step: retry
+      requires_human: false

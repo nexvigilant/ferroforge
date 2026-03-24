@@ -1,0 +1,180 @@
+name: algo-bias-triage
+description: 'Algovigilance: triage bias signals by disparity ratio, affected population size, and protected attribute category'
+version: 0.1.0
+interface:
+  inputs:
+    disparity_ratio:
+      type: float
+      required: false
+    affected_population_pct:
+      type: float
+      required: false
+    protected_attribute:
+      type: string
+      required: false
+  outputs:
+    triage_level:
+      type: string
+    action:
+      type: string
+    review_deadline_days:
+      type: int
+    observer_visible:
+      type: bool
+tree:
+  start: check_disparity_high
+  nodes:
+    check_disparity_high:
+      type: condition
+      variable: disparity_ratio
+      operator: gt
+      value: 2.0
+      true_next: check_population_large_critical
+      false_next: check_disparity_moderate
+    check_population_large_critical:
+      type: condition
+      variable: affected_population_pct
+      operator: gt
+      value: 10.0
+      true_next: critical_bias
+      false_next: serious_bias
+    check_disparity_moderate:
+      type: condition
+      variable: disparity_ratio
+      operator: gt
+      value: 1.5
+      true_next: check_population_moderate
+      false_next: check_disparity_minor
+    check_population_moderate:
+      type: condition
+      variable: affected_population_pct
+      operator: gt
+      value: 5.0
+      true_next: moderate_bias
+      false_next: minor_bias
+    check_disparity_minor:
+      type: condition
+      variable: disparity_ratio
+      operator: gt
+      value: 1.1
+      true_next: minor_bias
+      false_next: no_bias
+    critical_bias:
+      type: return
+      value:
+        triage_level: CRITICAL
+        action: quarantine_and_audit
+        review_deadline_days: 3
+        observer_visible: true
+    serious_bias:
+      type: return
+      value:
+        triage_level: SERIOUS
+        action: expedited_review
+        review_deadline_days: 7
+        observer_visible: true
+    moderate_bias:
+      type: return
+      value:
+        triage_level: MODERATE
+        action: schedule_fairness_audit
+        review_deadline_days: 14
+        observer_visible: true
+    minor_bias:
+      type: return
+      value:
+        triage_level: MINOR
+        action: add_to_monitoring
+        review_deadline_days: 30
+        observer_visible: true
+    no_bias:
+      type: return
+      value:
+        triage_level: NONE
+        action: no_action
+        review_deadline_days: 90
+        observer_visible: false
+tests:
+- input:
+    disparity_ratio: 3.5
+    affected_population_pct: 25.0
+    protected_attribute: race
+  expect:
+    triage_level: CRITICAL
+    action: quarantine_and_audit
+    review_deadline_days: 3
+    observer_visible: true
+- input:
+    disparity_ratio: 2.5
+    affected_population_pct: 8.0
+    protected_attribute: gender
+  expect:
+    triage_level: SERIOUS
+    action: expedited_review
+    review_deadline_days: 7
+    observer_visible: true
+- input:
+    disparity_ratio: 1.7
+    affected_population_pct: 12.0
+    protected_attribute: age
+  expect:
+    triage_level: MODERATE
+    action: schedule_fairness_audit
+    review_deadline_days: 14
+    observer_visible: true
+- input:
+    disparity_ratio: 1.6
+    affected_population_pct: 3.0
+    protected_attribute: disability
+  expect:
+    triage_level: MINOR
+    action: add_to_monitoring
+    review_deadline_days: 30
+    observer_visible: true
+- input:
+    disparity_ratio: 1.2
+    affected_population_pct: 1.0
+    protected_attribute: religion
+  expect:
+    triage_level: MINOR
+    action: add_to_monitoring
+    review_deadline_days: 30
+    observer_visible: true
+- input:
+    disparity_ratio: 1.05
+    affected_population_pct: 50.0
+    protected_attribute: gender
+  expect:
+    triage_level: NONE
+    action: no_action
+    review_deadline_days: 90
+    observer_visible: false
+- input: {}
+  expect:
+    triage_level: NONE
+    action: no_action
+    review_deadline_days: 90
+    observer_visible: false
+- input:
+    disparity_ratio: 0.0
+  expect:
+    triage_level: NONE
+    action: no_action
+    review_deadline_days: 90
+    observer_visible: false
+- input:
+    disparity_ratio: 2.1
+    affected_population_pct: 10.0
+  expect:
+    triage_level: SERIOUS
+    action: expedited_review
+    review_deadline_days: 7
+    observer_visible: true
+- input:
+    disparity_ratio: 2.1
+    affected_population_pct: 10.1
+  expect:
+    triage_level: CRITICAL
+    action: quarantine_and_audit
+    review_deadline_days: 3
+    observer_visible: true

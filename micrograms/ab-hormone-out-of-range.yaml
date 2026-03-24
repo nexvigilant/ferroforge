@@ -1,0 +1,60 @@
+name: ab-hormone-out-of-range
+description: 'Antibody: detects hormone level outside [0,1] range (stem-bio invariant). All hormone levels are normalized floats.'
+version: 0.1.0
+interface:
+  inputs:
+    hormone_level:
+      type: number
+      required: true
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check_high
+  nodes:
+    check_high:
+      type: condition
+      variable: hormone_level
+      operator: gt
+      value: 1.0
+      true_next: violation_high
+      false_next: check_low
+    check_low:
+      type: condition
+      variable: hormone_level
+      operator: lt
+      value: 0
+      true_next: violation_low
+      false_next: clean
+    violation_high:
+      type: return
+      value:
+        threat: true
+        response: 'BLOCK: hormone level > 1.0 — clamp to 1.0'
+    violation_low:
+      type: return
+      value:
+        threat: true
+        response: 'BLOCK: hormone level < 0 — clamp to 0.0'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { hormone_level: 0.5 }
+  expect: { threat: false }
+- input: { hormone_level: 0 }
+  expect: { threat: false }
+- input: { hormone_level: 1.0 }
+  expect: { threat: false }
+- input: { hormone_level: 1.5 }
+  expect: { threat: true }
+- input: { hormone_level: -0.1 }
+  expect: { threat: true }
+- input: {}
+  expect:
+    response: PASS
+    threat: false

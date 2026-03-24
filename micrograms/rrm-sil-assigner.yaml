@@ -1,0 +1,347 @@
+name: rrm-sil-assigner
+description: "Railway Reference Model SIL assigner. Given an RRM layer number (1-6), assigns the Safety Integrity Level range per EN 50129 framework. Layer 4 (Signaling) carries SIL 4 — information processing errors have the most direct path to catastrophe. Maps to PV test coverage and validation requirements."
+version: 0.1.0
+interface:
+  inputs:
+    layer_number:
+      type: int
+      required: false
+    has_safety_critical_function:
+      type: bool
+      required: false
+    failure_consequence:
+      type: string
+      required: false
+  outputs:
+    sil_minimum:
+      type: int
+    sil_maximum:
+      type: int
+    sil_recommendation:
+      type: int
+    development_rigor:
+      type: string
+    test_coverage_requirement:
+      type: string
+    tolerable_hazard_rate:
+      type: string
+    pv_requirement:
+      type: string
+    railway_rationale:
+      type: string
+  aliases: {}
+tree:
+  start: check_layer
+  nodes:
+    check_layer:
+      type: condition
+      variable: layer_number
+      operator: is_not_null
+      value: true
+      true_next: route_layer
+      false_next: check_consequence_only
+    route_layer:
+      type: condition
+      variable: layer_number
+      operator: eq
+      value: 4
+      true_next: sil_4_signaling
+      false_next: route_layer_3
+    route_layer_3:
+      type: condition
+      variable: layer_number
+      operator: eq
+      value: 3
+      true_next: check_l3_safety
+      false_next: route_layer_5
+    route_layer_5:
+      type: condition
+      variable: layer_number
+      operator: eq
+      value: 5
+      true_next: check_l5_safety
+      false_next: route_layer_2
+    route_layer_2:
+      type: condition
+      variable: layer_number
+      operator: eq
+      value: 2
+      true_next: sil_1_2_way
+      false_next: route_layer_1
+    route_layer_1:
+      type: condition
+      variable: layer_number
+      operator: eq
+      value: 1
+      true_next: sil_0_1_formation
+      false_next: route_layer_6
+    route_layer_6:
+      type: condition
+      variable: layer_number
+      operator: eq
+      value: 6
+      true_next: sil_0_enterprise
+      false_next: invalid_layer
+    check_l3_safety:
+      type: condition
+      variable: has_safety_critical_function
+      operator: eq
+      value: true
+      true_next: sil_3_traction_critical
+      false_next: sil_2_3_traction
+    check_l5_safety:
+      type: condition
+      variable: has_safety_critical_function
+      operator: eq
+      value: true
+      true_next: sil_2_operations_critical
+      false_next: sil_1_2_operations
+    check_consequence_only:
+      type: condition
+      variable: failure_consequence
+      operator: eq
+      value: "catastrophic"
+      true_next: sil_4_by_consequence
+      false_next: check_consequence_critical
+    check_consequence_critical:
+      type: condition
+      variable: failure_consequence
+      operator: eq
+      value: "critical"
+      true_next: sil_3_by_consequence
+      false_next: check_consequence_marginal
+    check_consequence_marginal:
+      type: condition
+      variable: failure_consequence
+      operator: eq
+      value: "marginal"
+      true_next: sil_2_by_consequence
+      false_next: check_consequence_negligible
+    check_consequence_negligible:
+      type: condition
+      variable: failure_consequence
+      operator: eq
+      value: "negligible"
+      true_next: sil_0_by_consequence
+      false_next: no_input
+    sil_4_signaling:
+      type: return
+      value:
+        sil_minimum: 4
+        sil_maximum: 4
+        sil_recommendation: 4
+        development_rigor: "Formal methods required — independent verification, diverse redundancy (2oo3), proven-in-use evidence"
+        test_coverage_requirement: "100% branch coverage, formal proof of safety properties, independent V&V"
+        tolerable_hazard_rate: "10^-9 per hour (one dangerous failure per billion operating hours)"
+        pv_requirement: "Signal detection must have zero false negatives — every real signal must be detected. ICH E2E equivalent."
+        railway_rationale: "Signaling errors have the most direct path to catastrophe — wrong movement authority = collision"
+    sil_3_traction_critical:
+      type: return
+      value:
+        sil_minimum: 3
+        sil_maximum: 3
+        sil_recommendation: 3
+        development_rigor: "Semi-formal methods — structured testing, independent review, safety case required"
+        test_coverage_requirement: "95%+ branch coverage, safety case with structured argument (GSN), independent review"
+        tolerable_hazard_rate: "10^-8 per hour"
+        pv_requirement: "Drug-critical functions: dosing calculations, interaction checking, contraindication enforcement"
+        railway_rationale: "Traction with safety function — braking system failure directly causes harm"
+    sil_2_3_traction:
+      type: return
+      value:
+        sil_minimum: 2
+        sil_maximum: 3
+        sil_recommendation: 2
+        development_rigor: "Structured development — defined processes, peer review, traceability"
+        test_coverage_requirement: "90%+ branch coverage, integration testing with documented test cases"
+        tolerable_hazard_rate: "10^-7 per hour"
+        pv_requirement: "Drug product handling: adverse event classification, MedDRA coding accuracy"
+        railway_rationale: "Vehicle systems — mechanical failure causes derailment but protective systems exist"
+    sil_1_2_way:
+      type: return
+      value:
+        sil_minimum: 1
+        sil_maximum: 2
+        sil_recommendation: 1
+        development_rigor: "Good engineering practice — documented design, standard testing"
+        test_coverage_requirement: "80%+ branch coverage, regression testing"
+        tolerable_hazard_rate: "10^-6 per hour"
+        pv_requirement: "Regulatory framework compliance: reporting format validation, submission deadline tracking"
+        railway_rationale: "Infrastructure degrades slowly — inspection intervals prevent catastrophic failure"
+    sil_1_2_operations:
+      type: return
+      value:
+        sil_minimum: 1
+        sil_maximum: 2
+        sil_recommendation: 1
+        development_rigor: "Good engineering practice — documented design, standard testing"
+        test_coverage_requirement: "80%+ branch coverage, operational scenario testing"
+        tolerable_hazard_rate: "10^-6 per hour"
+        pv_requirement: "Case management workflow: ICSR routing, follow-up tracking, aggregate report generation"
+        railway_rationale: "Operational errors cause delays and inefficiency; safety systems at L4 prevent catastrophe"
+    sil_2_operations_critical:
+      type: return
+      value:
+        sil_minimum: 2
+        sil_maximum: 2
+        sil_recommendation: 2
+        development_rigor: "Structured development with safety oversight — peer review, traceability to safety requirements"
+        test_coverage_requirement: "90%+ branch coverage, safety scenario testing"
+        tolerable_hazard_rate: "10^-7 per hour"
+        pv_requirement: "Safety-critical operations: expedited report submission (15-day deadline), SUSAR handling"
+        railway_rationale: "Operations with direct safety impact — wrong dispatching decision can override signaling"
+    sil_0_1_formation:
+      type: return
+      value:
+        sil_minimum: 0
+        sil_maximum: 1
+        sil_recommendation: 0
+        development_rigor: "Standard practice — basic quality assurance"
+        test_coverage_requirement: "Functional testing, no formal coverage requirement"
+        tolerable_hazard_rate: "10^-5 per hour"
+        pv_requirement: "Patient population data: demographics collection, exposure estimation"
+        railway_rationale: "Passive substrate — failures are gradual and detectable through inspection"
+    sil_0_enterprise:
+      type: return
+      value:
+        sil_minimum: 0
+        sil_maximum: 0
+        sil_recommendation: 0
+        development_rigor: "Business process governance — policy documentation, audit trail"
+        test_coverage_requirement: "Process compliance auditing, no software coverage requirement"
+        tolerable_hazard_rate: "N/A — strategic decisions not quantified by hazard rate"
+        pv_requirement: "PV system governance: PSMF maintenance, QPPV oversight, organizational safety culture"
+        railway_rationale: "Enterprise decisions operate on long time constants — errors correctable before harm"
+    sil_4_by_consequence:
+      type: return
+      value:
+        sil_minimum: 4
+        sil_maximum: 4
+        sil_recommendation: 4
+        development_rigor: "Formal methods required — catastrophic consequence demands highest integrity"
+        test_coverage_requirement: "100% branch coverage, formal proof, independent V&V"
+        tolerable_hazard_rate: "10^-9 per hour"
+        pv_requirement: "Any function where failure leads to undetected safety signal — patient death"
+        railway_rationale: "Consequence-driven: catastrophic = SIL 4 regardless of layer"
+    sil_3_by_consequence:
+      type: return
+      value:
+        sil_minimum: 3
+        sil_maximum: 3
+        sil_recommendation: 3
+        development_rigor: "Semi-formal methods — critical consequence requires structured assurance"
+        test_coverage_requirement: "95%+ branch coverage, safety case required"
+        tolerable_hazard_rate: "10^-8 per hour"
+        pv_requirement: "Functions where failure causes delayed safety response — missed expedited report"
+        railway_rationale: "Consequence-driven: critical = SIL 3"
+    sil_2_by_consequence:
+      type: return
+      value:
+        sil_minimum: 2
+        sil_maximum: 2
+        sil_recommendation: 2
+        development_rigor: "Structured development — marginal consequence allows standard engineering"
+        test_coverage_requirement: "90%+ branch coverage, documented test cases"
+        tolerable_hazard_rate: "10^-7 per hour"
+        pv_requirement: "Functions where failure causes degraded quality — incorrect MedDRA coding, imprecise causality"
+        railway_rationale: "Consequence-driven: marginal = SIL 2"
+    sil_0_by_consequence:
+      type: return
+      value:
+        sil_minimum: 0
+        sil_maximum: 0
+        sil_recommendation: 0
+        development_rigor: "Standard practice — negligible consequence"
+        test_coverage_requirement: "Basic functional testing"
+        tolerable_hazard_rate: "10^-5 per hour"
+        pv_requirement: "Administrative functions — reporting cosmetics, UI layout, non-safety metadata"
+        railway_rationale: "Consequence-driven: negligible = SIL 0"
+    invalid_layer:
+      type: return
+      value:
+        sil_minimum: 0
+        sil_maximum: 0
+        sil_recommendation: 0
+        development_rigor: "Invalid layer number — must be 1-6"
+        test_coverage_requirement: "N/A"
+        tolerable_hazard_rate: "N/A"
+        pv_requirement: "N/A"
+        railway_rationale: "Layer number out of range (valid: 1-6)"
+    no_input:
+      type: return
+      value:
+        sil_minimum: 0
+        sil_maximum: 0
+        sil_recommendation: 0
+        development_rigor: "Insufficient input — provide layer_number or failure_consequence"
+        test_coverage_requirement: "N/A"
+        tolerable_hazard_rate: "N/A"
+        pv_requirement: "N/A"
+        railway_rationale: "Cannot assign SIL without layer or consequence information"
+tests:
+- input:
+    layer_number: 4
+  expect:
+    sil_recommendation: 4
+    sil_minimum: 4
+    test_coverage_requirement: "100% branch coverage, formal proof of safety properties, independent V&V"
+- input:
+    layer_number: 3
+  expect:
+    sil_recommendation: 2
+    sil_minimum: 2
+- input:
+    layer_number: 3
+    has_safety_critical_function: true
+  expect:
+    sil_recommendation: 3
+    sil_minimum: 3
+- input:
+    layer_number: 5
+  expect:
+    sil_recommendation: 1
+    sil_minimum: 1
+- input:
+    layer_number: 5
+    has_safety_critical_function: true
+  expect:
+    sil_recommendation: 2
+    sil_minimum: 2
+- input:
+    layer_number: 2
+  expect:
+    sil_recommendation: 1
+    sil_minimum: 1
+- input:
+    layer_number: 1
+  expect:
+    sil_recommendation: 0
+    sil_minimum: 0
+- input:
+    layer_number: 6
+  expect:
+    sil_recommendation: 0
+    sil_minimum: 0
+- input:
+    failure_consequence: "catastrophic"
+  expect:
+    sil_recommendation: 4
+- input:
+    failure_consequence: "critical"
+  expect:
+    sil_recommendation: 3
+- input:
+    failure_consequence: "marginal"
+  expect:
+    sil_recommendation: 2
+- input:
+    failure_consequence: "negligible"
+  expect:
+    sil_recommendation: 0
+- input:
+    layer_number: 7
+  expect:
+    railway_rationale: "Layer number out of range (valid: 1-6)"
+- input: {}
+  expect:
+    railway_rationale: "Cannot assign SIL without layer or consequence information"

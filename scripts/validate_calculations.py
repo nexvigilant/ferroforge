@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 """
+DEPRECATED — Replaced by Rust parity tests: crates/station/tests/compute_parity.rs (47 tests)
+This file tests the Python proxy path via dispatch.py. The Rust compute engine
+is now the production path and has its own parity test suite with identical reference vectors.
+
+---
 NexVigilant Station — Calculation Validation Suite
 
 Validates PV computation correctness against known reference values.

@@ -1,0 +1,45 @@
+name: station-trial-pipeline
+description: "Clinical trial SAE data → safety concern triage → causality routing. From compare-trial-arms output to DSMB review decision."
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - config-trial-sae-triage
+  - adapt-safety-concern
+  - signal-to-causality
+tests:
+- name: deaths in treatment arm → urgent causality
+  input:
+    treatment_sae_rate: 8.5
+    control_sae_rate: 3.0
+    total_saes: 25
+    has_deaths: true
+    phase: "3"
+  expect:
+    safety_concern: critical
+    signal_detected: true
+    priority: URGENT
+    next_step: causality_assessment
+- name: elevated SAE rate differential → standard causality
+  input:
+    treatment_sae_rate: 12.0
+    control_sae_rate: 4.0
+    total_saes: 30
+    has_deaths: false
+    phase: "3"
+  expect:
+    safety_concern: elevated
+    signal_detected: true
+    priority: STANDARD
+    next_step: causality_assessment
+- name: favorable (low SAE, no deaths) → continue monitoring
+  input:
+    treatment_sae_rate: 1.5
+    control_sae_rate: 3.0
+    total_saes: 5
+    has_deaths: false
+  expect:
+    safety_concern: favorable
+    signal_detected: false
+    priority: LOW
+    next_step: continue_monitoring

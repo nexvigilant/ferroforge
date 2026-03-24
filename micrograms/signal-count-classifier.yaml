@@ -1,0 +1,75 @@
+name: signal-count-classifier
+description: 'Signal count to traffic level: maps the number of positive signal algorithms (0-5) to a traffic level for display'
+version: 0.1.0
+interface:
+  inputs:
+    signal_count:
+      type: number
+      required: true
+      description: 'Number of positive signal algorithms (out of PRR, ROR, IC, EBGM, Chi-square)'
+  outputs:
+    traffic_level:
+      type: string
+tree:
+  start: check_zero
+  nodes:
+    check_zero:
+      type: condition
+      variable: signal_count
+      operator: eq
+      value: 0
+      true_next: green
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: signal_count
+      operator: lte
+      value: 2
+      true_next: yellow
+      false_next: red
+    green:
+      type: return
+      value:
+        traffic_level: green
+    yellow:
+      type: return
+      value:
+        traffic_level: yellow
+    red:
+      type: return
+      value:
+        traffic_level: red
+tests:
+# Zero signals = green
+- input:
+    signal_count: 0
+  expect:
+    traffic_level: green
+# 1 signal = yellow
+- input:
+    signal_count: 1
+  expect:
+    traffic_level: yellow
+# 2 signals = yellow (boundary)
+- input:
+    signal_count: 2
+  expect:
+    traffic_level: yellow
+# 3 signals = red
+- input:
+    signal_count: 3
+  expect:
+    traffic_level: red
+# 4 signals = red
+- input:
+    signal_count: 4
+  expect:
+    traffic_level: red
+# All 5 signals = red
+- input:
+    signal_count: 5
+  expect:
+    traffic_level: red
+- input: {}
+  expect:
+    traffic_level: red

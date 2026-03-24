@@ -1,0 +1,151 @@
+name: data-completeness
+description: 'Assess data completeness: COMPLETE (>=95%), PARTIAL (>=70%), INSUFFICIENT (<70%)'
+version: 0.1.0
+interface:
+  inputs:
+    pct_filled:
+      type: int
+      required: false
+  outputs:
+    completeness:
+      type: string
+    needs_enrichment:
+      type: bool
+    proceed:
+      type: bool
+tree:
+  start: complete_check
+  nodes:
+    partial_check:
+      type: condition
+      variable: pct_filled
+      operator: gte
+      value: 70
+      true_next: partial
+      false_next: insufficient
+    complete_check:
+      type: condition
+      variable: pct_filled
+      operator: gte
+      value: 95
+      true_next: complete
+      false_next: partial_check
+    insufficient:
+      type: return
+      value:
+        proceed: false
+        completeness: INSUFFICIENT
+        needs_enrichment: true
+    complete:
+      type: return
+      value:
+        completeness: COMPLETE
+        proceed: true
+        needs_enrichment: false
+    partial:
+      type: return
+      value:
+        completeness: PARTIAL
+        proceed: true
+        needs_enrichment: true
+tests:
+- input:
+    pct_filled: 98
+  expect:
+    proceed: true
+    completeness: COMPLETE
+    needs_enrichment: false
+- input:
+    pct_filled: 80
+  expect:
+    completeness: PARTIAL
+    needs_enrichment: true
+    proceed: true
+- input:
+    pct_filled: 50
+  expect:
+    needs_enrichment: true
+    proceed: false
+    completeness: INSUFFICIENT
+- input:
+    pct_filled: 95
+  expect:
+    completeness: COMPLETE
+    proceed: true
+    needs_enrichment: false
+- input:
+    pct_filled: 70
+  expect:
+    completeness: PARTIAL
+    proceed: true
+    needs_enrichment: true
+- input:
+    pct_filled: 69
+  expect:
+    needs_enrichment: true
+    completeness: INSUFFICIENT
+    proceed: false
+- input:
+    pct_filled: 0
+  expect:
+    proceed: false
+    completeness: INSUFFICIENT
+    needs_enrichment: true
+- input:
+    pct_filled: -1
+  expect:
+    completeness: INSUFFICIENT
+    needs_enrichment: true
+    proceed: false
+- input:
+    pct_filled: 71
+  expect:
+    proceed: true
+    completeness: PARTIAL
+    needs_enrichment: true
+- input:
+    pct_filled: 7000
+  expect:
+    needs_enrichment: false
+    completeness: COMPLETE
+    proceed: true
+- input: {}
+  expect:
+    proceed: false
+    completeness: INSUFFICIENT
+    needs_enrichment: true
+- input:
+    pct_filled: 0
+  expect:
+    proceed: false
+    completeness: INSUFFICIENT
+    needs_enrichment: true
+- input:
+    pct_filled: -1
+  expect:
+    needs_enrichment: true
+    completeness: INSUFFICIENT
+    proceed: false
+- input:
+    pct_filled: 94
+  expect:
+    completeness: PARTIAL
+    proceed: true
+    needs_enrichment: true
+- input:
+    pct_filled: 96
+  expect:
+    proceed: true
+    needs_enrichment: false
+    completeness: COMPLETE
+- input:
+    pct_filled: 9500
+  expect:
+    needs_enrichment: false
+    completeness: COMPLETE
+    proceed: true
+- input: {}
+  expect:
+    proceed: false
+    needs_enrichment: true
+    completeness: INSUFFICIENT

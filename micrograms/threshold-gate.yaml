@@ -1,0 +1,73 @@
+name: threshold-gate
+description: Pass/fail gate against a configurable threshold
+version: 0.1.0
+interface:
+  inputs:
+    value:
+      type: int
+      required: false
+  outputs:
+    gate:
+      type: string
+    passed:
+      type: bool
+tree:
+  start: check
+  nodes:
+    pass:
+      type: return
+      value:
+        passed: true
+        gate: PASS
+    check:
+      type: condition
+      variable: value
+      operator: gte
+      value: 80
+      true_next: pass
+      false_next: fail
+    fail:
+      type: return
+      value:
+        passed: false
+        gate: FAIL
+tests:
+- input:
+    value: 95
+  expect:
+    gate: PASS
+    passed: true
+- input:
+    value: 80
+  expect:
+    gate: PASS
+    passed: true
+- input:
+    value: 79
+  expect:
+    gate: FAIL
+    passed: false
+- input:
+    value: 0
+  expect:
+    passed: false
+    gate: FAIL
+- input:
+    value: -1
+  expect:
+    passed: false
+    gate: FAIL
+- input:
+    value: 81
+  expect:
+    gate: PASS
+    passed: true
+- input:
+    value: 8000
+  expect:
+    gate: PASS
+    passed: true
+- input: {}
+  expect:
+    passed: false
+    gate: FAIL

@@ -1,0 +1,124 @@
+name: pubmed-relevance-gate
+description: Filters PubMed articles for pharmacovigilance relevance. Gates on article type, MeSH tags, and publication recency.
+version: 0.1.0
+interface:
+  inputs:
+    article_type:
+      type: string
+      required: false
+    has_adverse_event_mesh:
+      type: bool
+      required: false
+    publication_year:
+      type: int
+      required: false
+    is_case_report:
+      type: bool
+      required: false
+  outputs:
+    pv_relevance:
+      type: string
+    include_in_analysis:
+      type: bool
+tree:
+  start: check_type
+  nodes:
+    check_type:
+      type: condition
+      variable: article_type
+      operator: is_null
+      true_next: check_mesh_only
+      false_next: check_case_report
+    check_case_report:
+      type: condition
+      variable: is_case_report
+      operator: eq
+      value: true
+      true_next: check_mesh
+      false_next: check_mesh
+    check_mesh_only:
+      type: condition
+      variable: has_adverse_event_mesh
+      operator: eq
+      value: true
+      true_next: medium_relevance
+      false_next: return_none
+    check_mesh:
+      type: condition
+      variable: has_adverse_event_mesh
+      operator: eq
+      value: true
+      true_next: high_relevance
+      false_next: check_year
+    check_year:
+      type: condition
+      variable: publication_year
+      operator: gte
+      value: 2020
+      true_next: medium_relevance
+      false_next: return_low
+    high_relevance:
+      type: return
+      value:
+        pv_relevance: high
+        include_in_analysis: true
+    medium_relevance:
+      type: return
+      value:
+        pv_relevance: medium
+        include_in_analysis: true
+    return_low:
+      type: return
+      value:
+        pv_relevance: low
+        include_in_analysis: false
+    return_none:
+      type: return
+      value:
+        pv_relevance: none
+        include_in_analysis: false
+tests:
+  - input:
+      article_type: "Case Report"
+      has_adverse_event_mesh: true
+      publication_year: 2024
+      is_case_report: true
+    expect:
+      pv_relevance: high
+      include_in_analysis: true
+  - input:
+      article_type: "Review"
+      has_adverse_event_mesh: true
+      publication_year: 2023
+      is_case_report: false
+    expect:
+      pv_relevance: high
+      include_in_analysis: true
+  - input:
+      article_type: "Research Article"
+      has_adverse_event_mesh: false
+      publication_year: 2024
+      is_case_report: false
+    expect:
+      pv_relevance: medium
+      include_in_analysis: true
+  - input:
+      article_type: "Editorial"
+      has_adverse_event_mesh: false
+      publication_year: 2015
+      is_case_report: false
+    expect:
+      pv_relevance: low
+      include_in_analysis: false
+  - input:
+      article_type: "Clinical Trial"
+      has_adverse_event_mesh: true
+      publication_year: 2022
+      is_case_report: false
+    expect:
+      pv_relevance: high
+      include_in_analysis: true
+  - input: {}
+    expect:
+      pv_relevance: none
+      include_in_analysis: false

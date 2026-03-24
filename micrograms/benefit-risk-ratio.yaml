@@ -1,0 +1,422 @@
+name: benefit-risk-ratio
+description: Compute benefit-risk classification from numeric scores. Maps to ICH E2C(R2) PBRER benefit-risk evaluation framework. Chains from signal-to-risk and benefit-risk-gate.
+version: 0.1.0
+tree:
+  start: check_benefit_high
+  nodes:
+    favorable:
+      type: return
+      value:
+        reassessment_interval: 12 months per PBRER cycle
+        classification: Benefits clearly outweigh risks
+        br_ratio: FAVORABLE
+        regulatory_action: No additional risk minimization required
+    check_low_benefit:
+      type: condition
+      variable: risk_score
+      operator: lt
+      value: 20
+      true_next: uncertain
+      false_next: unfavorable
+    favorable_with_monitoring:
+      type: return
+      value:
+        regulatory_action: Implement or maintain risk minimization measures
+        reassessment_interval: 6 months with enhanced monitoring
+        br_ratio: FAVORABLE_WITH_CONDITIONS
+        classification: Benefits outweigh risks with risk minimization measures
+    unfavorable_despite_benefit:
+      type: return
+      value:
+        br_ratio: UNFAVORABLE
+        classification: Risks outweigh benefits despite demonstrated efficacy
+        regulatory_action: Consider labeling changes, REMS, or market withdrawal
+        reassessment_interval: Immediate regulatory consultation
+    unfavorable:
+      type: return
+      value:
+        reassessment_interval: Immediate regulatory action required
+        regulatory_action: Recommend market withdrawal or severe use restriction
+        br_ratio: UNFAVORABLE
+        classification: Risks outweigh limited benefits
+    check_vulnerable_favorable:
+      type: condition
+      variable: patient_population_vulnerability
+      operator: eq
+      value: high
+      true_next: uncertain_vulnerable
+      false_next: favorable_with_monitoring
+    check_risk_low_for_high_benefit:
+      type: condition
+      variable: risk_score
+      operator: lt
+      value: 30
+      true_next: favorable
+      false_next: check_risk_moderate_for_high_benefit
+    check_risk_moderate_for_high_benefit:
+      type: condition
+      variable: risk_score
+      operator: lt
+      value: 70
+      true_next: check_vulnerable_favorable
+      false_next: unfavorable_despite_benefit
+    uncertain:
+      type: return
+      value:
+        reassessment_interval: 3 months pending data collection
+        br_ratio: UNCERTAIN
+        classification: Benefit-risk balance requires further data
+        regulatory_action: Initiate additional studies or post-authorization safety study
+    check_benefit_high:
+      type: condition
+      variable: benefit_score
+      operator: gte
+      value: 70
+      true_next: check_risk_low_for_high_benefit
+      false_next: check_benefit_moderate
+    check_benefit_moderate:
+      type: condition
+      variable: benefit_score
+      operator: gte
+      value: 40
+      true_next: check_risk_for_moderate_benefit
+      false_next: check_low_benefit
+    check_risk_for_moderate_benefit:
+      type: condition
+      variable: risk_score
+      operator: lt
+      value: 50
+      true_next: favorable_with_monitoring
+      false_next: uncertain
+    uncertain_vulnerable:
+      type: return
+      value:
+        regulatory_action: Risk minimization measures required — contraindication review
+        br_ratio: UNCERTAIN_VULNERABLE
+        reassessment_interval: Monthly review until resolved
+        classification: Uncertain benefit-risk in vulnerable population
+tests:
+- input:
+    benefit_score: 85
+    risk_score: 15
+  expect:
+    br_ratio: FAVORABLE
+    classification: Benefits clearly outweigh risks
+- input:
+    risk_score: 50
+    benefit_score: 80
+  expect:
+    br_ratio: FAVORABLE_WITH_CONDITIONS
+- input:
+    patient_population_vulnerability: high
+    risk_score: 50
+    benefit_score: 80
+  expect:
+    regulatory_action: Risk minimization measures required — contraindication review
+    br_ratio: UNCERTAIN_VULNERABLE
+- input:
+    benefit_score: 80
+    risk_score: 80
+  expect:
+    br_ratio: UNFAVORABLE
+    classification: Risks outweigh benefits despite demonstrated efficacy
+- input:
+    benefit_score: 50
+    risk_score: 30
+  expect:
+    br_ratio: FAVORABLE_WITH_CONDITIONS
+- input:
+    benefit_score: 50
+    risk_score: 60
+  expect:
+    br_ratio: UNCERTAIN
+- input:
+    risk_score: 10
+    benefit_score: 20
+  expect:
+    br_ratio: UNCERTAIN
+- input:
+    benefit_score: 20
+    risk_score: 50
+  expect:
+    br_ratio: UNFAVORABLE
+- input:
+    benefit_score: 30
+    risk_score: 80
+  expect:
+    br_ratio: UNFAVORABLE
+    regulatory_action: Recommend market withdrawal or severe use restriction
+- input:
+    benefit_score: 70
+    risk_score: 29
+  expect:
+    br_ratio: FAVORABLE
+- input:
+    risk_score: 30
+    benefit_score: 70
+  expect:
+    br_ratio: FAVORABLE_WITH_CONDITIONS
+- input:
+    risk_score: 0
+  expect:
+    reassessment_interval: 3 months pending data collection
+    br_ratio: UNCERTAIN
+    classification: Benefit-risk balance requires further data
+    regulatory_action: Initiate additional studies or post-authorization safety study
+- input:
+    risk_score: -1
+  expect:
+    br_ratio: UNCERTAIN
+    regulatory_action: Initiate additional studies or post-authorization safety study
+    classification: Benefit-risk balance requires further data
+    reassessment_interval: 3 months pending data collection
+- input:
+    risk_score: 19
+  expect:
+    reassessment_interval: 3 months pending data collection
+    classification: Benefit-risk balance requires further data
+    regulatory_action: Initiate additional studies or post-authorization safety study
+    br_ratio: UNCERTAIN
+- input:
+    risk_score: 21
+  expect:
+    reassessment_interval: Immediate regulatory action required
+    br_ratio: UNFAVORABLE
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    classification: Risks outweigh limited benefits
+- input:
+    risk_score: 2000
+  expect:
+    reassessment_interval: Immediate regulatory action required
+    classification: Risks outweigh limited benefits
+    br_ratio: UNFAVORABLE
+    regulatory_action: Recommend market withdrawal or severe use restriction
+- input: {}
+  expect:
+    classification: Risks outweigh limited benefits
+    br_ratio: UNFAVORABLE
+    reassessment_interval: Immediate regulatory action required
+    regulatory_action: Recommend market withdrawal or severe use restriction
+- input:
+    risk_score: 0
+  expect:
+    br_ratio: UNCERTAIN
+    classification: Benefit-risk balance requires further data
+    reassessment_interval: 3 months pending data collection
+    regulatory_action: Initiate additional studies or post-authorization safety study
+- input:
+    risk_score: -1
+  expect:
+    regulatory_action: Initiate additional studies or post-authorization safety study
+    reassessment_interval: 3 months pending data collection
+    classification: Benefit-risk balance requires further data
+    br_ratio: UNCERTAIN
+- input:
+    risk_score: 31
+  expect:
+    br_ratio: UNFAVORABLE
+    classification: Risks outweigh limited benefits
+    reassessment_interval: Immediate regulatory action required
+    regulatory_action: Recommend market withdrawal or severe use restriction
+- input:
+    risk_score: 3000
+  expect:
+    br_ratio: UNFAVORABLE
+    reassessment_interval: Immediate regulatory action required
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    classification: Risks outweigh limited benefits
+- input: {}
+  expect:
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    reassessment_interval: Immediate regulatory action required
+    classification: Risks outweigh limited benefits
+    br_ratio: UNFAVORABLE
+- input:
+    risk_score: 0
+  expect:
+    reassessment_interval: 3 months pending data collection
+    classification: Benefit-risk balance requires further data
+    br_ratio: UNCERTAIN
+    regulatory_action: Initiate additional studies or post-authorization safety study
+- input:
+    risk_score: -1
+  expect:
+    br_ratio: UNCERTAIN
+    regulatory_action: Initiate additional studies or post-authorization safety study
+    classification: Benefit-risk balance requires further data
+    reassessment_interval: 3 months pending data collection
+- input:
+    risk_score: 69
+  expect:
+    reassessment_interval: Immediate regulatory action required
+    br_ratio: UNFAVORABLE
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    classification: Risks outweigh limited benefits
+- input:
+    risk_score: 71
+  expect:
+    reassessment_interval: Immediate regulatory action required
+    classification: Risks outweigh limited benefits
+    br_ratio: UNFAVORABLE
+    regulatory_action: Recommend market withdrawal or severe use restriction
+- input:
+    risk_score: 7000
+  expect:
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    br_ratio: UNFAVORABLE
+    reassessment_interval: Immediate regulatory action required
+    classification: Risks outweigh limited benefits
+- input: {}
+  expect:
+    classification: Risks outweigh limited benefits
+    reassessment_interval: Immediate regulatory action required
+    br_ratio: UNFAVORABLE
+    regulatory_action: Recommend market withdrawal or severe use restriction
+- input:
+    benefit_score: 0
+  expect:
+    classification: Risks outweigh limited benefits
+    br_ratio: UNFAVORABLE
+    reassessment_interval: Immediate regulatory action required
+    regulatory_action: Recommend market withdrawal or severe use restriction
+- input:
+    benefit_score: -1
+  expect:
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    br_ratio: UNFAVORABLE
+    classification: Risks outweigh limited benefits
+    reassessment_interval: Immediate regulatory action required
+- input:
+    benefit_score: 69
+  expect:
+    reassessment_interval: 3 months pending data collection
+    classification: Benefit-risk balance requires further data
+    regulatory_action: Initiate additional studies or post-authorization safety study
+    br_ratio: UNCERTAIN
+- input:
+    benefit_score: 71
+  expect:
+    regulatory_action: Consider labeling changes, REMS, or market withdrawal
+    reassessment_interval: Immediate regulatory consultation
+    br_ratio: UNFAVORABLE
+    classification: Risks outweigh benefits despite demonstrated efficacy
+- input:
+    benefit_score: 7000
+  expect:
+    reassessment_interval: Immediate regulatory consultation
+    regulatory_action: Consider labeling changes, REMS, or market withdrawal
+    br_ratio: UNFAVORABLE
+    classification: Risks outweigh benefits despite demonstrated efficacy
+- input: {}
+  expect:
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    br_ratio: UNFAVORABLE
+    classification: Risks outweigh limited benefits
+    reassessment_interval: Immediate regulatory action required
+- input:
+    benefit_score: 0
+  expect:
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    br_ratio: UNFAVORABLE
+    reassessment_interval: Immediate regulatory action required
+    classification: Risks outweigh limited benefits
+- input:
+    benefit_score: -1
+  expect:
+    reassessment_interval: Immediate regulatory action required
+    classification: Risks outweigh limited benefits
+    br_ratio: UNFAVORABLE
+    regulatory_action: Recommend market withdrawal or severe use restriction
+- input:
+    benefit_score: 39
+  expect:
+    reassessment_interval: Immediate regulatory action required
+    br_ratio: UNFAVORABLE
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    classification: Risks outweigh limited benefits
+- input:
+    benefit_score: 41
+  expect:
+    br_ratio: UNCERTAIN
+    classification: Benefit-risk balance requires further data
+    reassessment_interval: 3 months pending data collection
+    regulatory_action: Initiate additional studies or post-authorization safety study
+- input:
+    benefit_score: 4000
+  expect:
+    classification: Risks outweigh benefits despite demonstrated efficacy
+    br_ratio: UNFAVORABLE
+    regulatory_action: Consider labeling changes, REMS, or market withdrawal
+    reassessment_interval: Immediate regulatory consultation
+- input: {}
+  expect:
+    classification: Risks outweigh limited benefits
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    reassessment_interval: Immediate regulatory action required
+    br_ratio: UNFAVORABLE
+- input:
+    risk_score: 0
+  expect:
+    reassessment_interval: 3 months pending data collection
+    br_ratio: UNCERTAIN
+    regulatory_action: Initiate additional studies or post-authorization safety study
+    classification: Benefit-risk balance requires further data
+- input:
+    risk_score: -1
+  expect:
+    classification: Benefit-risk balance requires further data
+    regulatory_action: Initiate additional studies or post-authorization safety study
+    br_ratio: UNCERTAIN
+    reassessment_interval: 3 months pending data collection
+- input:
+    risk_score: 49
+  expect:
+    classification: Risks outweigh limited benefits
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    br_ratio: UNFAVORABLE
+    reassessment_interval: Immediate regulatory action required
+- input:
+    risk_score: 51
+  expect:
+    br_ratio: UNFAVORABLE
+    reassessment_interval: Immediate regulatory action required
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    classification: Risks outweigh limited benefits
+- input:
+    risk_score: 5000
+  expect:
+    reassessment_interval: Immediate regulatory action required
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    classification: Risks outweigh limited benefits
+    br_ratio: UNFAVORABLE
+- input: {}
+  expect:
+    regulatory_action: Recommend market withdrawal or severe use restriction
+    br_ratio: UNFAVORABLE
+    reassessment_interval: Immediate regulatory action required
+    classification: Risks outweigh limited benefits
+interface:
+  inputs:
+    benefit_score:
+      type: int
+      required: true
+    patient_population_vulnerability:
+      type: string
+      required: false
+    risk_score:
+      type: int
+      required: true
+  outputs:
+    br_ratio:
+      type: string
+      required: false
+    reassessment_interval:
+      type: string
+      required: false
+    classification:
+      type: string
+      required: false
+    regulatory_action:
+      type: string
+      required: false
+  aliases: {}

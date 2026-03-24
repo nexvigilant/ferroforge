@@ -1,0 +1,268 @@
+name: signal-detection-pipeline
+description: 'Routes a drug through the full signal detection pipeline: classifies signal strength from PRR/ROR/case_count or routes to FAERS lookup'
+version: 0.1.0
+interface:
+  inputs:
+    drug_name:
+      type: string
+      required: false
+    event_term:
+      type: string
+      required: false
+    prr:
+      type: float
+      required: false
+    ror:
+      type: float
+      required: false
+    case_count:
+      type: int
+      required: false
+  outputs:
+    signal_strength:
+      type: string
+    recommended_action:
+      type: string
+    next_step:
+      type: string
+tree:
+  start: check_prr_present
+  nodes:
+    check_prr_present:
+      type: condition
+      variable: prr
+      operator: is_not_null
+      value: true
+      true_next: check_ror_present
+      false_next: check_drug_name
+    check_ror_present:
+      type: condition
+      variable: ror
+      operator: is_not_null
+      value: true
+      true_next: check_strong_prr
+      false_next: check_prr_strong_solo
+    check_drug_name:
+      type: condition
+      variable: drug_name
+      operator: is_not_null
+      value: true
+      true_next: route_faers
+      false_next: insufficient_data
+    check_strong_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2
+      true_next: check_strong_ror
+      false_next: check_moderate_prr
+    check_strong_ror:
+      type: condition
+      variable: ror
+      operator: gte
+      value: 2
+      true_next: check_strong_cases
+      false_next: moderate_signal
+    check_strong_cases:
+      type: condition
+      variable: case_count
+      operator: gte
+      value: 3
+      true_next: strong_signal
+      false_next: moderate_signal
+    check_moderate_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 1.5
+      true_next: check_moderate_ror
+      false_next: check_ror_moderate_solo
+    check_moderate_ror:
+      type: condition
+      variable: ror
+      operator: gte
+      value: 2
+      true_next: moderate_signal
+      false_next: weak_signal
+    check_ror_moderate_solo:
+      type: condition
+      variable: ror
+      operator: gte
+      value: 2
+      true_next: moderate_signal
+      false_next: noise_signal
+    check_prr_strong_solo:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2
+      true_next: moderate_signal_prr_only
+      false_next: check_prr_weak_solo
+    check_prr_weak_solo:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 1.5
+      true_next: weak_signal
+      false_next: noise_signal
+    strong_signal:
+      type: return
+      value:
+        signal_strength: strong
+        recommended_action: Initiate causality assessment and regulatory review
+        next_step: causality_assessment
+    moderate_signal:
+      type: return
+      value:
+        signal_strength: moderate
+        recommended_action: Schedule causality assessment and continue monitoring
+        next_step: causality_assessment
+    moderate_signal_prr_only:
+      type: return
+      value:
+        signal_strength: moderate
+        recommended_action: Schedule causality assessment and continue monitoring
+        next_step: causality_assessment
+    weak_signal:
+      type: return
+      value:
+        signal_strength: weak
+        recommended_action: Continue monitoring and collect additional data
+        next_step: enhanced_monitoring
+    noise_signal:
+      type: return
+      value:
+        signal_strength: noise
+        recommended_action: No action required at this time
+        next_step: routine_monitoring
+    route_faers:
+      type: return
+      value:
+        signal_strength: pending
+        recommended_action: Query FAERS for adverse event data before signal classification
+        next_step: faers_lookup
+    insufficient_data:
+      type: return
+      value:
+        signal_strength: unknown
+        recommended_action: Provide drug name or signal metrics to begin analysis
+        next_step: data_collection
+tests:
+# Strong signal: PRR>=2, ROR>=2, cases>=3
+- input:
+    drug_name: metformin
+    event_term: lactic_acidosis
+    prr: 4.5
+    ror: 3.2
+    case_count: 15
+  expect:
+    signal_strength: strong
+    recommended_action: Initiate causality assessment and regulatory review
+    next_step: causality_assessment
+# Boundary: PRR exactly 2.0, ROR exactly 2.0, cases exactly 3
+- input:
+    drug_name: aspirin
+    event_term: gi_bleed
+    prr: 2.0
+    ror: 2.0
+    case_count: 3
+  expect:
+    signal_strength: strong
+    recommended_action: Initiate causality assessment and regulatory review
+    next_step: causality_assessment
+# Moderate: PRR>=2, ROR>=2, but cases<3
+- input:
+    prr: 3.0
+    ror: 2.5
+    case_count: 1
+  expect:
+    signal_strength: moderate
+    recommended_action: Schedule causality assessment and continue monitoring
+    next_step: causality_assessment
+# Moderate: PRR>=2, ROR<2
+- input:
+    prr: 2.5
+    ror: 1.5
+    case_count: 10
+  expect:
+    signal_strength: moderate
+    recommended_action: Schedule causality assessment and continue monitoring
+    next_step: causality_assessment
+# Moderate: PRR<2, ROR>=2
+- input:
+    prr: 1.2
+    ror: 3.0
+    case_count: 5
+  expect:
+    signal_strength: moderate
+    recommended_action: Schedule causality assessment and continue monitoring
+    next_step: causality_assessment
+# Weak: PRR between 1.5 and 2.0, ROR<2
+- input:
+    prr: 1.7
+    ror: 1.3
+    case_count: 4
+  expect:
+    signal_strength: weak
+    recommended_action: Continue monitoring and collect additional data
+    next_step: enhanced_monitoring
+# Noise: PRR<1.5, ROR<2
+- input:
+    prr: 1.0
+    ror: 0.8
+    case_count: 2
+  expect:
+    signal_strength: noise
+    recommended_action: No action required at this time
+    next_step: routine_monitoring
+# Only drug_name provided, no metrics
+- input:
+    drug_name: ibuprofen
+  expect:
+    signal_strength: pending
+    recommended_action: Query FAERS for adverse event data before signal classification
+    next_step: faers_lookup
+# Drug name with event term but no metrics
+- input:
+    drug_name: warfarin
+    event_term: hemorrhage
+  expect:
+    signal_strength: pending
+    recommended_action: Query FAERS for adverse event data before signal classification
+    next_step: faers_lookup
+# PRR only, no ROR - PRR>=2
+- input:
+    prr: 2.5
+  expect:
+    signal_strength: moderate
+    recommended_action: Schedule causality assessment and continue monitoring
+    next_step: causality_assessment
+# PRR only, weak range
+- input:
+    prr: 1.6
+  expect:
+    signal_strength: weak
+    recommended_action: Continue monitoring and collect additional data
+    next_step: enhanced_monitoring
+# PRR only, noise range
+- input:
+    prr: 0.9
+  expect:
+    signal_strength: noise
+    recommended_action: No action required at this time
+    next_step: routine_monitoring
+# Empty input
+- input: {}
+  expect:
+    signal_strength: unknown
+    recommended_action: Provide drug name or signal metrics to begin analysis
+    next_step: data_collection
+# Extreme PRR/ROR values
+- input:
+    prr: 50.0
+    ror: 25.0
+    case_count: 100
+  expect:
+    signal_strength: strong
+    recommended_action: Initiate causality assessment and regulatory review
+    next_step: causality_assessment

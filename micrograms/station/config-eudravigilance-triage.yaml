@@ -1,0 +1,89 @@
+name: config-eudravigilance-triage
+description: "Triage EudraVigilance ICSR volume and ROR signal data"
+version: 0.1.0
+interface:
+  inputs:
+    total_icsrs:
+      type: int
+      required: false
+    serious_pct:
+      type: int
+      required: false
+    fatal_count:
+      type: int
+      required: false
+    ror:
+      type: float
+      required: false
+    ror_ci_lower:
+      type: float
+      required: false
+  outputs:
+    eu_signal: { type: string }
+    action: { type: string }
+    priority: { type: int }
+tree:
+  start: check_fatal
+  nodes:
+    check_fatal:
+      type: condition
+      variable: fatal_count
+      operator: is_null
+      true_next: check_ror
+      false_next: check_any_fatal
+    check_any_fatal:
+      type: condition
+      variable: fatal_count
+      operator: gte
+      value: 1
+      true_next: critical
+      false_next: check_ror
+    check_ror:
+      type: condition
+      variable: ror_ci_lower
+      operator: is_null
+      true_next: check_volume
+      false_next: check_ror_sig
+    check_ror_sig:
+      type: condition
+      variable: ror_ci_lower
+      operator: gte
+      value: 1.0
+      true_next: confirmed
+      false_next: check_volume
+    check_volume:
+      type: condition
+      variable: total_icsrs
+      operator: is_null
+      true_next: insufficient
+      false_next: check_high_vol
+    check_high_vol:
+      type: condition
+      variable: total_icsrs
+      operator: gte
+      value: 50
+      true_next: monitor
+      false_next: insufficient
+    critical:
+      type: return
+      value: { eu_signal: critical, action: prac_referral, priority: 1 }
+    confirmed:
+      type: return
+      value: { eu_signal: confirmed, action: signal_assessment, priority: 2 }
+    monitor:
+      type: return
+      value: { eu_signal: monitor, action: periodic_review, priority: 3 }
+    insufficient:
+      type: return
+      value: { eu_signal: none, action: accumulate, priority: 4 }
+tests:
+  - input: { fatal_count: 3, total_icsrs: 200, ror: 2.5, ror_ci_lower: 1.8 }
+    expect: { eu_signal: critical, action: prac_referral, priority: 1 }
+  - input: { fatal_count: 0, ror: 3.1, ror_ci_lower: 1.5, total_icsrs: 100 }
+    expect: { eu_signal: confirmed, action: signal_assessment, priority: 2 }
+  - input: { fatal_count: 0, ror: 1.2, ror_ci_lower: 0.7, total_icsrs: 80 }
+    expect: { eu_signal: monitor, action: periodic_review, priority: 3 }
+  - input: { total_icsrs: 10 }
+    expect: { eu_signal: none, action: accumulate, priority: 4 }
+  - input: {}
+    expect: { eu_signal: none, action: accumulate, priority: 4 }

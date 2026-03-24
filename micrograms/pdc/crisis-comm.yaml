@@ -1,0 +1,126 @@
+name: crisis-comm
+description: "Domain 14: Crisis communication routing by severity and timeline — immediate response through recovery."
+version: 0.1.0
+interface:
+  inputs:
+    crisis_phase:
+      type: string
+      required: false
+  outputs:
+    actions:
+      type: string
+    ai_assist:
+      type: string
+    communication:
+      type: string
+    phase:
+      type: string
+    rule:
+      type: string
+    stakeholders:
+      type: string
+    timeline:
+      type: string
+tree:
+  start: check_phase
+  nodes:
+    check_phase:
+      type: condition
+      variable: crisis_phase
+      operator: eq
+      value: immediate
+      true_next: immediate
+      false_next: check_active
+    check_active:
+      type: condition
+      variable: crisis_phase
+      operator: eq
+      value: active
+      true_next: active
+      false_next: check_sustained
+    check_sustained:
+      type: condition
+      variable: crisis_phase
+      operator: eq
+      value: sustained
+      true_next: sustained
+      false_next: check_recovery
+    check_recovery:
+      type: condition
+      variable: crisis_phase
+      operator: eq
+      value: recovery
+      true_next: recovery
+      false_next: preparedness
+    immediate:
+      type: return
+      value:
+        phase: IMMEDIATE
+        timeline: "0-24 hours"
+        actions: "activate crisis team, assess scope, prepare holding statement, notify key stakeholders"
+        communication: "acknowledge issue, state commitment to investigation, avoid speculation"
+        stakeholders: "internal leadership, regulatory authorities, key partners"
+        ai_assist: "social media monitoring, stakeholder alert system, template activation"
+        rule: "speed over perfection — say what you know, say what you do not know, say what you are doing"
+    active:
+      type: return
+      value:
+        phase: ACTIVE
+        timeline: "24 hours - 7 days"
+        actions: "coordinate multi-channel response, regular stakeholder updates, media management"
+        communication: "provide updates with new information, maintain consistency across channels"
+        stakeholders: "all stakeholder groups, media, public"
+        ai_assist: "sentiment tracking, message consistency checking, stakeholder feedback analysis"
+        rule: "consistency and frequency — stakeholders need regular updates even if nothing has changed"
+    sustained:
+      type: return
+      value:
+        phase: SUSTAINED
+        timeline: "1-4 weeks"
+        actions: "manage ongoing investigation communication, address misinformation, support stakeholders"
+        communication: "detailed updates as investigation progresses, address emerging concerns proactively"
+        stakeholders: "targeted updates by stakeholder group"
+        ai_assist: "misinformation detection, communication impact analysis, fatigue monitoring"
+        rule: "proactive over reactive — anticipate questions and address them before they are asked"
+    recovery:
+      type: return
+      value:
+        phase: RECOVERY
+        timeline: "1-6 months"
+        actions: "restore confidence, communicate outcomes, implement lessons learned, rebuild trust"
+        communication: "transparent outcome reporting, corrective action communication, trust rebuilding"
+        stakeholders: "all groups with focus on most affected"
+        ai_assist: "trust sentiment tracking, recovery metrics, effectiveness measurement"
+        rule: "demonstrate learning — show what changed because of this crisis"
+    preparedness:
+      type: return
+      value:
+        phase: PREPAREDNESS
+        timeline: "ongoing"
+        actions: "maintain crisis plan, train spokespersons, update templates, conduct simulations"
+        communication: "build stakeholder relationships before crises occur"
+        ai_assist: "predictive crisis detection, simulation automation, readiness scoring"
+        rule: "the best crisis communication starts years before the crisis"
+tests:
+- input:
+    crisis_phase: immediate
+  expect:
+    phase: IMMEDIATE
+    timeline: "0-24 hours"
+- input:
+    crisis_phase: active
+  expect:
+    phase: ACTIVE
+    timeline: "24 hours - 7 days"
+- input:
+    crisis_phase: sustained
+  expect:
+    phase: SUSTAINED
+- input:
+    crisis_phase: recovery
+  expect:
+    phase: RECOVERY
+- input: {}
+  expect:
+    phase: PREPAREDNESS
+    rule: "the best crisis communication starts years before the crisis"

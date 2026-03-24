@@ -1,0 +1,144 @@
+name: tier-promote
+description: 'Flywheel tier promotion gate: validates node can advance Draft→Staging→Live based on emitter count, test pass rate, and reality score'
+version: 0.1.0
+interface:
+  inputs:
+    automation:
+      type: int
+      required: false
+    current_tier:
+      type: string
+      required: false
+    emitters:
+      type: int
+      required: false
+    reality_score:
+      type: int
+      required: false
+    test_pass_rate:
+      type: int
+      required: false
+  outputs:
+    approved:
+      type: bool
+    decision:
+      type: string
+tree:
+  start: check_tier
+  nodes:
+    check_tier:
+      type: condition
+      variable: current_tier
+      operator: eq
+      value: draft
+      true_next: draft_to_staging
+      false_next: check_staging
+    check_staging:
+      type: condition
+      variable: current_tier
+      operator: eq
+      value: staging
+      true_next: staging_to_live
+      false_next: already_live
+    draft_to_staging:
+      type: condition
+      variable: emitters
+      operator: gte
+      value: 1
+      true_next: draft_tests
+      false_next: blocked
+    draft_tests:
+      type: condition
+      variable: test_pass_rate
+      operator: gte
+      value: 100
+      true_next: promote
+      false_next: blocked
+    staging_to_live:
+      type: condition
+      variable: reality_score
+      operator: gte
+      value: 50
+      true_next: staging_automation
+      false_next: blocked
+    staging_automation:
+      type: condition
+      variable: automation
+      operator: gte
+      value: 50
+      true_next: promote
+      false_next: blocked
+    promote:
+      type: return
+      value:
+        decision: PROMOTE
+        approved: true
+    blocked:
+      type: return
+      value:
+        decision: BLOCKED
+        approved: false
+    already_live:
+      type: return
+      value:
+        decision: ALREADY_LIVE
+        approved: false
+tests:
+- input:
+    current_tier: draft
+    emitters: 1
+    test_pass_rate: 100
+    reality_score: 18
+    automation: 20
+  expect:
+    decision: PROMOTE
+    approved: true
+- input:
+    current_tier: draft
+    emitters: 0
+    test_pass_rate: 100
+    reality_score: 18
+    automation: 20
+  expect:
+    decision: BLOCKED
+    approved: false
+- input:
+    current_tier: staging
+    emitters: 2
+    test_pass_rate: 100
+    reality_score: 66
+    automation: 92
+  expect:
+    decision: PROMOTE
+    approved: true
+- input:
+    current_tier: staging
+    emitters: 2
+    test_pass_rate: 100
+    reality_score: 35
+    automation: 15
+  expect:
+    decision: BLOCKED
+    approved: false
+- input:
+    current_tier: live
+    emitters: 3
+    test_pass_rate: 100
+    reality_score: 66
+    automation: 92
+  expect:
+    decision: ALREADY_LIVE
+    approved: false
+- input:
+    current_tier: draft
+    emitters: 1
+    test_pass_rate: 80
+    reality_score: 10
+    automation: 5
+  expect:
+    decision: BLOCKED
+    approved: false
+- input: {}
+  expect:
+    approved: false
+    decision: ALREADY_LIVE

@@ -1,0 +1,85 @@
+name: adapt-signal-strength
+description: "Adapter: convert configmigram signal_strength to signal pipeline inputs (signal_detected + synthetic prr)"
+version: 0.1.0
+
+interface:
+  inputs:
+    signal_strength:
+      type: string
+      required: false
+      description: "From configmigram: strong, moderate, weak, none"
+  outputs:
+    signal_detected:
+      type: bool
+    prr:
+      type: float
+
+tree:
+  start: check_strength
+  nodes:
+    check_strength:
+      type: condition
+      variable: signal_strength
+      operator: is_null
+      true_next: no_signal
+      false_next: check_strong
+
+    check_strong:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "strong"
+      true_next: strong_out
+      false_next: check_moderate
+
+    check_moderate:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "moderate"
+      true_next: moderate_out
+      false_next: check_weak
+
+    check_weak:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "weak"
+      true_next: weak_out
+      false_next: no_signal
+
+    strong_out:
+      type: return
+      value:
+        signal_detected: true
+        prr: 6.0
+
+    moderate_out:
+      type: return
+      value:
+        signal_detected: true
+        prr: 3.0
+
+    weak_out:
+      type: return
+      value:
+        signal_detected: true
+        prr: 1.5
+
+    no_signal:
+      type: return
+      value:
+        signal_detected: false
+        prr: 0.5
+
+tests:
+  - input: { signal_strength: "strong" }
+    expect: { signal_detected: true, prr: 6.0 }
+  - input: { signal_strength: "moderate" }
+    expect: { signal_detected: true, prr: 3.0 }
+  - input: { signal_strength: "weak" }
+    expect: { signal_detected: true, prr: 1.5 }
+  - input: { signal_strength: "none" }
+    expect: { signal_detected: false, prr: 0.5 }
+  - input: {}
+    expect: { signal_detected: false, prr: 0.5 }

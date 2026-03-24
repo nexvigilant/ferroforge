@@ -1,0 +1,182 @@
+name: smq-relevance-checker
+description: Check MedDRA SMQ relevance for an event term and estimate scope
+version: 0.1.0
+tree:
+  start: validate_inputs
+  nodes:
+    check_smq_cardiac:
+      type: condition
+      variable: smq_name
+      operator: matches
+      value: (?i)(cardiac|heart|arrhythmia)
+      true_next: relevant_narrow
+      false_next: not_relevant
+    check_smq_infection:
+      type: condition
+      variable: smq_name
+      operator: matches
+      value: (?i)(infection|sepsis|immunosuppression)
+      true_next: relevant_broad
+      false_next: not_relevant
+    check_smq_neuro:
+      type: condition
+      variable: smq_name
+      operator: matches
+      value: (?i)(neuro|seizure|brain|stroke)
+      true_next: relevant_narrow
+      false_next: not_relevant
+    relevant_broad:
+      type: return
+      value:
+        likely_relevant: true
+        scope: broad
+        confidence: 0.7
+    missing_input:
+      type: return
+      value:
+        confidence: 0.0
+        likely_relevant: false
+        scope: null
+    relevant_narrow:
+      type: return
+      value:
+        confidence: 0.9
+        likely_relevant: true
+        scope: narrow
+    not_relevant:
+      type: return
+      value:
+        confidence: 0.8
+        likely_relevant: false
+        scope: none
+    validate_inputs:
+      type: condition
+      variable: event_term
+      operator: is_not_null
+      value: null
+      true_next: validate_smq
+      false_next: missing_input
+    check_neuro:
+      type: condition
+      variable: event_term
+      operator: matches
+      value: (?i)(seizure|stroke|neurological|brain)
+      true_next: check_smq_neuro
+      false_next: check_infection
+    check_relevance:
+      type: condition
+      variable: event_term
+      operator: matches
+      value: (?i)(cardiac|heart|arrhythmia|infarction)
+      true_next: check_smq_cardiac
+      false_next: check_respiratory
+    validate_smq:
+      type: condition
+      variable: smq_name
+      operator: is_not_null
+      value: null
+      true_next: check_relevance
+      false_next: missing_input
+    check_respiratory:
+      type: condition
+      variable: event_term
+      operator: matches
+      value: (?i)(respiratory|asthma|pneumonia|dyspnea)
+      true_next: check_smq_respiratory
+      false_next: check_neuro
+    check_smq_respiratory:
+      type: condition
+      variable: smq_name
+      operator: matches
+      value: (?i)(respiratory|asthma|lung|pneumonia)
+      true_next: relevant_broad
+      false_next: not_relevant
+    check_infection:
+      type: condition
+      variable: event_term
+      operator: matches
+      value: (?i)(infection|sepsis|pneumonia|abscess)
+      true_next: check_smq_infection
+      false_next: not_relevant
+tests:
+- input:
+    event_term: ZZZZZ_NO_MATCH
+    smq_name: ZZZZZ_NO_MATCH
+  expect:
+    confidence: 0.8
+    likely_relevant: false
+    scope: none
+- input:
+    event_term: ZZZZZ_NO_MATCH
+  expect:
+    confidence: 0.0
+    likely_relevant: false
+    scope: null
+- input:
+    event_term: cardiac
+    smq_name: ZZZZZ_NO_MATCH
+  expect:
+    confidence: 0.8
+    likely_relevant: false
+    scope: none
+- input:
+    event_term: cardiac
+    smq_name: cardiac
+  expect:
+    confidence: 0.9
+    likely_relevant: true
+    scope: narrow
+- input:
+    event_term: infection
+    smq_name: ZZZZZ_NO_MATCH
+  expect:
+    confidence: 0.8
+    likely_relevant: false
+    scope: none
+- input:
+    event_term: infection
+    smq_name: infection
+  expect:
+    likely_relevant: true
+    scope: broad
+    confidence: 0.7
+- input:
+    event_term: respiratory
+    smq_name: ZZZZZ_NO_MATCH
+  expect:
+    confidence: 0.8
+    likely_relevant: false
+    scope: none
+- input:
+    event_term: respiratory
+    smq_name: respiratory
+  expect:
+    likely_relevant: true
+    scope: broad
+    confidence: 0.7
+- input:
+    event_term: seizure
+    smq_name: ZZZZZ_NO_MATCH
+  expect:
+    confidence: 0.8
+    likely_relevant: false
+    scope: none
+- input:
+    event_term: seizure
+    smq_name: neuro
+  expect:
+    confidence: 0.9
+    likely_relevant: true
+    scope: narrow
+- input:
+    smq_name: ZZZZZ_NO_MATCH
+  expect:
+    confidence: 0.0
+    likely_relevant: false
+    scope: null
+- input: {}
+  expect:
+    confidence: 0.0
+    likely_relevant: false
+    scope: null
+interface: null

@@ -1,0 +1,88 @@
+name: report-deadline
+description: Determine regulatory reporting deadline based on seriousness and expectedness
+version: 0.1.0
+interface:
+  inputs:
+    expedited:
+      type: bool
+      required: false
+    seriousness:
+      type: string
+      required: false
+  outputs:
+    deadline_days:
+      type: int
+    regulatory_basis:
+      type: string
+    report_type:
+      type: string
+tree:
+  start: expedited_check
+  nodes:
+    day7:
+      type: return
+      value:
+        deadline_days: 7
+        regulatory_basis: ICH E2A fatal/life-threatening
+        report_type: 7-day
+    day15:
+      type: return
+      value:
+        report_type: 15-day
+        deadline_days: 15
+        regulatory_basis: ICH E2A serious unexpected
+    periodic:
+      type: return
+      value:
+        regulatory_basis: ICH E2A non-serious
+        report_type: periodic
+        deadline_days: 90
+    expedited_check:
+      type: condition
+      variable: expedited
+      operator: eq
+      value: true
+      true_next: fatal_check
+      false_next: periodic
+    fatal_check:
+      type: condition
+      variable: seriousness
+      operator: eq
+      value: SERIOUS
+      true_next: day7
+      false_next: day15
+tests:
+- input:
+    expedited: true
+    seriousness: SERIOUS
+  expect:
+    report_type: 7-day
+    deadline_days: 7
+- input:
+    expedited: true
+    seriousness: NON-SERIOUS
+  expect:
+    deadline_days: 15
+    report_type: 15-day
+- input:
+    seriousness: SERIOUS
+    expedited: false
+  expect:
+    report_type: periodic
+    deadline_days: 90
+- input:
+    seriousness: NON-SERIOUS
+    expedited: false
+  expect:
+    deadline_days: 90
+    report_type: periodic
+- input: {}
+  expect:
+    regulatory_basis: ICH E2A non-serious
+    deadline_days: 90
+    report_type: periodic
+- input: {}
+  expect:
+    deadline_days: 90
+    regulatory_basis: ICH E2A non-serious
+    report_type: periodic

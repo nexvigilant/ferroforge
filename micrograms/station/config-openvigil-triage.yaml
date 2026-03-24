@@ -1,0 +1,364 @@
+name: config-openvigil-triage
+description: Triage OpenVigil disproportionality output. Takes PRR/ROR/IC from compute-disproportionality and classifies signal strength with recommended action.
+version: 0.1.0
+tree:
+  start: check_case_count
+  nodes:
+    check_minimum_cases:
+      type: condition
+      variable: case_count
+      operator: lt
+      value: 3
+      true_next: insufficient_data
+      false_next: check_strong_signal
+    check_ror_strong:
+      type: condition
+      variable: ror_ci_lower
+      operator: gte
+      value: 2.0
+      true_next: strong_signal
+      false_next: moderate_signal
+    check_prr_ci_strong:
+      type: condition
+      variable: prr_ci_lower
+      operator: gte
+      value: 2.0
+      true_next: check_ror_confirms_strong
+      false_next: check_prr_ci_moderate
+    no_signal:
+      type: return
+      value:
+        action: routine_monitoring
+        evidence_quality: medium
+        signal_strength: none
+        priority: 4
+    insufficient_data:
+      type: return
+      value:
+        priority: 5
+        action: accumulate_data
+        signal_strength: none
+        evidence_quality: insufficient
+    moderate_signal_no_ci:
+      type: return
+      value:
+        evidence_quality: low
+        signal_strength: moderate
+        priority: 2
+        action: detailed_case_review
+    check_ic_rescue:
+      type: condition
+      variable: ic
+      operator: is_null
+      value: null
+      true_next: weak_signal
+      false_next: check_ic_threshold
+    weak_signal:
+      type: return
+      value:
+        priority: 3
+        signal_strength: weak
+        evidence_quality: medium
+        action: add_to_watchlist
+    check_ic_threshold:
+      type: condition
+      variable: ic
+      operator: gte
+      value: 0.5
+      true_next: weak_signal
+      false_next: no_signal
+    check_prr_threshold:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: moderate_signal_no_ci
+      false_next: check_prr_weak
+    check_case_count:
+      type: condition
+      variable: case_count
+      operator: is_null
+      value: null
+      true_next: check_prr_only
+      false_next: check_minimum_cases
+    check_prr_only:
+      type: condition
+      variable: prr
+      operator: is_null
+      value: null
+      true_next: no_data
+      false_next: check_strong_signal
+    moderate_signal:
+      type: return
+      value:
+        signal_strength: moderate
+        action: detailed_case_review
+        evidence_quality: high
+        priority: 2
+    check_prr_ci_moderate:
+      type: condition
+      variable: prr_ci_lower
+      operator: gte
+      value: 1.0
+      true_next: moderate_signal
+      false_next: check_ic_rescue
+    check_ror_confirms_strong:
+      type: condition
+      variable: ror_ci_lower
+      operator: is_null
+      value: null
+      true_next: strong_signal
+      false_next: check_ror_strong
+    no_data:
+      type: return
+      value:
+        signal_strength: none
+        priority: 5
+        action: query_failed
+        evidence_quality: none
+    strong_signal:
+      type: return
+      value:
+        priority: 1
+        evidence_quality: high
+        signal_strength: strong
+        action: immediate_safety_review
+    check_prr_weak:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 1.0
+      true_next: weak_signal
+      false_next: no_signal
+    check_strong_signal:
+      type: condition
+      variable: prr_ci_lower
+      operator: is_null
+      value: null
+      true_next: check_prr_threshold
+      false_next: check_prr_ci_strong
+tests:
+- input:
+    prr_ci_lower: 3.1
+    ror_ci_lower: 3.5
+    prr: 4.5
+    ic: 2.1
+    case_count: 85
+    ror: 5.2
+  expect:
+    signal_strength: strong
+    evidence_quality: high
+    priority: 1
+    action: immediate_safety_review
+- input:
+    ror: 3.2
+    prr: 3.0
+    ic: 1.5
+    ror_ci_lower: 1.8
+    case_count: 40
+    prr_ci_lower: 2.5
+  expect:
+    action: detailed_case_review
+    signal_strength: moderate
+    priority: 2
+    evidence_quality: high
+- input:
+    case_count: 20
+    ror: 2.0
+    prr: 2.1
+    ror_ci_lower: 1.1
+    prr_ci_lower: 1.3
+    ic: 0.8
+  expect:
+    priority: 2
+    signal_strength: moderate
+    action: detailed_case_review
+    evidence_quality: high
+- input:
+    case_count: 15
+    ror_ci_lower: 0.9
+    ror: 1.6
+    ic: 0.6
+    prr: 1.5
+    prr_ci_lower: 0.8
+  expect:
+    action: add_to_watchlist
+    priority: 3
+    evidence_quality: medium
+    signal_strength: weak
+- input:
+    ror: 0.9
+    prr: 0.8
+    ic: -0.2
+    prr_ci_lower: 0.4
+    case_count: 30
+    ror_ci_lower: 0.5
+  expect:
+    action: routine_monitoring
+    signal_strength: none
+    priority: 4
+    evidence_quality: medium
+- input:
+    prr: 1.2
+    prr_ci_lower: 0.3
+    ic: 0.1
+    case_count: 2
+    ror: 1.1
+  expect:
+    action: accumulate_data
+    signal_strength: none
+    evidence_quality: insufficient
+    priority: 5
+- input: {}
+  expect:
+    signal_strength: none
+    action: query_failed
+    evidence_quality: none
+    priority: 5
+- input:
+    case_count: 50
+    prr: 5.0
+  expect:
+    action: detailed_case_review
+    signal_strength: moderate
+    priority: 2
+    evidence_quality: low
+- input:
+    case_count: 0
+  expect:
+    priority: 5
+    action: accumulate_data
+    signal_strength: none
+    evidence_quality: insufficient
+- input:
+    case_count: -1
+  expect:
+    signal_strength: none
+    evidence_quality: insufficient
+    action: accumulate_data
+    priority: 5
+- input:
+    case_count: 4
+  expect:
+    action: routine_monitoring
+    priority: 4
+    evidence_quality: medium
+    signal_strength: none
+- input:
+    ror_ci_lower: 1.999
+  expect:
+    signal_strength: none
+    priority: 5
+    action: query_failed
+    evidence_quality: none
+- input:
+    ror_ci_lower: 2.001
+  expect:
+    action: query_failed
+    priority: 5
+    signal_strength: none
+    evidence_quality: none
+- input:
+    prr_ci_lower: 1.999
+  expect:
+    priority: 5
+    evidence_quality: none
+    signal_strength: none
+    action: query_failed
+- input:
+    prr_ci_lower: 2.001
+  expect:
+    priority: 5
+    action: query_failed
+    evidence_quality: none
+    signal_strength: none
+- input:
+    ic: 0.499
+  expect:
+    priority: 5
+    evidence_quality: none
+    signal_strength: none
+    action: query_failed
+- input:
+    ic: 0.501
+  expect:
+    evidence_quality: none
+    signal_strength: none
+    priority: 5
+    action: query_failed
+- input:
+    prr: 1.999
+  expect:
+    action: add_to_watchlist
+    signal_strength: weak
+    evidence_quality: medium
+    priority: 3
+- input:
+    prr: 2.001
+  expect:
+    evidence_quality: low
+    priority: 2
+    signal_strength: moderate
+    action: detailed_case_review
+- input:
+    prr_ci_lower: 0.999
+  expect:
+    signal_strength: none
+    action: query_failed
+    priority: 5
+    evidence_quality: none
+- input:
+    prr_ci_lower: 1.001
+  expect:
+    priority: 5
+    action: query_failed
+    signal_strength: none
+    evidence_quality: none
+- input:
+    prr: 0.999
+  expect:
+    signal_strength: none
+    action: routine_monitoring
+    evidence_quality: medium
+    priority: 4
+- input:
+    prr: 1.001
+  expect:
+    priority: 3
+    action: add_to_watchlist
+    evidence_quality: medium
+    signal_strength: weak
+interface:
+  inputs:
+    prr:
+      type: float
+      required: false
+    ror_ci_lower:
+      type: float
+      required: false
+    ic:
+      type: float
+      required: false
+    case_count:
+      type: int
+      required: false
+    prr_ci_lower:
+      type: float
+      required: false
+    ror:
+      type: float
+      required: false
+  outputs:
+    priority:
+      type: int
+      required: false
+    evidence_quality:
+      type: string
+      required: false
+    signal_strength:
+      type: string
+      required: false
+    action:
+      type: string
+      required: false
+  aliases: {}

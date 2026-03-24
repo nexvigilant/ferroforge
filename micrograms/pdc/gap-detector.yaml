@@ -1,0 +1,140 @@
+name: gap-detector
+description: "Management: detect competency gaps — given current level and target EPA, identify what domains need development."
+version: 0.1.0
+interface:
+  inputs:
+    current_min_primary:
+      type: int
+      required: false
+    current_min_supporting:
+      type: int
+      required: false
+    target_epa_max_level:
+      type: int
+      required: false
+  outputs:
+    development_months:
+      type: string
+    gap_type:
+      type: string
+    has_gap:
+      type: bool
+    message:
+      type: string
+    recommendation:
+      type: string
+    severity:
+      type: string
+tree:
+  start: check_target_tier
+  nodes:
+    check_target_tier:
+      type: condition
+      variable: target_epa_max_level
+      operator: gte
+      value: 4
+      true_next: check_advanced_gap
+      false_next: check_basic_gap
+    check_advanced_gap:
+      type: condition
+      variable: current_min_primary
+      operator: gte
+      value: 4
+      true_next: check_supporting_advanced
+      false_next: primary_gap_advanced
+    check_supporting_advanced:
+      type: condition
+      variable: current_min_supporting
+      operator: gte
+      value: 3
+      true_next: no_gap
+      false_next: supporting_gap
+    check_basic_gap:
+      type: condition
+      variable: current_min_primary
+      operator: gte
+      value: 3
+      true_next: check_supporting_basic
+      false_next: primary_gap_basic
+    check_supporting_basic:
+      type: condition
+      variable: current_min_supporting
+      operator: gte
+      value: 2
+      true_next: no_gap
+      false_next: supporting_gap
+    primary_gap_advanced:
+      type: return
+      value:
+        has_gap: true
+        gap_type: PRIMARY
+        severity: HIGH
+        message: "Primary domains below L4 — need advancement before attempting advanced EPAs (5-10)"
+        recommendation: "focused development in primary domains, mentored practice, innovation projects"
+        development_months: 12
+    primary_gap_basic:
+      type: return
+      value:
+        has_gap: true
+        gap_type: PRIMARY
+        severity: MEDIUM
+        message: "Primary domains below L3 — need advancement before attempting core EPAs (1-4)"
+        recommendation: "structured learning, supervised practice, portfolio development"
+        development_months: 6
+    supporting_gap:
+      type: return
+      value:
+        has_gap: true
+        gap_type: SUPPORTING
+        severity: LOW
+        message: "Supporting domains below minimum — targeted development needed"
+        recommendation: "cross-domain exposure, integrated projects, peer learning"
+        development_months: 3
+    no_gap:
+      type: return
+      value:
+        has_gap: false
+        gap_type: NONE
+        severity: NONE
+        message: "Ready for target EPA — all domain requirements met"
+        recommendation: "proceed with EPA development"
+tests:
+- input:
+    target_epa_max_level: 4
+    current_min_primary: 4
+    current_min_supporting: 3
+  expect:
+    has_gap: false
+    gap_type: NONE
+- input:
+    target_epa_max_level: 4
+    current_min_primary: 3
+    current_min_supporting: 3
+  expect:
+    has_gap: true
+    gap_type: PRIMARY
+    severity: HIGH
+- input:
+    target_epa_max_level: 4
+    current_min_primary: 4
+    current_min_supporting: 2
+  expect:
+    has_gap: true
+    gap_type: SUPPORTING
+- input:
+    target_epa_max_level: 3
+    current_min_primary: 3
+    current_min_supporting: 2
+  expect:
+    has_gap: false
+- input:
+    target_epa_max_level: 3
+    current_min_primary: 2
+    current_min_supporting: 2
+  expect:
+    has_gap: true
+    gap_type: PRIMARY
+    severity: MEDIUM
+- input: {}
+  expect:
+    has_gap: true

@@ -1,0 +1,259 @@
+name: denominator-confidence
+description: "NexCore denominator confidence scorer: classifies denominator reliability based on data source characteristics, capture rate, and boundary resolution"
+version: 0.1.0
+interface:
+  inputs:
+    capture_pct:
+      type: float
+      required: true
+    source_type:
+      type: string
+      required: true
+    is_transaction_ledger:
+      type: bool
+      required: false
+    has_dedup:
+      type: bool
+      required: false
+    has_reconciliation:
+      type: bool
+      required: false
+  outputs:
+    confidence_tier:
+      type: string
+    denominator_class:
+      type: string
+    epistemic_status:
+      type: string
+    usable_for:
+      type: string
+    warning:
+      type: string
+tree:
+  start: check_capture
+  nodes:
+    check_capture:
+      type: condition
+      variable: capture_pct
+      operator: gte
+      value: 90
+      true_next: high_capture
+      false_next: check_moderate_capture
+    check_moderate_capture:
+      type: condition
+      variable: capture_pct
+      operator: gte
+      value: 60
+      true_next: moderate_capture
+      false_next: check_low_capture
+    check_low_capture:
+      type: condition
+      variable: capture_pct
+      operator: gte
+      value: 30
+      true_next: low_capture
+      false_next: insufficient_capture
+    high_capture:
+      type: condition
+      variable: is_transaction_ledger
+      operator: eq
+      value: true
+      true_next: census_grade
+      false_next: high_estimated
+    census_grade:
+      type: condition
+      variable: has_reconciliation
+      operator: eq
+      value: true
+      true_next: census_reconciled
+      false_next: census_unreconciled
+    census_reconciled:
+      type: return
+      value:
+        confidence_tier: census
+        denominator_class: counted
+        epistemic_status: "verified fact — transaction ledger with reconciliation"
+        usable_for: "true incidence rates, regulatory submissions, publication-grade epidemiology"
+        warning: none
+    census_unreconciled:
+      type: return
+      value:
+        confidence_tier: census
+        denominator_class: counted
+        epistemic_status: "counted but unreconciled — may contain duplicates"
+        usable_for: "incidence rate estimation, internal signal detection"
+        warning: "Deduplication not confirmed. Run reconciliation before regulatory use."
+    high_estimated:
+      type: condition
+      variable: has_dedup
+      operator: eq
+      value: true
+      true_next: high_deduped
+      false_next: high_raw
+    high_deduped:
+      type: return
+      value:
+        confidence_tier: high
+        denominator_class: estimated
+        epistemic_status: "high-confidence estimate — deduplicated, >90% capture"
+        usable_for: "signal detection, trend analysis, internal decision-making"
+        warning: "Not a transaction ledger. Denominator is estimated, not counted."
+    high_raw:
+      type: return
+      value:
+        confidence_tier: moderate
+        denominator_class: estimated
+        epistemic_status: "moderate estimate — high capture but no deduplication"
+        usable_for: "screening, hypothesis generation"
+        warning: "Possible duplicates inflate denominator. Dedup before rate computation."
+    moderate_capture:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: claims
+      true_next: claims_moderate
+      false_next: other_moderate
+    claims_moderate:
+      type: return
+      value:
+        confidence_tier: moderate
+        denominator_class: estimated
+        epistemic_status: "claims-based estimate — 60-90% capture, known blind spots"
+        usable_for: "signal screening, denominator approximation, trend detection"
+        warning: "Cash-pay, mail-order, and compounding pharmacy fills are likely missing."
+    other_moderate:
+      type: return
+      value:
+        confidence_tier: moderate
+        denominator_class: estimated
+        epistemic_status: "partial capture — model-dependent correction required"
+        usable_for: "signal screening with correction factor"
+        warning: "Apply capture adjustment factor before computing rates."
+    low_capture:
+      type: return
+      value:
+        confidence_tier: low
+        denominator_class: modeled
+        epistemic_status: "low capture — denominator is a model output, not a count"
+        usable_for: "hypothesis generation only, not suitable for rate computation"
+        warning: "Denominator below 60% capture. Rates computed from this source are unreliable."
+    insufficient_capture:
+      type: return
+      value:
+        confidence_tier: unusable
+        denominator_class: unknown
+        epistemic_status: "insufficient — denominator is effectively unknown"
+        usable_for: "nothing — this is the FAERS paradigm (unknown denominator)"
+        warning: "Capture below 30%. This is not a denominator, it is a guess. Do not compute rates."
+tests:
+- name: pharmacy_ledger_reconciled
+  input:
+    capture_pct: 98
+    source_type: ncpdp
+    is_transaction_ledger: true
+    has_reconciliation: true
+  expect:
+    confidence_tier: census
+    denominator_class: counted
+    epistemic_status: "verified fact — transaction ledger with reconciliation"
+- name: pharmacy_ledger_no_reconciliation
+  input:
+    capture_pct: 95
+    source_type: ncpdp
+    is_transaction_ledger: true
+    has_reconciliation: false
+  expect:
+    confidence_tier: census
+    denominator_class: counted
+- name: claims_high_capture_deduped
+  input:
+    capture_pct: 92
+    source_type: claims
+    is_transaction_ledger: false
+    has_dedup: true
+  expect:
+    confidence_tier: high
+    denominator_class: estimated
+- name: claims_high_no_dedup
+  input:
+    capture_pct: 91
+    source_type: claims
+    is_transaction_ledger: false
+    has_dedup: false
+  expect:
+    confidence_tier: moderate
+    denominator_class: estimated
+- name: claims_moderate_capture
+  input:
+    capture_pct: 72
+    source_type: claims
+    is_transaction_ledger: false
+  expect:
+    confidence_tier: moderate
+    denominator_class: estimated
+    epistemic_status: "claims-based estimate — 60-90% capture, known blind spots"
+- name: ehr_moderate_capture
+  input:
+    capture_pct: 65
+    source_type: ehr
+    is_transaction_ledger: false
+  expect:
+    confidence_tier: moderate
+    denominator_class: estimated
+- name: low_capture_source
+  input:
+    capture_pct: 40
+    source_type: survey
+    is_transaction_ledger: false
+  expect:
+    confidence_tier: low
+    denominator_class: modeled
+- name: faers_paradigm
+  input:
+    capture_pct: 5
+    source_type: spontaneous
+    is_transaction_ledger: false
+  expect:
+    confidence_tier: unusable
+    denominator_class: unknown
+- name: zero_capture
+  input:
+    capture_pct: 0
+    source_type: none
+    is_transaction_ledger: false
+  expect:
+    confidence_tier: unusable
+    denominator_class: unknown
+- name: boundary_exact_90
+  input:
+    capture_pct: 90
+    source_type: ncpdp
+    is_transaction_ledger: true
+    has_reconciliation: true
+  expect:
+    confidence_tier: census
+    denominator_class: counted
+- name: boundary_exact_60
+  input:
+    capture_pct: 60
+    source_type: claims
+    is_transaction_ledger: false
+  expect:
+    confidence_tier: moderate
+    denominator_class: estimated
+- name: boundary_exact_30
+  input:
+    capture_pct: 30
+    source_type: pdmp
+    is_transaction_ledger: false
+  expect:
+    confidence_tier: low
+    denominator_class: modeled
+- name: null_input_safety
+  input: {}
+  expect:
+    confidence_tier: unusable
+    denominator_class: unknown
+    epistemic_status: insufficient — denominator is effectively unknown
+    usable_for: nothing — this is the FAERS paradigm (unknown denominator)
+    warning: "Capture below 30%. This is not a denominator, it is a guess. Do not compute rates."

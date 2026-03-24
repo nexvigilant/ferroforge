@@ -1,0 +1,61 @@
+name: rrm-assessment
+description: "Railway Reference Model full assessment chain. Classifies a system component into an RRM layer, determines its ETCS-equivalent monitoring level, assigns a Safety Integrity Level, and computes capacity. Four-stage pipeline: classify → monitor → assign SIL → compute capacity."
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - rrm-layer-classifier
+  - rrm-monitoring-level
+  - rrm-sil-assigner
+  - rrm-capacity-calculator
+tests:
+- name: "Signal detection system — full pipeline"
+  input:
+    processes_safety_critical_state: true
+    is_continuous: true
+    has_position_reporting: true
+  expect:
+    layer_number: 4
+    layer_name: "Signaling"
+    etcs_level: 3
+    level_name: "Moving Block"
+    sil_recommendation: 4
+    capacity_class: "Maximum"
+- name: "Passive infrastructure — Formation L1"
+  input:
+    is_passive_substrate: true
+    detection_latency_hours: 168
+  expect:
+    layer_number: 1
+    layer_name: "Formation"
+    etcs_level: 0
+    level_name: "Time Interval"
+    sil_recommendation: 0
+- name: "Operations coordinator — L5 with periodic monitoring"
+  input:
+    coordinates_multiple_entities: true
+    update_frequency_per_hour: 4
+  expect:
+    layer_number: 5
+    layer_name: "Operations"
+    etcs_level: 1
+    level_name: "Spot Transmission"
+    sil_recommendation: 1
+- name: "Enterprise strategy — L6 minimal monitoring"
+  input:
+    sets_strategy_or_policy: true
+  expect:
+    layer_number: 6
+    layer_name: "Enterprise"
+    sil_recommendation: 0
+- name: "Real-time safety with continuous monitoring"
+  input:
+    has_real_time_requirement: true
+    is_continuous: true
+    is_predictive: true
+  expect:
+    layer_number: 4
+    layer_name: "Signaling"
+    etcs_level: 3
+    sil_recommendation: 4
+    capacity_class: "Maximum"

@@ -1,0 +1,111 @@
+name: epar-section-router
+description: "Route EMA EPAR queries to appropriate module section based on query type"
+version: 0.1.0
+
+tree:
+  start: validate_query_type
+  nodes:
+    validate_query_type:
+      type: condition
+      variable: query_type
+      operator: is_not_null
+      true_next: classify_query
+      false_next: missing_input
+
+    classify_query:
+      type: condition
+      variable: query_type
+      operator: matches
+      value: "(?i)^efficacy$"
+      true_next: route_efficacy
+      false_next: check_safety
+
+    check_safety:
+      type: condition
+      variable: query_type
+      operator: matches
+      value: "(?i)^safety$"
+      true_next: route_safety
+      false_next: check_quality
+
+    check_quality:
+      type: condition
+      variable: query_type
+      operator: matches
+      value: "(?i)^quality$"
+      true_next: route_quality
+      false_next: check_rmp
+
+    check_rmp:
+      type: condition
+      variable: query_type
+      operator: matches
+      value: "(?i)^rmp$"
+      true_next: route_rmp
+      false_next: invalid_query
+
+    route_efficacy:
+      type: return
+      value:
+        epar_section: "efficacy"
+        module_number: 2
+        relevance_to_pv: "indirect"
+
+    route_safety:
+      type: return
+      value:
+        epar_section: "safety"
+        module_number: 2
+        relevance_to_pv: "direct"
+
+    route_quality:
+      type: return
+      value:
+        epar_section: "quality"
+        module_number: 3
+        relevance_to_pv: "indirect"
+
+    route_rmp:
+      type: return
+      value:
+        epar_section: "risk_management_plan"
+        module_number: 1
+        relevance_to_pv: "direct"
+
+    invalid_query:
+      type: return
+      value:
+        epar_section: null
+        module_number: null
+        relevance_to_pv: null
+
+    missing_input:
+      type: return
+      value:
+        epar_section: null
+        module_number: null
+        relevance_to_pv: null
+
+tests:
+  - input: { query_type: "efficacy" }
+    expect: { epar_section: "efficacy", module_number: 2, relevance_to_pv: "indirect" }
+
+  - input: { query_type: "safety" }
+    expect: { epar_section: "safety", module_number: 2, relevance_to_pv: "direct" }
+
+  - input: { query_type: "quality" }
+    expect: { epar_section: "quality", module_number: 3, relevance_to_pv: "indirect" }
+
+  - input: { query_type: "rmp" }
+    expect: { epar_section: "risk_management_plan", module_number: 1, relevance_to_pv: "direct" }
+
+  - input: { query_type: "invalid" }
+    expect: { epar_section: null, module_number: null, relevance_to_pv: null }
+
+  - input: { query_type: null }
+    expect: { epar_section: null, module_number: null, relevance_to_pv: null }
+  - input: {}
+    expect:
+      epar_section: null
+      module_number: null
+      relevance_to_pv: null

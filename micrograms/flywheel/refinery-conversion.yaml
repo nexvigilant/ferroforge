@@ -1,0 +1,65 @@
+name: refinery-conversion
+description: "Compute conversion rate (processed/raw) and classify. Measures what % of crude enters unit processes vs stripped as noise."
+version: 0.1.0
+tree:
+  start: check_input
+  nodes:
+    check_input:
+      type: condition
+      variable: crude_in
+      operator: gt
+      value: 0
+      true_next: classify_conversion
+      false_next: return_no_input
+    classify_conversion:
+      type: condition
+      variable: conversion_pct
+      operator: gte
+      value: 90
+      true_next: return_full_conversion
+      false_next: check_partial
+    check_partial:
+      type: condition
+      variable: conversion_pct
+      operator: gte
+      value: 60
+      true_next: return_partial_conversion
+      false_next: return_poor_conversion
+    return_full_conversion:
+      type: return
+      value:
+        conversion_class: FULL
+        action: "Nearly all signals entering processing streams"
+        refinery_analog: "Deep conversion cracking; minimal unconverted residuum"
+    return_partial_conversion:
+      type: return
+      value:
+        conversion_class: PARTIAL
+        action: "Significant signals bypassing processing; check fractionation"
+        refinery_analog: "Moderate conversion; heavy gas oil requires secondary cracking"
+    return_poor_conversion:
+      type: return
+      value:
+        conversion_class: POOR
+        action: "Most signals unprocessed; fractionation stage failing"
+        refinery_analog: "Low conversion; feedstock passing through unreacted"
+    return_no_input:
+      type: return
+      value:
+        conversion_class: NO_INPUT
+        action: "No crude feedstock"
+        refinery_analog: "Refinery idle"
+tests:
+  - input: { crude_in: 100, conversion_pct: 95 }
+    expect: { conversion_class: FULL }
+  - input: { crude_in: 100, conversion_pct: 75 }
+    expect: { conversion_class: PARTIAL }
+  - input: { crude_in: 100, conversion_pct: 40 }
+    expect: { conversion_class: POOR }
+  - input: { crude_in: 0, conversion_pct: 0 }
+    expect: { conversion_class: NO_INPUT }
+  - input: {}
+    expect:
+      action: No crude feedstock
+      conversion_class: NO_INPUT
+      refinery_analog: Refinery idle

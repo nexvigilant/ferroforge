@@ -1,0 +1,187 @@
+name: algo-drift-classify
+description: 'Algovigilance: classify AI model drift severity from distribution shift metrics (PSI, KS p-value) and observation window'
+version: 0.1.0
+interface:
+  inputs:
+    psi:
+      type: float
+      required: false
+    ks_pvalue:
+      type: float
+      required: false
+    observation_days:
+      type: int
+      required: false
+  outputs:
+    drift_class:
+      type: string
+    severity:
+      type: string
+    action:
+      type: string
+    rebaseline:
+      type: bool
+tree:
+  start: check_psi_critical
+  nodes:
+    check_psi_critical:
+      type: condition
+      variable: psi
+      operator: gt
+      value: 0.25
+      true_next: check_rapid_critical
+      false_next: check_psi_moderate
+    check_rapid_critical:
+      type: condition
+      variable: observation_days
+      operator: lte
+      value: 7
+      true_next: critical_rapid
+      false_next: critical_gradual
+    check_psi_moderate:
+      type: condition
+      variable: psi
+      operator: gt
+      value: 0.1
+      true_next: check_ks_confirm
+      false_next: check_psi_minor
+    check_ks_confirm:
+      type: condition
+      variable: ks_pvalue
+      operator: lt
+      value: 0.05
+      true_next: moderate_confirmed
+      false_next: moderate_unconfirmed
+    check_psi_minor:
+      type: condition
+      variable: psi
+      operator: gt
+      value: 0.05
+      true_next: minor_drift
+      false_next: no_drift
+    critical_rapid:
+      type: return
+      value:
+        drift_class: CRITICAL_RAPID
+        severity: P1
+        action: halt_and_investigate
+        rebaseline: false
+    critical_gradual:
+      type: return
+      value:
+        drift_class: CRITICAL_GRADUAL
+        severity: P2
+        action: investigate_and_monitor
+        rebaseline: false
+    moderate_confirmed:
+      type: return
+      value:
+        drift_class: MODERATE_CONFIRMED
+        severity: P3
+        action: schedule_review
+        rebaseline: false
+    moderate_unconfirmed:
+      type: return
+      value:
+        drift_class: MODERATE_UNCONFIRMED
+        severity: P4
+        action: increase_monitoring
+        rebaseline: false
+    minor_drift:
+      type: return
+      value:
+        drift_class: MINOR
+        severity: P5
+        action: log_and_watch
+        rebaseline: false
+    no_drift:
+      type: return
+      value:
+        drift_class: NONE
+        severity: NONE
+        action: no_action
+        rebaseline: false
+tests:
+- input:
+    psi: 0.45
+    ks_pvalue: 0.001
+    observation_days: 3
+  expect:
+    drift_class: CRITICAL_RAPID
+    severity: P1
+    action: halt_and_investigate
+    rebaseline: false
+- input:
+    psi: 0.30
+    ks_pvalue: 0.01
+    observation_days: 30
+  expect:
+    drift_class: CRITICAL_GRADUAL
+    severity: P2
+    action: investigate_and_monitor
+    rebaseline: false
+- input:
+    psi: 0.15
+    ks_pvalue: 0.03
+    observation_days: 14
+  expect:
+    drift_class: MODERATE_CONFIRMED
+    severity: P3
+    action: schedule_review
+    rebaseline: false
+- input:
+    psi: 0.12
+    ks_pvalue: 0.08
+    observation_days: 14
+  expect:
+    drift_class: MODERATE_UNCONFIRMED
+    severity: P4
+    action: increase_monitoring
+    rebaseline: false
+- input:
+    psi: 0.07
+    ks_pvalue: 0.15
+    observation_days: 30
+  expect:
+    drift_class: MINOR
+    severity: P5
+    action: log_and_watch
+    rebaseline: false
+- input:
+    psi: 0.03
+    ks_pvalue: 0.50
+    observation_days: 60
+  expect:
+    drift_class: NONE
+    severity: NONE
+    action: no_action
+    rebaseline: false
+- input: {}
+  expect:
+    drift_class: NONE
+    severity: NONE
+    action: no_action
+    rebaseline: false
+- input:
+    psi: 0.0
+  expect:
+    drift_class: NONE
+    severity: NONE
+    action: no_action
+    rebaseline: false
+- input:
+    psi: 0.26
+    observation_days: 7
+  expect:
+    drift_class: CRITICAL_RAPID
+    severity: P1
+    action: halt_and_investigate
+    rebaseline: false
+- input:
+    psi: 0.26
+    observation_days: 8
+  expect:
+    drift_class: CRITICAL_GRADUAL
+    severity: P2
+    action: investigate_and_monitor
+    rebaseline: false

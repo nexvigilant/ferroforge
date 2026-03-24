@@ -1,0 +1,169 @@
+name: guardian-signal-bridge
+description: 'Translates expedited-reporting chain outputs (report_type, timeline, days_from_awareness) into Guardian-compatible signal parameters (source, severity, pattern). Bridges Layer 2 decision logic to Layer 3 Guardian integration.'
+version: 0.2.0
+interface:
+  inputs:
+    days_from_awareness:
+      type: int
+      required: false
+    report_type:
+      type: string
+      required: false
+    risk_score:
+      type: float
+      required: false
+    serious:
+      type: bool
+      required: false
+    timeline:
+      type: string
+      required: false
+  outputs:
+    guardian_context:
+      type: string
+    guardian_pattern:
+      type: string
+    guardian_severity:
+      type: float
+    guardian_source:
+      type: string
+tree:
+  start: check_timeline
+  nodes:
+    check_timeline:
+      type: condition
+      variable: timeline
+      operator: eq
+      value: 7_CALENDAR_DAYS
+      true_next: critical_signal
+      false_next: check_15day
+    check_15day:
+      type: condition
+      variable: timeline
+      operator: eq
+      value: 15_CALENDAR_DAYS
+      true_next: high_signal
+      false_next: check_periodic
+    check_periodic:
+      type: condition
+      variable: timeline
+      operator: eq
+      value: PERIODIC
+      true_next: check_serious_periodic
+      false_next: check_risk_score
+    check_serious_periodic:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: monitor_serious
+      false_next: document_severity
+    check_risk_score:
+      type: condition
+      variable: risk_score
+      operator: gte
+      value: 80
+      true_next: critical_risk
+      false_next: default_severity
+    critical_signal:
+      type: return
+      value:
+        guardian_source: pv
+        guardian_pattern: expedited_critical
+        guardian_severity: 0.95
+        guardian_context: "Expedited 7-day report required - fatal/life-threatening SUSAR"
+    high_signal:
+      type: return
+      value:
+        guardian_source: pv
+        guardian_pattern: expedited_high
+        guardian_severity: 0.80
+        guardian_context: "Expedited 15-day report required - serious unexpected ADR"
+    monitor_serious:
+      type: return
+      value:
+        guardian_source: pv
+        guardian_pattern: monitor_serious
+        guardian_severity: 0.55
+        guardian_context: "Serious expected case - periodic PSUR/DSUR reporting"
+    document_severity:
+      type: return
+      value:
+        guardian_source: pv
+        guardian_pattern: document_only
+        guardian_severity: 0.15
+        guardian_context: "Non-serious case - line listing periodic report"
+    critical_risk:
+      type: return
+      value:
+        guardian_source: pv
+        guardian_pattern: risk_critical
+        guardian_severity: 0.90
+        guardian_context: "Critical risk score from signal detection pipeline"
+    default_severity:
+      type: return
+      value:
+        guardian_source: pv
+        guardian_pattern: routine
+        guardian_severity: 0.10
+        guardian_context: "Routine case - no elevated risk indicators"
+tests:
+- name: 7-day expedited fatal case maps to critical guardian signal
+  input:
+    timeline: 7_CALENDAR_DAYS
+    report_type: IND_SAFETY
+    days_from_awareness: 7
+    serious: true
+  expect:
+    guardian_source: pv
+    guardian_pattern: expedited_critical
+    guardian_severity: 0.95
+    guardian_context: "Expedited 7-day report required - fatal/life-threatening SUSAR"
+- name: 15-day expedited serious unexpected maps to high signal
+  input:
+    timeline: 15_CALENDAR_DAYS
+    report_type: FIELD_ALERT
+    days_from_awareness: 15
+    serious: true
+  expect:
+    guardian_source: pv
+    guardian_pattern: expedited_high
+    guardian_severity: 0.80
+    guardian_context: "Expedited 15-day report required - serious unexpected ADR"
+- name: periodic serious expected case
+  input:
+    timeline: PERIODIC
+    report_type: PSUR_DSUR
+    days_from_awareness: 90
+    serious: true
+  expect:
+    guardian_source: pv
+    guardian_pattern: monitor_serious
+    guardian_severity: 0.55
+    guardian_context: "Serious expected case - periodic PSUR/DSUR reporting"
+- name: periodic non-serious line listing
+  input:
+    timeline: PERIODIC
+    report_type: LINE_LISTING
+    days_from_awareness: 90
+    serious: false
+  expect:
+    guardian_source: pv
+    guardian_pattern: document_only
+    guardian_severity: 0.15
+    guardian_context: "Non-serious case - line listing periodic report"
+- name: high risk score without timeline
+  input:
+    risk_score: 90.0
+  expect:
+    guardian_source: pv
+    guardian_pattern: risk_critical
+    guardian_severity: 0.90
+    guardian_context: "Critical risk score from signal detection pipeline"
+- name: null input defaults to routine
+  input: {}
+  expect:
+    guardian_source: pv
+    guardian_pattern: routine
+    guardian_severity: 0.10
+    guardian_context: "Routine case - no elevated risk indicators"

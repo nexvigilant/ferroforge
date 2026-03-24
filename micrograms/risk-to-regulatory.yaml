@@ -1,0 +1,270 @@
+name: risk-to-regulatory
+description: 'Router: routes risk management decisions to the appropriate regulatory submission action based on market action, benefit-risk verdict, and labeling needs'
+version: 1.0.0
+interface:
+  inputs:
+    benefit_risk_decision:
+      type: string
+      required: false
+    labeling_update_needed:
+      type: bool
+      required: false
+    market_action:
+      type: string
+      required: false
+    rems_required:
+      type: bool
+      required: false
+  outputs:
+    next_mg:
+      type: string
+    regulatory_filing:
+      type: string
+    route:
+      type: string
+    submission_type:
+      type: string
+    timeline:
+      type: string
+tree:
+  start: check_withdrawal
+  nodes:
+    check_withdrawal:
+      type: condition
+      variable: market_action
+      operator: eq
+      value: withdrawal
+      true_next: market_withdrawal
+      false_next: check_restriction
+    market_withdrawal:
+      type: return
+      value:
+        route: MARKET_WITHDRAWAL
+        regulatory_filing: FDA_Form_3580
+        timeline: immediate
+        next_mg: expedited-reporting
+        submission_type: withdrawal
+    check_restriction:
+      type: condition
+      variable: market_action
+      operator: eq
+      value: restriction
+      true_next: market_restriction
+      false_next: check_negative_br
+    market_restriction:
+      type: return
+      value:
+        route: MARKET_RESTRICTION
+        regulatory_filing: sNDA_safety
+        timeline: 30_days
+        next_mg: rems-classifier
+        submission_type: safety_supplement
+    check_negative_br:
+      type: condition
+      variable: benefit_risk_decision
+      operator: eq
+      value: NEGATIVE
+      true_next: safety_review
+      false_next: check_rems
+    safety_review:
+      type: return
+      value:
+        route: SAFETY_REVIEW
+        regulatory_filing: Type_II_Variation
+        timeline: urgent
+        next_mg: expedited-reporting
+        submission_type: variation
+    check_rems:
+      type: condition
+      variable: rems_required
+      operator: eq
+      value: true
+      true_next: rems_submission
+      false_next: check_labeling
+    rems_submission:
+      type: return
+      value:
+        route: REMS_SUBMISSION
+        regulatory_filing: REMS_modification
+        timeline: 60_days
+        next_mg: rems-classifier
+        submission_type: rems
+    check_labeling:
+      type: condition
+      variable: labeling_update_needed
+      operator: eq
+      value: true
+      true_next: labeling_update
+      false_next: check_conditional_br
+    labeling_update:
+      type: return
+      value:
+        route: LABELING_UPDATE
+        regulatory_filing: CBE_supplement
+        timeline: 90_days
+        next_mg: cioms-frequency
+        submission_type: labeling
+    check_conditional_br:
+      type: condition
+      variable: benefit_risk_decision
+      operator: eq
+      value: CONDITIONAL
+      true_next: rmp_update
+      false_next: no_regulatory_action
+    rmp_update:
+      type: return
+      value:
+        route: RMP_UPDATE
+        regulatory_filing: RMP_variation
+        timeline: 120_days
+        next_mg: benefit-risk-gate
+        submission_type: rmp
+    no_regulatory_action:
+      type: return
+      value:
+        route: NO_REGULATORY_ACTION
+        regulatory_filing: none
+        timeline: periodic
+        next_mg: report-deadline
+        submission_type: none
+tests:
+- name: withdrawal triggers immediate market withdrawal filing
+  input:
+    benefit_risk_decision: NEGATIVE
+    rems_required: false
+    labeling_update_needed: false
+    market_action: withdrawal
+  expect:
+    route: MARKET_WITHDRAWAL
+    regulatory_filing: FDA_Form_3580
+    timeline: immediate
+    next_mg: expedited-reporting
+    submission_type: withdrawal
+- name: restriction triggers sNDA safety supplement in 30 days
+  input:
+    benefit_risk_decision: ACCEPTABLE
+    rems_required: false
+    labeling_update_needed: false
+    market_action: restriction
+  expect:
+    route: MARKET_RESTRICTION
+    regulatory_filing: sNDA_safety
+    timeline: 30_days
+    next_mg: rems-classifier
+    submission_type: safety_supplement
+- name: negative benefit-risk decision triggers safety review
+  input:
+    benefit_risk_decision: NEGATIVE
+    rems_required: false
+    labeling_update_needed: false
+    market_action: none
+  expect:
+    route: SAFETY_REVIEW
+    regulatory_filing: Type_II_Variation
+    timeline: urgent
+    next_mg: expedited-reporting
+    submission_type: variation
+- name: rems required triggers REMS modification filing
+  input:
+    benefit_risk_decision: CONDITIONAL
+    rems_required: true
+    labeling_update_needed: false
+    market_action: none
+  expect:
+    route: REMS_SUBMISSION
+    regulatory_filing: REMS_modification
+    timeline: 60_days
+    next_mg: rems-classifier
+    submission_type: rems
+- name: labeling update needed triggers CBE supplement
+  input:
+    benefit_risk_decision: FAVORABLE
+    rems_required: false
+    labeling_update_needed: true
+    market_action: none
+  expect:
+    route: LABELING_UPDATE
+    regulatory_filing: CBE_supplement
+    timeline: 90_days
+    next_mg: cioms-frequency
+    submission_type: labeling
+- name: conditional benefit-risk triggers RMP variation
+  input:
+    benefit_risk_decision: CONDITIONAL
+    rems_required: false
+    labeling_update_needed: false
+    market_action: none
+  expect:
+    route: RMP_UPDATE
+    regulatory_filing: RMP_variation
+    timeline: 120_days
+    next_mg: benefit-risk-gate
+    submission_type: rmp
+- name: favorable decision with no flags yields no regulatory action
+  input:
+    benefit_risk_decision: FAVORABLE
+    rems_required: false
+    labeling_update_needed: false
+    market_action: none
+  expect:
+    route: NO_REGULATORY_ACTION
+    regulatory_filing: none
+    timeline: periodic
+    next_mg: report-deadline
+    submission_type: none
+- name: acceptable decision with no flags yields no regulatory action
+  input:
+    benefit_risk_decision: ACCEPTABLE
+    rems_required: false
+    labeling_update_needed: false
+    market_action: none
+  expect:
+    route: NO_REGULATORY_ACTION
+    regulatory_filing: none
+    timeline: periodic
+    next_mg: report-deadline
+    submission_type: none
+- name: withdrawal takes priority over negative benefit-risk
+  input:
+    benefit_risk_decision: NEGATIVE
+    rems_required: true
+    labeling_update_needed: true
+    market_action: withdrawal
+  expect:
+    route: MARKET_WITHDRAWAL
+    regulatory_filing: FDA_Form_3580
+    timeline: immediate
+    next_mg: expedited-reporting
+    submission_type: withdrawal
+- name: restriction takes priority over REMS requirement
+  input:
+    benefit_risk_decision: CONDITIONAL
+    rems_required: true
+    labeling_update_needed: false
+    market_action: restriction
+  expect:
+    route: MARKET_RESTRICTION
+    regulatory_filing: sNDA_safety
+    timeline: 30_days
+    next_mg: rems-classifier
+    submission_type: safety_supplement
+- name: REMS takes priority over labeling update
+  input:
+    benefit_risk_decision: FAVORABLE
+    rems_required: true
+    labeling_update_needed: true
+    market_action: none
+  expect:
+    route: REMS_SUBMISSION
+    regulatory_filing: REMS_modification
+    timeline: 60_days
+    next_mg: rems-classifier
+    submission_type: rems
+- name: empty input defaults to no regulatory action
+  input: {}
+  expect:
+    route: NO_REGULATORY_ACTION
+    regulatory_filing: none
+    timeline: periodic
+    next_mg: report-deadline
+    submission_type: none

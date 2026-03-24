@@ -1,0 +1,187 @@
+name: gi-hepato-safety-gate
+description: 'GI and hepatic safety classifier: maps digestive system adverse reactions using Hy''s Law criteria for DILI and GI severity'
+version: 0.1.0
+interface:
+  inputs:
+    reaction_pt:
+      type: string
+      required: true
+      description: MedDRA preferred term for the GI/hepatic reaction
+    alt_xuln:
+      type: float
+      required: false
+      description: ALT elevation as x ULN (e.g., 3.0 = 3x upper limit of normal)
+    tbili_xuln:
+      type: float
+      required: false
+      description: Total bilirubin elevation as x ULN
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    soc:
+      type: string
+    dili_signal:
+      type: bool
+      description: Whether Hy's Law criteria are met (ALT>=3xULN + TBili>=2xULN)
+    action:
+      type: string
+tree:
+  start: check_hys_law
+  nodes:
+    check_hys_law:
+      type: condition
+      variable: alt_xuln
+      operator: gte
+      value: 3
+      true_next: check_tbili
+      false_next: check_hepatic_failure
+    check_tbili:
+      type: condition
+      variable: tbili_xuln
+      operator: gte
+      value: 2
+      true_next: critical_hys
+      false_next: serious_alt
+    check_hepatic_failure:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: HEPATIC FAILURE
+      true_next: critical_liver
+      false_next: check_hepatitis
+    check_hepatitis:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: HEPATITIS
+      true_next: serious_hepatitis
+      false_next: check_gi_perforation
+    check_gi_perforation:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: PERFORATION
+      true_next: critical_perf
+      false_next: check_gi_bleed
+    check_gi_bleed:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: HAEMORRHAGE
+      true_next: serious_bleed
+      false_next: check_pancreatitis
+    check_pancreatitis:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: PANCREATITIS
+      true_next: serious_panc
+      false_next: mild
+    critical_hys:
+      type: return
+      value:
+        severity: critical
+        soc: Hepatobiliary disorders
+        dili_signal: true
+        action: immediate_expedited_report
+    serious_alt:
+      type: return
+      value:
+        severity: serious
+        soc: Hepatobiliary disorders
+        dili_signal: false
+        action: expedited_report
+    critical_liver:
+      type: return
+      value:
+        severity: critical
+        soc: Hepatobiliary disorders
+        dili_signal: false
+        action: immediate_expedited_report
+    serious_hepatitis:
+      type: return
+      value:
+        severity: serious
+        soc: Hepatobiliary disorders
+        dili_signal: false
+        action: expedited_report
+    critical_perf:
+      type: return
+      value:
+        severity: critical
+        soc: Gastrointestinal disorders
+        dili_signal: false
+        action: immediate_expedited_report
+    serious_bleed:
+      type: return
+      value:
+        severity: serious
+        soc: Gastrointestinal disorders
+        dili_signal: false
+        action: expedited_report
+    serious_panc:
+      type: return
+      value:
+        severity: serious
+        soc: Gastrointestinal disorders
+        dili_signal: false
+        action: expedited_report
+    mild:
+      type: return
+      value:
+        severity: mild
+        soc: Gastrointestinal disorders
+        dili_signal: false
+        action: routine_surveillance
+tests:
+  - name: hys_law_met
+    input:
+      reaction_pt: HEPATOCELLULAR INJURY
+      alt_xuln: 5.0
+      tbili_xuln: 3.0
+    expect:
+      severity: critical
+      dili_signal: true
+  - name: alt_elevated_only
+    input:
+      reaction_pt: ALANINE AMINOTRANSFERASE INCREASED
+      alt_xuln: 4.0
+      tbili_xuln: 1.0
+    expect:
+      severity: serious
+      dili_signal: false
+  - name: hepatic_failure
+    input:
+      reaction_pt: HEPATIC FAILURE
+    expect:
+      severity: critical
+  - name: hepatitis
+    input:
+      reaction_pt: HEPATITIS CHOLESTATIC
+    expect:
+      severity: serious
+  - name: gi_perforation
+    input:
+      reaction_pt: INTESTINAL PERFORATION
+    expect:
+      severity: critical
+  - name: gi_bleed
+    input:
+      reaction_pt: UPPER GASTROINTESTINAL HAEMORRHAGE
+    expect:
+      severity: serious
+  - name: pancreatitis
+    input:
+      reaction_pt: PANCREATITIS ACUTE
+    expect:
+      severity: serious
+  - name: mild_nausea
+    input:
+      reaction_pt: NAUSEA
+    expect:
+      severity: mild
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild

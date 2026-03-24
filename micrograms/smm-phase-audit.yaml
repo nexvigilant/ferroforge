@@ -1,0 +1,118 @@
+name: smm-phase-audit
+description: "NVG-SMM-001 Section 3: Audit a scientific method phase for documentation compliance. 10 phases (I-X), each with required docs and violation class if absent. Chemistry analog: Beer-Lambert — signal (documentation) must exceed noise floor for detection."
+version: 0.1.0
+interface:
+  inputs:
+    phase:
+      type: string
+      required: false
+    phase_name:
+      type: string
+      required: false
+    fatal_if_absent:
+      type: bool
+      required: true
+    documentation_present:
+      type: bool
+      required: true
+    violation_class:
+      type: string
+      required: false
+  outputs:
+    compliant:
+      type: bool
+    violation_class:
+      type: string
+    label:
+      type: string
+    action:
+      type: string
+    chemistry_analog:
+      type: string
+
+tree:
+  start: route_phase
+  nodes:
+    route_phase:
+      type: condition
+      variable: fatal_if_absent
+      operator: eq
+      value: true
+      true_next: check_fatal_doc
+      false_next: check_nonfatal_doc
+    check_fatal_doc:
+      type: condition
+      variable: documentation_present
+      operator: eq
+      value: true
+      true_next: compliant
+      false_next: fatal_violation
+    check_nonfatal_doc:
+      type: condition
+      variable: documentation_present
+      operator: eq
+      value: true
+      true_next: compliant
+      false_next: route_nonfatal_class
+    route_nonfatal_class:
+      type: condition
+      variable: violation_class
+      operator: eq
+      value: C
+      true_next: critical_violation
+      false_next: major_violation
+    fatal_violation:
+      type: return
+      value:
+        compliant: false
+        violation_class: F
+        label: FATAL
+        action: "Required documentation absent in fatal-if-absent phase. Evidence excluded."
+        chemistry_analog: "Signal below detection limit — instrument cannot register"
+    critical_violation:
+      type: return
+      value:
+        compliant: false
+        violation_class: C
+        label: CRITICAL
+        action: "Structural deficiency. Reduced weight integration."
+        chemistry_analog: "Signal present but below quantification limit"
+    major_violation:
+      type: return
+      value:
+        compliant: false
+        violation_class: M
+        label: MAJOR
+        action: "Methodological gap. Advisory flag on integration."
+        chemistry_analog: "Signal quantifiable but imprecise — wide confidence interval"
+    compliant:
+      type: return
+      value:
+        compliant: true
+        violation_class: none
+        label: COMPLIANT
+        action: "Phase documentation complete."
+        chemistry_analog: "Signal clear — good signal-to-noise ratio"
+
+tests:
+  # Phase IV (Hypothesize) — fatal if absent
+  - input: { phase: "IV", phase_name: "Hypothesize", fatal_if_absent: true, documentation_present: false, violation_class: F }
+    expect: { compliant: false, violation_class: F, label: FATAL }
+  - input: { phase: "IV", phase_name: "Hypothesize", fatal_if_absent: true, documentation_present: true, violation_class: F }
+    expect: { compliant: true, violation_class: none, label: COMPLIANT }
+  # Phase II (Observe) — critical if absent
+  - input: { phase: "II", phase_name: "Observe", fatal_if_absent: false, documentation_present: false, violation_class: C }
+    expect: { compliant: false, violation_class: C, label: CRITICAL }
+  # Phase I (Initialize) — major if absent
+  - input: { phase: "I", phase_name: "Initialize", fatal_if_absent: false, documentation_present: false, violation_class: M }
+    expect: { compliant: false, violation_class: M, label: MAJOR }
+  # Phase V (Design) — fatal if absent, present
+  - input: { phase: "V", phase_name: "Design", fatal_if_absent: true, documentation_present: true, violation_class: F }
+    expect: { compliant: true, violation_class: none, label: COMPLIANT }
+  - input: {}
+    expect:
+      action: Methodological gap. Advisory flag on integration.
+      chemistry_analog: Signal quantifiable but imprecise — wide confidence interval
+      compliant: false
+      label: MAJOR
+      violation_class: M

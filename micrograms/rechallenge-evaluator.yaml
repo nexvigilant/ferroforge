@@ -1,0 +1,198 @@
+name: rechallenge-evaluator
+description: 'Rechallenge rate evaluator using cross-variable comparison: compares baseline_rate, first_exposure_rate, and rechallenge_rate to assess Bradford Hill experiment criterion. Uses cross-variable template resolution to directly compare rates against each other.'
+version: 0.1.0
+interface:
+  inputs:
+    baseline_rate:
+      type: float
+      required: true
+      description: 'Adverse event rate at baseline (events per 1000 patients)'
+    first_exposure_rate:
+      type: float
+      required: true
+      description: 'Adverse event rate during first exposure'
+    rechallenge_rate:
+      type: float
+      required: true
+      description: 'Adverse event rate during rechallenge (re-exposure)'
+  outputs:
+    pattern:
+      type: string
+      description: 'CLASSIC_RECHALLENGE, SENSITIZATION, TOLERANCE, INCONSISTENT, NO_EFFECT'
+    experiment_criterion_met:
+      type: string
+      description: 'yes/no — Bradford Hill experiment criterion satisfied'
+    confidence:
+      type: string
+      description: 'HIGH, MEDIUM, LOW confidence in the assessment'
+    interpretation:
+      type: string
+      description: 'Plain English explanation of rechallenge pattern'
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(baseline, first, rechallenge) at ∂(rate_comparison) — three-way rate comparison for experiment criterion'
+  primes: ['κ', '∂', 'N', 'μ']
+  arguments: ['baseline_rate', 'first_exposure_rate', 'rechallenge_rate']
+  chain_prediction: 'μ(κ(rates)) → bradford_hill_experiment_criterion'
+tree:
+  start: check_first_vs_baseline
+  nodes:
+    # Is first exposure rate > baseline?
+    check_first_vs_baseline:
+      type: condition
+      variable: first_exposure_rate
+      operator: gt
+      value: '{{baseline_rate}}'
+      true_next: first_elevated_check_rechallenge
+      false_next: first_not_elevated_check_rechallenge
+
+    # First exposure elevated — check rechallenge vs baseline
+    first_elevated_check_rechallenge:
+      type: condition
+      variable: rechallenge_rate
+      operator: gt
+      value: '{{baseline_rate}}'
+      true_next: rechallenge_elevated_check_vs_first
+      false_next: tolerance_pattern
+
+    # Both elevated — compare rechallenge to first exposure
+    rechallenge_elevated_check_vs_first:
+      type: condition
+      variable: rechallenge_rate
+      operator: gt
+      value: '{{first_exposure_rate}}'
+      true_next: sensitization
+      false_next: check_rechallenge_eq_first
+
+    check_rechallenge_eq_first:
+      type: condition
+      variable: rechallenge_rate
+      operator: eq
+      value: '{{first_exposure_rate}}'
+      true_next: classic_rechallenge_equal
+      false_next: classic_rechallenge_lower
+
+    # First exposure NOT elevated
+    first_not_elevated_check_rechallenge:
+      type: condition
+      variable: rechallenge_rate
+      operator: gt
+      value: '{{baseline_rate}}'
+      true_next: inconsistent_delayed
+      false_next: no_effect
+
+    # Terminal nodes
+    classic_rechallenge_equal:
+      type: return
+      value:
+        pattern: CLASSIC_RECHALLENGE
+        experiment_criterion_met: 'yes'
+        confidence: HIGH
+        interpretation: 'Classic rechallenge — rate elevated during both exposures at equal level. Strong Bradford Hill experiment criterion support.'
+
+    classic_rechallenge_lower:
+      type: return
+      value:
+        pattern: CLASSIC_RECHALLENGE
+        experiment_criterion_met: 'yes'
+        confidence: MEDIUM
+        interpretation: 'Rechallenge positive but at lower rate than first exposure. Partial tolerance may be developing. Still supports experiment criterion.'
+
+    sensitization:
+      type: return
+      value:
+        pattern: SENSITIZATION
+        experiment_criterion_met: 'yes'
+        confidence: HIGH
+        interpretation: 'Sensitization — rechallenge rate exceeds first exposure. Immune-mediated or cumulative mechanism suspected. Strong experiment criterion with dose-escalation concern.'
+
+    tolerance_pattern:
+      type: return
+      value:
+        pattern: TOLERANCE
+        experiment_criterion_met: 'no'
+        confidence: MEDIUM
+        interpretation: 'First exposure elevated but rechallenge normal. Suggests tolerance development or adaptation. Experiment criterion not met — effect is not reproducible.'
+
+    inconsistent_delayed:
+      type: return
+      value:
+        pattern: INCONSISTENT
+        experiment_criterion_met: 'no'
+        confidence: LOW
+        interpretation: 'First exposure normal but rechallenge elevated. Delayed onset or coincidental. Experiment criterion not cleanly met — investigate confounders.'
+
+    no_effect:
+      type: return
+      value:
+        pattern: NO_EFFECT
+        experiment_criterion_met: 'no'
+        confidence: HIGH
+        interpretation: 'No elevation at either exposure. No evidence of drug-event relationship via experiment criterion.'
+
+tests:
+# Classic rechallenge — both elevated equally
+- input:
+    baseline_rate: 5
+    first_exposure_rate: 20
+    rechallenge_rate: 20
+  expect:
+    pattern: CLASSIC_RECHALLENGE
+    experiment_criterion_met: 'yes'
+    confidence: HIGH
+
+# Classic rechallenge — rechallenge slightly lower
+- input:
+    baseline_rate: 5
+    first_exposure_rate: 25
+    rechallenge_rate: 18
+  expect:
+    pattern: CLASSIC_RECHALLENGE
+    experiment_criterion_met: 'yes'
+    confidence: MEDIUM
+
+# Sensitization — rechallenge higher than first
+- input:
+    baseline_rate: 5
+    first_exposure_rate: 15
+    rechallenge_rate: 30
+  expect:
+    pattern: SENSITIZATION
+    experiment_criterion_met: 'yes'
+    confidence: HIGH
+
+# Tolerance — first elevated, rechallenge normal
+- input:
+    baseline_rate: 10
+    first_exposure_rate: 25
+    rechallenge_rate: 8
+  expect:
+    pattern: TOLERANCE
+    experiment_criterion_met: 'no'
+    confidence: MEDIUM
+
+# Inconsistent — first normal, rechallenge elevated
+- input:
+    baseline_rate: 10
+    first_exposure_rate: 10
+    rechallenge_rate: 25
+  expect:
+    pattern: INCONSISTENT
+    experiment_criterion_met: 'no'
+    confidence: LOW
+
+# No effect — nothing elevated
+- input:
+    baseline_rate: 10
+    first_exposure_rate: 8
+    rechallenge_rate: 9
+  expect:
+    pattern: NO_EFFECT
+    experiment_criterion_met: 'no'
+    confidence: HIGH
+
+# Null input safety
+- input: {}
+  expect:
+    pattern: NO_EFFECT
+    experiment_criterion_met: 'no'

@@ -1,0 +1,194 @@
+name: reality-gradient-classifier
+description: Classify VDAG reality gradient score into 5-tier rating
+version: 0.1.0
+tree:
+  start: check_production
+  nodes:
+    safety_validated:
+      type: return
+      value:
+        executable: true
+        description: Safety baseline met — efficacy evidence needed
+        rating: safety_validated
+    efficacy_demonstrated:
+      type: return
+      value:
+        rating: efficacy_demonstrated
+        executable: true
+        description: Core efficacy demonstrated — scale testing required
+    testing_theater:
+      type: return
+      value:
+        executable: false
+        description: Insufficient evidence — testing theater risk
+        rating: testing_theater
+    check_production:
+      type: condition
+      variable: score
+      operator: gte
+      value: 0.95
+      true_next: production_ready
+      false_next: check_scale
+    check_scale:
+      type: condition
+      variable: score
+      operator: gte
+      value: 0.8
+      true_next: scale_confirmed
+      false_next: check_efficacy
+    production_ready:
+      type: return
+      value:
+        rating: production_ready
+        executable: true
+        description: All evidence strong — production deployment approved
+    check_efficacy:
+      type: condition
+      variable: score
+      operator: gte
+      value: 0.5
+      true_next: efficacy_demonstrated
+      false_next: check_safety
+    scale_confirmed:
+      type: return
+      value:
+        rating: scale_confirmed
+        description: Scale evidence confirmed — final validation pending
+        executable: true
+    check_safety:
+      type: condition
+      variable: score
+      operator: gte
+      value: 0.2
+      true_next: safety_validated
+      false_next: testing_theater
+tests:
+- input:
+    score: 0.98
+  expect:
+    description: All evidence strong — production deployment approved
+    rating: production_ready
+    executable: true
+- input:
+    score: 0.95
+  expect:
+    rating: production_ready
+    description: All evidence strong — production deployment approved
+    executable: true
+- input:
+    score: 0.85
+  expect:
+    rating: scale_confirmed
+    executable: true
+    description: Scale evidence confirmed — final validation pending
+- input:
+    score: 0.8
+  expect:
+    executable: true
+    rating: scale_confirmed
+    description: Scale evidence confirmed — final validation pending
+- input:
+    score: 0.65
+  expect:
+    executable: true
+    description: Core efficacy demonstrated — scale testing required
+    rating: efficacy_demonstrated
+- input:
+    score: 0.5
+  expect:
+    executable: true
+    rating: efficacy_demonstrated
+    description: Core efficacy demonstrated — scale testing required
+- input:
+    score: 0.35
+  expect:
+    description: Safety baseline met — efficacy evidence needed
+    rating: safety_validated
+    executable: true
+- input:
+    score: 0.2
+  expect:
+    rating: safety_validated
+    executable: true
+    description: Safety baseline met — efficacy evidence needed
+- input:
+    score: 0.1
+  expect:
+    description: Insufficient evidence — testing theater risk
+    executable: false
+    rating: testing_theater
+- input:
+    score: 0.0
+  expect:
+    executable: false
+    rating: testing_theater
+    description: Insufficient evidence — testing theater risk
+- input:
+    score: 0.949
+  expect:
+    executable: true
+    rating: scale_confirmed
+    description: Scale evidence confirmed — final validation pending
+- input:
+    score: 0.951
+  expect:
+    description: All evidence strong — production deployment approved
+    executable: true
+    rating: production_ready
+- input: {}
+  expect:
+    rating: testing_theater
+    executable: false
+    description: Insufficient evidence — testing theater risk
+- input:
+    score: 0.799
+  expect:
+    executable: true
+    description: Core efficacy demonstrated — scale testing required
+    rating: efficacy_demonstrated
+- input:
+    score: 0.801
+  expect:
+    rating: scale_confirmed
+    description: Scale evidence confirmed — final validation pending
+    executable: true
+- input: {}
+  expect:
+    description: Insufficient evidence — testing theater risk
+    executable: false
+    rating: testing_theater
+- input:
+    score: 0.499
+  expect:
+    executable: true
+    description: Safety baseline met — efficacy evidence needed
+    rating: safety_validated
+- input:
+    score: 0.501
+  expect:
+    executable: true
+    description: Core efficacy demonstrated — scale testing required
+    rating: efficacy_demonstrated
+- input: {}
+  expect:
+    executable: false
+    rating: testing_theater
+    description: Insufficient evidence — testing theater risk
+- input:
+    score: 0.199
+  expect:
+    rating: testing_theater
+    executable: false
+    description: Insufficient evidence — testing theater risk
+- input:
+    score: 0.201
+  expect:
+    executable: true
+    description: Safety baseline met — efficacy evidence needed
+    rating: safety_validated
+- input: {}
+  expect:
+    rating: testing_theater
+    description: Insufficient evidence — testing theater risk
+    executable: false
+interface: null

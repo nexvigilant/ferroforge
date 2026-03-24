@@ -1,0 +1,39 @@
+name: station-recall-pipeline
+description: "FDA recall data → severity classification → causality routing. From search-recalls output to notification decision."
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - config-fda-recall-severity
+  - adapt-risk-tier
+  - signal-to-causality
+tests:
+- name: Class I nationwide recall → urgent causality
+  input:
+    recall_class: "I"
+    is_ongoing: true
+    distribution_scope: "nationwide"
+  expect:
+    urgency: critical
+    signal_detected: true
+    priority: URGENT
+    next_step: causality_assessment
+- name: Class II ongoing → standard causality
+  input:
+    recall_class: "II"
+    is_ongoing: true
+    distribution_scope: "statewide"
+  expect:
+    urgency: high
+    signal_detected: true
+    priority: URGENT
+    next_step: causality_assessment
+- name: Class III resolved → continue monitoring
+  input:
+    recall_class: "III"
+    is_ongoing: false
+  expect:
+    urgency: low
+    signal_detected: false
+    priority: LOW
+    next_step: continue_monitoring

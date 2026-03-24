@@ -1,0 +1,166 @@
+name: threshold-drift-detector
+description: 'Detect threshold drift from consecutive warnings/criticals and declining reality trend. Outputs drift severity (NONE/MILD/SIGNIFICANT) with recommended action.'
+version: 0.1.0
+interface:
+  inputs:
+    consecutive_warnings:
+      type: integer
+      required: true
+    consecutive_criticals:
+      type: integer
+      required: true
+    reality_trend:
+      type: string
+      required: true
+  outputs:
+    drift_detected:
+      type: boolean
+    severity:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_criticals
+  nodes:
+    check_criticals:
+      type: condition
+      variable: consecutive_criticals
+      operator: gte
+      value: 3
+      true_next: return_significant
+      false_next: check_warnings
+    check_warnings:
+      type: condition
+      variable: consecutive_warnings
+      operator: gte
+      value: 5
+      true_next: return_mild_warnings
+      false_next: check_declining
+    check_declining:
+      type: condition
+      variable: reality_trend
+      operator: eq
+      value: declining
+      true_next: check_declining_warnings
+      false_next: return_none
+    check_declining_warnings:
+      type: condition
+      variable: consecutive_warnings
+      operator: gte
+      value: 2
+      true_next: return_mild_declining
+      false_next: return_none
+    return_significant:
+      type: return
+      value:
+        drift_detected: true
+        severity: SIGNIFICANT
+        action: Immediate threshold recalibration required — 3+ consecutive criticals indicate systematic miscalibration
+    return_mild_warnings:
+      type: return
+      value:
+        drift_detected: true
+        severity: MILD
+        action: Review warning thresholds — 5+ consecutive warnings suggest gradual drift
+    return_mild_declining:
+      type: return
+      value:
+        drift_detected: true
+        severity: MILD
+        action: Monitor closely — declining reality trend with warnings suggests emerging drift
+    return_none:
+      type: return
+      value:
+        drift_detected: false
+        severity: NONE
+        action: No drift detected — thresholds appear well-calibrated
+tests:
+- input:
+    consecutive_warnings: 0
+    consecutive_criticals: 3
+    reality_trend: stable
+  expect:
+    drift_detected: true
+    severity: SIGNIFICANT
+- input:
+    consecutive_warnings: 10
+    consecutive_criticals: 5
+    reality_trend: declining
+  expect:
+    drift_detected: true
+    severity: SIGNIFICANT
+- input:
+    consecutive_warnings: 5
+    consecutive_criticals: 0
+    reality_trend: stable
+  expect:
+    drift_detected: true
+    severity: MILD
+- input:
+    consecutive_warnings: 7
+    consecutive_criticals: 2
+    reality_trend: stable
+  expect:
+    drift_detected: true
+    severity: MILD
+- input:
+    consecutive_warnings: 2
+    consecutive_criticals: 0
+    reality_trend: declining
+  expect:
+    drift_detected: true
+    severity: MILD
+- input:
+    consecutive_warnings: 3
+    consecutive_criticals: 0
+    reality_trend: declining
+  expect:
+    drift_detected: true
+    severity: MILD
+- input:
+    consecutive_warnings: 0
+    consecutive_criticals: 0
+    reality_trend: stable
+  expect:
+    drift_detected: false
+    severity: NONE
+- input:
+    consecutive_warnings: 1
+    consecutive_criticals: 0
+    reality_trend: declining
+  expect:
+    drift_detected: false
+    severity: NONE
+- input:
+    consecutive_warnings: 4
+    consecutive_criticals: 0
+    reality_trend: stable
+  expect:
+    drift_detected: false
+    severity: NONE
+- input:
+    consecutive_warnings: 0
+    consecutive_criticals: 2
+    reality_trend: declining
+  expect:
+    drift_detected: false
+    severity: NONE
+- input:
+    consecutive_warnings: 0
+    consecutive_criticals: 0
+    reality_trend: declining
+  expect:
+    drift_detected: false
+    severity: NONE
+- input:
+    consecutive_warnings: 1
+    consecutive_criticals: 1
+    reality_trend: stable
+  expect:
+    drift_detected: false
+    severity: NONE
+- input: {}
+  expect:
+    action: No drift detected — thresholds appear well-calibrated
+    drift_detected: false
+    severity: NONE

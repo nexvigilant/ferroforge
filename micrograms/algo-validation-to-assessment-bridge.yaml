@@ -1,0 +1,148 @@
+name: algo-validation-to-assessment-bridge
+description: "Bridge microgram: maps signal-deep-validation outputs to pv-12-algorithm-assessment inputs. Implements Algorithm 3 (TRANSFER) between the two chains. confidence → evidence_sufficient, trend → tolerance_met, overall → decision_defined."
+version: 0.1.0
+interface:
+  inputs:
+    confidence:
+      type: integer
+      required: true
+      description: "Signal validation confidence (0-100)"
+    trend:
+      type: string
+      required: true
+      description: "Signal trend from trend-detector"
+    overall:
+      type: string
+      required: true
+      description: "Overall signal classification from multi-signal-combiner"
+  outputs:
+    evidence_sufficient:
+      type: boolean
+    decision_defined:
+      type: boolean
+    tolerance_met:
+      type: boolean
+    perspectives_checked:
+      type: integer
+    algorithm:
+      type: string
+tree:
+  start: check_confidence
+  nodes:
+    check_confidence:
+      type: condition
+      variable: confidence
+      operator: gte
+      value: 70
+      true_next: high_confidence
+      false_next: check_mid_confidence
+    check_mid_confidence:
+      type: condition
+      variable: confidence
+      operator: gte
+      value: 40
+      true_next: mid_confidence
+      false_next: low_confidence
+    high_confidence:
+      type: condition
+      variable: overall
+      operator: eq
+      value: CONFIRMED
+      true_next: confirmed_high
+      false_next: probable_high
+    confirmed_high:
+      type: condition
+      variable: trend
+      operator: eq
+      value: STABLE
+      true_next: bridge_full_ready
+      false_next: bridge_confirmed_unstable
+    probable_high:
+      type: condition
+      variable: trend
+      operator: eq
+      value: STABLE
+      true_next: bridge_probable_stable
+      false_next: bridge_probable_unstable
+    mid_confidence:
+      type: condition
+      variable: trend
+      operator: eq
+      value: RISING
+      true_next: bridge_emerging
+      false_next: bridge_uncertain
+    low_confidence:
+      type: return
+      value:
+        evidence_sufficient: false
+        decision_defined: false
+        tolerance_met: false
+        perspectives_checked: 1
+        algorithm: "BRIDGE: confidence < 40 → evidence insufficient, decision undefined, not converged"
+    bridge_full_ready:
+      type: return
+      value:
+        evidence_sufficient: true
+        decision_defined: true
+        tolerance_met: true
+        perspectives_checked: 4
+        algorithm: "BRIDGE: CONFIRMED + high confidence + STABLE → full assessment readiness"
+    bridge_confirmed_unstable:
+      type: return
+      value:
+        evidence_sufficient: true
+        decision_defined: true
+        tolerance_met: false
+        perspectives_checked: 3
+        algorithm: "BRIDGE: CONFIRMED but trend not stable → evidence present, convergence needed"
+    bridge_probable_stable:
+      type: return
+      value:
+        evidence_sufficient: true
+        decision_defined: true
+        tolerance_met: true
+        perspectives_checked: 3
+        algorithm: "BRIDGE: PROBABLE + stable → ready for assessment, moderate confidence"
+    bridge_probable_unstable:
+      type: return
+      value:
+        evidence_sufficient: true
+        decision_defined: true
+        tolerance_met: false
+        perspectives_checked: 2
+        algorithm: "BRIDGE: PROBABLE but unstable → evidence present, needs convergence monitoring"
+    bridge_emerging:
+      type: return
+      value:
+        evidence_sufficient: false
+        decision_defined: false
+        tolerance_met: false
+        perspectives_checked: 1
+        algorithm: "BRIDGE: mid-confidence + RISING → emerging signal, do NOT commit, monitor closely"
+    bridge_uncertain:
+      type: return
+      value:
+        evidence_sufficient: false
+        decision_defined: false
+        tolerance_met: false
+        perspectives_checked: 1
+        algorithm: "BRIDGE: mid-confidence + not rising → insufficient, re-evaluate at next cycle"
+tests:
+- name: confirmed_strong_stable
+  input: { confidence: 95, trend: STABLE, overall: CONFIRMED }
+  expect: { evidence_sufficient: true, decision_defined: true, tolerance_met: true, perspectives_checked: 4 }
+- name: confirmed_strong_rising
+  input: { confidence: 95, trend: RISING, overall: CONFIRMED }
+  expect: { evidence_sufficient: true, decision_defined: true, tolerance_met: false, perspectives_checked: 3 }
+- name: probable_stable
+  input: { confidence: 75, trend: STABLE, overall: PROBABLE }
+  expect: { evidence_sufficient: true, decision_defined: true, tolerance_met: true, perspectives_checked: 3 }
+- name: weak_rising_emerging
+  input: { confidence: 45, trend: RISING, overall: SUGGESTIVE }
+  expect: { evidence_sufficient: false, decision_defined: false, tolerance_met: false, perspectives_checked: 1 }
+- name: noise_low_confidence
+  input: { confidence: 20, trend: RISING, overall: NO_SIGNAL }
+  expect: { evidence_sufficient: false, decision_defined: false, tolerance_met: false, perspectives_checked: 1 }
+- name: null_safety
+  input: {}
+  expect: { evidence_sufficient: false, decision_defined: false, tolerance_met: false, perspectives_checked: 1 }

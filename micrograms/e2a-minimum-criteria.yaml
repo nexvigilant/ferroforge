@@ -1,0 +1,166 @@
+name: e2a-minimum-criteria
+description: 'ICH E2A / CIOMS-I minimum ICSR validity gate: all 4 elements (reporter, patient, drug, event) must be identifiable'
+version: 0.1.0
+interface:
+  inputs:
+    adverse_event:
+      type: bool
+      required: false
+    identifiable_patient:
+      type: bool
+      required: false
+    identifiable_reporter:
+      type: bool
+      required: false
+    suspected_drug:
+      type: bool
+      required: false
+  outputs:
+    description:
+      type: string
+    missing_elements:
+      type: string
+    regulatory_reference:
+      type: string
+    valid_icsr:
+      type: bool
+tree:
+  start: check_reporter
+  nodes:
+    check_reporter:
+      type: condition
+      variable: identifiable_reporter
+      operator: eq
+      value: true
+      true_next: check_patient
+      false_next: missing_reporter
+    check_patient:
+      type: condition
+      variable: identifiable_patient
+      operator: eq
+      value: true
+      true_next: check_drug
+      false_next: missing_patient
+    check_drug:
+      type: condition
+      variable: suspected_drug
+      operator: eq
+      value: true
+      true_next: check_event
+      false_next: missing_drug
+    check_event:
+      type: condition
+      variable: adverse_event
+      operator: eq
+      value: true
+      true_next: valid
+      false_next: missing_event
+    valid:
+      type: return
+      value:
+        valid_icsr: true
+        missing_elements: NONE
+        description: All 4 minimum ICSR elements present - case is valid for processing
+        regulatory_reference: ICH E2A Section III.A / CIOMS-I
+    missing_reporter:
+      type: return
+      value:
+        valid_icsr: false
+        missing_elements: IDENTIFIABLE_REPORTER
+        description: No identifiable reporter - case does not meet minimum ICSR criteria
+        regulatory_reference: ICH E2A Section III.A / CIOMS-I
+    missing_patient:
+      type: return
+      value:
+        valid_icsr: false
+        missing_elements: IDENTIFIABLE_PATIENT
+        description: No identifiable patient - case does not meet minimum ICSR criteria
+        regulatory_reference: ICH E2A Section III.A / CIOMS-I
+    missing_drug:
+      type: return
+      value:
+        valid_icsr: false
+        missing_elements: SUSPECTED_DRUG
+        description: No suspected drug identified - case does not meet minimum ICSR criteria
+        regulatory_reference: ICH E2A Section III.A / CIOMS-I
+    missing_event:
+      type: return
+      value:
+        valid_icsr: false
+        missing_elements: ADVERSE_EVENT
+        description: No adverse event described - case does not meet minimum ICSR criteria
+        regulatory_reference: ICH E2A Section III.A / CIOMS-I
+tests:
+# All 4 elements present - valid ICSR
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspected_drug: true
+    adverse_event: true
+  expect:
+    valid_icsr: true
+    missing_elements: NONE
+    description: All 4 minimum ICSR elements present - case is valid for processing
+    regulatory_reference: ICH E2A Section III.A / CIOMS-I
+# Missing reporter
+- input:
+    identifiable_reporter: false
+    identifiable_patient: true
+    suspected_drug: true
+    adverse_event: true
+  expect:
+    valid_icsr: false
+    missing_elements: IDENTIFIABLE_REPORTER
+    description: No identifiable reporter - case does not meet minimum ICSR criteria
+    regulatory_reference: ICH E2A Section III.A / CIOMS-I
+# Missing patient
+- input:
+    identifiable_reporter: true
+    identifiable_patient: false
+    suspected_drug: true
+    adverse_event: true
+  expect:
+    valid_icsr: false
+    missing_elements: IDENTIFIABLE_PATIENT
+    description: No identifiable patient - case does not meet minimum ICSR criteria
+    regulatory_reference: ICH E2A Section III.A / CIOMS-I
+# Missing drug
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspected_drug: false
+    adverse_event: true
+  expect:
+    valid_icsr: false
+    missing_elements: SUSPECTED_DRUG
+    description: No suspected drug identified - case does not meet minimum ICSR criteria
+    regulatory_reference: ICH E2A Section III.A / CIOMS-I
+# Missing event
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspected_drug: true
+    adverse_event: false
+  expect:
+    valid_icsr: false
+    missing_elements: ADVERSE_EVENT
+    description: No adverse event described - case does not meet minimum ICSR criteria
+    regulatory_reference: ICH E2A Section III.A / CIOMS-I
+# All missing (empty input)
+- input: {}
+  expect:
+    valid_icsr: false
+    missing_elements: IDENTIFIABLE_REPORTER
+    description: No identifiable reporter - case does not meet minimum ICSR criteria
+    regulatory_reference: ICH E2A Section III.A / CIOMS-I
+# Explicit all false
+- input:
+    identifiable_reporter: false
+    identifiable_patient: false
+    suspected_drug: false
+    adverse_event: false
+  expect:
+    valid_icsr: false
+    missing_elements: IDENTIFIABLE_REPORTER
+    description: No identifiable reporter - case does not meet minimum ICSR criteria
+    regulatory_reference: ICH E2A Section III.A / CIOMS-I

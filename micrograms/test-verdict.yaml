@@ -1,0 +1,142 @@
+name: test-verdict
+description: 'Classify test run: GREEN (0 failures), YELLOW (<=5% failure rate), RED (>5%)'
+version: 0.1.0
+interface:
+  inputs:
+    failure_rate:
+      type: int
+      required: false
+    failures:
+      type: int
+      required: false
+  outputs:
+    block:
+      type: bool
+    deploy:
+      type: bool
+    verdict:
+      type: string
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: failures
+      operator: is_null
+      value: null
+      true_next: unknown_return
+      false_next: zero_check
+    unknown_return:
+      type: return
+      value:
+        verdict: UNKNOWN
+        deploy: false
+        block: true
+    zero_check:
+      type: condition
+      variable: failures
+      operator: eq
+      value: 0
+      true_next: green
+      false_next: rate_check
+    yellow:
+      type: return
+      value:
+        verdict: YELLOW
+        block: false
+        deploy: false
+    rate_check:
+      type: condition
+      variable: failure_rate
+      operator: lte
+      value: 5
+      true_next: yellow
+      false_next: red
+    green:
+      type: return
+      value:
+        verdict: GREEN
+        deploy: true
+        block: false
+    red:
+      type: return
+      value:
+        deploy: false
+        verdict: RED
+        block: true
+tests:
+- input:
+    failures: 0
+    failure_rate: 0
+  expect:
+    block: false
+    verdict: GREEN
+    deploy: true
+- input:
+    failures: 2
+    failure_rate: 3
+  expect:
+    verdict: YELLOW
+    block: false
+    deploy: false
+- input:
+    failures: 10
+    failure_rate: 15
+  expect:
+    verdict: RED
+    deploy: false
+    block: true
+- input:
+    failure_rate: 5
+    failures: 1
+  expect:
+    deploy: false
+    block: false
+    verdict: YELLOW
+- input:
+    failure_rate: 6
+    failures: 5
+  expect:
+    deploy: false
+    block: true
+    verdict: RED
+- input:
+    failures: -1
+  expect:
+    deploy: false
+    verdict: RED
+    block: true
+- input:
+    failures: -1
+  expect:
+    deploy: false
+    verdict: RED
+    block: true
+- input: {}
+  expect:
+    verdict: UNKNOWN
+    deploy: false
+    block: true
+- input:
+    failure_rate: -1
+  expect:
+    verdict: UNKNOWN
+    deploy: false
+    block: true
+- input:
+    failure_rate: 4
+  expect:
+    verdict: UNKNOWN
+    deploy: false
+    block: true
+- input:
+    failure_rate: 500
+  expect:
+    verdict: UNKNOWN
+    deploy: false
+    block: true
+- input: {}
+  expect:
+    verdict: UNKNOWN
+    deploy: false
+    block: true

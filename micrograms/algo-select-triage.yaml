@@ -1,0 +1,123 @@
+name: algo-select-triage
+description: "Algorithm 12 (SELECT): Differential survival. Applies fitness boundary, measures recurrence frequency (ν), returns persist/watch/decay verdict."
+version: 0.1.0
+interface:
+  inputs:
+    recurrence_count:
+      type: integer
+      required: true
+    total_opportunities:
+      type: integer
+      required: true
+    fitness_threshold:
+      type: float
+      required: true
+    produces_correct_output:
+      type: boolean
+      required: true
+  outputs:
+    verdict:
+      type: string
+    algorithm:
+      type: string
+tree:
+  start: check_correctness
+  nodes:
+    check_correctness:
+      type: condition
+      variable: produces_correct_output
+      operator: eq
+      value: false
+      true_next: decay_broken
+      false_next: check_opportunities
+    check_opportunities:
+      type: condition
+      variable: total_opportunities
+      operator: lte
+      value: 0
+      true_next: decay_no_data
+      false_next: check_high_frequency
+    check_high_frequency:
+      type: condition
+      variable: recurrence_count
+      operator: gte
+      value: 50
+      true_next: check_high_against_threshold
+      false_next: check_mid_frequency
+    check_high_against_threshold:
+      type: condition
+      variable: fitness_threshold
+      operator: lte
+      value: 0.5
+      true_next: persist
+      false_next: check_very_high
+    check_very_high:
+      type: condition
+      variable: recurrence_count
+      operator: gte
+      value: 80
+      true_next: persist
+      false_next: watch
+    check_mid_frequency:
+      type: condition
+      variable: recurrence_count
+      operator: gte
+      value: 40
+      true_next: watch
+      false_next: check_low
+    check_low:
+      type: condition
+      variable: recurrence_count
+      operator: gte
+      value: 10
+      true_next: check_lenient_threshold
+      false_next: decay
+    check_lenient_threshold:
+      type: condition
+      variable: fitness_threshold
+      operator: lte
+      value: 0.1
+      true_next: persist
+      false_next: decay
+    persist:
+      type: return
+      value:
+        verdict: persist
+        algorithm: "SELECT: ν(∃ at ∂_fitness) → π — frequency above threshold, item persists"
+    watch:
+      type: return
+      value:
+        verdict: watch
+        algorithm: "SELECT: ν near ∂_fitness — within margin of threshold, monitor next generation"
+    decay:
+      type: return
+      value:
+        verdict: decay
+        algorithm: "SELECT: ν(∃ at ∂_fitness) → ∅ — frequency below threshold, item decays"
+    decay_broken:
+      type: return
+      value:
+        verdict: decay
+        algorithm: "SELECT: κ(output, expected) fails — incorrect output, immediate decay"
+    decay_no_data:
+      type: return
+      value:
+        verdict: decay
+        algorithm: "SELECT: N(opportunities) = 0 — no data to measure ν"
+tests:
+- input: { recurrence_count: 80, total_opportunities: 100, fitness_threshold: 0.5, produces_correct_output: true }
+  expect: { verdict: persist }
+- input: { recurrence_count: 5, total_opportunities: 100, fitness_threshold: 0.5, produces_correct_output: true }
+  expect: { verdict: decay }
+- input: { recurrence_count: 42, total_opportunities: 100, fitness_threshold: 0.5, produces_correct_output: true }
+  expect: { verdict: watch }
+- input: { recurrence_count: 90, total_opportunities: 100, fitness_threshold: 0.1, produces_correct_output: false }
+  expect: { verdict: decay }
+- input: { recurrence_count: 0, total_opportunities: 0, fitness_threshold: 0.5, produces_correct_output: true }
+  expect: { verdict: decay }
+- input: { recurrence_count: 50, total_opportunities: 100, fitness_threshold: 0.5, produces_correct_output: true }
+  expect: { verdict: persist }
+- input: { recurrence_count: 15, total_opportunities: 100, fitness_threshold: 0.05, produces_correct_output: true }
+  expect: { verdict: persist }
+- input: {}
+  expect: { verdict: decay }

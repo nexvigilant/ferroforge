@@ -1,0 +1,183 @@
+name: signal-compliance-bridge
+description: 'Merges signal detection output (signal_detected, prr, classification) with case assessment output (serious, unexpected, report_type) into a unified compliance action. Bridges the signal path and case path into one verdict.'
+version: 0.1.0
+interface:
+  inputs:
+    classification:
+      type: string
+      required: false
+    days_from_awareness:
+      type: int
+      required: false
+    report_type:
+      type: string
+      required: false
+    serious:
+      type: bool
+      required: false
+    signal_detected:
+      type: bool
+      required: false
+    timeline:
+      type: string
+      required: false
+    unexpected:
+      type: bool
+      required: false
+  outputs:
+    compliance_action:
+      type: string
+    compliance_priority:
+      type: string
+    compliance_verdict:
+      type: string
+    requires_signal_review:
+      type: bool
+tree:
+  start: check_signal_and_serious
+  nodes:
+    check_signal_and_serious:
+      type: condition
+      variable: signal_detected
+      operator: eq
+      value: true
+      true_next: signal_plus_serious
+      false_next: no_signal_path
+    signal_plus_serious:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: check_unexpected_signal
+      false_next: signal_only
+    check_unexpected_signal:
+      type: condition
+      variable: unexpected
+      operator: eq
+      value: true
+      true_next: critical_compliance
+      false_next: elevated_compliance
+    no_signal_path:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: serious_no_signal
+      false_next: routine_compliance
+    serious_no_signal:
+      type: condition
+      variable: unexpected
+      operator: eq
+      value: true
+      true_next: elevated_no_signal
+      false_next: standard_compliance
+    critical_compliance:
+      type: return
+      value:
+        compliance_verdict: CRITICAL
+        compliance_priority: P1
+        compliance_action: "Expedited report + signal review committee + benefit-risk re-evaluation"
+        requires_signal_review: true
+    elevated_compliance:
+      type: return
+      value:
+        compliance_verdict: ELEVATED
+        compliance_priority: P2
+        compliance_action: "Expedited report + signal monitoring intensification"
+        requires_signal_review: true
+    signal_only:
+      type: return
+      value:
+        compliance_verdict: SIGNAL_WATCH
+        compliance_priority: P3
+        compliance_action: "Signal confirmed but case non-serious - add to signal tracking log"
+        requires_signal_review: true
+    elevated_no_signal:
+      type: return
+      value:
+        compliance_verdict: ELEVATED
+        compliance_priority: P2
+        compliance_action: "Serious unexpected case without signal confirmation - expedited report + investigate signal gap"
+        requires_signal_review: false
+    standard_compliance:
+      type: return
+      value:
+        compliance_verdict: STANDARD
+        compliance_priority: P3
+        compliance_action: "Serious expected case - periodic PSUR/DSUR reporting"
+        requires_signal_review: false
+    routine_compliance:
+      type: return
+      value:
+        compliance_verdict: ROUTINE
+        compliance_priority: P4
+        compliance_action: "Non-serious case without signal - line listing only"
+        requires_signal_review: false
+tests:
+- name: signal + serious + unexpected = CRITICAL P1
+  input:
+    signal_detected: true
+    serious: true
+    unexpected: true
+    timeline: 7_CALENDAR_DAYS
+    report_type: IND_SAFETY
+    days_from_awareness: 7
+  expect:
+    compliance_verdict: CRITICAL
+    compliance_priority: P1
+    requires_signal_review: true
+- name: signal + serious + expected = ELEVATED P2
+  input:
+    signal_detected: true
+    serious: true
+    unexpected: false
+    timeline: PERIODIC
+    report_type: PSUR_DSUR
+    days_from_awareness: 90
+  expect:
+    compliance_verdict: ELEVATED
+    compliance_priority: P2
+    requires_signal_review: true
+- name: signal + non-serious = SIGNAL_WATCH P3
+  input:
+    signal_detected: true
+    serious: false
+    unexpected: true
+  expect:
+    compliance_verdict: SIGNAL_WATCH
+    compliance_priority: P3
+    requires_signal_review: true
+- name: no signal + serious + unexpected = ELEVATED P2
+  input:
+    signal_detected: false
+    serious: true
+    unexpected: true
+    timeline: 15_CALENDAR_DAYS
+    report_type: FIELD_ALERT
+  expect:
+    compliance_verdict: ELEVATED
+    compliance_priority: P2
+    requires_signal_review: false
+- name: no signal + serious + expected = STANDARD P3
+  input:
+    signal_detected: false
+    serious: true
+    unexpected: false
+  expect:
+    compliance_verdict: STANDARD
+    compliance_priority: P3
+    requires_signal_review: false
+- name: no signal + non-serious = ROUTINE P4
+  input:
+    signal_detected: false
+    serious: false
+  expect:
+    compliance_verdict: ROUTINE
+    compliance_priority: P4
+    requires_signal_review: false
+- name: null input defaults to routine
+  input: {}
+  expect:
+    compliance_verdict: ROUTINE
+    compliance_priority: P4
+    requires_signal_review: false

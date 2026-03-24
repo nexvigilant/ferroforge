@@ -1,0 +1,144 @@
+name: mcp-staleness-gate
+version: "1.0"
+description: "Decide action for stale MCP server binary. Hook computes is_stale (binary_mtime > process_start). Microgram decides action. chains_to: session-velocity (feeds_momentum flag)."
+
+interface:
+  inputs:
+    build_detected:
+      type: bool
+      required: true
+    is_stale:
+      type: bool
+      required: true
+    staleness_seconds:
+      type: int
+      required: false
+  outputs:
+    status:
+      type: string
+    action:
+      type: string
+    message:
+      type: string
+    feeds_momentum:
+      type: bool
+tree:
+  start: check_build_detected
+  nodes:
+    check_build_detected:
+      type: condition
+      variable: build_detected
+      operator: eq
+      value: true
+      true_next: check_staleness
+      false_next: no_action
+
+    check_staleness:
+      type: condition
+      variable: is_stale
+      operator: eq
+      value: true
+      true_next: check_severity
+      false_next: fresh
+
+    check_severity:
+      type: condition
+      variable: staleness_seconds
+      operator: gt
+      value: 300
+      true_next: critical_stale
+      false_next: stale
+
+    critical_stale:
+      type: return
+      value:
+        status: CRITICAL_STALE
+        action: reconnect_needed
+        message: "MCP binary stale >5min — /mcp reconnect urgently needed"
+        feeds_momentum: true
+
+    stale:
+      type: return
+      value:
+        status: STALE
+        action: reconnect_needed
+        message: "MCP binary rebuilt — /mcp reconnect needed"
+        feeds_momentum: true
+
+    fresh:
+      type: return
+      value:
+        status: FRESH
+        action: none
+        message: "MCP binary matches running process"
+        feeds_momentum: false
+
+    no_action:
+      type: return
+      value:
+        status: SKIPPED
+        action: none
+        message: "No build detected"
+        feeds_momentum: false
+
+tests:
+  - name: "stale binary after rebuild — short gap"
+    input:
+      build_detected: true
+      is_stale: true
+      staleness_seconds: 120
+    expect:
+      status: STALE
+      action: reconnect_needed
+
+  - name: "critical stale — over 5 minutes"
+    input:
+      build_detected: true
+      is_stale: true
+      staleness_seconds: 600
+    expect:
+      status: CRITICAL_STALE
+      action: reconnect_needed
+
+  - name: "fresh binary — process started after build"
+    input:
+      build_detected: true
+      is_stale: false
+      staleness_seconds: 0
+    expect:
+      status: FRESH
+      action: none
+
+  - name: "no build detected — skip entirely"
+    input:
+      build_detected: false
+      is_stale: true
+      staleness_seconds: 9999
+    expect:
+      status: SKIPPED
+      action: none
+
+  - name: "boundary — exactly 300s is not critical"
+    input:
+      build_detected: true
+      is_stale: true
+      staleness_seconds: 300
+    expect:
+      status: STALE
+      action: reconnect_needed
+
+  - name: "boundary — 301s is critical"
+    input:
+      build_detected: true
+      is_stale: true
+      staleness_seconds: 301
+    expect:
+      status: CRITICAL_STALE
+      action: reconnect_needed
+  - name: null_input_safety
+    input: {}
+    expect:
+      action: none
+      feeds_momentum: false
+      message: No build detected
+      status: SKIPPED

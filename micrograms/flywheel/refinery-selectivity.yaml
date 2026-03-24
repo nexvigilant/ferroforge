@@ -1,0 +1,65 @@
+name: refinery-selectivity
+description: "Compute selectivity (desired_product/all_products). Measures whether the flywheel produces the RIGHT product, not just any product."
+version: 0.1.0
+tree:
+  start: check_products
+  nodes:
+    check_products:
+      type: condition
+      variable: products_out
+      operator: gt
+      value: 0
+      true_next: classify_selectivity
+      false_next: return_no_products
+    classify_selectivity:
+      type: condition
+      variable: selectivity_pct
+      operator: gte
+      value: 70
+      true_next: return_high_selectivity
+      false_next: check_medium
+    check_medium:
+      type: condition
+      variable: selectivity_pct
+      operator: gte
+      value: 40
+      true_next: return_medium_selectivity
+      false_next: return_low_selectivity
+    return_high_selectivity:
+      type: return
+      value:
+        selectivity_class: HIGH
+        action: "Flywheel producing mostly targeted outputs"
+        refinery_analog: "High-selectivity catalyst; desired product dominates"
+    return_medium_selectivity:
+      type: return
+      value:
+        selectivity_class: MEDIUM
+        action: "Mixed output; blending stage producing off-spec products"
+        refinery_analog: "Moderate selectivity; side reactions consuming feedstock"
+    return_low_selectivity:
+      type: return
+      value:
+        selectivity_class: LOW
+        action: "Most output is wrong type; reconfigure unit processes"
+        refinery_analog: "Poor catalyst selectivity; unwanted isomers dominating"
+    return_no_products:
+      type: return
+      value:
+        selectivity_class: NO_PRODUCTS
+        action: "No products to evaluate"
+        refinery_analog: "No reaction products; check reactor conditions"
+tests:
+  - input: { products_out: 80, selectivity_pct: 85 }
+    expect: { selectivity_class: HIGH }
+  - input: { products_out: 80, selectivity_pct: 55 }
+    expect: { selectivity_class: MEDIUM }
+  - input: { products_out: 80, selectivity_pct: 20 }
+    expect: { selectivity_class: LOW }
+  - input: { products_out: 0, selectivity_pct: 0 }
+    expect: { selectivity_class: NO_PRODUCTS }
+  - input: {}
+    expect:
+      action: No products to evaluate
+      refinery_analog: No reaction products; check reactor conditions
+      selectivity_class: NO_PRODUCTS

@@ -1,0 +1,312 @@
+name: coordinator-pipeline
+description: "PDC: Full coordinator pipeline — classify task scope, determine HITL level, identify domain, route to CPA agent"
+version: 0.1.0
+interface:
+  inputs:
+    affects_patient_safety:
+      type: bool
+      required: false
+    affects_regulatory:
+      type: bool
+      required: false
+    cpa_count:
+      type: int
+      required: false
+    is_irreversible:
+      type: bool
+      required: false
+    primary_cpa:
+      type: int
+      required: false
+  outputs:
+    action:
+      type: string
+    agent:
+      type: string
+    audit:
+      type: bool
+    cpa:
+      type: int
+    domains:
+      type: string
+    escalation:
+      type: string
+    governance_min:
+      type: string
+    hitl:
+      type: string
+    nexcore_targets:
+      type: string
+    reason:
+      type: string
+    tier:
+      type: string
+tree:
+  start: check_safety
+  nodes:
+    check_safety:
+      type: condition
+      variable: affects_patient_safety
+      operator: eq
+      value: true
+      true_next: safety_critical
+      false_next: check_irreversible
+    check_irreversible:
+      type: condition
+      variable: is_irreversible
+      operator: eq
+      value: true
+      true_next: safety_critical
+      false_next: check_regulatory
+    check_regulatory:
+      type: condition
+      variable: affects_regulatory
+      operator: eq
+      value: true
+      true_next: regulatory_scope
+      false_next: check_multi_cpa
+    check_multi_cpa:
+      type: condition
+      variable: cpa_count
+      operator: gte
+      value: 2
+      true_next: cross_cpa_scope
+      false_next: cpa_null_guard
+    cpa_null_guard:
+      type: condition
+      variable: primary_cpa
+      operator: is_null
+      value: null
+      true_next: cpa_unknown_return
+      false_next: check_cpa_id
+    cpa_unknown_return:
+      type: return
+      value:
+        hitl: MANUAL
+        agent: pdc-coordinator
+        reason: "CPA unknown \u2014 manual triage required"
+    check_cpa_id:
+      type: condition
+      variable: primary_cpa
+      operator: lte
+      value: 4
+      true_next: check_cpa_low
+      false_next: check_cpa_high
+    check_cpa_low:
+      type: condition
+      variable: primary_cpa
+      operator: lte
+      value: 2
+      true_next: check_cpa_1_or_2
+      false_next: check_cpa_3_or_4
+    check_cpa_high:
+      type: condition
+      variable: primary_cpa
+      operator: lte
+      value: 6
+      true_next: check_cpa_5_or_6
+      false_next: check_cpa_7_or_8
+    check_cpa_1_or_2:
+      type: condition
+      variable: primary_cpa
+      operator: eq
+      value: 1
+      true_next: route_case
+      false_next: route_signal
+    check_cpa_3_or_4:
+      type: condition
+      variable: primary_cpa
+      operator: eq
+      value: 3
+      true_next: route_risk
+      false_next: route_compliance
+    check_cpa_5_or_6:
+      type: condition
+      variable: primary_cpa
+      operator: eq
+      value: 5
+      true_next: route_data
+      false_next: route_comms
+    check_cpa_7_or_8:
+      type: condition
+      variable: primary_cpa
+      operator: eq
+      value: 7
+      true_next: route_research
+      false_next: route_ai
+    safety_critical:
+      type: return
+      value:
+        hitl: APPROVE
+        tier: DRAFT
+        action: "STOP — present plan to Matthew, await explicit authorization"
+        audit: true
+        governance_min: 1
+        escalation: "patient safety or irreversible action detected"
+    regulatory_scope:
+      type: return
+      value:
+        hitl: REVIEW
+        tier: STAGING
+        action: "agent executes, output reviewed by Matthew before merge"
+        audit: true
+        governance_min: 2
+        agent: "pdc-compliance-dev"
+        escalation: "regulatory compliance scope"
+    cross_cpa_scope:
+      type: return
+      value:
+        hitl: REVIEW
+        tier: STAGING
+        action: "spawn multiple agents, all outputs reviewed before merge"
+        audit: true
+        governance_min: 2
+        agent: "pdc-coordinator (multi-agent)"
+        escalation: "cross-CPA boundary — coordination required"
+    route_case:
+      type: return
+      value:
+        hitl: AUTO
+        tier: LIVE
+        agent: "pdc-case-dev"
+        cpa: 1
+        domains: "D2, D3, D4, D14"
+        nexcore_targets: "nexcore-vigilance (ICSR modules)"
+    route_signal:
+      type: return
+      value:
+        hitl: AUTO
+        tier: LIVE
+        agent: "pdc-signal-dev"
+        cpa: 2
+        domains: "D8, D9, D10, D15"
+        nexcore_targets: "nexcore-pv-core, nexcore-signal-pipeline"
+    route_risk:
+      type: return
+      value:
+        hitl: AUTO
+        tier: LIVE
+        agent: "pdc-risk-dev"
+        cpa: 3
+        domains: "D11, D13, D14, D6"
+        nexcore_targets: "nexcore-qbr, nexcore-vigilance (risk)"
+    route_compliance:
+      type: return
+      value:
+        hitl: AUTO
+        tier: LIVE
+        agent: "pdc-compliance-dev"
+        cpa: 4
+        domains: "D12, D1, D11"
+        nexcore_targets: "nexcore-vigilance (regulatory)"
+    route_data:
+      type: return
+      value:
+        hitl: AUTO
+        tier: LIVE
+        agent: "pdc-data-dev"
+        cpa: 5
+        domains: "D7, D15, AI"
+        nexcore_targets: "nexcore-faers-etl, nexcore-dataframe"
+    route_comms:
+      type: return
+      value:
+        hitl: AUTO
+        tier: LIVE
+        agent: "pdc-comms-dev"
+        cpa: 6
+        domains: "D13, D14, D15, D10"
+        nexcore_targets: "Nucleus pages, nexcore-api"
+    route_research:
+      type: return
+      value:
+        hitl: AUTO
+        tier: LIVE
+        agent: "pdc-research-dev"
+        cpa: 7
+        domains: "D5, D9, D8, D15"
+        nexcore_targets: "nexcore-pvdsl, nexcore-vigilance (methodology)"
+    route_ai:
+      type: return
+      value:
+        hitl: AUTO
+        tier: LIVE
+        agent: "pdc-ai-dev"
+        cpa: 8
+        domains: "All 15"
+        nexcore_targets: "nexcore-dtree, all crates (AI integration)"
+tests:
+- input:
+    affects_patient_safety: true
+    primary_cpa: 2
+  expect:
+    hitl: APPROVE
+    tier: DRAFT
+    audit: true
+- input:
+    is_irreversible: true
+    primary_cpa: 5
+  expect:
+    hitl: APPROVE
+    tier: DRAFT
+- input:
+    affects_regulatory: true
+    primary_cpa: 4
+  expect:
+    hitl: REVIEW
+    agent: "pdc-compliance-dev"
+- input:
+    cpa_count: 3
+    primary_cpa: 2
+  expect:
+    hitl: REVIEW
+    tier: STAGING
+- input:
+    primary_cpa: 1
+    cpa_count: 1
+  expect:
+    hitl: AUTO
+    agent: "pdc-case-dev"
+    cpa: 1
+- input:
+    primary_cpa: 2
+    cpa_count: 1
+  expect:
+    agent: "pdc-signal-dev"
+    cpa: 2
+- input:
+    primary_cpa: 3
+    cpa_count: 1
+  expect:
+    agent: "pdc-risk-dev"
+- input:
+    primary_cpa: 4
+    cpa_count: 1
+  expect:
+    agent: "pdc-compliance-dev"
+- input:
+    primary_cpa: 5
+    cpa_count: 1
+  expect:
+    agent: "pdc-data-dev"
+- input:
+    primary_cpa: 6
+    cpa_count: 1
+  expect:
+    agent: "pdc-comms-dev"
+- input:
+    primary_cpa: 7
+    cpa_count: 1
+  expect:
+    agent: "pdc-research-dev"
+- input:
+    primary_cpa: 8
+    cpa_count: 1
+  expect:
+    agent: "pdc-ai-dev"
+    cpa: 8
+- input: {}
+  expect:
+    hitl: MANUAL
+    agent: pdc-coordinator
+    reason: "CPA unknown \u2014 manual triage required"

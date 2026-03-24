@@ -1,0 +1,90 @@
+name: deadline-urgency-classifier
+description: 'Dashboard deadline urgency: maps days remaining to traffic level for PV operations center display'
+version: 0.1.0
+interface:
+  inputs:
+    days_remaining:
+      type: number
+      required: true
+      description: 'Days until regulatory deadline (can be negative if overdue)'
+  outputs:
+    traffic_level:
+      type: string
+tree:
+  start: check_critical
+  nodes:
+    check_critical:
+      type: condition
+      variable: days_remaining
+      operator: lte
+      value: 3
+      true_next: critical
+      false_next: check_warning
+    check_warning:
+      type: condition
+      variable: days_remaining
+      operator: lte
+      value: 7
+      true_next: warning
+      false_next: normal
+    critical:
+      type: return
+      value:
+        traffic_level: red
+    warning:
+      type: return
+      value:
+        traffic_level: yellow
+    normal:
+      type: return
+      value:
+        traffic_level: green
+tests:
+# Overdue
+- input:
+    days_remaining: -1
+  expect:
+    traffic_level: red
+# Zero days
+- input:
+    days_remaining: 0
+  expect:
+    traffic_level: red
+# 1 day
+- input:
+    days_remaining: 1
+  expect:
+    traffic_level: red
+# Boundary: exactly 3 = red (lte)
+- input:
+    days_remaining: 3
+  expect:
+    traffic_level: red
+# Just above 3 = yellow
+- input:
+    days_remaining: 4
+  expect:
+    traffic_level: yellow
+# Mid warning
+- input:
+    days_remaining: 5
+  expect:
+    traffic_level: yellow
+# Boundary: exactly 7 = yellow (lte)
+- input:
+    days_remaining: 7
+  expect:
+    traffic_level: yellow
+# Just above 7 = green
+- input:
+    days_remaining: 8
+  expect:
+    traffic_level: green
+# Comfortable
+- input:
+    days_remaining: 30
+  expect:
+    traffic_level: green
+- input: {}
+  expect:
+    traffic_level: green

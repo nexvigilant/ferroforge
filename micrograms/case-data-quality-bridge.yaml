@@ -1,0 +1,205 @@
+name: case-data-quality-bridge
+description: Translates data completeness assessment and CIOMS frequency classification into case quality tier. Bridges data-completeness and cioms-frequency outputs into case-quality-gate and intake-to-triage inputs.
+version: 0.1.0
+tree:
+  start: check_enrichment
+  nodes:
+    check_cioms_common_enrichment:
+      type: condition
+      variable: cioms_category
+      operator: eq
+      value: COMMON
+      true_next: enrichment_moderate_frequency
+      false_next: enrichment_low_frequency
+    enrichment_low_frequency:
+      type: return
+      value:
+        quality_assessment: Incomplete data for rare event — every case matters, request enrichment
+        meets_minimum: true
+        completeness_pct: 50
+        quality_tier: MINIMUM
+    check_cioms_enrichment:
+      type: condition
+      variable: cioms_category
+      operator: eq
+      value: VERY_COMMON
+      true_next: enrichment_high_frequency
+      false_next: check_cioms_common_enrichment
+    check_enrichment:
+      type: condition
+      variable: needs_enrichment
+      operator: eq
+      value: true
+      true_next: check_cioms_enrichment
+      false_next: check_cioms_complete
+    check_cioms_common_complete:
+      type: condition
+      variable: cioms_category
+      operator: eq
+      value: COMMON
+      true_next: complete_moderate_frequency
+      false_next: check_rare_complete
+    complete_moderate_frequency:
+      type: return
+      value:
+        quality_assessment: Complete data for common event — high quality case
+        meets_minimum: true
+        completeness_pct: 87
+        quality_tier: HIGH
+    check_cioms_complete:
+      type: condition
+      variable: cioms_category
+      operator: eq
+      value: VERY_COMMON
+      true_next: complete_high_frequency
+      false_next: check_cioms_common_complete
+    complete_rare:
+      type: return
+      value:
+        quality_tier: EXCELLENT
+        meets_minimum: true
+        completeness_pct: 100
+        quality_assessment: Complete data for rare event — high-value case for signal detection
+    complete_standard:
+      type: return
+      value:
+        quality_assessment: Complete data — standard quality tier
+        completeness_pct: 87
+        quality_tier: HIGH
+        meets_minimum: true
+    enrichment_moderate_frequency:
+      type: return
+      value:
+        quality_tier: MINIMUM
+        completeness_pct: 50
+        quality_assessment: Data needs enrichment for common-frequency event — standard follow-up
+        meets_minimum: true
+    complete_high_frequency:
+      type: return
+      value:
+        quality_tier: EXCELLENT
+        quality_assessment: Complete data for very common event — ready for automated processing
+        meets_minimum: true
+        completeness_pct: 100
+    enrichment_high_frequency:
+      type: return
+      value:
+        quality_assessment: Data incomplete but high-frequency event — prioritize enrichment
+        completeness_pct: 75
+        meets_minimum: true
+        quality_tier: GOOD
+    check_rare_complete:
+      type: condition
+      variable: cioms_category
+      operator: eq
+      value: RARE
+      true_next: complete_rare
+      false_next: complete_standard
+tests:
+- input:
+    cioms_category: VERY_COMMON
+    needs_enrichment: true
+  expect:
+    completeness_pct: 75
+    meets_minimum: true
+    quality_tier: GOOD
+- input:
+    needs_enrichment: true
+    cioms_category: COMMON
+  expect:
+    quality_tier: MINIMUM
+    completeness_pct: 50
+- input:
+    needs_enrichment: true
+    cioms_category: RARE
+  expect:
+    meets_minimum: true
+    quality_tier: MINIMUM
+- input:
+    needs_enrichment: false
+    cioms_category: VERY_COMMON
+  expect:
+    quality_tier: EXCELLENT
+    completeness_pct: 100
+- input:
+    needs_enrichment: false
+    cioms_category: COMMON
+  expect:
+    completeness_pct: 87
+    quality_tier: HIGH
+- input:
+    cioms_category: RARE
+    needs_enrichment: false
+  expect:
+    quality_tier: EXCELLENT
+    completeness_pct: 100
+- input:
+    needs_enrichment: false
+    cioms_category: UNCOMMON
+  expect:
+    meets_minimum: true
+    quality_tier: HIGH
+- input:
+    cioms_category: VERY_RARE
+    needs_enrichment: true
+  expect:
+    quality_tier: MINIMUM
+    completeness_pct: 50
+- input: {}
+  expect:
+    quality_assessment: Complete data — standard quality tier
+    completeness_pct: 87
+    quality_tier: HIGH
+    meets_minimum: true
+- input: {}
+  expect:
+    completeness_pct: 87
+    quality_assessment: Complete data — standard quality tier
+    quality_tier: HIGH
+    meets_minimum: true
+- input: {}
+  expect:
+    quality_assessment: Complete data — standard quality tier
+    quality_tier: HIGH
+    meets_minimum: true
+    completeness_pct: 87
+- input: {}
+  expect:
+    quality_assessment: Complete data — standard quality tier
+    completeness_pct: 87
+    quality_tier: HIGH
+    meets_minimum: true
+- input: {}
+  expect:
+    meets_minimum: true
+    quality_tier: HIGH
+    quality_assessment: Complete data — standard quality tier
+    completeness_pct: 87
+- input: {}
+  expect:
+    meets_minimum: true
+    quality_tier: HIGH
+    completeness_pct: 87
+    quality_assessment: Complete data — standard quality tier
+interface:
+  inputs:
+    cioms_category:
+      type: string
+      required: false
+    needs_enrichment:
+      type: bool
+      required: true
+  outputs:
+    meets_minimum:
+      type: bool
+      required: true
+    completeness_pct:
+      type: int
+      required: true
+    quality_tier:
+      type: string
+      required: true
+    quality_assessment:
+      type: string
+      required: true
+  aliases: {}

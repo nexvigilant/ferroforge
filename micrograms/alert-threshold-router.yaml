@@ -1,0 +1,116 @@
+name: alert-threshold-router
+description: 'Route signal type + value to threshold action using Evans criteria and standard PV thresholds'
+version: 0.1.0
+interface:
+  inputs:
+    signal_type:
+      type: string
+      required: false
+    signal_value:
+      type: float
+      required: false
+  outputs:
+    action:
+      type: string
+    next_step:
+      type: string
+    requires_review:
+      type: bool
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: PRR
+      true_next: prr_threshold
+      false_next: check_ror
+    prr_threshold:
+      type: condition
+      variable: signal_value
+      operator: gte
+      value: 2.0
+      true_next: alert
+      false_next: monitor
+    check_ror:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: ROR
+      true_next: ror_threshold
+      false_next: check_ic
+    ror_threshold:
+      type: condition
+      variable: signal_value
+      operator: gte
+      value: 2.5
+      true_next: alert
+      false_next: monitor
+    check_ic:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: IC
+      true_next: ic_threshold
+      false_next: monitor
+    ic_threshold:
+      type: condition
+      variable: signal_value
+      operator: gte
+      value: 1.0
+      true_next: alert
+      false_next: monitor
+    alert:
+      type: return
+      value:
+        action: ALERT
+        requires_review: true
+        next_step: causality_assessment
+    monitor:
+      type: return
+      value:
+        action: MONITOR
+        requires_review: false
+        next_step: continue_surveillance
+tests:
+- input:
+    signal_type: PRR
+    signal_value: 3.5
+  expect:
+    action: ALERT
+    requires_review: true
+    next_step: causality_assessment
+- input:
+    signal_type: PRR
+    signal_value: 1.5
+  expect:
+    action: MONITOR
+    requires_review: false
+    next_step: continue_surveillance
+- input:
+    signal_type: ROR
+    signal_value: 4.0
+  expect:
+    action: ALERT
+    requires_review: true
+    next_step: causality_assessment
+- input:
+    signal_type: IC
+    signal_value: 1.2
+  expect:
+    action: ALERT
+    requires_review: true
+    next_step: causality_assessment
+- input:
+    signal_type: EBGM
+    signal_value: 5.0
+  expect:
+    action: MONITOR
+    requires_review: false
+    next_step: continue_surveillance
+- input: {}
+  expect:
+    action: MONITOR
+    next_step: continue_surveillance
+    requires_review: false

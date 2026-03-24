@@ -1,0 +1,232 @@
+name: dossier-completeness
+description: 'Safety dossier completeness scorer: evaluates FAERS, guideline, and competitor data availability to classify dossier as comprehensive/adequate/minimal/empty with a 0-100 score'
+version: 0.1.0
+interface:
+  inputs:
+    has_faers:
+      type: bool
+      required: true
+    faers_report_count:
+      type: float
+      required: true
+    signal_count:
+      type: float
+      required: true
+    guideline_hits:
+      type: float
+      required: true
+    competitor_count:
+      type: float
+      required: true
+  outputs:
+    completeness:
+      type: string
+    score:
+      type: float
+    gaps:
+      type: string
+tree:
+  start: check_faers
+  nodes:
+    check_faers:
+      type: condition
+      variable: has_faers
+      operator: eq
+      value: true
+      true_next: check_guidelines
+      false_next: check_any_data
+    check_any_data:
+      type: condition
+      variable: guideline_hits
+      operator: gt
+      value: 0
+      true_next: minimal_guidelines_only
+      false_next: check_competitors_only
+    check_competitors_only:
+      type: condition
+      variable: competitor_count
+      operator: gt
+      value: 0
+      true_next: minimal_competitors_only
+      false_next: empty_dossier
+    check_guidelines:
+      type: condition
+      variable: guideline_hits
+      operator: gt
+      value: 0
+      true_next: check_competitors
+      false_next: check_faers_only_quality
+    check_competitors:
+      type: condition
+      variable: competitor_count
+      operator: gt
+      value: 0
+      true_next: all_three_sections
+      false_next: faers_and_guidelines
+    all_three_sections:
+      type: condition
+      variable: faers_report_count
+      operator: gte
+      value: 1000
+      true_next: comprehensive
+      false_next: adequate_all
+    check_faers_only_quality:
+      type: condition
+      variable: faers_report_count
+      operator: gte
+      value: 5000
+      true_next: adequate_faers_strong
+      false_next: minimal_faers_only
+    comprehensive:
+      type: return
+      value:
+        completeness: comprehensive
+        score: 95
+        gaps: none
+    adequate_all:
+      type: return
+      value:
+        completeness: adequate
+        score: 75
+        gaps: Low FAERS report volume
+    faers_and_guidelines:
+      type: return
+      value:
+        completeness: adequate
+        score: 65
+        gaps: Competitive landscape data
+    adequate_faers_strong:
+      type: return
+      value:
+        completeness: adequate
+        score: 55
+        gaps: Regulatory guidelines and competitive data
+    minimal_faers_only:
+      type: return
+      value:
+        completeness: minimal
+        score: 35
+        gaps: Regulatory guidelines and competitive data
+    minimal_guidelines_only:
+      type: return
+      value:
+        completeness: minimal
+        score: 25
+        gaps: FAERS safety data and competitive landscape
+    minimal_competitors_only:
+      type: return
+      value:
+        completeness: minimal
+        score: 20
+        gaps: FAERS safety data and regulatory guidelines
+    empty_dossier:
+      type: return
+      value:
+        completeness: empty
+        score: 0
+        gaps: All sections — FAERS, guidelines, and competitors
+tests:
+# All sections, high volume
+- input:
+    has_faers: true
+    faers_report_count: 50000
+    signal_count: 5
+    guideline_hits: 8
+    competitor_count: 3
+  expect:
+    completeness: comprehensive
+    score: 95
+    gaps: none
+# All sections, low FAERS volume
+- input:
+    has_faers: true
+    faers_report_count: 500
+    signal_count: 2
+    guideline_hits: 3
+    competitor_count: 2
+  expect:
+    completeness: adequate
+    score: 75
+    gaps: Low FAERS report volume
+# FAERS + Guidelines, no competitors
+- input:
+    has_faers: true
+    faers_report_count: 10000
+    signal_count: 3
+    guideline_hits: 5
+    competitor_count: 0
+  expect:
+    completeness: adequate
+    score: 65
+    gaps: Competitive landscape data
+# FAERS only, strong volume
+- input:
+    has_faers: true
+    faers_report_count: 8000
+    signal_count: 4
+    guideline_hits: 0
+    competitor_count: 0
+  expect:
+    completeness: adequate
+    score: 55
+    gaps: Regulatory guidelines and competitive data
+# FAERS only, low volume
+- input:
+    has_faers: true
+    faers_report_count: 200
+    signal_count: 1
+    guideline_hits: 0
+    competitor_count: 0
+  expect:
+    completeness: minimal
+    score: 35
+    gaps: Regulatory guidelines and competitive data
+# Guidelines only
+- input:
+    has_faers: false
+    faers_report_count: 0
+    signal_count: 0
+    guideline_hits: 4
+    competitor_count: 0
+  expect:
+    completeness: minimal
+    score: 25
+    gaps: FAERS safety data and competitive landscape
+# Competitors only
+- input:
+    has_faers: false
+    faers_report_count: 0
+    signal_count: 0
+    guideline_hits: 0
+    competitor_count: 3
+  expect:
+    completeness: minimal
+    score: 20
+    gaps: FAERS safety data and regulatory guidelines
+# Empty dossier
+- input:
+    has_faers: false
+    faers_report_count: 0
+    signal_count: 0
+    guideline_hits: 0
+    competitor_count: 0
+  expect:
+    completeness: empty
+    score: 0
+    gaps: All sections — FAERS, guidelines, and competitors
+# Boundary: exactly 1000 reports with all sections = comprehensive
+- input:
+    has_faers: true
+    faers_report_count: 1000
+    signal_count: 1
+    guideline_hits: 1
+    competitor_count: 1
+  expect:
+    completeness: comprehensive
+    score: 95
+    gaps: none
+- input: {}
+  expect:
+    completeness: empty
+    gaps: "All sections — FAERS, guidelines, and competitors"
+    score: 0

@@ -1,0 +1,217 @@
+name: meddra-router
+description: 'MedDRA coding level selector: determines which hierarchy level (LLT/PT/HLT/HLGT/SOC) to use based on coding purpose and context'
+version: 1.0.0
+interface:
+  inputs:
+    coding_purpose:
+      type: string
+      required: false
+    multiple_terms:
+      type: bool
+      required: false
+    specificity_available:
+      type: bool
+      required: false
+  outputs:
+    coding_guidance:
+      type: string
+    description:
+      type: string
+    level:
+      type: string
+    meddra_hierarchy_position:
+      type: int
+tree:
+  start: check_case_coding
+  nodes:
+    check_case_coding:
+      type: condition
+      variable: coding_purpose
+      operator: eq
+      value: case_coding
+      true_next: check_specificity
+      false_next: check_signal_detection
+
+    check_specificity:
+      type: condition
+      variable: specificity_available
+      operator: eq
+      value: true
+      true_next: return_pt_case
+      false_next: return_llt
+
+    check_signal_detection:
+      type: condition
+      variable: coding_purpose
+      operator: eq
+      value: signal_detection
+      true_next: return_pt_signal
+      false_next: check_labeling
+
+    check_labeling:
+      type: condition
+      variable: coding_purpose
+      operator: eq
+      value: labeling
+      true_next: check_multiple_terms
+      false_next: check_aggregate
+
+    check_multiple_terms:
+      type: condition
+      variable: multiple_terms
+      operator: eq
+      value: true
+      true_next: return_hlgt
+      false_next: return_hlt
+
+    check_aggregate:
+      type: condition
+      variable: coding_purpose
+      operator: eq
+      value: aggregate_analysis
+      true_next: return_soc
+      false_next: return_pt_default
+
+    return_pt_case:
+      type: return
+      value:
+        level: PT
+        description: Preferred Term — most specific for individual case coding
+        meddra_hierarchy_position: 3
+        coding_guidance: Use the most clinically specific PT that captures the verbatim term
+
+    return_llt:
+      type: return
+      value:
+        level: LLT
+        description: Lowest Level Term — verbatim mapping when PT unclear
+        meddra_hierarchy_position: 1
+        coding_guidance: Map verbatim term to LLT first, then link to parent PT for reporting
+
+    return_pt_signal:
+      type: return
+      value:
+        level: PT
+        description: Preferred Term — standard for disproportionality analysis
+        meddra_hierarchy_position: 3
+        coding_guidance: PRR and other disproportionality methods operate at PT level per ICH E2B
+
+    return_hlgt:
+      type: return
+      value:
+        level: HLGT
+        description: High Level Group Term — aggregate for product labeling
+        meddra_hierarchy_position: 4
+        coding_guidance: Group related PTs under HLGT for labeling sections covering multiple terms
+
+    return_hlt:
+      type: return
+      value:
+        level: HLT
+        description: High Level Term — single-concept labeling
+        meddra_hierarchy_position: 3
+        coding_guidance: Use HLT when labeling addresses a single clinical concept across related PTs
+
+    return_soc:
+      type: return
+      value:
+        level: SOC
+        description: System Organ Class — broadest level for trend analysis
+        meddra_hierarchy_position: 5
+        coding_guidance: Aggregate by body system for periodic reports and population-level trend analysis
+
+    return_pt_default:
+      type: return
+      value:
+        level: PT
+        description: Preferred Term — default when purpose unclear
+        meddra_hierarchy_position: 3
+        coding_guidance: PT is the standard reporting level; consult Medical Dictionary for Drug Regulatory Activities guidance
+
+tests:
+- input:
+    coding_purpose: case_coding
+    specificity_available: true
+    multiple_terms: false
+  expect:
+    level: PT
+    description: Preferred Term — most specific for individual case coding
+    meddra_hierarchy_position: 3
+
+- input:
+    coding_purpose: case_coding
+    specificity_available: false
+    multiple_terms: false
+  expect:
+    level: LLT
+    description: Lowest Level Term — verbatim mapping when PT unclear
+    meddra_hierarchy_position: 1
+
+- input:
+    coding_purpose: signal_detection
+    specificity_available: true
+    multiple_terms: false
+  expect:
+    level: PT
+    description: Preferred Term — standard for disproportionality analysis
+    meddra_hierarchy_position: 3
+
+- input:
+    coding_purpose: signal_detection
+    specificity_available: false
+    multiple_terms: true
+  expect:
+    level: PT
+    description: Preferred Term — standard for disproportionality analysis
+    meddra_hierarchy_position: 3
+
+- input:
+    coding_purpose: labeling
+    multiple_terms: true
+    specificity_available: true
+  expect:
+    level: HLGT
+    description: High Level Group Term — aggregate for product labeling
+    meddra_hierarchy_position: 4
+
+- input:
+    coding_purpose: labeling
+    multiple_terms: false
+    specificity_available: true
+  expect:
+    level: HLT
+    description: High Level Term — single-concept labeling
+    meddra_hierarchy_position: 3
+
+- input:
+    coding_purpose: aggregate_analysis
+    specificity_available: true
+    multiple_terms: true
+  expect:
+    level: SOC
+    description: System Organ Class — broadest level for trend analysis
+    meddra_hierarchy_position: 5
+
+- input:
+    coding_purpose: aggregate_analysis
+    specificity_available: false
+    multiple_terms: false
+  expect:
+    level: SOC
+    description: System Organ Class — broadest level for trend analysis
+    meddra_hierarchy_position: 5
+
+- input:
+    coding_purpose: unknown_purpose
+    specificity_available: true
+    multiple_terms: false
+  expect:
+    level: PT
+    description: Preferred Term — default when purpose unclear
+    meddra_hierarchy_position: 3
+
+- input: {}
+  expect:
+    level: PT
+    description: Preferred Term — default when purpose unclear
+    meddra_hierarchy_position: 3

@@ -1,0 +1,128 @@
+name: epa7-risk-minimize
+description: "EPA 7: Design risk minimization — routes by risk severity, population scope, and intervention type needed."
+version: 0.1.0
+interface:
+  inputs:
+    existing_labeling_adequate:
+      type: bool
+      required: false
+    population_scope:
+      type: string
+      required: false
+    risk_severity:
+      type: int
+      required: false
+  outputs:
+    ai_support:
+      type: string
+    evaluation:
+      type: string
+    intervention:
+      type: string
+    measures:
+      type: string
+    monitoring:
+      type: string
+    regulatory:
+      type: string
+tree:
+  start: check_severity
+  nodes:
+    check_severity:
+      type: condition
+      variable: risk_severity
+      operator: gte
+      value: 4
+      true_next: check_population_high
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: risk_severity
+      operator: gte
+      value: 2
+      true_next: moderate_risk
+      false_next: low_risk
+    check_population_high:
+      type: condition
+      variable: population_scope
+      operator: eq
+      value: broad
+      true_next: additional_measures_broad
+      false_next: additional_measures_targeted
+    moderate_risk:
+      type: condition
+      variable: existing_labeling_adequate
+      operator: eq
+      value: true
+      true_next: routine_measures
+      false_next: enhanced_routine
+    additional_measures_broad:
+      type: return
+      value:
+        intervention: ADDITIONAL_BROAD
+        measures: "REMS/RMP, DHPC, educational program, restricted distribution"
+        monitoring: "real-time effectiveness tracking, patient registry"
+        evaluation: "quarterly effectiveness review, outcome measurement"
+        ai_support: "predictive modeling, adherence tracking, automated alerts"
+        regulatory: "submit RMP/REMS, regulatory notification required"
+    additional_measures_targeted:
+      type: return
+      value:
+        intervention: ADDITIONAL_TARGETED
+        measures: "targeted DHPC, HCP training, patient guide, monitoring program"
+        monitoring: "targeted effectiveness tracking, prescriber surveys"
+        evaluation: "semi-annual review, prescriber compliance assessment"
+        ai_support: "targeted analytics, compliance monitoring"
+        regulatory: "RMP update, regulatory communication"
+    routine_measures:
+      type: return
+      value:
+        intervention: ROUTINE
+        measures: "labeling update (SmPC/PIL), routine pharmacovigilance"
+        monitoring: "standard surveillance, periodic safety reporting"
+        evaluation: "annual review in PSUR/PBRER"
+        ai_support: "automated signal monitoring"
+    enhanced_routine:
+      type: return
+      value:
+        intervention: ENHANCED_ROUTINE
+        measures: "labeling update + targeted communication to HCPs"
+        monitoring: "enhanced surveillance, focused signal detection"
+        evaluation: "semi-annual review, communication impact assessment"
+        ai_support: "enhanced monitoring, communication tracking"
+    low_risk:
+      type: return
+      value:
+        intervention: ROUTINE_MINIMAL
+        measures: "standard labeling, routine surveillance"
+        monitoring: "routine pharmacovigilance"
+        evaluation: "annual PSUR review"
+tests:
+- input:
+    risk_severity: 5
+    population_scope: broad
+  expect:
+    intervention: ADDITIONAL_BROAD
+    regulatory: "submit RMP/REMS, regulatory notification required"
+- input:
+    risk_severity: 4
+    population_scope: narrow
+  expect:
+    intervention: ADDITIONAL_TARGETED
+- input:
+    risk_severity: 3
+    existing_labeling_adequate: true
+  expect:
+    intervention: ROUTINE
+- input:
+    risk_severity: 2
+    existing_labeling_adequate: false
+  expect:
+    intervention: ENHANCED_ROUTINE
+- input:
+    risk_severity: 1
+  expect:
+    intervention: ROUTINE_MINIMAL
+- input: {}
+  expect:
+    intervention: ROUTINE_MINIMAL

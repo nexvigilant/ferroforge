@@ -1,0 +1,216 @@
+name: appe-activity-router
+description: "APPE Ch7: Route participant to appropriate PV activity by week and level. Chains TO naranjo-quick, icsr-triage, prr-signal for live practice."
+version: 0.1.0
+interface:
+  inputs:
+    competency_level:
+      type: int
+      required: false
+    week:
+      type: int
+      required: false
+  outputs:
+    activities:
+      type: string
+    activity_type:
+      type: string
+    assessment:
+      type: string
+    ch7_section:
+      type: string
+    epa_focus:
+      type: string
+    message:
+      type: string
+    pv_tool_chain:
+      type: string
+    supervision:
+      type: string
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: week
+      operator: is_null
+      value: null
+      true_next: clinical_observation
+      false_next: check_week
+    check_week:
+      type: condition
+      variable: week
+      operator: lte
+      value: 2
+      true_next: observation_phase
+      false_next: check_mid_weeks
+    check_mid_weeks:
+      type: condition
+      variable: week
+      operator: lte
+      value: 4
+      true_next: check_supervised_level
+      false_next: check_late_weeks
+    check_late_weeks:
+      type: condition
+      variable: week
+      operator: lte
+      value: 6
+      true_next: check_independent_level
+      false_next: invalid_week
+
+    # W1-2: Observation regardless of level
+    observation_phase:
+      type: condition
+      variable: week
+      operator: eq
+      value: 1
+      true_next: orientation_activities
+      false_next: clinical_observation
+
+    orientation_activities:
+      type: return
+      value:
+        activity_type: ORIENTATION
+        supervision: direct_observation
+        activities:
+          - "PV terminology workshops"
+          - "AI system demonstrations"
+          - "Stakeholder mapping exercise"
+          - "Historical case studies (Thalidomide, DES, Vioxx)"
+        epa_focus: "none — building vocabulary"
+        pv_tool_chain: "none"
+        assessment: "documentation_review"
+        ch7_section: "7.2"
+
+    clinical_observation:
+      type: return
+      value:
+        activity_type: CLINICAL_OBSERVATION
+        supervision: direct_observation
+        activities:
+          - "ADR classification exercises (Type A vs Type B)"
+          - "Temporal pattern recognition"
+          - "Organ system mapping with ADR correlation"
+          - "Observe case processing with structured notes"
+        epa_focus: "EPA-1 observation, EPA-2 introduction"
+        pv_tool_chain: "case-seriousness -> naranjo-quick (demonstration only)"
+        assessment: "classification_accuracy_rubric"
+        ch7_section: "7.2"
+
+    # W3-4: Supervised practice — route by competency
+    check_supervised_level:
+      type: condition
+      variable: competency_level
+      operator: gte
+      value: 1.5
+      true_next: supervised_advanced
+      false_next: supervised_basic
+
+    supervised_basic:
+      type: return
+      value:
+        activity_type: SUPERVISED_BASIC
+        supervision: supervisor_present
+        activities:
+          - "Simulated case data entry with feedback"
+          - "MedDRA coding practice under supervision"
+          - "Basic search strategy development"
+          - "Documentation standards practice"
+        epa_focus: "EPA-1 basic processing, EPA-2 literature discovery"
+        pv_tool_chain: "icsr-triage (supervised)"
+        assessment: "work_product_review"
+        ch7_section: "7.3"
+
+    supervised_advanced:
+      type: return
+      value:
+        activity_type: SUPERVISED_PRACTICE
+        supervision: supervisor_present
+        activities:
+          - "Process straightforward ICSRs with supervisor"
+          - "Construct basic causality assessments"
+          - "Literature quality assessment"
+          - "Cross-functional meeting participation"
+        epa_focus: "EPA-1 processing, EPA-2 evaluation, EPA-3 preparation"
+        pv_tool_chain: "icsr-triage -> naranjo-quick -> causality-to-action"
+        assessment: "direct_observation + multi_source_feedback"
+        ch7_section: "7.3"
+
+    # W5-6: Independent practice — gate on L2 readiness
+    check_independent_level:
+      type: condition
+      variable: competency_level
+      operator: gte
+      value: 2
+      true_next: independent_practice
+      false_next: extended_supervised
+
+    independent_practice:
+      type: return
+      value:
+        activity_type: INDEPENDENT_PRACTICE
+        supervision: periodic_check
+        activities:
+          - "Process cases independently"
+          - "Signal concept analysis with PRR interpretation"
+          - "Benefit-risk introduction exercises"
+          - "AI ethics case study leadership"
+          - "Journal club presentation"
+          - "Peer teaching and mentorship"
+        epa_focus: "EPA-1 independent, EPA-2 synthesis, EPA-3 presentation, EPA-10 awareness"
+        pv_tool_chain: "icsr-triage -> naranjo-quick -> prr-signal -> signal-action"
+        assessment: "portfolio_review + 360_degree_feedback"
+        ch7_section: "7.3"
+
+    extended_supervised:
+      type: return
+      value:
+        activity_type: EXTENDED_SUPERVISED
+        supervision: supervisor_present
+        activities:
+          - "Continue supervised case processing"
+          - "Targeted remediation on gap domains"
+          - "Additional causality assessment practice"
+          - "Communication skill reinforcement"
+        epa_focus: "EPA-1 continued practice"
+        pv_tool_chain: "icsr-triage -> naranjo-quick (supervised)"
+        assessment: "daily_observation + midpoint_reassessment"
+        ch7_section: "7.2"
+
+    invalid_week:
+      type: return
+      value:
+        activity_type: INVALID
+        message: "APPE rotation is weeks 1-6"
+
+tests:
+# Week 1 — always orientation
+- input: { week: 1, competency_level: 0 }
+  expect: { activity_type: ORIENTATION, supervision: direct_observation }
+# Week 2 — clinical observation
+- input: { week: 2, competency_level: 1 }
+  expect: { activity_type: CLINICAL_OBSERVATION, supervision: direct_observation }
+# Week 3, low level — supervised basic
+- input: { week: 3, competency_level: 1 }
+  expect: { activity_type: SUPERVISED_BASIC, supervision: supervisor_present }
+# Week 4, ready — supervised advanced
+- input: { week: 4, competency_level: 1.5 }
+  expect: { activity_type: SUPERVISED_PRACTICE, supervision: supervisor_present }
+# Week 5, L2 ready — independent
+- input: { week: 5, competency_level: 2 }
+  expect: { activity_type: INDEPENDENT_PRACTICE, supervision: periodic_check }
+# Week 6, L2 — independent with full chain
+- input: { week: 6, competency_level: 2.5 }
+  expect: { activity_type: INDEPENDENT_PRACTICE, supervision: periodic_check }
+# Week 5, not ready — extended supervised
+- input: { week: 5, competency_level: 1.5 }
+  expect: { activity_type: EXTENDED_SUPERVISED, supervision: supervisor_present }
+# Week 6, not ready — still extended
+- input: { week: 6, competency_level: 1.8 }
+  expect: { activity_type: EXTENDED_SUPERVISED, supervision: supervisor_present }
+# Invalid week
+- input: { week: 7, competency_level: 2 }
+  expect: { activity_type: INVALID }
+# Edge: empty (week defaults to 0, which is lte 2 but neq 1)
+- input: {}
+  expect: { activity_type: CLINICAL_OBSERVATION }

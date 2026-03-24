@@ -1,0 +1,56 @@
+name: ab-dopamine-spike
+description: 'Antibody: detects dopamine spike without cooldown (stem-bio reward pathway). Consecutive high-reward stimuli without temporal decay cause hedonic adaptation.'
+version: 0.1.0
+interface:
+  inputs:
+    dopamine_level:
+      type: number
+      required: true
+    reward_count_consecutive:
+      type: number
+      required: true
+  outputs:
+    threat:
+      type: boolean
+    response:
+      type: string
+tree:
+  start: check_level
+  nodes:
+    check_level:
+      type: condition
+      variable: dopamine_level
+      operator: gt
+      value: 0.7
+      true_next: check_consecutive
+      false_next: clean
+    check_consecutive:
+      type: condition
+      variable: reward_count_consecutive
+      operator: gte
+      value: 3
+      true_next: adaptation
+      false_next: clean
+    adaptation:
+      type: return
+      value:
+        threat: true
+        response: 'WARN: hedonic adaptation risk — 3+ consecutive rewards without decay'
+    clean:
+      type: return
+      value:
+        threat: false
+        response: 'PASS'
+tests:
+- input: { dopamine_level: 0.5, reward_count_consecutive: 5 }
+  expect: { threat: false }
+- input: { dopamine_level: 0.8, reward_count_consecutive: 2 }
+  expect: { threat: false }
+- input: { dopamine_level: 0.8, reward_count_consecutive: 3 }
+  expect: { threat: true }
+- input: { dopamine_level: 0.9, reward_count_consecutive: 10 }
+  expect: { threat: true }
+- input: {}
+  expect:
+    response: PASS
+    threat: false

@@ -22,15 +22,25 @@ FROM python:3.12-slim
 # Station binary
 COPY --from=builder /build/target/release/nexvigilant-station /usr/local/bin/nexvigilant-station
 
-# Config files + proxy scripts
+# Stable binaries first (change infrequently → better layer caching)
+COPY bin/rsk /usr/local/bin/rsk
+
+# Config files + proxy scripts (change with each feature)
 COPY configs/ /app/configs/
 COPY scripts/ /app/scripts/
+
+# Microgram decision trees + chains (change with PV logic updates)
+COPY micrograms/ /app/micrograms/
+COPY chains/ /app/chains/
 
 WORKDIR /app
 
 # Cloud Run sends traffic to $PORT (default 8080)
 ENV PORT=8080
 ENV RUST_LOG=nexvigilant_station=info
+ENV RSK_BINARY=/usr/local/bin/rsk
+ENV MCG_DIR=/app/micrograms
+ENV CHAINS_DIR=/app/chains
 
 # Cloud Run uses its own startup probe at /health — Docker HEALTHCHECK not needed
 

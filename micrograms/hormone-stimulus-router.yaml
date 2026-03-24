@@ -1,0 +1,315 @@
+name: hormone-stimulus-router
+description: 'Endocrine stimulus-response router: maps stimulus category and intensity to hormone response and behavioral modulation using stem-bio SCIENCE model'
+version: 0.1.0
+interface:
+  inputs:
+    stimulus_category:
+      type: string
+      required: true
+      description: 'One of: stress, reward, social, temporal, urgency'
+    intensity:
+      type: number
+      required: true
+      description: 'Signal intensity 0.0 to 1.0'
+    current_cortisol:
+      type: number
+      required: true
+      description: 'Current cortisol level 0.0 to 1.0'
+  outputs:
+    primary_hormone:
+      type: string
+    hormone_delta:
+      type: number
+    behavioral_shift:
+      type: string
+    risk_tolerance_direction:
+      type: string
+tree:
+  start: route_stimulus
+  nodes:
+    route_stimulus:
+      type: condition
+      variable: stimulus_category
+      operator: eq
+      value: stress
+      true_next: stress_path
+      false_next: check_reward
+    check_reward:
+      type: condition
+      variable: stimulus_category
+      operator: eq
+      value: reward
+      true_next: reward_path
+      false_next: check_social
+    check_social:
+      type: condition
+      variable: stimulus_category
+      operator: eq
+      value: social
+      true_next: social_path
+      false_next: check_urgency
+    check_urgency:
+      type: condition
+      variable: stimulus_category
+      operator: eq
+      value: urgency
+      true_next: urgency_path
+      false_next: temporal_path
+    stress_path:
+      type: condition
+      variable: intensity
+      operator: gt
+      value: 0.7
+      true_next: stress_high
+      false_next: stress_check_cortisol
+    stress_check_cortisol:
+      type: condition
+      variable: current_cortisol
+      operator: gt
+      value: 0.6
+      true_next: stress_burnout
+      false_next: stress_moderate
+    stress_high:
+      type: return
+      value:
+        primary_hormone: cortisol
+        hormone_delta: 0.3
+        behavioral_shift: conservative
+        risk_tolerance_direction: decrease
+    stress_burnout:
+      type: return
+      value:
+        primary_hormone: cortisol
+        hormone_delta: 0.1
+        behavioral_shift: protective
+        risk_tolerance_direction: decrease
+    stress_moderate:
+      type: return
+      value:
+        primary_hormone: adrenaline
+        hormone_delta: 0.2
+        behavioral_shift: alert
+        risk_tolerance_direction: stable
+    reward_path:
+      type: condition
+      variable: intensity
+      operator: gt
+      value: 0.5
+      true_next: reward_high
+      false_next: reward_low
+    reward_high:
+      type: return
+      value:
+        primary_hormone: dopamine
+        hormone_delta: 0.2
+        behavioral_shift: explorative
+        risk_tolerance_direction: increase
+    reward_low:
+      type: return
+      value:
+        primary_hormone: serotonin
+        hormone_delta: 0.1
+        behavioral_shift: satisfied
+        risk_tolerance_direction: stable
+    social_path:
+      type: condition
+      variable: intensity
+      operator: gt
+      value: 0.6
+      true_next: social_high
+      false_next: social_check_cortisol
+    social_check_cortisol:
+      type: condition
+      variable: current_cortisol
+      operator: gt
+      value: 0.5
+      true_next: social_stressed
+      false_next: social_low
+    social_high:
+      type: return
+      value:
+        primary_hormone: oxytocin
+        hormone_delta: 0.35
+        behavioral_shift: collaborative
+        risk_tolerance_direction: increase
+    social_stressed:
+      type: return
+      value:
+        primary_hormone: serotonin
+        hormone_delta: 0.15
+        behavioral_shift: satisfied
+        risk_tolerance_direction: stable
+    social_low:
+      type: return
+      value:
+        primary_hormone: oxytocin
+        hormone_delta: 0.1
+        behavioral_shift: collaborative
+        risk_tolerance_direction: stable
+    urgency_path:
+      type: condition
+      variable: intensity
+      operator: gt
+      value: 0.8
+      true_next: urgency_critical
+      false_next: urgency_elevated
+    urgency_critical:
+      type: return
+      value:
+        primary_hormone: adrenaline
+        hormone_delta: 0.4
+        behavioral_shift: fight_or_flight
+        risk_tolerance_direction: increase
+    urgency_elevated:
+      type: return
+      value:
+        primary_hormone: adrenaline
+        hormone_delta: 0.2
+        behavioral_shift: focused
+        risk_tolerance_direction: stable
+    temporal_path:
+      type: condition
+      variable: intensity
+      operator: gt
+      value: 0.5
+      true_next: temporal_high
+      false_next: temporal_check_cortisol
+    temporal_check_cortisol:
+      type: condition
+      variable: current_cortisol
+      operator: gt
+      value: 0.6
+      true_next: temporal_exhausted
+      false_next: temporal_low
+    temporal_high:
+      type: return
+      value:
+        primary_hormone: melatonin
+        hormone_delta: 0.3
+        behavioral_shift: decay
+        risk_tolerance_direction: decrease
+    temporal_exhausted:
+      type: return
+      value:
+        primary_hormone: cortisol
+        hormone_delta: 0.2
+        behavioral_shift: protective
+        risk_tolerance_direction: decrease
+    temporal_low:
+      type: return
+      value:
+        primary_hormone: melatonin
+        hormone_delta: 0.1
+        behavioral_shift: focused
+        risk_tolerance_direction: stable
+tests:
+- input:
+    stimulus_category: stress
+    intensity: 0.9
+    current_cortisol: 0.3
+  expect:
+    primary_hormone: cortisol
+    hormone_delta: 0.3
+    behavioral_shift: conservative
+- input:
+    stimulus_category: stress
+    intensity: 0.4
+    current_cortisol: 0.8
+  expect:
+    primary_hormone: cortisol
+    hormone_delta: 0.1
+    behavioral_shift: protective
+- input:
+    stimulus_category: stress
+    intensity: 0.4
+    current_cortisol: 0.3
+  expect:
+    primary_hormone: adrenaline
+    hormone_delta: 0.2
+    behavioral_shift: alert
+- input:
+    stimulus_category: reward
+    intensity: 0.8
+    current_cortisol: 0.3
+  expect:
+    primary_hormone: dopamine
+    hormone_delta: 0.2
+    behavioral_shift: explorative
+- input:
+    stimulus_category: reward
+    intensity: 0.3
+    current_cortisol: 0.3
+  expect:
+    primary_hormone: serotonin
+    hormone_delta: 0.1
+    behavioral_shift: satisfied
+- input:
+    stimulus_category: social
+    intensity: 0.8
+    current_cortisol: 0.3
+  expect:
+    primary_hormone: oxytocin
+    hormone_delta: 0.35
+    behavioral_shift: collaborative
+- input:
+    stimulus_category: social
+    intensity: 0.3
+    current_cortisol: 0.7
+  expect:
+    primary_hormone: serotonin
+    hormone_delta: 0.15
+    behavioral_shift: satisfied
+- input:
+    stimulus_category: social
+    intensity: 0.3
+    current_cortisol: 0.3
+  expect:
+    primary_hormone: oxytocin
+    hormone_delta: 0.1
+    behavioral_shift: collaborative
+- input:
+    stimulus_category: urgency
+    intensity: 0.9
+    current_cortisol: 0.4
+  expect:
+    primary_hormone: adrenaline
+    hormone_delta: 0.4
+    behavioral_shift: fight_or_flight
+- input:
+    stimulus_category: urgency
+    intensity: 0.5
+    current_cortisol: 0.4
+  expect:
+    primary_hormone: adrenaline
+    hormone_delta: 0.2
+    behavioral_shift: focused
+- input:
+    stimulus_category: temporal
+    intensity: 0.8
+    current_cortisol: 0.3
+  expect:
+    primary_hormone: melatonin
+    hormone_delta: 0.3
+    behavioral_shift: decay
+- input:
+    stimulus_category: temporal
+    intensity: 0.3
+    current_cortisol: 0.8
+  expect:
+    primary_hormone: cortisol
+    hormone_delta: 0.2
+    behavioral_shift: protective
+- input:
+    stimulus_category: temporal
+    intensity: 0.3
+    current_cortisol: 0.3
+  expect:
+    primary_hormone: melatonin
+    hormone_delta: 0.1
+    behavioral_shift: focused
+- input: {}
+  expect:
+    behavioral_shift: focused
+    hormone_delta: 0.1
+    primary_hormone: melatonin
+    risk_tolerance_direction: stable

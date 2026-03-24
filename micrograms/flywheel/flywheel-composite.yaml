@@ -1,0 +1,183 @@
+name: flywheel-composite
+description: 'Composite flywheel health gate combining event flow, velocity band, and tier coverage. GREEN (healthy+fast+covered), YELLOW (any warning), RED (any critical failure).'
+version: 0.1.0
+interface:
+  inputs:
+    event_health:
+      type: string
+      required: false
+    live_node_count:
+      type: int
+      required: false
+    staging_node_count:
+      type: int
+      required: false
+    velocity_band:
+      type: string
+      required: false
+  outputs:
+    action:
+      type: string
+    composite_health:
+      type: string
+    flywheel_operational:
+      type: bool
+tree:
+  start: check_event_red
+  nodes:
+    check_event_red:
+      type: condition
+      variable: event_health
+      operator: eq
+      value: RED
+      true_next: red
+      false_next: check_velocity_slow
+    check_velocity_slow:
+      type: condition
+      variable: velocity_band
+      operator: eq
+      value: SLOW
+      true_next: red
+      false_next: check_live_nodes
+    check_live_nodes:
+      type: condition
+      variable: live_node_count
+      operator: gte
+      value: 1
+      true_next: check_warnings
+      false_next: red
+    check_warnings:
+      type: condition
+      variable: event_health
+      operator: eq
+      value: YELLOW
+      true_next: yellow
+      false_next: check_velocity_acceptable
+    check_velocity_acceptable:
+      type: condition
+      variable: velocity_band
+      operator: eq
+      value: ACCEPTABLE
+      true_next: yellow
+      false_next: check_staging_empty
+    check_staging_empty:
+      type: condition
+      variable: staging_node_count
+      operator: eq
+      value: 0
+      true_next: yellow
+      false_next: green
+    green:
+      type: return
+      value:
+        composite_health: GREEN
+        flywheel_operational: true
+        action: none
+    yellow:
+      type: return
+      value:
+        composite_health: YELLOW
+        flywheel_operational: true
+        action: monitor
+    red:
+      type: return
+      value:
+        composite_health: RED
+        flywheel_operational: false
+        action: intervene
+tests:
+- input:
+    event_health: GREEN
+    velocity_band: EXCEPTIONAL
+    live_node_count: 2
+    staging_node_count: 2
+  expect:
+    composite_health: GREEN
+    flywheel_operational: true
+    action: none
+- input:
+    event_health: GREEN
+    velocity_band: TARGET
+    live_node_count: 2
+    staging_node_count: 2
+  expect:
+    composite_health: GREEN
+    flywheel_operational: true
+    action: none
+- input:
+    event_health: RED
+    velocity_band: EXCEPTIONAL
+    live_node_count: 2
+    staging_node_count: 2
+  expect:
+    composite_health: RED
+    flywheel_operational: false
+    action: intervene
+- input:
+    event_health: GREEN
+    velocity_band: SLOW
+    live_node_count: 2
+    staging_node_count: 2
+  expect:
+    composite_health: RED
+    flywheel_operational: false
+    action: intervene
+- input:
+    event_health: GREEN
+    velocity_band: TARGET
+    live_node_count: 0
+    staging_node_count: 2
+  expect:
+    composite_health: RED
+    flywheel_operational: false
+    action: intervene
+- input:
+    event_health: YELLOW
+    velocity_band: TARGET
+    live_node_count: 2
+    staging_node_count: 2
+  expect:
+    composite_health: YELLOW
+    flywheel_operational: true
+    action: monitor
+- input:
+    event_health: GREEN
+    velocity_band: ACCEPTABLE
+    live_node_count: 2
+    staging_node_count: 2
+  expect:
+    composite_health: YELLOW
+    flywheel_operational: true
+    action: monitor
+- input:
+    event_health: GREEN
+    velocity_band: TARGET
+    live_node_count: 2
+    staging_node_count: 0
+  expect:
+    composite_health: YELLOW
+    flywheel_operational: true
+    action: monitor
+- input:
+    event_health: GREEN
+    velocity_band: EXCEPTIONAL
+    live_node_count: 3
+    staging_node_count: 1
+  expect:
+    composite_health: GREEN
+    flywheel_operational: true
+    action: none
+- input:
+    event_health: YELLOW
+    velocity_band: SLOW
+    live_node_count: 2
+    staging_node_count: 2
+  expect:
+    composite_health: RED
+    flywheel_operational: false
+    action: intervene
+- input: {}
+  expect:
+    action: intervene
+    composite_health: RED
+    flywheel_operational: false

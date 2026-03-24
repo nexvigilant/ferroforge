@@ -1,0 +1,225 @@
+name: reporting-obligation-router
+description: Routes serious adverse event reports to appropriate regulatory authorities
+  based on occurrence location, marketing authorization, seriousness, and urgency.
+  Determines submission method.
+version: 0.1.0
+interface:
+  inputs:
+    country_of_occurrence:
+      type: string
+      required: false
+    marketing_authorization_holder:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    is_expedited:
+      type: bool
+      required: false
+  outputs:
+    authority:
+      type: string
+    submission_method:
+      type: string
+tree:
+  start: check_country
+  nodes:
+    check_country:
+      type: condition
+      variable: country_of_occurrence
+      operator: matches
+      value: US|USA|United States
+      true_next: us_report
+      false_next: check_eu
+    us_report:
+      type: return
+      value:
+        authority: FDA
+        submission_method: MedWatch_E2A
+    check_eu:
+      type: condition
+      variable: country_of_occurrence
+      operator: matches
+      value: EU|EMA|Germany|France|Italy|Spain|Netherlands|Belgium|Austria|Denmark|Finland|Greece|Ireland|Luxembourg|Poland|Portugal|Sweden|Bulgaria|Croatia|Cyprus|Czech|Estonia|Hungary|Latvia|Lithuania|Malta|Romania|Slovakia|Slovenia
+      true_next: eu_check_mah
+      false_next: check_uk
+    eu_check_mah:
+      type: condition
+      variable: marketing_authorization_holder
+      operator: eq
+      value: true
+      true_next: eu_check_expedited
+      false_next: eu_health_authority
+    eu_check_expedited:
+      type: condition
+      variable: is_expedited
+      operator: eq
+      value: true
+      true_next: eu_expedited
+      false_next: eu_standard
+    eu_expedited:
+      type: return
+      value:
+        authority: EMA
+        submission_method: eudravigilance_urgent
+    eu_standard:
+      type: return
+      value:
+        authority: EMA
+        submission_method: eudravigilance_standard
+    eu_health_authority:
+      type: return
+      value:
+        authority: EMA
+        submission_method: eudravigilance_standard
+    check_uk:
+      type: condition
+      variable: country_of_occurrence
+      operator: matches
+      value: UK|United Kingdom|GB|Britain
+      true_next: uk_check_serious
+      false_next: check_au
+    uk_check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: uk_report
+      false_next: uk_non_serious
+    uk_report:
+      type: return
+      value:
+        authority: MHRA
+        submission_method: MHRA_report
+    uk_non_serious:
+      type: return
+      value:
+        authority: MHRA
+        submission_method: periodic_submission
+    check_au:
+      type: condition
+      variable: country_of_occurrence
+      operator: matches
+      value: AU|Australia
+      true_next: au_report
+      false_next: check_japan
+    au_report:
+      type: return
+      value:
+        authority: TGA
+        submission_method: TGA_DAEN
+    check_japan:
+      type: condition
+      variable: country_of_occurrence
+      operator: matches
+      value: JP|Japan
+      true_next: japan_check_serious
+      false_next: multiple_authorities
+    japan_check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: japan_report
+      false_next: japan_periodic
+    japan_report:
+      type: return
+      value:
+        authority: PMDA
+        submission_method: PMDA_serious_adverse_event
+    japan_periodic:
+      type: return
+      value:
+        authority: PMDA
+        submission_method: periodic_safety_update
+    multiple_authorities:
+      type: return
+      value:
+        authority: multiple
+        submission_method: local_health_authority_standard
+tests:
+- input:
+    country_of_occurrence: AU
+    is_expedited: false
+    is_serious: false
+    marketing_authorization_holder: false
+  expect:
+    authority: TGA
+    submission_method: TGA_DAEN
+- input:
+    country_of_occurrence: EU
+    is_expedited: false
+    is_serious: false
+    marketing_authorization_holder: false
+  expect:
+    authority: EMA
+    submission_method: eudravigilance_standard
+- input:
+    country_of_occurrence: EU
+    is_expedited: false
+    is_serious: false
+    marketing_authorization_holder: true
+  expect:
+    authority: EMA
+    submission_method: eudravigilance_standard
+- input:
+    country_of_occurrence: EU
+    is_expedited: true
+    is_serious: false
+    marketing_authorization_holder: true
+  expect:
+    authority: EMA
+    submission_method: eudravigilance_urgent
+- input:
+    country_of_occurrence: JP
+    is_expedited: false
+    is_serious: false
+    marketing_authorization_holder: false
+  expect:
+    authority: PMDA
+    submission_method: periodic_safety_update
+- input:
+    country_of_occurrence: JP
+    is_expedited: false
+    is_serious: true
+    marketing_authorization_holder: false
+  expect:
+    authority: PMDA
+    submission_method: PMDA_serious_adverse_event
+- input:
+    country_of_occurrence: UK
+    is_expedited: false
+    is_serious: false
+    marketing_authorization_holder: false
+  expect:
+    authority: MHRA
+    submission_method: periodic_submission
+- input:
+    country_of_occurrence: UK
+    is_expedited: false
+    is_serious: true
+    marketing_authorization_holder: false
+  expect:
+    authority: MHRA
+    submission_method: MHRA_report
+- input:
+    country_of_occurrence: US
+    is_expedited: false
+    is_serious: false
+    marketing_authorization_holder: false
+  expect:
+    authority: FDA
+    submission_method: MedWatch_E2A
+- input:
+    country_of_occurrence: ZZZZZ_NO_MATCH
+    is_expedited: false
+    is_serious: false
+    marketing_authorization_holder: false
+  expect:
+    authority: multiple
+    submission_method: local_health_authority_standard
+- input: {}
+  expect:
+    authority: multiple
+    submission_method: local_health_authority_standard

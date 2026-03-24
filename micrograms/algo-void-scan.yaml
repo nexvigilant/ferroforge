@@ -1,0 +1,281 @@
+name: algo-void-scan
+description: "Algorithm 9 (VOID): Detect what's missing. Compares expected data elements against what's present, returns gap count and verdict. κ(ς, ∅) at ∂ → Σ."
+version: 0.1.0
+interface:
+  inputs:
+    has_disproportionality:
+      type: boolean
+      required: true
+    has_clinical_trial_data:
+      type: boolean
+      required: true
+    has_labeling_acknowledgment:
+      type: boolean
+      required: true
+    has_rechallenge_data:
+      type: boolean
+      required: true
+    has_dose_response:
+      type: boolean
+      required: true
+    has_time_to_onset:
+      type: boolean
+      required: true
+    has_class_comparison:
+      type: boolean
+      required: true
+  outputs:
+    gap_count:
+      type: integer
+    completeness:
+      type: string
+    highest_value_gap:
+      type: string
+    algorithm:
+      type: string
+tree:
+  start: count_rechallenge
+  nodes:
+    count_rechallenge:
+      type: condition
+      variable: has_rechallenge_data
+      operator: eq
+      value: false
+      true_next: gap_rechallenge
+      false_next: count_dose_response
+    gap_rechallenge:
+      type: condition
+      variable: has_dose_response
+      operator: eq
+      value: false
+      true_next: gap_both_critical
+      false_next: check_remaining_with_rechallenge_gap
+    gap_both_critical:
+      type: condition
+      variable: has_time_to_onset
+      operator: eq
+      value: false
+      true_next: three_plus_gaps
+      false_next: two_critical_gaps
+    three_plus_gaps:
+      type: condition
+      variable: has_class_comparison
+      operator: eq
+      value: false
+      true_next: four_gaps
+      false_next: three_gaps
+    four_gaps:
+      type: return
+      value:
+        gap_count: 4
+        completeness: incomplete
+        highest_value_gap: rechallenge_data
+        algorithm: "VOID: 4 gaps detected — rechallenge, dose-response, time-to-onset, class comparison all absent"
+    three_gaps:
+      type: return
+      value:
+        gap_count: 3
+        completeness: incomplete
+        highest_value_gap: rechallenge_data
+        algorithm: "VOID: 3 gaps — rechallenge + dose-response + time-to-onset absent"
+    two_critical_gaps:
+      type: return
+      value:
+        gap_count: 2
+        completeness: partial
+        highest_value_gap: rechallenge_data
+        algorithm: "VOID: 2 critical gaps — rechallenge + dose-response absent"
+    check_remaining_with_rechallenge_gap:
+      type: condition
+      variable: has_time_to_onset
+      operator: eq
+      value: false
+      true_next: rechallenge_plus_onset_gap
+      false_next: rechallenge_only_gap
+    rechallenge_plus_onset_gap:
+      type: return
+      value:
+        gap_count: 2
+        completeness: partial
+        highest_value_gap: rechallenge_data
+        algorithm: "VOID: 2 gaps — rechallenge + time-to-onset absent"
+    rechallenge_only_gap:
+      type: return
+      value:
+        gap_count: 1
+        completeness: near_complete
+        highest_value_gap: rechallenge_data
+        algorithm: "VOID: 1 gap — rechallenge data absent (caps Naranjo at POSSIBLE)"
+    count_dose_response:
+      type: condition
+      variable: has_dose_response
+      operator: eq
+      value: false
+      true_next: dose_response_gap
+      false_next: check_minor_gaps
+    dose_response_gap:
+      type: return
+      value:
+        gap_count: 1
+        completeness: near_complete
+        highest_value_gap: dose_response
+        algorithm: "VOID: 1 gap — dose-response absent"
+    check_minor_gaps:
+      type: condition
+      variable: has_time_to_onset
+      operator: eq
+      value: false
+      true_next: minor_gap
+      false_next: check_class
+    check_class:
+      type: condition
+      variable: has_class_comparison
+      operator: eq
+      value: false
+      true_next: minor_gap_class
+      false_next: complete
+    minor_gap:
+      type: return
+      value:
+        gap_count: 1
+        completeness: near_complete
+        highest_value_gap: time_to_onset
+        algorithm: "VOID: 1 minor gap — time-to-onset absent"
+    minor_gap_class:
+      type: return
+      value:
+        gap_count: 1
+        completeness: near_complete
+        highest_value_gap: class_comparison
+        algorithm: "VOID: 1 minor gap — class comparison absent"
+    complete:
+      type: return
+      value:
+        gap_count: 0
+        completeness: complete
+        highest_value_gap: none
+        algorithm: "VOID: 0 gaps — all 7 data elements present. Assessment fully evidenced."
+tests:
+- name: semaglutide_case_4_gaps
+  input:
+    has_disproportionality: true
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: true
+    has_rechallenge_data: false
+    has_dose_response: false
+    has_time_to_onset: false
+    has_class_comparison: false
+  expect:
+    gap_count: 4
+    completeness: incomplete
+    highest_value_gap: rechallenge_data
+- name: fully_evidenced
+  input:
+    has_disproportionality: true
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: true
+    has_rechallenge_data: true
+    has_dose_response: true
+    has_time_to_onset: true
+    has_class_comparison: true
+  expect:
+    gap_count: 0
+    completeness: complete
+    highest_value_gap: none
+- name: rechallenge_only_gap
+  input:
+    has_disproportionality: true
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: true
+    has_rechallenge_data: false
+    has_dose_response: true
+    has_time_to_onset: true
+    has_class_comparison: true
+  expect:
+    gap_count: 1
+    completeness: near_complete
+    highest_value_gap: rechallenge_data
+- name: null_safety
+  input: {}
+  expect:
+    gap_count: 0
+    completeness: complete
+    highest_value_gap: none
+- name: dose_response_only_gap
+  input:
+    has_disproportionality: true
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: true
+    has_rechallenge_data: true
+    has_dose_response: false
+    has_time_to_onset: true
+    has_class_comparison: true
+  expect:
+    gap_count: 1
+    completeness: near_complete
+    highest_value_gap: dose_response
+- name: rechallenge_plus_onset_gap
+  input:
+    has_disproportionality: true
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: true
+    has_rechallenge_data: false
+    has_dose_response: true
+    has_time_to_onset: false
+    has_class_comparison: true
+  expect:
+    gap_count: 2
+    completeness: partial
+    highest_value_gap: rechallenge_data
+- name: two_critical_gaps
+  input:
+    has_disproportionality: true
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: true
+    has_rechallenge_data: false
+    has_dose_response: false
+    has_time_to_onset: true
+    has_class_comparison: true
+  expect:
+    gap_count: 2
+    completeness: partial
+    highest_value_gap: rechallenge_data
+- name: three_gaps
+  input:
+    has_disproportionality: true
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: true
+    has_rechallenge_data: false
+    has_dose_response: false
+    has_time_to_onset: false
+    has_class_comparison: true
+  expect:
+    gap_count: 3
+    completeness: incomplete
+    highest_value_gap: rechallenge_data
+- name: minor_gap_onset_absent
+  input:
+    has_disproportionality: true
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: true
+    has_rechallenge_data: true
+    has_dose_response: true
+    has_time_to_onset: false
+    has_class_comparison: true
+  expect:
+    gap_count: 1
+    completeness: near_complete
+    highest_value_gap: time_to_onset
+- name: minor_gap_class_absent
+  input:
+    has_disproportionality: true
+    has_clinical_trial_data: true
+    has_labeling_acknowledgment: true
+    has_rechallenge_data: true
+    has_dose_response: true
+    has_time_to_onset: true
+    has_class_comparison: false
+  expect:
+    gap_count: 1
+    completeness: near_complete
+    highest_value_gap: class_comparison

@@ -1,0 +1,232 @@
+name: signal-method
+description: "Domain 8: Route to signal detection method by data type, sample size, and analytical goal — PRR, ROR, IC, EBGM, ML, NLP."
+version: 0.1.0
+interface:
+  inputs:
+    case_count:
+      type: int
+      required: false
+    data_type:
+      type: string
+      required: false
+    prefer_bayesian:
+      type: bool
+      required: false
+  outputs:
+    action:
+      type: string
+    ai_enhance:
+      type: string
+    approach:
+      type: string
+    capabilities:
+      type: string
+    components:
+      type: string
+    formula_ebgm:
+      type: string
+    formula_ic:
+      type: string
+    formula_prr:
+      type: string
+    formula_ror:
+      type: string
+    limitations:
+      type: string
+    nexcore_tool:
+      type: string
+    next_step:
+      type: string
+    note:
+      type: string
+    primary:
+      type: string
+    secondary:
+      type: string
+    signal_criteria:
+      type: string
+    signal_criteria_ic:
+      type: string
+    strengths:
+      type: string
+    tertiary:
+      type: string
+tree:
+  start: check_data_type
+  nodes:
+    check_data_type:
+      type: condition
+      variable: data_type
+      operator: eq
+      value: spontaneous
+      true_next: check_sample_size
+      false_next: check_literature
+    check_literature:
+      type: condition
+      variable: data_type
+      operator: eq
+      value: literature
+      true_next: nlp_method
+      false_next: check_ehr
+    check_ehr:
+      type: condition
+      variable: data_type
+      operator: eq
+      value: ehr
+      true_next: ml_method
+      false_next: check_multimodal
+    check_multimodal:
+      type: condition
+      variable: data_type
+      operator: eq
+      value: multimodal
+      true_next: ensemble_method
+      false_next: prr_default
+    check_sample_size:
+      type: condition
+      variable: case_count
+      operator: gte
+      value: 100
+      true_next: check_bayesian_preference
+      false_next: check_small_sample
+    check_small_sample:
+      type: condition
+      variable: case_count
+      operator: gte
+      value: 3
+      true_next: prr_ror
+      false_next: insufficient
+    check_bayesian_preference:
+      type: condition
+      variable: prefer_bayesian
+      operator: eq
+      value: true
+      true_next: bayesian_methods
+      false_next: frequentist_methods
+    prr_ror:
+      type: return
+      value:
+        primary: PRR
+        secondary: ROR
+        approach: frequentist
+        formula_prr: "PRR = (a/(a+b)) / (c/(c+d))"
+        signal_criteria: "PRR >= 2.0, chi-squared >= 4.0, N >= 3"
+        formula_ror: "ROR = (a*d) / (b*c)"
+        strengths: "simple, interpretable, widely accepted, low computational cost"
+        limitations: "sensitive to small numbers, no shrinkage, reporting bias"
+        ai_enhance: "automated 2x2 table construction, batch analysis, temporal stratification"
+        nexcore_tool: "signal_detect, pv_signal_prr, pv_signal_ror"
+    bayesian_methods:
+      type: return
+      value:
+        primary: EBGM
+        secondary: IC
+        approach: bayesian
+        formula_ebgm: "EBGM = E[lambda | N_ij] via Multi-item Gamma Poisson Shrinker"
+        signal_criteria: "EB05 >= 2.0 (lower bound of 90% CI)"
+        formula_ic: "IC = log2(observed/expected) with Bayesian shrinkage"
+        signal_criteria_ic: "IC025 > 0 (lower bound of 95% CI)"
+        strengths: "handles sparse data, shrinkage reduces false positives, robust with large databases"
+        limitations: "computationally intensive, prior specification sensitivity"
+        ai_enhance: "GPU-accelerated computation, adaptive prior updating, multi-drug analysis"
+        nexcore_tool: "pv_signal_ebgm, pv_signal_ic"
+    frequentist_methods:
+      type: return
+      value:
+        primary: PRR
+        secondary: ROR
+        tertiary: "chi-squared, Fisher's exact"
+        approach: frequentist
+        strengths: "simple computation, established thresholds, regulatory acceptance"
+        limitations: "no shrinkage, multiple testing concerns, sparse data sensitivity"
+        ai_enhance: "FDR correction, stratified analysis, temporal trend detection"
+        nexcore_tool: "signal_detect, signal_batch, pv_signal_prr, pv_signal_ror"
+    nlp_method:
+      type: return
+      value:
+        primary: NLP
+        secondary: "text mining + disproportionality"
+        approach: ai_enhanced
+        capabilities: "narrative analysis, medical concept extraction, severity assessment, literature screening"
+        strengths: "processes unstructured text, identifies patterns in case narratives and publications"
+        limitations: "language dependent, requires training data, validation needed"
+        nexcore_tool: "faers_search, mesh_search, mesh_enrich_pubmed"
+    ml_method:
+      type: return
+      value:
+        primary: MACHINE_LEARNING
+        secondary: "clustering + classification"
+        approach: ai_enhanced
+        capabilities: "patient cohort identification, temporal pattern detection, risk stratification"
+        strengths: "handles high-dimensional data, captures non-linear relationships, adaptive"
+        limitations: "requires labeled data, interpretability challenges, overfitting risk"
+        nexcore_tool: "dtree_train, dtree_predict, signal_detect"
+    ensemble_method:
+      type: return
+      value:
+        primary: ENSEMBLE
+        secondary: "multi-method integration"
+        approach: hybrid
+        components: "PRR + EBGM + ML clustering + NLP"
+        strengths: "maximizes sensitivity and specificity, reduces single-method blind spots"
+        limitations: "complexity, computational cost, integration challenges"
+        nexcore_tool: "signal_batch, pv_signal_complete"
+    insufficient:
+      type: return
+      value:
+        primary: CASE_SERIES
+        approach: qualitative
+        action: "insufficient data for statistical signal detection — conduct case series review"
+        next_step: "accumulate more reports, targeted literature review, expert consultation"
+    prr_default:
+      type: return
+      value:
+        primary: PRR
+        approach: frequentist
+        note: "default to PRR for unspecified data types"
+tests:
+- input:
+    data_type: spontaneous
+    case_count: 5
+  expect:
+    primary: PRR
+    secondary: ROR
+    approach: frequentist
+- input:
+    data_type: spontaneous
+    case_count: 500
+    prefer_bayesian: true
+  expect:
+    primary: EBGM
+    secondary: IC
+    approach: bayesian
+- input:
+    data_type: spontaneous
+    case_count: 200
+    prefer_bayesian: false
+  expect:
+    primary: PRR
+    approach: frequentist
+- input:
+    data_type: spontaneous
+    case_count: 1
+  expect:
+    primary: CASE_SERIES
+    approach: qualitative
+- input:
+    data_type: literature
+  expect:
+    primary: NLP
+    approach: ai_enhanced
+- input:
+    data_type: ehr
+  expect:
+    primary: MACHINE_LEARNING
+- input:
+    data_type: multimodal
+  expect:
+    primary: ENSEMBLE
+    approach: hybrid
+- input: {}
+  expect:
+    primary: PRR

@@ -1,0 +1,265 @@
+name: visual-dag
+description: Routes DAG structure to visual representation format (Mermaid, ASCII, or dot) for notebook rendering
+version: 0.1.0
+interface:
+  inputs:
+    node_count:
+      type: int
+      required: true
+    has_parallel:
+      type: bool
+      required: false
+    has_cycles:
+      type: bool
+      required: false
+    format:
+      type: string
+      required: false
+    max_depth:
+      type: int
+      required: false
+  outputs:
+    render_format:
+      type: string
+    layout_direction:
+      type: string
+    complexity:
+      type: string
+    notebook_cell_type:
+      type: string
+    warning:
+      type: string
+tree:
+  start: check_cycles
+  nodes:
+    check_cycles:
+      type: condition
+      variable: has_cycles
+      operator: eq
+      value: true
+      true_next: cycle_warning
+      false_next: check_format
+    cycle_warning:
+      type: return
+      value:
+        render_format: error
+        layout_direction: none
+        complexity: invalid
+        notebook_cell_type: markdown
+        warning: "DAG contains cycles -- not a valid DAG. Remove cycles before visualizing."
+    check_format:
+      type: condition
+      variable: format
+      operator: eq
+      value: dot
+      true_next: dot_format
+      false_next: check_ascii
+    check_ascii:
+      type: condition
+      variable: format
+      operator: eq
+      value: ascii
+      true_next: ascii_format
+      false_next: check_node_count
+    check_node_count:
+      type: condition
+      variable: node_count
+      operator: gte
+      value: 20
+      true_next: large_dag
+      false_next: check_medium
+    check_medium:
+      type: condition
+      variable: node_count
+      operator: gte
+      value: 8
+      true_next: medium_dag
+      false_next: check_parallel
+    check_parallel:
+      type: condition
+      variable: has_parallel
+      operator: eq
+      value: true
+      true_next: small_parallel_dag
+      false_next: small_linear_dag
+    small_linear_dag:
+      type: return
+      value:
+        render_format: mermaid
+        layout_direction: TD
+        complexity: linear
+        notebook_cell_type: markdown
+        warning: none
+    small_parallel_dag:
+      type: return
+      value:
+        render_format: mermaid
+        layout_direction: LR
+        complexity: parallel
+        notebook_cell_type: markdown
+        warning: none
+    medium_dag:
+      type: return
+      value:
+        render_format: mermaid
+        layout_direction: TD
+        complexity: medium
+        notebook_cell_type: markdown
+        warning: none
+    large_dag:
+      type: return
+      value:
+        render_format: dot
+        layout_direction: TB
+        complexity: large
+        notebook_cell_type: code
+        warning: "Large DAG (20+ nodes) -- using Graphviz dot for better layout. Requires graphviz Python package."
+    dot_format:
+      type: return
+      value:
+        render_format: dot
+        layout_direction: TB
+        complexity: explicit
+        notebook_cell_type: code
+        warning: none
+    ascii_format:
+      type: return
+      value:
+        render_format: ascii
+        layout_direction: TD
+        complexity: text-only
+        notebook_cell_type: code
+        warning: none
+tests:
+- name: linear_3_nodes
+  input:
+    node_count: 3
+    has_parallel: false
+    has_cycles: false
+  expect:
+    render_format: mermaid
+    layout_direction: TD
+    complexity: linear
+    notebook_cell_type: markdown
+    warning: none
+- name: parallel_5_nodes
+  input:
+    node_count: 5
+    has_parallel: true
+    has_cycles: false
+  expect:
+    render_format: mermaid
+    layout_direction: LR
+    complexity: parallel
+    notebook_cell_type: markdown
+    warning: none
+- name: medium_dag_10_nodes
+  input:
+    node_count: 10
+    has_parallel: false
+    has_cycles: false
+  expect:
+    render_format: mermaid
+    layout_direction: TD
+    complexity: medium
+    notebook_cell_type: markdown
+    warning: none
+- name: large_dag_25_nodes
+  input:
+    node_count: 25
+    has_parallel: true
+    has_cycles: false
+  expect:
+    render_format: dot
+    layout_direction: TB
+    complexity: large
+    notebook_cell_type: code
+- name: cyclic_graph_rejected
+  input:
+    node_count: 4
+    has_parallel: false
+    has_cycles: true
+  expect:
+    render_format: error
+    complexity: invalid
+    notebook_cell_type: markdown
+- name: explicit_dot_format
+  input:
+    node_count: 3
+    has_parallel: false
+    has_cycles: false
+    format: dot
+  expect:
+    render_format: dot
+    layout_direction: TB
+    complexity: explicit
+    notebook_cell_type: code
+    warning: none
+- name: explicit_ascii_format
+  input:
+    node_count: 5
+    has_parallel: true
+    has_cycles: false
+    format: ascii
+  expect:
+    render_format: ascii
+    layout_direction: TD
+    complexity: text-only
+    notebook_cell_type: code
+    warning: none
+- name: diamond_dag
+  input:
+    node_count: 4
+    has_parallel: true
+    has_cycles: false
+  expect:
+    render_format: mermaid
+    layout_direction: LR
+    complexity: parallel
+    notebook_cell_type: markdown
+    warning: none
+- name: single_node
+  input:
+    node_count: 1
+    has_parallel: false
+    has_cycles: false
+  expect:
+    render_format: mermaid
+    layout_direction: TD
+    complexity: linear
+    notebook_cell_type: markdown
+- name: boundary_medium
+  input:
+    node_count: 8
+    has_parallel: false
+    has_cycles: false
+  expect:
+    render_format: mermaid
+    layout_direction: TD
+    complexity: medium
+- name: boundary_large
+  input:
+    node_count: 20
+    has_parallel: false
+    has_cycles: false
+  expect:
+    render_format: dot
+    layout_direction: TB
+    complexity: large
+- name: zero_nodes
+  input:
+    node_count: 0
+    has_parallel: false
+    has_cycles: false
+  expect:
+    render_format: mermaid
+    layout_direction: TD
+    complexity: linear
+- name: null_input_safety
+  input: {}
+  expect:
+    complexity: linear
+    layout_direction: TD
+    notebook_cell_type: markdown
+    render_format: mermaid
+    warning: none

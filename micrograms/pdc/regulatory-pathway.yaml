@@ -1,0 +1,138 @@
+name: regulatory-pathway
+description: "Domain 12: Route to regulatory submission pathway by product type, urgency, and therapeutic designation."
+version: 0.1.0
+interface:
+  inputs:
+    has_breakthrough_designation:
+      type: bool
+      required: false
+    is_orphan:
+      type: bool
+      required: false
+    serious_condition:
+      type: bool
+      required: false
+    unmet_medical_need:
+      type: bool
+      required: false
+  outputs:
+    ai_assist:
+      type: string
+    business_impact:
+      type: string
+    ema:
+      type: string
+    fda:
+      type: string
+    features:
+      type: string
+    pathway:
+      type: string
+    review_timeline_months:
+      type: int
+tree:
+  start: check_breakthrough
+  nodes:
+    check_breakthrough:
+      type: condition
+      variable: has_breakthrough_designation
+      operator: eq
+      value: true
+      true_next: breakthrough
+      false_next: check_accelerated
+    check_accelerated:
+      type: condition
+      variable: serious_condition
+      operator: eq
+      value: true
+      true_next: check_unmet_need
+      false_next: check_orphan
+    check_unmet_need:
+      type: condition
+      variable: unmet_medical_need
+      operator: eq
+      value: true
+      true_next: accelerated
+      false_next: priority_review
+    check_orphan:
+      type: condition
+      variable: is_orphan
+      operator: eq
+      value: true
+      true_next: orphan
+      false_next: standard
+    breakthrough:
+      type: return
+      value:
+        pathway: BREAKTHROUGH
+        review_timeline_months: 6
+        features: "intensive FDA guidance, rolling review, organizational commitment"
+        fda: "Breakthrough Therapy Designation (BTD)"
+        ema: "PRIME (Priority Medicines) scheme"
+        business_impact: "18+ months faster approval, enhanced regulatory relationship"
+        ai_assist: "regulatory intelligence, submission optimization, meeting preparation"
+    accelerated:
+      type: return
+      value:
+        pathway: ACCELERATED
+        review_timeline_months: 6
+        features: "surrogate endpoint acceptance, post-marketing confirmatory study required"
+        fda: "Accelerated Approval (Subpart H/I)"
+        ema: "Conditional Marketing Authorization"
+        business_impact: "earlier market access, post-marketing commitment"
+    priority_review:
+      type: return
+      value:
+        pathway: PRIORITY
+        review_timeline_months: 6
+        features: "shortened review timeline, serious condition treatment"
+        fda: "Priority Review"
+        ema: "Accelerated Assessment"
+    orphan:
+      type: return
+      value:
+        pathway: ORPHAN
+        review_timeline_months: 10
+        features: "market exclusivity, fee waivers, protocol assistance"
+        fda: "Orphan Drug Designation (7-year exclusivity)"
+        ema: "Orphan Medicinal Product (10-year exclusivity)"
+    standard:
+      type: return
+      value:
+        pathway: STANDARD
+        review_timeline_months: 10
+        features: "standard review process, full clinical data package"
+        fda: "Standard NDA/BLA review"
+        ema: "Centralized/Decentralized/Mutual Recognition Procedure"
+tests:
+- input:
+    has_breakthrough_designation: true
+  expect:
+    pathway: BREAKTHROUGH
+    review_timeline_months: 6
+- input:
+    serious_condition: true
+    unmet_medical_need: true
+    has_breakthrough_designation: false
+  expect:
+    pathway: ACCELERATED
+- input:
+    serious_condition: true
+    unmet_medical_need: false
+    has_breakthrough_designation: false
+  expect:
+    pathway: PRIORITY
+- input:
+    is_orphan: true
+    serious_condition: false
+  expect:
+    pathway: ORPHAN
+- input:
+    serious_condition: false
+    is_orphan: false
+  expect:
+    pathway: STANDARD
+    review_timeline_months: 10
+- input: {}
+  expect:
+    pathway: STANDARD

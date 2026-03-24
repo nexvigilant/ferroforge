@@ -1,0 +1,126 @@
+name: session-health-chi
+description: 'T Tauri χ health classifier: maps branching ratio χ = output/input to health band using equilibrium boundaries from Serna et al. 2024 (ApJ 968 68)'
+version: 0.1.0
+input_type: session_metrics
+output_type: health_assessment
+interface:
+  inputs:
+    chi:
+      type: float
+      required: true
+      description: 'Branching ratio χ = output_events / input_events'
+  outputs:
+    band:
+      type: string
+      description: 'Health band: SpinningUp, Healthy, Depleting, or Critical'
+    severity:
+      type: string
+      description: 'Severity level: info, ok, warning, critical'
+    equilibrium_distance:
+      type: float
+      description: 'Distance from equilibrium peak χ=0.04'
+    action:
+      type: string
+      description: 'Recommended action based on health band'
+tree:
+  start: check_critical
+  nodes:
+    check_critical:
+      type: condition
+      variable: chi
+      operator: gt
+      value: 0.60
+      true_next: critical
+      false_next: check_depleting
+    check_depleting:
+      type: condition
+      variable: chi
+      operator: gt
+      value: 0.27
+      true_next: depleting
+      false_next: check_healthy
+    check_healthy:
+      type: condition
+      variable: chi
+      operator: gte
+      value: 0.02
+      true_next: healthy
+      false_next: spinning_up
+    critical:
+      type: return
+      value:
+        band: Critical
+        severity: critical
+        equilibrium_distance: -1.0
+        action: 'ALERT: χ exceeds APSW thermodynamic limit (0.60). Output rate unsustainable. Investigate output flooding or input starvation.'
+    depleting:
+      type: return
+      value:
+        band: Depleting
+        severity: warning
+        equilibrium_distance: -1.0
+        action: 'WARNING: χ above equilibrium band (0.27). System outputting more than sustainable. Monitor for drift toward critical.'
+    healthy:
+      type: return
+      value:
+        band: Healthy
+        severity: ok
+        equilibrium_distance: 0.0
+        action: 'System operating within equilibrium band [0.02, 0.27]. No action required.'
+    spinning_up:
+      type: return
+      value:
+        band: SpinningUp
+        severity: info
+        equilibrium_distance: -1.0
+        action: 'INFO: χ below equilibrium band (0.02). System consuming more than outputting. Normal during startup or heavy input phase.'
+tests:
+  - input:
+      chi: 0.04
+    expect:
+      band: Healthy
+      severity: ok
+  - input:
+      chi: 0.02
+    expect:
+      band: Healthy
+      severity: ok
+  - input:
+      chi: 0.27
+    expect:
+      band: Healthy
+      severity: ok
+  - input:
+      chi: 0.01
+    expect:
+      band: SpinningUp
+      severity: info
+  - input:
+      chi: 0.0
+    expect:
+      band: SpinningUp
+      severity: info
+  - input:
+      chi: 0.40
+    expect:
+      band: Depleting
+      severity: warning
+  - input:
+      chi: 0.70
+    expect:
+      band: Critical
+      severity: critical
+  - input:
+      chi: 0.60
+    expect:
+      band: Depleting
+      severity: warning
+  - input:
+      chi: 0.61
+    expect:
+      band: Critical
+      severity: critical
+  - input: {}
+    expect:
+      band: SpinningUp
+      severity: info

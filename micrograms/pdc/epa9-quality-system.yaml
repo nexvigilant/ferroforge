@@ -1,0 +1,125 @@
+name: epa9-quality-system
+description: "EPA 9: Quality and compliance — routes by finding type, severity, and CAPA requirements."
+version: 0.1.0
+interface:
+  inputs:
+    finding_severity:
+      type: string
+      required: false
+  outputs:
+    actions:
+      type: string
+    capa_required:
+      type: bool
+    classification:
+      type: string
+    escalation:
+      type: string
+    monitoring:
+      type: string
+    response_days:
+      type: int
+tree:
+  start: check_critical
+  nodes:
+    check_critical:
+      type: condition
+      variable: finding_severity
+      operator: eq
+      value: critical
+      true_next: critical_finding
+      false_next: check_major
+    check_major:
+      type: condition
+      variable: finding_severity
+      operator: eq
+      value: major
+      true_next: major_finding
+      false_next: check_minor
+    check_minor:
+      type: condition
+      variable: finding_severity
+      operator: eq
+      value: minor
+      true_next: minor_finding
+      false_next: check_observation
+    check_observation:
+      type: condition
+      variable: finding_severity
+      operator: eq
+      value: observation
+      true_next: observation_finding
+      false_next: no_finding
+    critical_finding:
+      type: return
+      value:
+        classification: CRITICAL
+        capa_required: true
+        response_days: 5
+        escalation: "executive oversight, regulatory notification may be required"
+        actions: "immediate corrective action, root cause analysis, preventive measures"
+        monitoring: "daily progress tracking until closure"
+    major_finding:
+      type: return
+      value:
+        classification: MAJOR
+        capa_required: true
+        response_days: 15
+        escalation: "program management review"
+        actions: "corrective action plan, root cause investigation, process improvement"
+        monitoring: "weekly progress tracking"
+    minor_finding:
+      type: return
+      value:
+        classification: MINOR
+        capa_required: false
+        response_days: 30
+        escalation: "functional team review"
+        actions: "process adjustment, documentation update, training if needed"
+        monitoring: "monthly tracking"
+    observation_finding:
+      type: return
+      value:
+        classification: OBSERVATION
+        capa_required: false
+        response_days: 90
+        escalation: "none"
+        actions: "note for improvement, consider in next review cycle"
+        monitoring: "quarterly review"
+    no_finding:
+      type: return
+      value:
+        classification: COMPLIANT
+        capa_required: false
+        response_days: 0
+        actions: "document compliance, continue standard operations"
+tests:
+- input:
+    finding_severity: critical
+  expect:
+    classification: CRITICAL
+    capa_required: true
+    response_days: 5
+- input:
+    finding_severity: major
+  expect:
+    classification: MAJOR
+    capa_required: true
+    response_days: 15
+- input:
+    finding_severity: minor
+  expect:
+    classification: MINOR
+    capa_required: false
+- input:
+    finding_severity: observation
+  expect:
+    classification: OBSERVATION
+    response_days: 90
+- input:
+    finding_severity: none
+  expect:
+    classification: COMPLIANT
+- input: {}
+  expect:
+    classification: COMPLIANT

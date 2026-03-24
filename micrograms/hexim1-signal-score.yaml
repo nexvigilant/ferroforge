@@ -1,0 +1,419 @@
+name: hexim1-signal-score
+description: 'Campion Signal Theory: S = U x R x T. Scores biomarker hypothesis signal
+  strength from uniqueness (PubMed scarcity), recognition (clinical stage), and temporal
+  recency. Pre-compute signal_score = uniqueness * recognition * temporal before calling.'
+version: 0.2.0
+tree:
+  start: check_prime
+  nodes:
+    check_prime:
+      type: condition
+      variable: signal_score
+      operator: gte
+      value: 0.8
+      true_next: find_limit_prime
+      false_next: check_strong
+    strong_limit_r:
+      type: return
+      value:
+        verdict: STRONG_SIGNAL
+        limiting_factor: recognition
+        priority_action: PRIORITIZE — advance clinical validation to unlock full potential.
+    find_limit_strong_t:
+      type: condition
+      variable: temporal
+      operator: lte
+      value: 0.6
+      true_next: strong_limit_t
+      false_next: strong_balanced
+    strong_limit_u:
+      type: return
+      value:
+        priority_action: PRIORITIZE — strong signal but novelty eroding. Publish before
+          competition.
+        limiting_factor: uniqueness
+        verdict: STRONG_SIGNAL
+    moderate_balanced:
+      type: return
+      value:
+        priority_action: INVESTIGATE — moderate across board. Identify one dimension
+          to boost.
+        limiting_factor: balanced
+        verdict: MODERATE_SIGNAL
+    find_limit_prime:
+      type: condition
+      variable: uniqueness
+      operator: lte
+      value: 0.8
+      true_next: prime_limit_u
+      false_next: find_limit_prime_r
+    find_limit_moderate:
+      type: condition
+      variable: uniqueness
+      operator: lte
+      value: 0.6
+      true_next: moderate_limit_u
+      false_next: find_limit_moderate_r
+    check_moderate:
+      type: condition
+      variable: signal_score
+      operator: gte
+      value: 0.4
+      true_next: find_limit_moderate
+      false_next: check_weak
+    moderate_limit_t:
+      type: return
+      value:
+        verdict: MODERATE_SIGNAL
+        limiting_factor: temporal
+        priority_action: INVESTIGATE — aging data. Generate fresh evidence or deprioritize.
+    moderate_limit_u:
+      type: return
+      value:
+        priority_action: INVESTIGATE — crowded space reduces novelty. Find differentiating
+          angle.
+        verdict: MODERATE_SIGNAL
+        limiting_factor: uniqueness
+    find_limit_weak_r:
+      type: condition
+      variable: recognition
+      operator: lte
+      value: 0.6
+      true_next: weak_limit_r
+      false_next: find_limit_weak_t
+    find_limit_weak_t:
+      type: condition
+      variable: temporal
+      operator: lte
+      value: 0.6
+      true_next: weak_limit_t
+      false_next: weak_balanced
+    find_limit_strong:
+      type: condition
+      variable: uniqueness
+      operator: lte
+      value: 0.6
+      true_next: strong_limit_u
+      false_next: find_limit_strong_r
+    find_limit_prime_t:
+      type: condition
+      variable: temporal
+      operator: lte
+      value: 0.8
+      true_next: prime_limit_t
+      false_next: prime_balanced
+    prime_limit_r:
+      type: return
+      value:
+        priority_action: FILE PATENT — advance to next clinical stage to strengthen
+          recognition.
+        verdict: PRIME_SIGNAL
+        limiting_factor: recognition
+    moderate_limit_r:
+      type: return
+      value:
+        limiting_factor: recognition
+        priority_action: INVESTIGATE — needs clinical advancement to strengthen signal.
+        verdict: MODERATE_SIGNAL
+    check_strong:
+      type: condition
+      variable: signal_score
+      operator: gte
+      value: 0.6
+      true_next: find_limit_strong
+      false_next: check_moderate
+    find_limit_moderate_r:
+      type: condition
+      variable: recognition
+      operator: lte
+      value: 0.6
+      true_next: moderate_limit_r
+      false_next: find_limit_moderate_t
+    find_limit_moderate_t:
+      type: condition
+      variable: temporal
+      operator: lte
+      value: 0.6
+      true_next: moderate_limit_t
+      false_next: moderate_balanced
+    strong_balanced:
+      type: return
+      value:
+        verdict: STRONG_SIGNAL
+        limiting_factor: balanced
+        priority_action: PRIORITIZE — solid signal across all dimensions. Ready for
+          development.
+    weak_balanced:
+      type: return
+      value:
+        limiting_factor: balanced
+        verdict: WEAK_SIGNAL
+        priority_action: DEPRIORITIZE — weak across all dimensions. Not actionable.
+    find_limit_prime_r:
+      type: condition
+      variable: recognition
+      operator: lte
+      value: 0.8
+      true_next: prime_limit_r
+      false_next: find_limit_prime_t
+    prime_balanced:
+      type: return
+      value:
+        limiting_factor: balanced
+        verdict: PRIME_SIGNAL
+        priority_action: FILE PATENT — all components strong. Maximum signal.
+    weak_limit_u:
+      type: return
+      value:
+        priority_action: DEPRIORITIZE — well-trodden territory with weak overall signal.
+        verdict: WEAK_SIGNAL
+        limiting_factor: uniqueness
+    prime_limit_t:
+      type: return
+      value:
+        limiting_factor: temporal
+        verdict: PRIME_SIGNAL
+        priority_action: FILE PATENT — publish updated results to refresh temporal
+          score.
+    noise:
+      type: return
+      value:
+        verdict: NOISE
+        limiting_factor: all
+        priority_action: DISCARD — signal below noise threshold. Not worth investigating.
+    check_weak:
+      type: condition
+      variable: signal_score
+      operator: gte
+      value: 0.2
+      true_next: find_limit_weak
+      false_next: noise
+    find_limit_strong_r:
+      type: condition
+      variable: recognition
+      operator: lte
+      value: 0.6
+      true_next: strong_limit_r
+      false_next: find_limit_strong_t
+    weak_limit_t:
+      type: return
+      value:
+        limiting_factor: temporal
+        verdict: WEAK_SIGNAL
+        priority_action: DEPRIORITIZE — stale finding. Re-evaluate only if new data
+          emerges.
+    strong_limit_t:
+      type: return
+      value:
+        verdict: STRONG_SIGNAL
+        priority_action: PRIORITIZE — generate new data to refresh temporal score.
+        limiting_factor: temporal
+    prime_limit_u:
+      type: return
+      value:
+        priority_action: FILE PATENT — novel finding with strong validation. Uniqueness
+          is lowest component.
+        verdict: PRIME_SIGNAL
+        limiting_factor: uniqueness
+    find_limit_weak:
+      type: condition
+      variable: uniqueness
+      operator: lte
+      value: 0.6
+      true_next: weak_limit_u
+      false_next: find_limit_weak_r
+    weak_limit_r:
+      type: return
+      value:
+        limiting_factor: recognition
+        verdict: WEAK_SIGNAL
+        priority_action: DEPRIORITIZE — insufficient clinical validation. Monitor
+          only.
+tests:
+- input:
+    recognition: -0.19999999999999996
+    signal_score: -0.09999999999999998
+    temporal: -0.19999999999999996
+    uniqueness: -0.19999999999999996
+  expect:
+    verdict: NOISE
+    limiting_factor: all
+    priority_action: DISCARD — signal below noise threshold. Not worth investigating.
+- input:
+    recognition: -0.19999999999999996
+    signal_score: 0.2
+    temporal: -0.19999999999999996
+    uniqueness: -0.19999999999999996
+  expect:
+    priority_action: DEPRIORITIZE — well-trodden territory with weak overall signal.
+    verdict: WEAK_SIGNAL
+    limiting_factor: uniqueness
+- input:
+    recognition: -0.19999999999999996
+    signal_score: 0.2
+    temporal: -0.19999999999999996
+    uniqueness: 0.8
+  expect:
+    limiting_factor: recognition
+    verdict: WEAK_SIGNAL
+    priority_action: DEPRIORITIZE — insufficient clinical validation. Monitor only.
+- input:
+    recognition: -0.19999999999999996
+    signal_score: 0.4
+    temporal: -0.19999999999999996
+    uniqueness: -0.19999999999999996
+  expect:
+    priority_action: INVESTIGATE — crowded space reduces novelty. Find differentiating
+      angle.
+    verdict: MODERATE_SIGNAL
+    limiting_factor: uniqueness
+- input:
+    recognition: -0.19999999999999996
+    signal_score: 0.4
+    temporal: -0.19999999999999996
+    uniqueness: 0.8
+  expect:
+    limiting_factor: recognition
+    priority_action: INVESTIGATE — needs clinical advancement to strengthen signal.
+    verdict: MODERATE_SIGNAL
+- input:
+    recognition: -0.19999999999999996
+    signal_score: 0.6
+    temporal: -0.19999999999999996
+    uniqueness: -0.19999999999999996
+  expect:
+    priority_action: PRIORITIZE — strong signal but novelty eroding. Publish before
+      competition.
+    limiting_factor: uniqueness
+    verdict: STRONG_SIGNAL
+- input:
+    recognition: -0.19999999999999996
+    signal_score: 0.6
+    temporal: -0.19999999999999996
+    uniqueness: 0.8
+  expect:
+    verdict: STRONG_SIGNAL
+    limiting_factor: recognition
+    priority_action: PRIORITIZE — advance clinical validation to unlock full potential.
+- input:
+    recognition: -0.19999999999999996
+    signal_score: 0.8
+    temporal: -0.19999999999999996
+    uniqueness: -0.19999999999999996
+  expect:
+    priority_action: FILE PATENT — novel finding with strong validation. Uniqueness
+      is lowest component.
+    verdict: PRIME_SIGNAL
+    limiting_factor: uniqueness
+- input:
+    recognition: -0.19999999999999996
+    signal_score: 0.8
+    temporal: -0.19999999999999996
+    uniqueness: 1.1
+  expect:
+    priority_action: FILE PATENT — advance to next clinical stage to strengthen recognition.
+    verdict: PRIME_SIGNAL
+    limiting_factor: recognition
+- input:
+    recognition: 0.8
+    signal_score: 0.2
+    temporal: -0.19999999999999996
+    uniqueness: 0.8
+  expect:
+    limiting_factor: temporal
+    verdict: WEAK_SIGNAL
+    priority_action: DEPRIORITIZE — stale finding. Re-evaluate only if new data emerges.
+- input:
+    recognition: 0.8
+    signal_score: 0.2
+    temporal: 0.8
+    uniqueness: 0.8
+  expect:
+    limiting_factor: balanced
+    verdict: WEAK_SIGNAL
+    priority_action: DEPRIORITIZE — weak across all dimensions. Not actionable.
+- input:
+    recognition: 0.8
+    signal_score: 0.4
+    temporal: -0.19999999999999996
+    uniqueness: 0.8
+  expect:
+    verdict: MODERATE_SIGNAL
+    limiting_factor: temporal
+    priority_action: INVESTIGATE — aging data. Generate fresh evidence or deprioritize.
+- input:
+    recognition: 0.8
+    signal_score: 0.4
+    temporal: 0.8
+    uniqueness: 0.8
+  expect:
+    priority_action: INVESTIGATE — moderate across board. Identify one dimension to
+      boost.
+    limiting_factor: balanced
+    verdict: MODERATE_SIGNAL
+- input:
+    recognition: 0.8
+    signal_score: 0.6
+    temporal: -0.19999999999999996
+    uniqueness: 0.8
+  expect:
+    verdict: STRONG_SIGNAL
+    priority_action: PRIORITIZE — generate new data to refresh temporal score.
+    limiting_factor: temporal
+- input:
+    recognition: 0.8
+    signal_score: 0.6
+    temporal: 0.8
+    uniqueness: 0.8
+  expect:
+    verdict: STRONG_SIGNAL
+    limiting_factor: balanced
+    priority_action: PRIORITIZE — solid signal across all dimensions. Ready for development.
+- input:
+    recognition: 1.1
+    signal_score: 0.8
+    temporal: -0.19999999999999996
+    uniqueness: 1.1
+  expect:
+    limiting_factor: temporal
+    verdict: PRIME_SIGNAL
+    priority_action: FILE PATENT — publish updated results to refresh temporal score.
+- input:
+    recognition: 1.1
+    signal_score: 0.8
+    temporal: 1.1
+    uniqueness: 1.1
+  expect:
+    limiting_factor: balanced
+    verdict: PRIME_SIGNAL
+    priority_action: FILE PATENT — all components strong. Maximum signal.
+- input: {}
+  expect:
+    verdict: NOISE
+    limiting_factor: all
+    priority_action: DISCARD — signal below noise threshold. Not worth investigating.
+interface:
+  inputs:
+    temporal:
+      type: number
+      required: true
+    signal_score:
+      type: number
+      required: true
+    recognition:
+      type: number
+      required: true
+    uniqueness:
+      type: number
+      required: true
+  outputs:
+    verdict:
+      type: string
+      required: false
+    limiting_factor:
+      type: string
+      required: false
+    priority_action:
+      type: string
+      required: false
+  aliases: {}

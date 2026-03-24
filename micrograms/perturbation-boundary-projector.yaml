@@ -1,0 +1,249 @@
+name: perturbation-boundary-projector
+description: "Routes a perturbation pattern to the appropriate evaluation strategy based on boundary data availability. Implements the core architectural innovation: compute the interaction once, evaluate at any boundary. Exercises ∂ (Boundary) as a first-class parameterizable object."
+version: 0.1.0
+interface:
+  inputs:
+    boundary_type:
+      type: string
+      required: true
+    historical_reports:
+      type: int
+      required: false
+    has_qsp_model:
+      type: bool
+      required: false
+    perturbation_layers_available:
+      type: int
+      required: false
+    cross_boundary_signals:
+      type: int
+      required: false
+  outputs:
+    evaluation_strategy:
+      type: string
+    confidence_basis:
+      type: string
+    data_regime:
+      type: string
+    framework_advantage:
+      type: string
+    recommendation:
+      type: string
+tree:
+  start: classify_boundary
+  nodes:
+    classify_boundary:
+      type: condition
+      variable: boundary_type
+      operator: eq
+      value: novel
+      true_next: novel_boundary
+      false_next: check_data_rich
+    novel_boundary:
+      type: return
+      value:
+        evaluation_strategy: "PROJECTION — no historical data, use learned perturbation pattern"
+        confidence_basis: "Transfer from structurally similar boundaries + mechanistic plausibility"
+        data_regime: "zero-shot"
+        framework_advantage: "MAXIMUM — QSP/AOP cannot evaluate at boundaries with no historical data. This is the only approach that can."
+        recommendation: "This is the framework's unique value. Project the perturbation pattern onto the novel boundary. Flag predictions with high uncertainty — they are hypotheses, not measurements. But they are better than the alternative (no prediction at all)."
+    check_data_rich:
+      type: condition
+      variable: historical_reports
+      operator: gte
+      value: 500
+      true_next: check_has_qsp
+      false_next: check_data_moderate
+    check_has_qsp:
+      type: condition
+      variable: has_qsp_model
+      operator: eq
+      value: true
+      true_next: data_rich_with_qsp
+      false_next: data_rich_no_qsp
+    data_rich_with_qsp:
+      type: return
+      value:
+        evaluation_strategy: "ENSEMBLE — combine QSP boundary-specific model with perturbation pattern projection"
+        confidence_basis: "QSP model validated on historical data + cross-boundary transfer signal"
+        data_regime: "data-rich"
+        framework_advantage: "LOW — QSP likely outperforms at its own trained boundary. Framework adds cross-boundary context only."
+        recommendation: "Use QSP as primary, perturbation pattern as supplementary signal. The framework's value here is detecting when the perturbation pattern suggests a mechanism the QSP model doesn't encode. If they disagree, investigate — the disagreement is informative."
+    data_rich_no_qsp:
+      type: return
+      value:
+        evaluation_strategy: "PROJECTION + VALIDATION — use perturbation pattern, validate against historical data"
+        confidence_basis: "Perturbation pattern projection validated by retrospective fit to historical reports"
+        data_regime: "data-rich"
+        framework_advantage: "MODERATE — sufficient data to validate but no competing model. Framework provides structure."
+        recommendation: "Project the perturbation pattern onto this boundary and score against historical outcomes. Use the residuals to identify where the perturbation model is wrong — these are the interesting cases."
+    check_data_moderate:
+      type: condition
+      variable: historical_reports
+      operator: gte
+      value: 50
+      true_next: check_cross_boundary
+      false_next: check_data_sparse
+    check_cross_boundary:
+      type: condition
+      variable: cross_boundary_signals
+      operator: gte
+      value: 3
+      true_next: moderate_with_cross_signal
+      false_next: moderate_isolated
+    moderate_with_cross_signal:
+      type: return
+      value:
+        evaluation_strategy: "CROSS-BOUNDARY TRANSFER — borrow strength from related boundaries"
+        confidence_basis: "Perturbation pattern shared structure across boundaries + moderate direct evidence"
+        data_regime: "moderate-data"
+        framework_advantage: "HIGH — cross-boundary transfer is where the shared representation pays off. QSP builds separate models; the framework transfers."
+        recommendation: "This is the sweet spot. Enough data to anchor predictions, enough cross-boundary signal to improve them. Use the perturbation pattern to explain WHY signals appear at multiple boundaries — shared mechanism is the hypothesis."
+    moderate_isolated:
+      type: return
+      value:
+        evaluation_strategy: "PROJECTION with moderate confidence"
+        confidence_basis: "Perturbation pattern projection with moderate historical validation"
+        data_regime: "moderate-data"
+        framework_advantage: "MODERATE — framework provides mechanistic structure, but with limited cross-boundary signal the transfer advantage is muted"
+        recommendation: "Project and validate. Without cross-boundary signals, this is a single-boundary evaluation where the framework's advantage is the learned representation (discovers unknown mechanisms) but not the transfer property."
+    check_data_sparse:
+      type: condition
+      variable: historical_reports
+      operator: gte
+      value: 5
+      true_next: check_layers_available
+      false_next: check_near_zero
+    check_layers_available:
+      type: condition
+      variable: perturbation_layers_available
+      operator: gte
+      value: 3
+      true_next: sparse_mechanistically_rich
+      false_next: sparse_mechanistically_poor
+    sparse_mechanistically_rich:
+      type: return
+      value:
+        evaluation_strategy: "MECHANISM-FIRST — use lower-layer perturbation data to compensate for sparse boundary data"
+        confidence_basis: "Mechanistic evidence from layers 1-4 + sparse boundary observations"
+        data_regime: "sparse"
+        framework_advantage: "HIGH — mechanistic depth compensates for observational sparsity. QSP can't leverage cross-layer evidence without hand-specification."
+        recommendation: "The perturbation pattern's multi-layer structure shines here. Use binding/functional/pathway data to predict what SHOULD appear at this boundary, then check against the sparse observations. Disagreement reveals either model error or novel mechanism."
+    sparse_mechanistically_poor:
+      type: return
+      value:
+        evaluation_strategy: "PROJECTION with low confidence — limited evidence at all layers"
+        confidence_basis: "Perturbation pattern projection with minimal anchoring"
+        data_regime: "sparse"
+        framework_advantage: "MODERATE — better than nothing, but predictions are weakly constrained"
+        recommendation: "Flag as hypothesis-generating, not confirmatory. The framework can project, but with sparse data AND sparse mechanism, the projection is loosely constrained. Prioritize gathering lower-layer evidence."
+    check_near_zero:
+      type: condition
+      variable: historical_reports
+      operator: gte
+      value: 1
+      true_next: near_zero_data
+      false_next: novel_boundary
+    near_zero_data:
+      type: return
+      value:
+        evaluation_strategy: "SIGNAL DETECTION — is the perturbation pattern consistent with these rare observations?"
+        confidence_basis: "Mechanistic plausibility of the perturbation pattern producing this boundary reading"
+        data_regime: "near-zero"
+        framework_advantage: "HIGH — framework provides the mechanistic hypothesis that turns 1-4 reports from noise into signal (or confirms they're noise)"
+        recommendation: "The single hardest PV question: is this signal or noise? The perturbation pattern provides a prior. If the observed boundary reading is mechanistically plausible given the perturbation pattern, treat as signal. If not, treat as noise. The perturbation pattern IS the prior."
+tests:
+- name: novel_boundary
+  input:
+    boundary_type: novel
+  expect:
+    data_regime: "zero-shot"
+    framework_advantage: "MAXIMUM — QSP/AOP cannot evaluate at boundaries with no historical data. This is the only approach that can."
+- name: data_rich_with_qsp
+  input:
+    boundary_type: known
+    historical_reports: 1000
+    has_qsp_model: true
+  expect:
+    data_regime: "data-rich"
+    evaluation_strategy: "ENSEMBLE — combine QSP boundary-specific model with perturbation pattern projection"
+- name: data_rich_without_qsp
+  input:
+    boundary_type: known
+    historical_reports: 600
+    has_qsp_model: false
+  expect:
+    data_regime: "data-rich"
+    evaluation_strategy: "PROJECTION + VALIDATION — use perturbation pattern, validate against historical data"
+- name: moderate_data_with_cross_boundary
+  input:
+    boundary_type: known
+    historical_reports: 100
+    cross_boundary_signals: 5
+  expect:
+    data_regime: "moderate-data"
+    evaluation_strategy: "CROSS-BOUNDARY TRANSFER — borrow strength from related boundaries"
+    framework_advantage: "HIGH — cross-boundary transfer is where the shared representation pays off. QSP builds separate models; the framework transfers."
+- name: moderate_data_isolated
+  input:
+    boundary_type: known
+    historical_reports: 80
+    cross_boundary_signals: 1
+  expect:
+    data_regime: "moderate-data"
+- name: sparse_mechanistically_rich
+  input:
+    boundary_type: known
+    historical_reports: 15
+    perturbation_layers_available: 4
+  expect:
+    data_regime: "sparse"
+    evaluation_strategy: "MECHANISM-FIRST — use lower-layer perturbation data to compensate for sparse boundary data"
+- name: sparse_mechanistically_poor
+  input:
+    boundary_type: known
+    historical_reports: 10
+    perturbation_layers_available: 1
+  expect:
+    data_regime: "sparse"
+- name: near_zero_data
+  input:
+    boundary_type: known
+    historical_reports: 3
+  expect:
+    data_regime: "near-zero"
+    evaluation_strategy: "SIGNAL DETECTION — is the perturbation pattern consistent with these rare observations?"
+- name: exactly_one_report
+  input:
+    boundary_type: known
+    historical_reports: 1
+  expect:
+    data_regime: "near-zero"
+- name: zero_reports_treated_as_novel
+  input:
+    boundary_type: known
+    historical_reports: 0
+  expect:
+    data_regime: "zero-shot"
+- name: boundary_at_50_threshold
+  input:
+    boundary_type: known
+    historical_reports: 50
+    cross_boundary_signals: 3
+  expect:
+    data_regime: "moderate-data"
+- name: boundary_at_500_threshold
+  input:
+    boundary_type: known
+    historical_reports: 500
+    has_qsp_model: false
+  expect:
+    data_regime: "data-rich"
+- name: null_input_safety
+  input: {}
+  expect:
+    confidence_basis: Transfer from structurally similar boundaries + mechanistic plausibility
+    data_regime: zero-shot
+    evaluation_strategy: "PROJECTION — no historical data, use learned perturbation pattern"
+    framework_advantage: MAXIMUM — QSP/AOP cannot evaluate at boundaries with no historical data. This is the only approach that can.
+    recommendation: "This is the framework's unique value. Project the perturbation pattern onto the novel boundary. Flag predictions with high uncertainty — they are hypotheses, not measurements. But they are better than the alternative (no prediction at all)."

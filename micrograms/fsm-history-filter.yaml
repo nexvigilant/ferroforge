@@ -1,0 +1,84 @@
+name: fsm-history-filter
+description: 'PVOS FSM history: filters state machine transition history relevance based on transition count and recency - ACTIVE/STALE/ARCHIVED'
+version: 0.1.0
+interface:
+  inputs:
+    days_since_last:
+      type: int
+      required: false
+    transitions_count:
+      type: int
+      required: false
+  outputs:
+    description:
+      type: string
+    relevance:
+      type: string
+tree:
+  start: check_active
+  nodes:
+    check_active:
+      type: condition
+      variable: days_since_last
+      operator: lte
+      value: 7
+      true_next: active
+      false_next: check_stale
+    check_stale:
+      type: condition
+      variable: days_since_last
+      operator: lte
+      value: 30
+      true_next: check_stale_count
+      false_next: archived
+    check_stale_count:
+      type: condition
+      variable: transitions_count
+      operator: gte
+      value: 1
+      true_next: stale
+      false_next: archived
+    active:
+      type: return
+      value:
+        relevance: ACTIVE
+        description: Recent FSM activity within 7 days - history is current and actionable
+    stale:
+      type: return
+      value:
+        relevance: STALE
+        description: FSM last updated 8-30 days ago - history may need refresh or follow-up
+    archived:
+      type: return
+      value:
+        relevance: ARCHIVED
+        description: FSM inactive for more than 30 days - history archived for audit purposes
+tests:
+- input:
+    transitions_count: 5
+    days_since_last: 3
+  expect:
+    relevance: ACTIVE
+    description: Recent FSM activity within 7 days - history is current and actionable
+- input:
+    transitions_count: 3
+    days_since_last: 15
+  expect:
+    relevance: STALE
+    description: FSM last updated 8-30 days ago - history may need refresh or follow-up
+- input:
+    transitions_count: 2
+    days_since_last: 45
+  expect:
+    relevance: ARCHIVED
+    description: FSM inactive for more than 30 days - history archived for audit purposes
+- input:
+    transitions_count: 0
+    days_since_last: 20
+  expect:
+    relevance: ARCHIVED
+    description: FSM inactive for more than 30 days - history archived for audit purposes
+- input: {}
+  expect:
+    description: FSM inactive for more than 30 days - history archived for audit purposes
+    relevance: ARCHIVED

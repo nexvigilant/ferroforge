@@ -1,0 +1,140 @@
+name: case-processing-exercise
+description: "Academy L3: Given ICSR case details, classify seriousness per ICH E2A and determine regulatory reporting deadline."
+version: 0.1.0
+
+tree:
+  start: check_death
+  nodes:
+    check_death:
+      type: condition
+      variable: resulted_in_death
+      operator: eq
+      value: true
+      true_next: serious_death
+      false_next: check_life_threatening
+
+    check_life_threatening:
+      type: condition
+      variable: life_threatening
+      operator: eq
+      value: true
+      true_next: serious_life_threatening
+      false_next: check_hospitalization
+
+    check_hospitalization:
+      type: condition
+      variable: required_hospitalization
+      operator: eq
+      value: true
+      true_next: serious_hospitalization
+      false_next: check_disability
+
+    check_disability:
+      type: condition
+      variable: persistent_disability
+      operator: eq
+      value: true
+      true_next: serious_disability
+      false_next: check_congenital
+
+    check_congenital:
+      type: condition
+      variable: congenital_anomaly
+      operator: eq
+      value: true
+      true_next: serious_congenital
+      false_next: check_medically_important
+
+    check_medically_important:
+      type: condition
+      variable: medically_important
+      operator: eq
+      value: true
+      true_next: serious_medically_important
+      false_next: non_serious
+
+    serious_death:
+      type: return
+      value:
+        seriousness: serious
+        criteria: "Death"
+        deadline_days: 7
+        deadline_type: expedited
+        explanation: "Fatal outcome requires 7-day expedited report to regulatory authority (ICH E2A)."
+
+    serious_life_threatening:
+      type: return
+      value:
+        seriousness: serious
+        criteria: "Life-threatening"
+        deadline_days: 7
+        deadline_type: expedited
+        explanation: "Life-threatening event requires 7-day expedited report (ICH E2A). Patient was at immediate risk of death."
+
+    serious_hospitalization:
+      type: return
+      value:
+        seriousness: serious
+        criteria: "Hospitalization (initial or prolonged)"
+        deadline_days: 15
+        deadline_type: expedited
+        explanation: "Hospitalization requires 15-day expedited report (ICH E2A)."
+
+    serious_disability:
+      type: return
+      value:
+        seriousness: serious
+        criteria: "Persistent or significant disability/incapacity"
+        deadline_days: 15
+        deadline_type: expedited
+        explanation: "Persistent disability requires 15-day expedited report (ICH E2A)."
+
+    serious_congenital:
+      type: return
+      value:
+        seriousness: serious
+        criteria: "Congenital anomaly/birth defect"
+        deadline_days: 15
+        deadline_type: expedited
+        explanation: "Congenital anomaly requires 15-day expedited report (ICH E2A)."
+
+    serious_medically_important:
+      type: return
+      value:
+        seriousness: serious
+        criteria: "Other medically important condition"
+        deadline_days: 15
+        deadline_type: expedited
+        explanation: "Medically important event requires 15-day expedited report (ICH E2A). May jeopardize patient or require intervention."
+
+    non_serious:
+      type: return
+      value:
+        seriousness: non_serious
+        criteria: "None of the ICH E2A seriousness criteria met"
+        deadline_days: 90
+        deadline_type: periodic
+        explanation: "Non-serious event. Include in next periodic safety report (PSUR/PBRER) within 90 days."
+
+tests:
+  - name: "Fatal pancreatitis — 7-day expedited"
+    input: { resulted_in_death: true, life_threatening: false, required_hospitalization: false, persistent_disability: false, congenital_anomaly: false, medically_important: false }
+    expect: { seriousness: serious, deadline_days: 7 }
+  - name: "Life-threatening anaphylaxis — 7-day expedited"
+    input: { resulted_in_death: false, life_threatening: true, required_hospitalization: true, persistent_disability: false, congenital_anomaly: false, medically_important: false }
+    expect: { seriousness: serious, deadline_days: 7 }
+  - name: "Hospitalized for pancreatitis — 15-day expedited"
+    input: { resulted_in_death: false, life_threatening: false, required_hospitalization: true, persistent_disability: false, congenital_anomaly: false, medically_important: false }
+    expect: { seriousness: serious, deadline_days: 15 }
+  - name: "Persistent neuropathy — 15-day expedited"
+    input: { resulted_in_death: false, life_threatening: false, required_hospitalization: false, persistent_disability: true, congenital_anomaly: false, medically_important: false }
+    expect: { seriousness: serious, deadline_days: 15 }
+  - name: "Birth defect — 15-day expedited"
+    input: { resulted_in_death: false, life_threatening: false, required_hospitalization: false, persistent_disability: false, congenital_anomaly: true, medically_important: false }
+    expect: { seriousness: serious, deadline_days: 15 }
+  - name: "Mild nausea — non-serious, periodic"
+    input: { resulted_in_death: false, life_threatening: false, required_hospitalization: false, persistent_disability: false, congenital_anomaly: false, medically_important: false }
+    expect: { seriousness: non_serious, deadline_days: 90 }
+  - name: "Medically important seizure — 15-day"
+    input: { resulted_in_death: false, life_threatening: false, required_hospitalization: false, persistent_disability: false, congenital_anomaly: false, medically_important: true }
+    expect: { seriousness: serious, deadline_days: 15 }

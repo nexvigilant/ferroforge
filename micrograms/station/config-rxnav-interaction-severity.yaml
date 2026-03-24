@@ -1,0 +1,161 @@
+name: config-rxnav-interaction-severity
+description: "Classify drug interaction severity from RxNav get-interactions output. Routes by interaction count and severity indicators."
+version: 0.1.0
+
+interface:
+  inputs:
+    interaction_count:
+      type: int
+      required: false
+      description: "Number of interactions found"
+    has_contraindication:
+      type: bool
+      required: false
+      description: "At least one interaction is a contraindication"
+    has_serious:
+      type: bool
+      required: false
+      description: "At least one interaction marked serious/major"
+    has_moderate:
+      type: bool
+      required: false
+      description: "At least one interaction marked moderate"
+  outputs:
+    severity:
+      type: string
+      description: "contraindicated, major, moderate, minor, none"
+    action:
+      type: string
+    requires_review:
+      type: bool
+
+tree:
+  start: check_any_interactions
+  nodes:
+    check_any_interactions:
+      type: condition
+      variable: interaction_count
+      operator: is_null
+      true_next: no_interactions
+      false_next: check_count_zero
+
+    check_count_zero:
+      type: condition
+      variable: interaction_count
+      operator: eq
+      value: 0
+      true_next: no_interactions
+      false_next: check_contraindication
+
+    check_contraindication:
+      type: condition
+      variable: has_contraindication
+      operator: eq
+      value: true
+      true_next: contraindicated
+      false_next: check_serious
+
+    check_serious:
+      type: condition
+      variable: has_serious
+      operator: eq
+      value: true
+      true_next: major_interaction
+      false_next: check_moderate
+
+    check_moderate:
+      type: condition
+      variable: has_moderate
+      operator: eq
+      value: true
+      true_next: moderate_interaction
+      false_next: minor_interaction
+
+    contraindicated:
+      type: return
+      value:
+        severity: contraindicated
+        action: do_not_combine
+        requires_review: true
+
+    major_interaction:
+      type: return
+      value:
+        severity: major
+        action: clinical_review_required
+        requires_review: true
+
+    moderate_interaction:
+      type: return
+      value:
+        severity: moderate
+        action: monitor_therapy
+        requires_review: false
+
+    minor_interaction:
+      type: return
+      value:
+        severity: minor
+        action: be_aware
+        requires_review: false
+
+    no_interactions:
+      type: return
+      value:
+        severity: none
+        action: no_action_needed
+        requires_review: false
+
+tests:
+  - input:
+      interaction_count: 3
+      has_contraindication: true
+      has_serious: true
+      has_moderate: true
+    expect:
+      severity: contraindicated
+      action: do_not_combine
+      requires_review: true
+
+  - input:
+      interaction_count: 5
+      has_contraindication: false
+      has_serious: true
+      has_moderate: true
+    expect:
+      severity: major
+      action: clinical_review_required
+      requires_review: true
+
+  - input:
+      interaction_count: 2
+      has_contraindication: false
+      has_serious: false
+      has_moderate: true
+    expect:
+      severity: moderate
+      action: monitor_therapy
+      requires_review: false
+
+  - input:
+      interaction_count: 1
+      has_contraindication: false
+      has_serious: false
+      has_moderate: false
+    expect:
+      severity: minor
+      action: be_aware
+      requires_review: false
+
+  - input:
+      interaction_count: 0
+    expect:
+      severity: none
+      action: no_action_needed
+      requires_review: false
+
+  - input: {}
+    expect:
+      severity: none
+      action: no_action_needed
+      requires_review: false

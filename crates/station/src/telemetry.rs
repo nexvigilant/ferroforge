@@ -173,7 +173,17 @@ impl StationTelemetry {
 
     /// Record a completed tool call.
     pub fn record(&self, record: ToolCallRecord) {
-        // Append to JSONL file
+        // Structured log to stderr → Cloud Run captures to Cloud Logging
+        info!(
+            tool = %record.tool_name,
+            domain = %record.domain,
+            duration_ms = record.duration_ms,
+            status = %record.status,
+            is_error = record.is_error,
+            "tool_call"
+        );
+
+        // Append to JSONL file (local dev audit trail, ephemeral on Cloud Run)
         if let Some(ref path) = self.log_path
             && let Ok(json) = serde_json::to_string(&record)
             && let Ok(mut file) = OpenOptions::new()

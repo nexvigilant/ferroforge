@@ -1,0 +1,127 @@
+name: musculoskeletal-severity-gate
+description: 'Musculoskeletal safety classifier: maps muscular adverse reactions to severity grades for rhabdomyolysis, myopathy, and tendon disorders'
+version: 0.1.0
+interface:
+  inputs:
+    reaction_pt:
+      type: string
+      required: true
+      description: MedDRA preferred term for the musculoskeletal reaction
+    ck_xuln:
+      type: float
+      required: false
+      description: Creatine kinase as x ULN
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    soc:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_rhabdo
+  nodes:
+    check_rhabdo:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: RHABDOMYOLYSIS
+      true_next: critical
+      false_next: check_ck_critical
+    check_ck_critical:
+      type: condition
+      variable: ck_xuln
+      operator: gte
+      value: 10
+      true_next: critical
+      false_next: check_myopathy
+    check_myopathy:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: MYOPATHY
+      true_next: serious
+      false_next: check_tendon_rupture
+    check_tendon_rupture:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: TENDON RUPTURE
+      true_next: serious
+      false_next: check_ck_moderate
+    check_ck_moderate:
+      type: condition
+      variable: ck_xuln
+      operator: gte
+      value: 5
+      true_next: moderate
+      false_next: check_myalgia
+    check_myalgia:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: MYALGIA
+      true_next: mild
+      false_next: mild
+    critical:
+      type: return
+      value:
+        severity: critical
+        soc: Musculoskeletal and connective tissue disorders
+        action: immediate_expedited_report
+    serious:
+      type: return
+      value:
+        severity: serious
+        soc: Musculoskeletal and connective tissue disorders
+        action: expedited_report
+    moderate:
+      type: return
+      value:
+        severity: moderate
+        soc: Musculoskeletal and connective tissue disorders
+        action: monitor_and_assess
+    mild:
+      type: return
+      value:
+        severity: mild
+        soc: Musculoskeletal and connective tissue disorders
+        action: routine_surveillance
+tests:
+  - name: rhabdomyolysis
+    input:
+      reaction_pt: RHABDOMYOLYSIS
+    expect:
+      severity: critical
+  - name: ck_very_high
+    input:
+      reaction_pt: BLOOD CREATINE PHOSPHOKINASE INCREASED
+      ck_xuln: 15
+    expect:
+      severity: critical
+  - name: myopathy
+    input:
+      reaction_pt: MYOPATHY TOXIC
+    expect:
+      severity: serious
+  - name: tendon_rupture
+    input:
+      reaction_pt: ACHILLES TENDON RUPTURE
+    expect:
+      severity: serious
+  - name: ck_moderate
+    input:
+      reaction_pt: BLOOD CREATINE PHOSPHOKINASE INCREASED
+      ck_xuln: 7
+    expect:
+      severity: moderate
+  - name: myalgia
+    input:
+      reaction_pt: MYALGIA
+    expect:
+      severity: mild
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild

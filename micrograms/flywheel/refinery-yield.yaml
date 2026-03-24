@@ -1,0 +1,87 @@
+name: refinery-yield
+description: "Compute refinery yield (products/crude) and classify efficiency. Mass balance law: what enters must exit or accumulate."
+version: 0.1.0
+tree:
+  start: check_crude
+  nodes:
+    check_crude:
+      type: condition
+      variable: crude_in
+      operator: gt
+      value: 0
+      true_next: compute_yield
+      false_next: return_no_input
+    compute_yield:
+      type: condition
+      variable: products_out
+      operator: gte
+      value: 0
+      true_next: classify_yield
+      false_next: return_no_input
+    classify_yield:
+      type: condition
+      variable: yield_pct
+      operator: gte
+      value: 80
+      true_next: return_high_yield
+      false_next: check_medium
+    check_medium:
+      type: condition
+      variable: yield_pct
+      operator: gte
+      value: 50
+      true_next: return_medium_yield
+      false_next: check_low
+    check_low:
+      type: condition
+      variable: yield_pct
+      operator: gte
+      value: 20
+      true_next: return_low_yield
+      false_next: return_critical_yield
+    return_high_yield:
+      type: return
+      value:
+        yield_class: HIGH
+        action: "Refinery operating at target efficiency"
+        refinery_analog: "Optimal cracking temperature; maximum product extraction"
+    return_medium_yield:
+      type: return
+      value:
+        yield_class: MEDIUM
+        action: "Acceptable yield; check for fractionation losses"
+        refinery_analog: "Moderate conversion; some heavy residue remaining"
+    return_low_yield:
+      type: return
+      value:
+        yield_class: LOW
+        action: "Significant signal loss; audit unit processes for leaks"
+        refinery_analog: "Poor cracking efficiency; excessive heavy ends in bottoms"
+    return_critical_yield:
+      type: return
+      value:
+        yield_class: CRITICAL
+        action: "Most signals lost; system leak or processing failure"
+        refinery_analog: "Catalyst poisoning; feedstock bypassing reaction zone"
+    return_no_input:
+      type: return
+      value:
+        yield_class: NO_INPUT
+        action: "No crude feedstock; flywheel idle"
+        refinery_analog: "Refinery shutdown; no feedstock in pipeline"
+tests:
+  - input: { crude_in: 100, products_out: 85, yield_pct: 85 }
+    expect: { yield_class: HIGH }
+  - input: { crude_in: 100, products_out: 60, yield_pct: 60 }
+    expect: { yield_class: MEDIUM }
+  - input: { crude_in: 100, products_out: 30, yield_pct: 30 }
+    expect: { yield_class: LOW }
+  - input: { crude_in: 100, products_out: 10, yield_pct: 10 }
+    expect: { yield_class: CRITICAL }
+  - input: { crude_in: 0, products_out: 0, yield_pct: 0 }
+    expect: { yield_class: NO_INPUT }
+  - input: {}
+    expect:
+      action: No crude feedstock; flywheel idle
+      refinery_analog: Refinery shutdown; no feedstock in pipeline
+      yield_class: NO_INPUT

@@ -1,0 +1,144 @@
+name: recall-severity-classifier
+description: Classify FDA drug recall severity based on class and reason
+version: 0.1.0
+tree:
+  start: validate_class
+  nodes:
+    severity_class_ii_minor:
+      type: return
+      value:
+        public_warning: false
+        rationale: Class II recall with moderate quality issue requiring professional
+          guidance
+        severity: adverse_health
+    unknown_class:
+      type: return
+      value:
+        rationale: null
+        severity: null
+        public_warning: false
+    validate_reason:
+      type: condition
+      variable: reason
+      operator: is_not_null
+      value: null
+      true_next: classify_class
+      false_next: missing_input
+    check_class_ii:
+      type: condition
+      variable: recall_class
+      operator: matches
+      value: (?i)^II$
+      true_next: check_reason_ii
+      false_next: check_class_iii
+    severity_class_ii_major:
+      type: return
+      value:
+        severity: adverse_health
+        rationale: Class II recall with significant quality defect that could cause
+          adverse health
+        public_warning: true
+    validate_class:
+      type: condition
+      variable: recall_class
+      operator: is_not_null
+      value: null
+      true_next: validate_reason
+      false_next: missing_input
+    classify_class:
+      type: condition
+      variable: recall_class
+      operator: matches
+      value: (?i)^I$
+      true_next: severity_class_i
+      false_next: check_class_ii
+    check_class_iii:
+      type: condition
+      variable: recall_class
+      operator: matches
+      value: (?i)^III$
+      true_next: severity_class_iii
+      false_next: unknown_class
+    severity_class_i:
+      type: return
+      value:
+        public_warning: true
+        severity: life_threatening
+        rationale: Class I recalls have the most serious potential for adverse health
+          consequences
+    severity_class_iii:
+      type: return
+      value:
+        public_warning: false
+        rationale: Class III recalls are unlikely to cause adverse health consequences
+        severity: unlikely_harm
+    missing_input:
+      type: return
+      value:
+        public_warning: false
+        rationale: null
+        severity: null
+    check_reason_ii:
+      type: condition
+      variable: reason
+      operator: matches
+      value: (?i)(contamination|sterility|potency|impurity)
+      true_next: severity_class_ii_major
+      false_next: severity_class_ii_minor
+tests:
+- input:
+    reason: ZZZZZ_NO_MATCH
+    recall_class: I
+  expect:
+    public_warning: true
+    severity: life_threatening
+    rationale: Class I recalls have the most serious potential for adverse health
+      consequences
+- input:
+    reason: ZZZZZ_NO_MATCH
+    recall_class: II
+  expect:
+    public_warning: false
+    rationale: Class II recall with moderate quality issue requiring professional
+      guidance
+    severity: adverse_health
+- input:
+    reason: ZZZZZ_NO_MATCH
+    recall_class: III
+  expect:
+    public_warning: false
+    rationale: Class III recalls are unlikely to cause adverse health consequences
+    severity: unlikely_harm
+- input:
+    reason: ZZZZZ_NO_MATCH
+    recall_class: ZZZZZ_NO_MATCH
+  expect:
+    rationale: null
+    severity: null
+    public_warning: false
+- input:
+    reason: ZZZZZ_NO_MATCH
+  expect:
+    public_warning: false
+    rationale: null
+    severity: null
+- input:
+    reason: contamination
+    recall_class: II
+  expect:
+    severity: adverse_health
+    rationale: Class II recall with significant quality defect that could cause adverse
+      health
+    public_warning: true
+- input:
+    recall_class: I
+  expect:
+    public_warning: false
+    rationale: null
+    severity: null
+- input: {}
+  expect:
+    public_warning: false
+    rationale: null
+    severity: null
+interface: null

@@ -1,0 +1,297 @@
+name: session-scorecard
+description: 'Product Chain Scorecard: scores a session (or any work unit) on how far it advanced through the T1 primitive product chain. L0=Void identified, L1=State measured, L2=Compared, L3=Acted, L4=Persisted, L5=Shipped. Self-similar across scales: session, chain, directive, strategy.'
+version: 0.1.0
+primitive_signature:
+  dominant: κ
+  expression: 'κ(ς(∅)) iterated at 6 levels — monotonic comparison chain'
+  primes: ['∅', 'ς', 'κ', '→', '∂']
+  arguments: ['∅', 'ς', 'κ', '→', 'π', '∝']
+  chain_prediction: 'Σ<∝|π|→>(κ(ς(∅))) — typed sum over level-specific primitives'
+interface:
+  inputs:
+    void_identified:
+      type: bool
+      required: false
+      description: 'L0: Did the work identify what is missing? (∅)'
+    state_measured:
+      type: bool
+      required: false
+      description: 'L1: Did the work measure current observed state? (ς)'
+    compared_to_goal:
+      type: bool
+      required: false
+      description: 'L2: Did the work compare measured state to expected/goal? (κ)'
+    action_taken:
+      type: bool
+      required: false
+      description: 'L3: Did the work change code, config, or system state? (→)'
+    change_persisted:
+      type: bool
+      required: false
+      description: 'L4: Was the change committed, saved, or artifact-persisted? (π)'
+    change_shipped:
+      type: bool
+      required: false
+      description: 'L5: Was the change deployed, published, or made irreversible? (∝)'
+  outputs:
+    level:
+      type: int
+      description: 'Product chain depth reached (0-5)'
+    level_name:
+      type: string
+      description: 'Primitive name at the reached level'
+    primitive:
+      type: string
+      description: 'T1 symbol at the reached level'
+    chain:
+      type: string
+      description: 'Full product chain expression up to reached level'
+    verdict:
+      type: string
+      description: 'Golf-edict aligned verdict'
+    scorecard_note:
+      type: string
+      description: 'What the score means at this level'
+tree:
+  start: check_void
+  nodes:
+    # L0: Did the work even identify the gap?
+    check_void:
+      type: condition
+      variable: void_identified
+      operator: eq
+      value: true
+      true_next: check_state
+      false_next: level_minus1
+    level_minus1:
+      type: return
+      value:
+        level: -1
+        level_name: BLANK
+        primitive: '-'
+        chain: '(empty)'
+        verdict: no_scorecard
+        scorecard_note: 'No work detected. The session produced nothing — not even an observation. DQ: failure to return a scorecard.'
+
+    # L1: Was state actually measured (not recalled from memory)?
+    check_state:
+      type: condition
+      variable: state_measured
+      operator: eq
+      value: true
+      true_next: check_compare
+      false_next: level_0
+    level_0:
+      type: return
+      value:
+        level: 0
+        level_name: VOID
+        primitive: '∅'
+        chain: '∅'
+        verdict: void_only
+        scorecard_note: 'Gap identified but not measured. The void was named but state was not observed. Like reading the course map without walking the holes.'
+
+    # L2: Was measured state compared to expected/goal?
+    check_compare:
+      type: condition
+      variable: compared_to_goal
+      operator: eq
+      value: true
+      true_next: check_action
+      false_next: level_1
+    level_1:
+      type: return
+      value:
+        level: 1
+        level_name: STATE
+        primitive: 'ς'
+        chain: 'ς(∅)'
+        verdict: observed
+        scorecard_note: 'State measured honestly. G1 satisfied — the ball was played as it lies. But no comparison to goal means no direction. A practice swing.'
+
+    # L3: Was action taken to change state?
+    check_action:
+      type: condition
+      variable: action_taken
+      operator: eq
+      value: true
+      true_next: check_persist
+      false_next: level_2
+    level_2:
+      type: return
+      value:
+        level: 2
+        level_name: COMPARE
+        primitive: 'κ'
+        chain: 'κ(ς(∅))'
+        verdict: audit_complete
+        scorecard_note: 'Measured and compared. Valid audit. The lie was assessed and the target identified. No stroke taken — observation IS the deliverable if this was an audit session.'
+
+    # L4: Was the change persisted (committed, saved)?
+    check_persist:
+      type: condition
+      variable: change_persisted
+      operator: eq
+      value: true
+      true_next: check_ship
+      false_next: level_3
+    level_3:
+      type: return
+      value:
+        level: 3
+        level_name: ACT
+        primitive: '→'
+        chain: '→(κ(ς(∅)))'
+        verdict: spark
+        scorecard_note: 'Action taken but not persisted. Energy without persistence — a spark. The stroke was taken but not recorded on the scorecard. G1+ρ violation: strokes exist that the scorecard does not reflect.'
+
+    # L5: Was the change shipped/deployed/made irreversible?
+    check_ship:
+      type: condition
+      variable: change_shipped
+      operator: eq
+      value: true
+      true_next: level_5
+      false_next: level_4
+    level_4:
+      type: return
+      value:
+        level: 4
+        level_name: PERSIST
+        primitive: 'π'
+        chain: 'π(→(κ(ς(∅))))'
+        verdict: committed
+        scorecard_note: 'Changed and committed. The scorecard is signed. Full internal round complete. Ready for deployment but not yet irreversible — the score is posted but the tournament is not over.'
+
+    level_5:
+      type: return
+      value:
+        level: 5
+        level_name: SHIP
+        primitive: '∝'
+        chain: '∝(π(→(κ(ς(∅)))))'
+        verdict: shipped
+        scorecard_note: 'Deployed and irreversible. Full product chain complete. The round is in the books. ∝ means it cannot be taken back — published to hub, merged to main, released to production.'
+
+tests:
+# Full chain — all levels hit
+- input:
+    void_identified: true
+    state_measured: true
+    compared_to_goal: true
+    action_taken: true
+    change_persisted: true
+    change_shipped: true
+  expect:
+    level: 5
+    level_name: SHIP
+    primitive: '∝'
+    verdict: shipped
+
+# Classic spark — acted but didn't commit (the 42-file pattern)
+- input:
+    void_identified: true
+    state_measured: true
+    compared_to_goal: true
+    action_taken: true
+    change_persisted: false
+    change_shipped: false
+  expect:
+    level: 3
+    level_name: ACT
+    primitive: '→'
+    verdict: spark
+
+# Pure audit — measured and compared, no action needed
+- input:
+    void_identified: true
+    state_measured: true
+    compared_to_goal: true
+    action_taken: false
+    change_persisted: false
+    change_shipped: false
+  expect:
+    level: 2
+    level_name: COMPARE
+    primitive: 'κ'
+    verdict: audit_complete
+
+# Committed but not shipped
+- input:
+    void_identified: true
+    state_measured: true
+    compared_to_goal: true
+    action_taken: true
+    change_persisted: true
+    change_shipped: false
+  expect:
+    level: 4
+    level_name: PERSIST
+    primitive: 'π'
+    verdict: committed
+
+# Void only — identified gap, didn't measure
+- input:
+    void_identified: true
+    state_measured: false
+  expect:
+    level: 0
+    level_name: VOID
+    primitive: '∅'
+    verdict: void_only
+
+# Nothing — blank scorecard
+- input:
+    void_identified: false
+  expect:
+    level: -1
+    level_name: BLANK
+    primitive: '-'
+    verdict: no_scorecard
+
+# Empty input — defaults to blank
+- input: {}
+  expect:
+    level: -1
+    level_name: BLANK
+    primitive: '-'
+    verdict: no_scorecard
+
+# State observed but not compared (no goal set)
+- input:
+    void_identified: true
+    state_measured: true
+    compared_to_goal: false
+  expect:
+    level: 1
+    level_name: STATE
+    primitive: 'ς'
+    verdict: observed
+
+# Chain break — can't persist what you didn't act on (monotonic enforcement)
+- input:
+    void_identified: true
+    state_measured: true
+    compared_to_goal: true
+    action_taken: false
+    change_persisted: true
+    change_shipped: false
+  expect:
+    level: 2
+    level_name: COMPARE
+    primitive: 'κ'
+    verdict: audit_complete
+
+# Chain break — can't ship what you didn't persist
+- input:
+    void_identified: true
+    state_measured: true
+    compared_to_goal: true
+    action_taken: true
+    change_persisted: false
+    change_shipped: true
+  expect:
+    level: 3
+    level_name: ACT
+    primitive: '→'
+    verdict: spark

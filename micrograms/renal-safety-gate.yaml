@@ -1,0 +1,158 @@
+name: renal-safety-gate
+description: 'Renal safety classifier: maps kidney adverse reactions to severity grades using KDIGO AKI staging and nephrotoxicity signals'
+version: 0.1.0
+interface:
+  inputs:
+    reaction_pt:
+      type: string
+      required: true
+      description: MedDRA preferred term for the renal reaction
+    creatinine_xbaseline:
+      type: float
+      required: false
+      description: Serum creatinine as x baseline (e.g., 3.0 = 3x baseline)
+  outputs:
+    severity:
+      type: string
+      description: 'critical | serious | moderate | mild'
+    soc:
+      type: string
+    aki_stage:
+      type: int
+      description: 'KDIGO AKI stage 0-3'
+    action:
+      type: string
+tree:
+  start: check_dialysis
+  nodes:
+    check_dialysis:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: DIALYSIS
+      true_next: critical
+      false_next: check_renal_failure
+    check_renal_failure:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: RENAL FAILURE
+      true_next: critical
+      false_next: check_creat_stage3
+    check_creat_stage3:
+      type: condition
+      variable: creatinine_xbaseline
+      operator: gte
+      value: 3.0
+      true_next: critical_aki3
+      false_next: check_creat_stage2
+    check_creat_stage2:
+      type: condition
+      variable: creatinine_xbaseline
+      operator: gte
+      value: 2.0
+      true_next: serious_aki2
+      false_next: check_creat_stage1
+    check_creat_stage1:
+      type: condition
+      variable: creatinine_xbaseline
+      operator: gte
+      value: 1.5
+      true_next: moderate_aki1
+      false_next: check_nephritis
+    check_nephritis:
+      type: condition
+      variable: reaction_pt
+      operator: contains
+      value: NEPHRITIS
+      true_next: serious_nephritis
+      false_next: mild
+    critical:
+      type: return
+      value:
+        severity: critical
+        soc: Renal and urinary disorders
+        aki_stage: 3
+        action: immediate_expedited_report
+    critical_aki3:
+      type: return
+      value:
+        severity: critical
+        soc: Renal and urinary disorders
+        aki_stage: 3
+        action: immediate_expedited_report
+    serious_aki2:
+      type: return
+      value:
+        severity: serious
+        soc: Renal and urinary disorders
+        aki_stage: 2
+        action: expedited_report
+    moderate_aki1:
+      type: return
+      value:
+        severity: moderate
+        soc: Renal and urinary disorders
+        aki_stage: 1
+        action: monitor_and_assess
+    serious_nephritis:
+      type: return
+      value:
+        severity: serious
+        soc: Renal and urinary disorders
+        aki_stage: 0
+        action: expedited_report
+    mild:
+      type: return
+      value:
+        severity: mild
+        soc: Renal and urinary disorders
+        aki_stage: 0
+        action: routine_surveillance
+tests:
+  - name: dialysis_required
+    input:
+      reaction_pt: DIALYSIS
+    expect:
+      severity: critical
+      aki_stage: 3
+  - name: renal_failure
+    input:
+      reaction_pt: ACUTE RENAL FAILURE
+    expect:
+      severity: critical
+  - name: aki_stage3
+    input:
+      reaction_pt: BLOOD CREATININE INCREASED
+      creatinine_xbaseline: 4.0
+    expect:
+      severity: critical
+      aki_stage: 3
+  - name: aki_stage2
+    input:
+      reaction_pt: BLOOD CREATININE INCREASED
+      creatinine_xbaseline: 2.5
+    expect:
+      severity: serious
+      aki_stage: 2
+  - name: aki_stage1
+    input:
+      reaction_pt: BLOOD CREATININE INCREASED
+      creatinine_xbaseline: 1.8
+    expect:
+      severity: moderate
+      aki_stage: 1
+  - name: nephritis
+    input:
+      reaction_pt: INTERSTITIAL NEPHRITIS
+    expect:
+      severity: serious
+  - name: mild_proteinuria
+    input:
+      reaction_pt: PROTEINURIA
+    expect:
+      severity: mild
+  - name: null_safety
+    input: {}
+    expect:
+      severity: mild

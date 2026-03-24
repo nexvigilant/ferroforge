@@ -1,0 +1,141 @@
+name: implementation-router
+description: "PDC: Route to implementation approach based on organizational context and learner profile"
+version: 0.1.0
+interface:
+  inputs:
+    cohort_available:
+      type: bool
+      required: false
+    has_specialization_focus:
+      type: bool
+      required: false
+    is_experienced_professional:
+      type: bool
+      required: false
+    parallel_capable:
+      type: bool
+      required: false
+  outputs:
+    approach:
+      type: string
+    best_for:
+      type: string
+    description:
+      type: string
+    pacing:
+      type: string
+    starts_with:
+      type: string
+    timeline:
+      type: string
+tree:
+  start: check_experienced
+  nodes:
+    check_experienced:
+      type: condition
+      variable: is_experienced_professional
+      operator: eq
+      value: true
+      true_next: accelerated
+      false_next: check_specialized
+    check_specialized:
+      type: condition
+      variable: has_specialization_focus
+      operator: eq
+      value: true
+      true_next: specialized
+      false_next: check_cohort
+    check_cohort:
+      type: condition
+      variable: cohort_available
+      operator: eq
+      value: true
+      true_next: check_parallel
+      false_next: individual_sequential
+    check_parallel:
+      type: condition
+      variable: parallel_capable
+      operator: eq
+      value: true
+      true_next: integrated_cohort
+      false_next: sequential_cohort
+    individual_sequential:
+      type: return
+      value:
+        approach: SEQUENTIAL
+        pacing: individual
+        description: "Systematic progression through competency domains one at a time"
+        timeline: "self-directed with competency-based advancement"
+        best_for: "self-motivated learners, resource-limited settings"
+    sequential_cohort:
+      type: return
+      value:
+        approach: SEQUENTIAL
+        pacing: cohort
+        description: "Group learning with structured timelines and peer support"
+        timeline: "cohort-based with defined milestones"
+        best_for: "programs with regular intake cycles"
+    integrated_cohort:
+      type: return
+      value:
+        approach: INTEGRATED
+        pacing: cohort
+        description: "Parallel development across multiple domains simultaneously"
+        timeline: "cohort-based with cross-functional rotations"
+        best_for: "organizations with diverse PV functions"
+    specialized:
+      type: return
+      value:
+        approach: SPECIALIZED
+        pacing: individual
+        description: "Focus on specific therapeutic areas or functional specializations"
+        timeline: "targeted development with domain depth"
+        best_for: "therapeutic area experts, functional specialists"
+    accelerated:
+      type: return
+      value:
+        approach: ACCELERATED
+        pacing: individual
+        description: "Fast-track options leveraging existing experience"
+        timeline: "gap-analysis-driven with competency-based advancement"
+        best_for: "experienced professionals with existing PV competency"
+        starts_with: "competency assessment and gap analysis"
+tests:
+- input:
+    is_experienced_professional: true
+  expect:
+    approach: ACCELERATED
+    starts_with: "competency assessment and gap analysis"
+- input:
+    is_experienced_professional: false
+    has_specialization_focus: true
+  expect:
+    approach: SPECIALIZED
+    best_for: "therapeutic area experts, functional specialists"
+- input:
+    is_experienced_professional: false
+    has_specialization_focus: false
+    cohort_available: true
+    parallel_capable: true
+  expect:
+    approach: INTEGRATED
+    pacing: cohort
+- input:
+    is_experienced_professional: false
+    has_specialization_focus: false
+    cohort_available: true
+    parallel_capable: false
+  expect:
+    approach: SEQUENTIAL
+    pacing: cohort
+- input:
+    is_experienced_professional: false
+    has_specialization_focus: false
+    cohort_available: false
+  expect:
+    approach: SEQUENTIAL
+    pacing: individual
+- input: {}
+  expect:
+    approach: SEQUENTIAL
+    pacing: individual

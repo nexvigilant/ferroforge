@@ -1,0 +1,133 @@
+name: node-readiness
+description: 'Flywheel node readiness gate: READY (loop_closure>=0.5 AND compounding>=0.5 AND automation>=0.2), WIRING (any>=0.3), DORMANT (all<0.3)'
+version: 0.1.0
+interface:
+  inputs:
+    automation:
+      type: int
+      required: false
+    compounding:
+      type: int
+      required: false
+    loop_closure:
+      type: int
+      required: false
+  outputs:
+    promotable:
+      type: bool
+    status:
+      type: string
+tree:
+  start: check_ready
+  nodes:
+    check_ready:
+      type: condition
+      variable: loop_closure
+      operator: gte
+      value: 50
+      true_next: check_compounding
+      false_next: check_wiring
+    check_compounding:
+      type: condition
+      variable: compounding
+      operator: gte
+      value: 50
+      true_next: check_automation
+      false_next: check_wiring
+    check_automation:
+      type: condition
+      variable: automation
+      operator: gte
+      value: 20
+      true_next: ready
+      false_next: check_wiring
+    check_wiring:
+      type: condition
+      variable: loop_closure
+      operator: gte
+      value: 30
+      true_next: wiring
+      false_next: check_wiring_alt
+    check_wiring_alt:
+      type: condition
+      variable: compounding
+      operator: gte
+      value: 30
+      true_next: wiring
+      false_next: dormant
+    ready:
+      type: return
+      value:
+        status: READY
+        promotable: true
+    wiring:
+      type: return
+      value:
+        status: WIRING
+        promotable: false
+    dormant:
+      type: return
+      value:
+        status: DORMANT
+        promotable: false
+tests:
+- input:
+    loop_closure: 68
+    compounding: 74
+    automation: 92
+  expect:
+    status: READY
+    promotable: true
+- input:
+    loop_closure: 72
+    compounding: 70
+    automation: 35
+  expect:
+    status: READY
+    promotable: true
+- input:
+    loop_closure: 25
+    compounding: 95
+    automation: 15
+  expect:
+    status: WIRING
+    promotable: false
+- input:
+    loop_closure: 55
+    compounding: 60
+    automation: 10
+  expect:
+    status: WIRING
+    promotable: false
+- input:
+    loop_closure: 15
+    compounding: 18
+    automation: 10
+  expect:
+    status: DORMANT
+    promotable: false
+- input:
+    loop_closure: 0
+    compounding: 0
+    automation: 0
+  expect:
+    status: DORMANT
+    promotable: false
+- input:
+    loop_closure: 50
+    compounding: 50
+    automation: 20
+  expect:
+    status: READY
+    promotable: true
+- input:
+    loop_closure: 49
+    compounding: 50
+    automation: 20
+  expect:
+    status: WIRING
+    promotable: false
+- input: {}
+  expect:
+    promotable: false
+    status: DORMANT
