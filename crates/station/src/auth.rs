@@ -190,7 +190,7 @@ pub fn auth_error_json(result: &AuthResult) -> serde_json::Value {
     match result {
         AuthResult::KeyRequired => serde_json::json!({
             "error": "API key required",
-            "message": "This tool requires authentication. Provide an API key via Authorization: Bearer nv_... header. Meta-tools (nexvigilant_directory, nexvigilant_capabilities, nexvigilant_chart_course, nexvigilant_ring_health) are free.",
+            "message": "This tool requires authentication. Provide an API key via Authorization: Bearer nv_... header. Start with nexvigilant_chart_course (free, no auth) to get guided workflows. Other free tools: nexvigilant_directory, nexvigilant_capabilities, nexvigilant_ring_health.",
             "docs": "https://nexvigilant.com/station/api-keys"
         }),
         AuthResult::InvalidKey => serde_json::json!({

@@ -183,6 +183,21 @@ impl ConfigRegistry {
 
         let mut tools: Vec<ToolInfo> = vec![
             ToolInfo {
+                name: "nexvigilant_chart_course".into(),
+                description: "START HERE — Your guided entry point to NexVigilant's pharmacovigilance tools. Returns step-by-step workflows with exact tool names and parameters for any drug safety question. 6 courses: drug-safety-profile, signal-investigation, causality-assessment, benefit-risk-assessment, regulatory-intelligence, competitive-landscape. Call with no args to see all courses, or provide a course name to get the execution plan.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "course": {
+                            "type": "string",
+                            "description": "Course name: 'drug-safety-profile' (most common), 'signal-investigation', 'causality-assessment', 'benefit-risk-assessment', 'regulatory-intelligence', or 'competitive-landscape'. Omit to list all courses with descriptions."
+                        }
+                    },
+                }),
+                output_schema: None,
+                annotations: meta_annotations.clone(),
+            },
+            ToolInfo {
                 name: "nexvigilant_directory".into(),
                 description: "[NexVigilant Station] Complete directory of all pharmacovigilance tools, domains, and capabilities. Lists every available tool with parameters and handler status.".into(),
                 input_schema: serde_json::json!({
@@ -217,21 +232,6 @@ impl ConfigRegistry {
                 input_schema: serde_json::json!({
                     "type": "object",
                     "properties": {},
-                }),
-                output_schema: None,
-                annotations: meta_annotations.clone(),
-            },
-            ToolInfo {
-                name: "nexvigilant_chart_course".into(),
-                description: "[NexVigilant Station] Chart a research course — predefined multi-tool workflows for drug safety profiling, signal investigation, target analysis, and HEXIM1 research. Call with no args to list courses, or provide 'course' to get the step-by-step plan.".into(),
-                input_schema: serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "course": {
-                            "type": "string",
-                            "description": "Course name (e.g., 'drug-safety-profile', 'signal-investigation', 'hexim1-landscape'). Omit to list all available courses."
-                        }
-                    },
                 }),
                 output_schema: None,
                 annotations: meta_annotations.clone(),

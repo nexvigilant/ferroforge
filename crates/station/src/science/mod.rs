@@ -177,7 +177,8 @@ fn handle_chart_course(args: &Value, _registry: &ConfigRegistry) -> ToolCallResu
         let result = json!({
             "status": "ok",
             "station": "NexVigilant Station",
-            "message": "Available research courses. Provide 'course' parameter to chart a specific course.",
+            "message": "Pick a course below and call this tool again with the 'course' parameter. Most users start with 'drug-safety-profile'. Each course returns the exact tool names and parameters to execute in order.",
+            "tip": "Example: nexvigilant_chart_course({\"course\": \"drug-safety-profile\"})",
             "courses": courses,
         });
 
