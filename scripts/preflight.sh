@@ -86,9 +86,9 @@ fi
 run_gate "Test harness smoke test" \
     python3 "$SCRIPTS_DIR/test_harness.py" $harness_args
 
-# Gate 5: Calculation validation (math correctness)
-run_gate "Calculation math validation (29 cases)" \
-    python3 "$SCRIPTS_DIR/validate_calculations.py"
+# Gate 5: Calculation validation (math correctness — Rust parity tests)
+run_gate "Calculation parity tests (47 cases)" \
+    cargo test -p nexvigilant-station --test compute_parity
 
 # Gate 6: Dispatch routing coverage
 run_gate "Dispatch route coverage" python3 "$SCRIPTS_DIR/gate_dispatch.py" "$PROJECT_DIR"
