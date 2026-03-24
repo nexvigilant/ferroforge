@@ -184,7 +184,7 @@ impl ConfigRegistry {
         let mut tools: Vec<ToolInfo> = vec![
             ToolInfo {
                 name: "nexvigilant_chart_course".into(),
-                description: "START HERE — Your guided entry point to NexVigilant's pharmacovigilance tools. Returns step-by-step workflows with exact tool names and parameters for any drug safety question. 6 courses: drug-safety-profile, signal-investigation, causality-assessment, benefit-risk-assessment, regulatory-intelligence, competitive-landscape. Call with no args to see all courses, or provide a course name to get the execution plan.".into(),
+                description: "[NexVigilant Station] START HERE — Your guided entry point to NexVigilant's pharmacovigilance tools. Returns step-by-step workflows with exact tool names and parameters for any drug safety question. 6 courses: drug-safety-profile, signal-investigation, causality-assessment, benefit-risk-assessment, regulatory-intelligence, competitive-landscape. Call with no args to see all courses, or provide a course name to get the execution plan.".into(),
                 input_schema: serde_json::json!({
                     "type": "object",
                     "properties": {

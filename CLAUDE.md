@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## FerroForge — NexVigilant Station
 
-Rust MCP server + 25 PV domain configs (193 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio (source: `ls configs/*.json | wc -l` = 25, tool count from JSON parsing = 188 + 5 Rust meta-tools = 193, measured 2026-03-11).
+Rust MCP server + 26 PV domain configs (198 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio (source: `ls configs/*.json | wc -l` = 26, tool count from JSON parsing = 198 tools total across all configs, plus ~18 Rust compute tools = 216 total including meta-tools, measured 2026-03-24).
 
 ## Build & Test
 
@@ -35,10 +35,10 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 | `crates/station/src/server.rs` | Stdio MCP server loop |
 | `crates/station/src/telemetry.rs` | Per-tool-call metrics (timestamp, domain, duration_ms, status) |
 | `scripts/dispatch.py` | Unified proxy router — routes by domain prefix to per-domain proxy scripts |
-| `scripts/*_proxy.py` | Per-domain API proxy scripts (21 files — source: measured 2026-03-08) |
+| `scripts/*_proxy.py` | Per-domain API proxy scripts (23 files — source: measured 2026-03-24) |
 | `scripts/config_forge.py` | Config generator + hub deployer (self-hosted or Cloud Run) |
 
-## Config Inventory (25 configs, 193 tools — source: measured 2026-03-08)
+## Config Inventory (26 configs, 198 tools — source: measured 2026-03-24)
 
 **Proxy scripts with HTTP calls (10):** openfda, clinicaltrials, pubmed, dailymed, rxnav, openvigilfrance, fda-accessdata, eudravigilance, fda-safety, science
 
