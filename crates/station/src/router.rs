@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::auth::{ApiKeyGate, AuthResult, auth_error_json};
 use crate::config::{ConfigRegistry, HubConfig, ToolDef};
+use crate::metering::{self, MeteringRecord, StationMeter};
 use crate::protocol::{ContentBlock, ToolCallResult};
 use crate::telemetry::{
     elapsed_ms, extract_domain, now_iso8601, start_timer, StationTelemetry, ToolCallRecord,
@@ -17,6 +18,7 @@ use crate::telemetry::{
 pub fn route_tool_call(
     registry: &ConfigRegistry,
     telemetry: &StationTelemetry,
+    meter: Option<&StationMeter>,
     auth_gate: &ApiKeyGate,
     auth_header: Option<&str>,
     tool_name: &str,
@@ -93,17 +95,45 @@ pub fn route_tool_call(
     // Extract status and error detail from the result content
     let (status, is_error, error_message) = extract_status(&result);
 
+    let client_id = metering::extract_client_id(auth_header);
+    let is_free = client_id.is_none();
+
     telemetry.record(ToolCallRecord {
         timestamp: now_iso8601(),
         tool_name: tool_name.to_string(),
-        domain,
+        domain: domain.clone(),
         duration_ms,
         status,
         is_error,
         error_message,
-        client_id: None,
+        client_id: client_id.clone(),
         request_id: Some(request_id.clone()),
     });
+
+    // Token metering for billing
+    if let Some(meter) = meter {
+        let input_bytes = serde_json::to_string(arguments)
+            .map(|s| s.len())
+            .unwrap_or(0);
+        let output_bytes = result
+            .content
+            .iter()
+            .map(|c| match c {
+                ContentBlock::Text { text } => text.len(),
+            })
+            .sum::<usize>();
+
+        meter.record(MeteringRecord {
+            timestamp: now_iso8601(),
+            client_id,
+            tool_name: tool_name.to_string(),
+            domain,
+            input_tokens: metering::estimate_tokens(input_bytes),
+            output_tokens: metering::estimate_tokens(output_bytes),
+            cost_microcents: None, // Phase 4: pricing engine
+            free_tier: is_free,
+        });
+    }
 
     // Inject request_id into the response JSON for client correlation
     inject_request_id(&mut result, &request_id);
@@ -182,6 +212,9 @@ fn route_tool_call_inner(
         return result;
     }
     if let Some(result) = crate::crystalbook::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::benefit_risk::try_handle(tool_name, arguments) {
         return result;
     }
 

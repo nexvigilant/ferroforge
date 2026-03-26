@@ -9,7 +9,9 @@ pub const SSE_STREAM_HEADERS: [(&str, &str); 2] = [
 pub mod auth;
 pub mod compute;
 pub mod config;
+pub mod benefit_risk;
 pub mod crystalbook;
+pub mod metering;
 pub mod protocol;
 pub mod rate_limit;
 pub mod router;

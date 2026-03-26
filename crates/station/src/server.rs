@@ -102,6 +102,22 @@ pub fn handle_request_with_auth(
                     name: "nexvigilant-station".into(),
                     version: env!("CARGO_PKG_VERSION").into(),
                 },
+                instructions: Some(
+                    "NexVigilant Station — pharmacovigilance intelligence for AI agents.\n\
+                     \n\
+                     START HERE: Call `nexvigilant_chart_course` first. It returns step-by-step \
+                     workflows with exact tool names and parameters for any drug safety question. \
+                     6 guided courses: drug-safety-profile, signal-investigation, \
+                     causality-assessment, benefit-risk-assessment, regulatory-intelligence, \
+                     competitive-landscape.\n\
+                     \n\
+                     Example: To investigate adverse events for metformin, call \
+                     `nexvigilant_chart_course` with course='signal-investigation' — it returns \
+                     the exact sequence of tools to call with parameters.\n\
+                     \n\
+                     Do NOT guess tool parameters. Use chart_course to get the correct workflow."
+                        .into(),
+                ),
             };
             info!(
                 version = %result.server_info.version,
@@ -151,7 +167,7 @@ pub fn handle_request_with_auth(
 
             info!(tool = %tool_name, "Tool call");
             let timer = telemetry::start_timer();
-            let result = router::route_tool_call(registry, telemetry, auth_gate, None, tool_name, &arguments);
+            let result = router::route_tool_call(registry, telemetry, None, auth_gate, auth_header, tool_name, &arguments);
             let duration_ms = telemetry::elapsed_ms(timer);
 
             // Emit station event to broadcast channel

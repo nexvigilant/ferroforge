@@ -240,7 +240,7 @@ fn test_load_ignores_non_config_files() {
 #[test]
 fn test_route_known_tool_with_stub() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "api_fda_gov_search_adverse_events", &json!({"drug_name": "aspirin"}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), None, "api_fda_gov_search_adverse_events", &json!({"drug_name": "aspirin"}));
     assert!(result.is_error.is_none());
     assert_eq!(result.content.len(), 1);
 }
@@ -248,7 +248,7 @@ fn test_route_known_tool_with_stub() {
 #[test]
 fn test_route_known_tool_without_stub() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "api_fda_gov_get_drug_counts", &json!({"drug_name": "metformin"}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), None, "api_fda_gov_get_drug_counts", &json!({"drug_name": "metformin"}));
     assert!(result.is_error.is_none());
     let text = match &result.content[0] {
         nexvigilant_station::protocol::ContentBlock::Text { text } => text,
@@ -259,14 +259,14 @@ fn test_route_known_tool_without_stub() {
 #[test]
 fn test_route_unknown_tool() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "nonexistent_tool", &json!({}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), None, "nonexistent_tool", &json!({}));
     assert_eq!(result.is_error, Some(true));
 }
 
 #[test]
 fn test_route_directory_meta_tool() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "nexvigilant_directory", &json!({}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), None, "nexvigilant_directory", &json!({}));
     assert!(result.is_error.is_none());
     let text = match &result.content[0] {
         nexvigilant_station::protocol::ContentBlock::Text { text } => text,
@@ -280,7 +280,7 @@ fn test_route_directory_meta_tool() {
 #[test]
 fn test_route_capabilities_search() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "nexvigilant_capabilities", &json!({"query": "adverse"}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), None, "nexvigilant_capabilities", &json!({"query": "adverse"}));
     assert!(result.is_error.is_none());
     let text = match &result.content[0] {
         nexvigilant_station::protocol::ContentBlock::Text { text } => text,
@@ -292,7 +292,7 @@ fn test_route_capabilities_search() {
 #[test]
 fn test_route_capabilities_domain_filter() {
     let reg = test_registry();
-    let result = router::route_tool_call(&reg, &test_telemetry(), &ApiKeyGate::new(None), None, "nexvigilant_capabilities", &json!({"domain": "dailymed"}));
+    let result = router::route_tool_call(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), None, "nexvigilant_capabilities", &json!({"domain": "dailymed"}));
     assert!(result.is_error.is_none());
     let text = match &result.content[0] {
         nexvigilant_station::protocol::ContentBlock::Text { text } => text,
@@ -309,7 +309,7 @@ fn test_route_capabilities_domain_filter() {
 fn test_route_injects_request_id_in_stub_response() {
     let reg = test_registry();
     let result = router::route_tool_call(
-        &reg, &test_telemetry(), &ApiKeyGate::new(None), None,
+        &reg, &test_telemetry(), None, &ApiKeyGate::new(None), None,
         "api_fda_gov_search_adverse_events", &json!({"drug_name": "aspirin"}),
     );
     let text = match &result.content[0] {
@@ -326,7 +326,7 @@ fn test_route_injects_request_id_in_stub_response() {
 fn test_route_injects_request_id_in_meta_tool() {
     let reg = test_registry();
     let result = router::route_tool_call(
-        &reg, &test_telemetry(), &ApiKeyGate::new(None), None,
+        &reg, &test_telemetry(), None, &ApiKeyGate::new(None), None,
         "nexvigilant_directory", &json!({}),
     );
     let text = match &result.content[0] {
@@ -341,7 +341,7 @@ fn test_route_request_id_recorded_in_telemetry() {
     let reg = test_registry();
     let telemetry = test_telemetry();
     let _ = router::route_tool_call(
-        &reg, &telemetry, &ApiKeyGate::new(None), None,
+        &reg, &telemetry, None, &ApiKeyGate::new(None), None,
         "api_fda_gov_search_adverse_events", &json!({"drug_name": "test"}),
     );
     let health = telemetry.health();
@@ -355,11 +355,11 @@ fn test_route_unique_request_ids() {
     let reg = test_registry();
     let telemetry = test_telemetry();
     let _ = router::route_tool_call(
-        &reg, &telemetry, &ApiKeyGate::new(None), None,
+        &reg, &telemetry, None, &ApiKeyGate::new(None), None,
         "api_fda_gov_search_adverse_events", &json!({"drug_name": "a"}),
     );
     let _ = router::route_tool_call(
-        &reg, &telemetry, &ApiKeyGate::new(None), None,
+        &reg, &telemetry, None, &ApiKeyGate::new(None), None,
         "api_fda_gov_search_adverse_events", &json!({"drug_name": "b"}),
     );
     let health = telemetry.health();
@@ -683,7 +683,7 @@ fn test_rate_limit_response_in_router() {
         });
     }
     // This call should be rate-limited
-    let result = router::route_tool_call(&reg, &telemetry, &ApiKeyGate::new(None), None, "api_fda_gov_search_adverse_events", &json!({"drug_name": "test"}));
+    let result = router::route_tool_call(&reg, &telemetry, None, &ApiKeyGate::new(None), None, "api_fda_gov_search_adverse_events", &json!({"drug_name": "test"}));
     assert_eq!(result.is_error, Some(true));
     let text = match &result.content[0] {
         nexvigilant_station::protocol::ContentBlock::Text { text } => text,
@@ -852,6 +852,7 @@ fn test_station_health_includes_courses() {
     let result = router::route_tool_call(
         &registry,
         &telemetry,
+        None,
         &ApiKeyGate::new(None),
         None,
         "nexvigilant_station_health",
@@ -875,6 +876,7 @@ fn test_directory_includes_courses() {
     let result = router::route_tool_call(
         &registry,
         &telemetry,
+        None,
         &ApiKeyGate::new(None),
         None,
         "nexvigilant_directory",
@@ -904,6 +906,7 @@ fn test_capabilities_returns_matching_courses() {
     let result = router::route_tool_call(
         &registry,
         &telemetry,
+        None,
         &ApiKeyGate::new(None),
         None,
         "nexvigilant_capabilities",
