@@ -58,6 +58,7 @@ pub struct StreamableState {
     pub event_tx: broadcast::Sender<StationEvent>,
     sessions: Mutex<HashMap<String, StreamableSession>>,
     pub auth_gate: ApiKeyGate,
+    pub meter: Arc<crate::metering::StationMeter>,
 }
 
 impl StreamableState {
@@ -66,6 +67,7 @@ impl StreamableState {
         telemetry: Arc<StationTelemetry>,
         event_tx: broadcast::Sender<StationEvent>,
         auth_gate: ApiKeyGate,
+        meter: Arc<crate::metering::StationMeter>,
     ) -> Self {
         Self {
             registry,
@@ -73,6 +75,7 @@ impl StreamableState {
             event_tx,
             sessions: Mutex::new(HashMap::new()),
             auth_gate,
+            meter,
         }
     }
 
@@ -162,6 +165,7 @@ pub async fn handle_mcp_post(
                     if let Some(resp) = handle_request_with_auth(
                         &state.registry,
                         &state.telemetry,
+                        Some(&state.meter),
                         &state.auth_gate,
                         req,
                         Some(&state.event_tx),
@@ -259,6 +263,7 @@ pub async fn handle_mcp_post(
     let response = handle_request_with_auth(
         &state.registry,
         &state.telemetry,
+        Some(&state.meter),
         &state.auth_gate,
         &request,
         Some(&state.event_tx),

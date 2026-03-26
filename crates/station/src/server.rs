@@ -76,12 +76,13 @@ pub fn handle_request(
     req: &JsonRpcRequest,
     event_tx: Option<&broadcast::Sender<StationEvent>>,
 ) -> Option<JsonRpcResponse> {
-    handle_request_with_auth(registry, telemetry, auth_gate, req, event_tx, None)
+    handle_request_with_auth(registry, telemetry, None, auth_gate, req, event_tx, None)
 }
 
 pub fn handle_request_with_auth(
     registry: &ConfigRegistry,
     telemetry: &StationTelemetry,
+    meter: Option<&crate::metering::StationMeter>,
     auth_gate: &ApiKeyGate,
     req: &JsonRpcRequest,
     event_tx: Option<&broadcast::Sender<StationEvent>>,
@@ -167,7 +168,7 @@ pub fn handle_request_with_auth(
 
             info!(tool = %tool_name, "Tool call");
             let timer = telemetry::start_timer();
-            let result = router::route_tool_call(registry, telemetry, None, auth_gate, auth_header, tool_name, &arguments);
+            let result = router::route_tool_call(registry, telemetry, meter, auth_gate, auth_header, tool_name, &arguments);
             let duration_ms = telemetry::elapsed_ms(timer);
 
             // Emit station event to broadcast channel

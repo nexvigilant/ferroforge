@@ -221,7 +221,6 @@ fn route_tool_call_inner(
     if let Some(result) = crate::benefit_risk::try_handle(tool_name, arguments) {
         return result;
     }
-    // signal_theory + preemptive_pv: gated (stale nexcore API refs, moved to _wip_modules/)
 
     match registry.find_tool(tool_name) {
         Some((config, tool)) => execute_tool(config, tool, tool_name, arguments, &registry.station_root, request_id),

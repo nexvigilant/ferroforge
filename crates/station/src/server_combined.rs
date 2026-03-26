@@ -81,7 +81,7 @@ pub async fn run_combined(
         event_tx: event_tx.clone(),
         sessions: Mutex::new(HashMap::new()),
         auth_gate: auth_gate.clone(),
-        meter,
+        meter: Arc::clone(&meter),
     });
 
     // Spawn session reaper — prunes zombie sessions every REAPER_INTERVAL_SECS
@@ -116,6 +116,7 @@ pub async fn run_combined(
         Arc::clone(&telemetry_arc),
         event_tx.clone(),
         auth_gate.clone(),
+        Arc::clone(&meter),
     ));
     StreamableState::spawn_reaper(Arc::clone(&streamable_state));
 

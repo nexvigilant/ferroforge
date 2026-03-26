@@ -103,14 +103,11 @@ pub fn compute_cost(
         .unwrap_or(&DEFAULT_RATE);
 
     // Convert from dollars-per-million to microcents-per-token
-    // 1 dollar = 100 cents = 1_000_000 microcents
-    // rate per million tokens → microcents per token = rate * 1_000_000 / 1_000_000 = rate
-    // So: microcents = tokens * rate_per_million * 1_000_000 / 1_000_000 = tokens * rate_per_million
-    // But rate is in dollars, need microcents: tokens * rate * 100 * 10000 / 1_000_000
-    // Simplify: tokens * rate / 10
-
-    let input_base = (input_tokens as f64 * rate.input_per_million / 10.0) as u64;
-    let output_base = (output_tokens as f64 * rate.output_per_million / 10.0) as u64;
+    // 1 dollar = 1_000_000 microcents (100 cents × 10_000 microcents/cent)
+    // cost_dollars = tokens × rate_per_million / 1_000_000
+    // cost_microcents = cost_dollars × 1_000_000 = tokens × rate_per_million
+    let input_base = (input_tokens as f64 * rate.input_per_million) as u64;
+    let output_base = (output_tokens as f64 * rate.output_per_million) as u64;
     let base_cost = input_base + output_base;
     let markup = (base_cost as f64 * HARNESS_MARKUP) as u64;
 
@@ -150,35 +147,35 @@ mod tests {
     #[test]
     fn test_compute_cost_opus() {
         let cost = compute_cost(Some("claude-opus-4-6"), 1000, 500).unwrap();
-        // input: 1000 * 15.0 / 10 = 1500 microcents
-        // output: 500 * 75.0 / 10 = 3750 microcents
-        // base: 5250, markup: 1575, total: 6825
-        assert_eq!(cost.base_cost_microcents, 5250);
-        assert_eq!(cost.markup_microcents, 1575);
-        assert_eq!(cost.total_microcents, 6825);
+        // input: 1000 * 15.0 = 15000 microcents
+        // output: 500 * 75.0 = 37500 microcents
+        // base: 52500, markup: 15750, total: 68250
+        assert_eq!(cost.base_cost_microcents, 52500);
+        assert_eq!(cost.markup_microcents, 15750);
+        assert_eq!(cost.total_microcents, 68250);
         assert_eq!(cost.rate_card_version, RATE_CARD_VERSION);
     }
 
     #[test]
     fn test_compute_cost_sonnet() {
         let cost = compute_cost(Some("claude-sonnet-4-6"), 1000, 500).unwrap();
-        // input: 1000 * 3.0 / 10 = 300
-        // output: 500 * 15.0 / 10 = 750
-        // base: 1050, markup: 315, total: 1365
-        assert_eq!(cost.base_cost_microcents, 1050);
-        assert_eq!(cost.markup_microcents, 315);
-        assert_eq!(cost.total_microcents, 1365);
+        // input: 1000 * 3.0 = 3000
+        // output: 500 * 15.0 = 7500
+        // base: 10500, markup: 3150, total: 13650
+        assert_eq!(cost.base_cost_microcents, 10500);
+        assert_eq!(cost.markup_microcents, 3150);
+        assert_eq!(cost.total_microcents, 13650);
     }
 
     #[test]
     fn test_compute_cost_haiku() {
         let cost = compute_cost(Some("claude-haiku-4-5"), 10000, 5000).unwrap();
-        // input: 10000 * 0.8 / 10 = 800
-        // output: 5000 * 4.0 / 10 = 2000
-        // base: 2800, markup: 840, total: 3640
-        assert_eq!(cost.base_cost_microcents, 2800);
-        assert_eq!(cost.markup_microcents, 840);
-        assert_eq!(cost.total_microcents, 3640);
+        // input: 10000 * 0.8 = 8000
+        // output: 5000 * 4.0 = 20000
+        // base: 28000, markup: 8400, total: 36400
+        assert_eq!(cost.base_cost_microcents, 28000);
+        assert_eq!(cost.markup_microcents, 8400);
+        assert_eq!(cost.total_microcents, 36400);
     }
 
     #[test]
@@ -190,7 +187,7 @@ mod tests {
     fn test_unknown_model_uses_default() {
         let cost = compute_cost(Some("unknown-model-v99"), 1000, 500).unwrap();
         // Uses default (Sonnet-level): same as sonnet test
-        assert_eq!(cost.base_cost_microcents, 1050);
+        assert_eq!(cost.base_cost_microcents, 10500);
     }
 
     #[test]

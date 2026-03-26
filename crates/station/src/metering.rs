@@ -192,16 +192,9 @@ pub fn extract_client_id(auth_header: Option<&str>) -> Option<String> {
 
 /// Current billing period as YYYY-MM string.
 fn current_period() -> String {
-    use std::time::SystemTime;
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    // Unix timestamp to YYYY-MM (approximate — sufficient for billing periods)
-    let days = now / 86400;
-    let years = 1970 + days / 365;
-    let month = ((days % 365) / 30) + 1;
-    format!("{years}-{month:02}")
+    // Use the same ISO 8601 timestamp as telemetry, then truncate to YYYY-MM
+    let ts = crate::telemetry::now_iso8601();
+    ts.get(..7).unwrap_or("1970-01").to_string()
 }
 
 #[cfg(test)]
