@@ -7,6 +7,7 @@ pub const SSE_STREAM_HEADERS: [(&str, &str); 2] = [
 ];
 
 pub mod auth;
+pub mod billing_api;
 pub mod compute;
 pub mod config;
 pub mod benefit_risk;

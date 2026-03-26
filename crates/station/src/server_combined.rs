@@ -47,6 +47,7 @@ struct AppState {
     event_tx: broadcast::Sender<StationEvent>,
     sessions: Mutex<HashMap<String, SessionInfo>>,
     auth_gate: ApiKeyGate,
+    meter: Arc<crate::metering::StationMeter>,
 }
 
 /// Run the combined MCP server — SSE + HTTP REST on one port.
@@ -72,12 +73,15 @@ pub async fn run_combined(
     let registry_arc = Arc::new(registry);
     let telemetry_arc = Arc::new(telemetry);
 
+    let meter = Arc::new(crate::metering::StationMeter::new(None, None));
+
     let state = Arc::new(AppState {
         registry: Arc::clone(&registry_arc),
         telemetry: Arc::clone(&telemetry_arc),
         event_tx: event_tx.clone(),
         sessions: Mutex::new(HashMap::new()),
         auth_gate: auth_gate.clone(),
+        meter,
     });
 
     // Spawn session reaper — prunes zombie sessions every REAPER_INTERVAL_SECS
@@ -149,6 +153,10 @@ pub async fn run_combined(
         .route("/rpc", post(handle_rpc))
         .route("/tools", get(handle_list_tools))
         .route("/tools/{name}", post(handle_tool_call))
+        // Billing API (outside rate limiter)
+        .route("/billing/usage", get(crate::billing_api::handle_usage))
+        .route("/billing/rates", get(crate::billing_api::handle_rates))
+        .route("/billing/balance", get(crate::billing_api::handle_balance))
         // Health + Stats (excluded from rate limiting below via middleware ordering)
         .route("/health", get(handle_health))
         .route("/stats", get(handle_stats))
