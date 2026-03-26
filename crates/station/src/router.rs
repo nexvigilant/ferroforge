@@ -123,14 +123,18 @@ pub fn route_tool_call(
             })
             .sum::<usize>();
 
+        let input_tokens = metering::estimate_tokens(input_bytes);
+        let output_tokens = metering::estimate_tokens(output_bytes);
+        let cost = crate::pricing::compute_cost(None, input_tokens, output_tokens);
+
         meter.record(MeteringRecord {
             timestamp: now_iso8601(),
             client_id,
             tool_name: tool_name.to_string(),
             domain,
-            input_tokens: metering::estimate_tokens(input_bytes),
-            output_tokens: metering::estimate_tokens(output_bytes),
-            cost_microcents: None, // Phase 4: pricing engine
+            input_tokens,
+            output_tokens,
+            cost_microcents: cost.map(|c| c.total_microcents),
             free_tier: is_free,
         });
     }
@@ -217,18 +221,7 @@ fn route_tool_call_inner(
     if let Some(result) = crate::benefit_risk::try_handle(tool_name, arguments) {
         return result;
     }
-    if let Some(result) = crate::signal_theory::try_handle(tool_name, arguments) {
-        return result;
-    }
-    if let Some(result) = crate::preemptive_pv::try_handle(tool_name, arguments) {
-        return result;
-    }
-    // if let Some(result) = crate::signal_theory::try_handle(tool_name, arguments) {
-    //     return result;
-    // }
-    // if let Some(result) = crate::preemptive_pv::try_handle(tool_name, arguments) {
-    //     return result;
-    // }
+    // signal_theory + preemptive_pv: gated (stale nexcore API refs, moved to _wip_modules/)
 
     match registry.find_tool(tool_name) {
         Some((config, tool)) => execute_tool(config, tool, tool_name, arguments, &registry.station_root, request_id),
