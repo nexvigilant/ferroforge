@@ -217,7 +217,12 @@ fn route_tool_call_inner(
     if let Some(result) = crate::benefit_risk::try_handle(tool_name, arguments) {
         return result;
     }
-    // TODO: signal_theory and preemptive_pv gated — stale nexcore API refs
+    if let Some(result) = crate::signal_theory::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::preemptive_pv::try_handle(tool_name, arguments) {
+        return result;
+    }
     // if let Some(result) = crate::signal_theory::try_handle(tool_name, arguments) {
     //     return result;
     // }
