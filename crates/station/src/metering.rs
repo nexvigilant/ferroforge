@@ -8,12 +8,13 @@
 //! tokenization is unnecessary. Validated against Vertex AI reports
 //! before billing goes live.
 
+use crate::usage_store::UsageStore;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tracing::{info, warn};
 
 /// Metering record for a single tool call.
@@ -60,11 +61,16 @@ pub struct StationMeter {
     log_path: Option<PathBuf>,
     /// In-memory usage summaries by client_id
     summaries: Mutex<HashMap<String, UsageSummary>>,
+    /// Firestore-backed usage persistence (None = local dev mode)
+    usage_store: Option<Arc<UsageStore>>,
 }
 
 impl StationMeter {
     /// Create a new metering engine.
-    pub fn new(log_path: Option<PathBuf>) -> Self {
+    ///
+    /// Pass `usage_store` for Firestore persistence (production).
+    /// Pass `None` for local dev (in-memory + JSONL only).
+    pub fn new(log_path: Option<PathBuf>, usage_store: Option<Arc<UsageStore>>) -> Self {
         if let Some(ref path) = log_path {
             info!("Metering log: {}", path.display());
         }
@@ -72,6 +78,7 @@ impl StationMeter {
             buffer: Mutex::new(Vec::with_capacity(100)),
             log_path,
             summaries: Mutex::new(HashMap::new()),
+            usage_store,
         }
     }
 
@@ -135,8 +142,7 @@ impl StationMeter {
             .unwrap_or_default()
     }
 
-    /// Flush buffered records to external store (Firestore in production).
-    /// Currently logs a summary — Firestore integration in Phase 2.
+    /// Flush buffered records to external store.
     fn flush_batch(&self, batch: Vec<MeteringRecord>) {
         let metered_count = batch.iter().filter(|r| !r.free_tier).count();
         let free_count = batch.len() - metered_count;
@@ -152,6 +158,14 @@ impl StationMeter {
             free_count,
             total_tokens
         );
+
+        // Forward metered records to UsageStore for Firestore persistence
+        if let Some(ref store) = self.usage_store {
+            for record in batch {
+                store.buffer_record(record);
+            }
+            store.flush();
+        }
     }
 }
 
@@ -215,7 +229,7 @@ mod tests {
 
     #[test]
     fn test_metering_record() {
-        let meter = StationMeter::new(None);
+        let meter = StationMeter::new(None, None);
 
         meter.record(MeteringRecord {
             timestamp: "2026-03-26T12:00:00Z".to_string(),
@@ -239,7 +253,7 @@ mod tests {
 
     #[test]
     fn test_free_tier_not_tracked_in_summary() {
-        let meter = StationMeter::new(None);
+        let meter = StationMeter::new(None, None);
 
         meter.record(MeteringRecord {
             timestamp: "2026-03-26T12:00:00Z".to_string(),

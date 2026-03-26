@@ -22,6 +22,7 @@ pub mod server_http;
 pub mod server_sse;
 pub mod server_streamable;
 pub mod telemetry;
+pub mod usage_store;
 
 /// Shutdown signal — resolves on SIGTERM (Cloud Run) or CTRL+C (local dev).
 ///
