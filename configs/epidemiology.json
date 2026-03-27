@@ -1,0 +1,130 @@
+{
+  "domain": "epidemiology.nexvigilant.com",
+  "private": false,
+  "copyright": "© 2026 NexVigilant, LLC.",
+  "title": "Epidemiology — Measures of Association & Impact",
+  "description": "Epidemiological measures mapped to pharmacovigilance: relative risk (→PRR), odds ratio (→ROR), attributable risk, NNT/NNH, attributable fraction, population AF, incidence rate, prevalence, Kaplan-Meier survival, SMR (→O/E), Mantel-Haenszel stratified analysis, and PV transfer mappings. Pure Rust computation — no network calls.",
+  "proxy": "rust-native",
+  "tools": [
+    {
+      "name": "relative-risk",
+      "description": "Compute relative risk RR = [a/(a+b)] / [c/(c+d)] with 95% CI. PV equivalent: PRR.",
+      "parameters": [
+        { "name": "a", "type": "number", "description": "Exposed + outcome (drug+event)", "required": true },
+        { "name": "b", "type": "number", "description": "Exposed + no outcome (drug+no event)", "required": true },
+        { "name": "c", "type": "number", "description": "Unexposed + outcome (no drug+event)", "required": true },
+        { "name": "d", "type": "number", "description": "Unexposed + no outcome (no drug+no event)", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "relative_risk": { "type": "number" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "odds-ratio",
+      "description": "Compute odds ratio OR = (a*d)/(b*c) with 95% CI. PV equivalent: ROR.",
+      "parameters": [
+        { "name": "a", "type": "number", "required": true },
+        { "name": "b", "type": "number", "required": true },
+        { "name": "c", "type": "number", "required": true },
+        { "name": "d", "type": "number", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "odds_ratio": { "type": "number" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "attributable-risk",
+      "description": "Compute attributable risk AR = Ie - Io (risk difference) with 95% CI.",
+      "parameters": [
+        { "name": "a", "type": "number", "required": true },
+        { "name": "b", "type": "number", "required": true },
+        { "name": "c", "type": "number", "required": true },
+        { "name": "d", "type": "number", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "attributable_risk": { "type": "number" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "nnt-nnh",
+      "description": "Compute Number Needed to Treat (NNT) or Number Needed to Harm (NNH) = 1/|AR|.",
+      "parameters": [
+        { "name": "a", "type": "number", "required": true },
+        { "name": "b", "type": "number", "required": true },
+        { "name": "c", "type": "number", "required": true },
+        { "name": "d", "type": "number", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "metric": { "type": "string" }, "value": { "type": "number" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "attributable-fraction",
+      "description": "Compute attributable fraction AF = (RR-1)/RR among exposed.",
+      "parameters": [
+        { "name": "a", "type": "number", "required": true },
+        { "name": "b", "type": "number", "required": true },
+        { "name": "c", "type": "number", "required": true },
+        { "name": "d", "type": "number", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "attributable_fraction": { "type": "number" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "population-af",
+      "description": "Compute population attributable fraction PAF = Pe(RR-1)/[1+Pe(RR-1)].",
+      "parameters": [
+        { "name": "a", "type": "number", "required": true },
+        { "name": "b", "type": "number", "required": true },
+        { "name": "c", "type": "number", "required": true },
+        { "name": "d", "type": "number", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "population_attributable_fraction": { "type": "number" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "incidence-rate",
+      "description": "Compute incidence rate IR = events/person-time with Poisson CI.",
+      "parameters": [
+        { "name": "events", "type": "number", "description": "Number of events", "required": true },
+        { "name": "person_time", "type": "number", "description": "Total person-time at risk", "required": true },
+        { "name": "multiplier", "type": "number", "description": "Scaling factor (default 1000)", "required": false }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "incidence_rate": { "type": "number" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "prevalence",
+      "description": "Compute prevalence P = cases/population with Wilson CI.",
+      "parameters": [
+        { "name": "cases", "type": "number", "required": true },
+        { "name": "population", "type": "number", "required": true },
+        { "name": "multiplier", "type": "number", "description": "Scaling factor (default 100 = percent)", "required": false }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "prevalence": { "type": "number" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "kaplan-meier",
+      "description": "Kaplan-Meier product-limit survival estimator S(t) = Π[1 - d_i/n_i] with Greenwood SE.",
+      "parameters": [
+        { "name": "intervals", "type": "array", "description": "Array of {time, events, censored} intervals", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "final_survival": { "type": "number" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "smr",
+      "description": "Standardized Mortality/Morbidity Ratio SMR = observed/expected with Byar CI. PV equivalent: O/E ratio.",
+      "parameters": [
+        { "name": "observed", "type": "number", "required": true },
+        { "name": "expected", "type": "number", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "smr": { "type": "number" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "pv-mappings",
+      "description": "Reference table of all epidemiology-to-pharmacovigilance concept transfer mappings with confidence scores.",
+      "parameters": [],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "mappings": { "type": "array" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}

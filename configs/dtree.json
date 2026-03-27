@@ -1,0 +1,107 @@
+{
+  "domain": "dtree.nexvigilant.com",
+  "private": false,
+  "copyright": "\u00a9 2026 NexVigilant, LLC.",
+  "title": "Decision Tree Engine",
+  "description": "Train, predict, prune, and export decision trees. Pure Rust via nexcore-dtree.",
+  "proxy": "rust-native",
+  "tools": [
+    {
+      "name": "train",
+      "description": "Train a decision tree classifier from labeled data. Returns the fitted tree as JSON for use with predict/prune/export. Use when building a classifier from tabular feature data.",
+      "parameters": [
+        { "name": "features", "type": "array", "description": "2D array of feature values (rows = samples, cols = features)", "required": true },
+        { "name": "labels", "type": "array", "description": "Array of class labels (one per sample)", "required": true },
+        { "name": "feature_names", "type": "array", "description": "Names for each feature column", "required": false },
+        { "name": "max_depth", "type": "integer", "description": "Maximum tree depth (default: 10)", "required": false },
+        { "name": "min_samples_split", "type": "integer", "description": "Minimum samples to split a node (default: 2)", "required": false },
+        { "name": "criterion", "type": "string", "description": "Split criterion: gini, entropy, or gain_ratio (default: gini)", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "tree_json": { "type": "string" },
+          "depth": { "type": "integer" },
+          "n_leaves": { "type": "integer" },
+          "n_nodes": { "type": "integer" }
+        },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "predict",
+      "description": "Run prediction on a fitted decision tree. Pass the tree_json from train and a feature vector. Use when classifying new data points.",
+      "parameters": [
+        { "name": "tree_json", "type": "string", "description": "Serialized tree from train output", "required": true },
+        { "name": "features", "type": "array", "description": "Feature values for one sample", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "prediction": { "type": "string" },
+          "path": { "type": "array" }
+        },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "feature-importance",
+      "description": "Get feature importance scores from a fitted tree. Returns weighted impurity decrease per feature. Use when understanding which features drive predictions.",
+      "parameters": [
+        { "name": "tree_json", "type": "string", "description": "Serialized tree from train output", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "importances": { "type": "array" }
+        },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "prune",
+      "description": "Cost-complexity prune a fitted tree. Reduces overfitting by removing low-value splits. Use when a tree is too deep or complex.",
+      "parameters": [
+        { "name": "tree_json", "type": "string", "description": "Serialized tree from train output", "required": true },
+        { "name": "alpha", "type": "number", "description": "Complexity parameter (higher = more pruning, default: 0.01)", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "tree_json": { "type": "string" },
+          "depth": { "type": "integer" },
+          "n_leaves": { "type": "integer" },
+          "nodes_removed": { "type": "integer" }
+        },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "info",
+      "description": "Get summary statistics for a fitted tree without modifying it. Use when inspecting tree structure.",
+      "parameters": [
+        { "name": "tree_json", "type": "string", "description": "Serialized tree from train output", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "depth": { "type": "integer" },
+          "n_leaves": { "type": "integer" },
+          "n_nodes": { "type": "integer" },
+          "feature_names": { "type": "array" }
+        },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}

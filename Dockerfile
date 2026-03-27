@@ -1,26 +1,13 @@
 # NexVigilant Station — Multi-transport MCP server
 # Supports: stdio (local), sse (mcp-remote), http (REST API), combined (SSE + HTTP)
 
-# Stage 1: Build the Rust binary
-FROM rust:1.93-slim AS builder
-
-# Git SHA for version stamping — passed by CI, defaults to "unknown" for local builds.
-# build.rs reads this env var since .git/ is excluded from the Docker context.
-ARG GIT_SHA=unknown
-ENV GIT_SHA=${GIT_SHA}
-
-WORKDIR /build
-COPY Cargo.toml Cargo.lock ./
-COPY crates/ crates/
-
-# Build release binary
-RUN cargo build -p nexvigilant-station --release
-
-# Stage 2: Minimal runtime image
+# Single-stage image — binary is pre-built locally via `cargo build --release`
+# because Station depends on nexcore crates via local path deps that aren't
+# available in the Docker build context.
 FROM python:3.12-slim
 
-# Station binary
-COPY --from=builder /build/target/release/nexvigilant-station /usr/local/bin/nexvigilant-station
+# Station binary (pre-built locally)
+COPY target/release/nexvigilant-station /usr/local/bin/nexvigilant-station
 
 # Stable binaries first (change infrequently → better layer caching)
 COPY bin/rsk /usr/local/bin/rsk

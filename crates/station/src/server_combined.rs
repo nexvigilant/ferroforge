@@ -159,6 +159,8 @@ pub async fn run_combined(
         .route("/billing/rates", get(crate::billing_api::handle_rates))
         .route("/billing/balance", get(crate::billing_api::handle_balance))
         // Health + Stats (excluded from rate limiting below via middleware ordering)
+        .route("/", get(handle_root))
+        .route("/.well-known/mcp.json", get(handle_well_known_mcp))
         .route("/health", get(handle_health))
         .route("/stats", get(handle_stats))
         .layer(axum::middleware::from_fn(response_headers_middleware))
@@ -427,6 +429,55 @@ async fn response_headers_middleware(
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// Root landing + well-known discovery
+// ═══════════════════════════════════════════════════════════════════
+
+/// Root landing page — helps clients that hit / instead of /mcp.
+async fn handle_root(
+    State(state): State<Arc<AppState>>,
+) -> Json<Value> {
+    Json(serde_json::json!({
+        "name": "nexvigilant-station",
+        "description": "NexVigilant Station — pharmacovigilance intelligence for AI agents",
+        "mcp_endpoint": "/mcp",
+        "sse_endpoint": "/sse",
+        "rest_endpoint": "/tools",
+        "health_endpoint": "/health",
+        "tools": state.registry.tool_count(),
+        "protocol": "MCP 2025-03-26",
+        "docs": "Connect via https://mcp.nexvigilant.com/mcp (Streamable HTTP) or /sse (SSE)",
+    }))
+}
+
+/// MCP discovery document at /.well-known/mcp.json
+async fn handle_well_known_mcp() -> Json<Value> {
+    Json(serde_json::json!({
+        "mcp": {
+            "version": "2025-03-26",
+            "endpoint": "https://mcp.nexvigilant.com/mcp",
+            "transports": [
+                {
+                    "type": "streamable-http",
+                    "url": "https://mcp.nexvigilant.com/mcp",
+                    "auth": "none"
+                },
+                {
+                    "type": "sse",
+                    "url": "https://mcp.nexvigilant.com/sse",
+                    "message_url": "https://mcp.nexvigilant.com/message",
+                    "auth": "none"
+                }
+            ]
+        },
+        "server": {
+            "name": "nexvigilant-station",
+            "vendor": "NexVigilant, LLC",
+            "url": "https://nexvigilant.com"
+        }
+    }))
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // Health (unified)
 // ═══════════════════════════════════════════════════════════════════
 
@@ -462,6 +513,8 @@ async fn handle_health(
         "config_hash": state.registry.config_hash(),
         "server": "nexvigilant-station",
         "version": env!("CARGO_PKG_VERSION"),
+        "protocol_version": "2025-03-26",
+        "last_checked": format!("{:?}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()),
         "git_sha": env!("GIT_SHA"),
     }))
 }

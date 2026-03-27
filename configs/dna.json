@@ -1,0 +1,95 @@
+{
+  "domain": "dna.nexvigilant.com",
+  "private": false,
+  "copyright": "© 2026 NexVigilant, LLC. DNA-Based Computation via nexcore-dna.",
+  "title": "DNA Computing — Quaternary Encoding, Codon Translation, and Sequence Alignment",
+  "description": "DNA is a quaternary encoding system (A,T,G,C) mapped to Rust's type system. Translate codons to amino acids, align sequences (Smith-Waterman/Needleman-Wunsch), compute codon degeneracy, assemble DNA programs, and run genetic evolution. Pure Rust via nexcore-dna.",
+  "proxy": "rust-native",
+  "tools": [
+    {
+      "name": "translate-codon",
+      "description": "Translate a 3-nucleotide codon (e.g., 'ATG') to its amino acid using the standard genetic code. ATG = Methionine (start codon). TAA/TAG/TGA = Stop codons.",
+      "parameters": [
+        { "name": "codon", "type": "string", "description": "Three-letter nucleotide codon (e.g., 'ATG', 'GCA', 'TAA')", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "amino_acid": { "type": "string" }, "codon": { "type": "string" }, "is_start": { "type": "boolean" }, "is_stop": { "type": "boolean" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "codon-degeneracy",
+      "description": "Get the degeneracy (number of codons encoding the same amino acid) for a given amino acid. Leucine has 6 codons (most degenerate), Methionine and Tryptophan have 1 (least degenerate).",
+      "parameters": [
+        { "name": "amino_acid", "type": "string", "description": "Three-letter amino acid code (e.g., 'Met', 'Leu', 'Stop') or single-letter code (e.g., 'M', 'L')", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "amino_acid": { "type": "string" }, "degeneracy": { "type": "integer" }, "codons": { "type": "array" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "align-sequences",
+      "description": "Align two DNA sequences using Smith-Waterman (local) or Needleman-Wunsch (global) algorithm. Returns alignment score, aligned sequences with gaps, and percent identity.",
+      "parameters": [
+        { "name": "query", "type": "string", "description": "Query DNA sequence (e.g., 'ATGCGATCGA')", "required": true },
+        { "name": "target", "type": "string", "description": "Target DNA sequence to align against", "required": true },
+        { "name": "method", "type": "string", "description": "Alignment method: 'local' (Smith-Waterman) or 'global' (Needleman-Wunsch). Default: 'local'.", "required": false },
+        { "name": "match_score", "type": "integer", "description": "Score for matching bases (default: 2)", "required": false },
+        { "name": "mismatch_score", "type": "integer", "description": "Score for mismatched bases (default: -1)", "required": false },
+        { "name": "gap_penalty", "type": "integer", "description": "Gap penalty (default: -2)", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "score": { "type": "integer" }, "aligned_query": { "type": "string" }, "aligned_target": { "type": "string" }, "identity": { "type": "number" }, "method": { "type": "string" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "assemble",
+      "description": "Assemble DNA assembly language source code into a Program. The DNA ISA uses 4-base instructions encoding operations on a quaternary register file.",
+      "parameters": [
+        { "name": "source", "type": "string", "description": "DNA assembly source code", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "instruction_count": { "type": "integer" }, "program_dna": { "type": "string" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "evolve",
+      "description": "Run genetic algorithm evolution from seed DNA sequences toward a target word. Simulates natural selection with mutation, crossover, and fitness scoring over multiple generations.",
+      "parameters": [
+        { "name": "seeds", "type": "array", "description": "Initial DNA seed sequences (strings)", "required": true },
+        { "name": "target", "type": "string", "description": "Target word to evolve toward", "required": true },
+        { "name": "generations", "type": "integer", "description": "Number of generations (default: 100)", "required": false },
+        { "name": "population_size", "type": "integer", "description": "Population size per generation (default: 50)", "required": false },
+        { "name": "mutation_rate", "type": "number", "description": "Mutation rate 0.0-1.0 (default: 0.01)", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "best_fitness": { "type": "number" }, "generations_run": { "type": "integer" }, "converged": { "type": "boolean" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "codon-table",
+      "description": "Return the complete standard genetic code — all 64 codons mapped to their amino acids. The Rosetta Stone of molecular biology.",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "codons": { "type": "object" }, "total": { "type": "integer" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}

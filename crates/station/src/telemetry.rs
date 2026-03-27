@@ -507,6 +507,19 @@ pub fn extract_domain(tool_name: &str) -> String {
         return "nexvigilant.meta".to_string();
     }
 
+    // Dynamic extraction: convert underscore-separated prefix to dotted domain.
+    // "benefit-risk_nexvigilant_com_compute_qbr" → "benefit-risk.nexvigilant.com"
+    // "en_wikipedia_org_get_article_summary" → "en.wikipedia.org"
+    // Heuristic: scan for known TLD segments (_com_, _org_, _gov_, _fr_, _eu_, _ch_)
+    // and take everything up to and including the TLD.
+    let tlds = ["_com_", "_org_", "_gov_", "_fr_", "_eu_", "_ch_"];
+    for tld in &tlds {
+        if let Some(pos) = tool_name.find(tld) {
+            let domain_part = &tool_name[..pos + tld.len() - 1]; // exclude trailing _
+            return domain_part.replace('_', ".").to_string();
+        }
+    }
+
     "unknown".to_string()
 }
 

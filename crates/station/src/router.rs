@@ -221,6 +221,108 @@ fn route_tool_call_inner(
     if let Some(result) = crate::benefit_risk::try_handle(tool_name, arguments) {
         return result;
     }
+    if let Some(result) = crate::signal_theory::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::preemptive_pv::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::epidemiology::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::stoichiometry::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::molecular_weight::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::game_theory::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::heligram::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::entropy::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::bicone::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::combinatorics::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::formula::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::harm_taxonomy::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::helix::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::markov::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::relay::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::brain::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::marketing::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::dataframe::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::edit_distance::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::energy::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::dtree::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::primitives::try_handle(tool_name, arguments, registry) {
+        return result;
+    }
+    if let Some(result) = crate::pvdsl::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::tov::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::compliance::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::algovigilance::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::chemivigilance::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::cccp::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::fda_guidance::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::signal_pipeline::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::phenotype::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::fhir::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::stem::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::zeta::try_handle(tool_name, arguments) {
+        return result;
+    }
 
     match registry.find_tool(tool_name) {
         Some((config, tool)) => execute_tool(config, tool, tool_name, arguments, &registry.station_root, request_id),
@@ -255,6 +357,20 @@ fn execute_tool(
         .or(config.proxy.as_ref());
 
     if let Some(proxy) = proxy_path {
+        // "rust-native" is a sentinel, not a script path. If we reach here,
+        // the Rust try_handle() returned None (likely invalid parameters).
+        // Return a structured error instead of spawning a nonexistent script.
+        if proxy == "rust-native" {
+            return ToolCallResult {
+                content: vec![ContentBlock::Text {
+                    text: format!(
+                        "Tool '{mcp_name}' is a Rust-native handler but returned no result. \
+                         Check that all required parameters are provided with valid values."
+                    ),
+                }],
+                is_error: Some(true),
+            };
+        }
         return execute_proxy(proxy, mcp_name, arguments, station_root, request_id);
     }
 

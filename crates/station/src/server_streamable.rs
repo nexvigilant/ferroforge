@@ -139,6 +139,15 @@ pub async fn handle_mcp_post(
             // Try batch: parse as array, process each, return array response.
             // MCP Streamable HTTP spec requires batch support.
             if let Ok(batch) = serde_json::from_str::<Vec<JsonRpcRequest>>(&body) {
+                // JSON-RPC 2.0 spec: empty batch is invalid
+                if batch.is_empty() {
+                    let resp = JsonRpcResponse::error(
+                        None,
+                        crate::protocol::INVALID_REQUEST,
+                        "Invalid Request: empty batch array",
+                    );
+                    return (StatusCode::OK, [("content-type", "application/json")], serde_json::to_string(&resp).unwrap_or_default()).into_response();
+                }
                 let mut responses = Vec::new();
                 let mut session_id = None;
                 for req in &batch {

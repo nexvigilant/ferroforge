@@ -117,7 +117,8 @@ fn test_jsonrpc_request_notification_no_id() {
 #[test]
 fn test_registry_tool_count() {
     let reg = test_registry();
-    assert_eq!(reg.tool_count(), 3);
+    // 3 config tools + 5 meta tools (directory, capabilities, station_health, chart_course, ring_health)
+    assert_eq!(reg.tool_count(), 8);
 }
 
 #[test]
@@ -200,7 +201,8 @@ fn test_load_from_empty_dir() {
     let dir = TempDir::new().expect("tmpdir");
     let reg = ConfigRegistry::load_from_dir(dir.path()).expect("should load");
     assert_eq!(reg.configs.len(), 0);
-    assert_eq!(reg.tool_count(), 0);
+    // 0 config tools + 5 meta tools
+    assert_eq!(reg.tool_count(), 5);
 }
 
 #[test]
@@ -220,7 +222,8 @@ fn test_load_json_config() {
     let reg = ConfigRegistry::load_from_dir(dir.path()).expect("should load");
     assert_eq!(reg.configs.len(), 1);
     assert_eq!(reg.configs[0].domain, "test.com");
-    assert_eq!(reg.tool_count(), 1);
+    // 1 config tool + 5 meta tools
+    assert_eq!(reg.tool_count(), 6);
 }
 
 #[test]
@@ -274,7 +277,7 @@ fn test_route_directory_meta_tool() {
     let parsed: Value = serde_json::from_str(text).expect("should be JSON");
     assert_eq!(parsed["station"], "NexVigilant Station");
     assert_eq!(parsed["total_domains"], 2);
-    assert_eq!(parsed["total_tools"], 3);
+    assert_eq!(parsed["total_tools"], 8);
 }
 
 #[test]

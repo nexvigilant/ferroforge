@@ -352,9 +352,11 @@ impl ConfigRegistry {
         None
     }
 
-    /// Total tool count across all configs.
+    /// Total tool count across all configs + Rust-native meta-tools.
+    /// Must match len(tool_infos()) to avoid /health vs tools/list mismatch.
     pub fn tool_count(&self) -> usize {
-        self.configs.iter().map(|c| c.tools.len()).sum()
+        const META_TOOLS: usize = 5; // chart_course, directory, capabilities, station_health, ring_health
+        META_TOOLS + self.configs.iter().map(|c| c.tools.len()).sum::<usize>()
     }
 
     /// SHA-256 hash of the config set for drift detection.

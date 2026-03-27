@@ -1,0 +1,74 @@
+{
+  "domain": "algovigilance.nexvigilant.com",
+  "private": false,
+  "copyright": "\u00a9 2026 NexVigilant, LLC.",
+  "title": "Algovigilance \u2014 AI/ML Safety Monitoring",
+  "description": "Algorithmovigilance tools: ICSR narrative deduplication via token similarity, signal triage with exponential decay, evidence reinforcement, and priority queue management. Pure Rust via nexcore-algovigilance.",
+  "proxy": "rust-native",
+  "tools": [
+    {
+      "name": "dedup-pair",
+      "description": "Compare two ICSR narratives for similarity. Uses token-based comparison to detect duplicate adverse event reports. Returns similarity score and duplicate verdict.",
+      "parameters": [
+        { "name": "narrative_a", "type": "string", "description": "First ICSR narrative text", "required": true },
+        { "name": "narrative_b", "type": "string", "description": "Second ICSR narrative text", "required": true },
+        { "name": "threshold", "type": "number", "description": "Similarity threshold for duplicate detection (default: 0.8)", "required": false }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "similarity": { "type": "number" }, "is_duplicate": { "type": "boolean" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "dedup-batch",
+      "description": "Configure batch deduplication for a drug's ICSR reports. Sets threshold and limit parameters for pairwise comparison.",
+      "parameters": [
+        { "name": "drug", "type": "string", "description": "Drug name", "required": true },
+        { "name": "threshold", "type": "number", "description": "Similarity threshold (default: 0.8)", "required": false },
+        { "name": "limit", "type": "integer", "description": "Maximum batch size (default: 100)", "required": false }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "triage-decay",
+      "description": "Compute decay-adjusted relevance for a drug-event signal. Applies exponential decay model with configurable half-life to assess signal freshness.",
+      "parameters": [
+        { "name": "drug", "type": "string", "description": "Drug name", "required": true },
+        { "name": "event", "type": "string", "description": "Adverse event term", "required": true },
+        { "name": "half_life_days", "type": "number", "description": "Signal half-life in days (default: 90)", "required": false },
+        { "name": "initial_confidence", "type": "number", "description": "Initial confidence level (default: 1.0)", "required": false }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "decayed_confidence": { "type": "number" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "triage-reinforce",
+      "description": "Reinforce a signal with new evidence (additional case reports). Restores confidence toward original level.",
+      "parameters": [
+        { "name": "drug", "type": "string", "description": "Drug name", "required": true },
+        { "name": "event", "type": "string", "description": "Adverse event term", "required": true },
+        { "name": "new_cases", "type": "integer", "description": "Number of new cases (default: 1)", "required": false }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "action": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "triage-queue",
+      "description": "Initialize a prioritized signal queue for a drug with configurable half-life, cutoff, and size limit.",
+      "parameters": [
+        { "name": "drug", "type": "string", "description": "Drug name", "required": true },
+        { "name": "half_life_days", "type": "number", "description": "Signal half-life in days (default: 90)", "required": false },
+        { "name": "cutoff", "type": "number", "description": "Minimum relevance cutoff (default: 0.1)", "required": false },
+        { "name": "limit", "type": "integer", "description": "Maximum queue size (default: 50)", "required": false }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "queue_size": { "type": "integer" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "status",
+      "description": "Get algovigilance engine status and capabilities summary.",
+      "parameters": [],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "engine": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}

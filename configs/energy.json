@@ -1,0 +1,133 @@
+{
+  "domain": "energy.nexvigilant.com",
+  "private": false,
+  "copyright": "\u00a9 2026 NexVigilant, LLC.",
+  "title": "Energy — Token Budget Management via ATP/ADP Biochemistry",
+  "description": "Metabolic energy management for AI token budgets. Computes energy charge (Atkinson EC), regime classification, model selection strategy, waste analysis, and temporal metrics. Pure Rust via nexcore-energy.",
+  "proxy": "rust-native",
+  "tools": [
+    {
+      "name": "compute_energy_charge",
+      "description": "Compute the Atkinson Energy Charge (EC) from token pools. EC = (tATP + 0.5*tADP) / (tATP + tADP + tAMP). Returns EC, regime, and recommended strategy.",
+      "parameters": [
+        { "name": "t_atp", "type": "integer", "description": "Tokens remaining (available for work)", "required": true },
+        { "name": "t_adp", "type": "integer", "description": "Tokens spent productively", "required": true },
+        { "name": "t_amp", "type": "integer", "description": "Tokens wasted", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "energy_charge": { "type": "number" },
+          "regime": { "type": "string" },
+          "strategy": { "type": "string" },
+          "allows_expensive": { "type": "boolean" }
+        },
+        "required": ["status", "energy_charge", "regime"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "classify_regime",
+      "description": "Classify an energy charge value into a metabolic regime. Anabolic (>0.85), Homeostatic (0.70-0.85), Catabolic (0.50-0.70), or Crisis (<0.50).",
+      "parameters": [
+        { "name": "energy_charge", "type": "number", "description": "EC value between 0 and 1", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "regime": { "type": "string" },
+          "label": { "type": "string" },
+          "allows_expensive": { "type": "boolean" }
+        },
+        "required": ["status", "regime"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "recommend_strategy",
+      "description": "Given token pools and a coupling ratio, recommend a model strategy (Opus/Sonnet/Haiku/HaikuCacheFirst/Checkpoint).",
+      "parameters": [
+        { "name": "t_atp", "type": "integer", "description": "Tokens remaining", "required": true },
+        { "name": "t_adp", "type": "integer", "description": "Tokens spent productively", "required": true },
+        { "name": "t_amp", "type": "integer", "description": "Tokens wasted", "required": true },
+        { "name": "coupling_ratio", "type": "number", "description": "Value per productive token (higher = more efficient)", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "strategy": { "type": "string" },
+          "cost_multiplier": { "type": "number" },
+          "energy_system": { "type": "string" }
+        },
+        "required": ["status", "strategy"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "analyze_waste",
+      "description": "Analyze token waste metrics: waste ratio, burn rate, lifespan efficiency, and estimated remaining operations.",
+      "parameters": [
+        { "name": "t_atp", "type": "integer", "description": "Tokens remaining", "required": true },
+        { "name": "t_adp", "type": "integer", "description": "Tokens spent productively", "required": true },
+        { "name": "t_amp", "type": "integer", "description": "Tokens wasted", "required": true },
+        { "name": "avg_cost_per_op", "type": "integer", "description": "Average tokens per operation for remaining ops estimate", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "waste_ratio": { "type": "number" },
+          "burn_rate": { "type": "number" },
+          "lifespan_efficiency": { "type": "number" },
+          "estimated_remaining_ops": { "type": "integer" }
+        },
+        "required": ["status", "waste_ratio", "burn_rate"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "temporal_metrics",
+      "description": "Compute temporal view of energy: metabolic age, chronological age, age gap, and conservation breakdown (future + time + entropy = total).",
+      "parameters": [
+        { "name": "t_atp", "type": "integer", "description": "Tokens remaining", "required": true },
+        { "name": "t_adp", "type": "integer", "description": "Tokens spent productively", "required": true },
+        { "name": "t_amp", "type": "integer", "description": "Tokens wasted", "required": true },
+        { "name": "total_value", "type": "number", "description": "External value measure for coupling efficiency", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "metabolic_age": { "type": "number" },
+          "chronological_age": { "type": "number" },
+          "age_gap": { "type": "number" },
+          "lifespan_efficiency": { "type": "number" },
+          "coupling_efficiency": { "type": "number" }
+        },
+        "required": ["status", "metabolic_age", "chronological_age"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "classify_waste",
+      "description": "Classify a waste event into one of 5 categories with prevention strategy. Categories: FutileCycling, Uncoupled, HeatLoss, SubstrateCycling, Retry.",
+      "parameters": [
+        { "name": "waste_type", "type": "string", "description": "One of: futile_cycling, uncoupled, heat_loss, substrate_cycling, retry", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "waste_class": { "type": "string" },
+          "label": { "type": "string" },
+          "prevention": { "type": "string" }
+        },
+        "required": ["status", "waste_class"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}

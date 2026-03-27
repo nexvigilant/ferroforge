@@ -6,16 +6,44 @@ pub const SSE_STREAM_HEADERS: [(&str, &str); 2] = [
     ("Cache-Control", "no-cache, no-transform"),
 ];
 
+pub mod algovigilance;
 pub mod auth;
+pub mod benefit_risk;
 pub mod billing_api;
+pub mod bicone;
+pub mod brain;
+pub mod cccp;
+pub mod chemivigilance;
+pub mod combinatorics;
+pub mod compliance;
 pub mod compute;
 pub mod config;
-pub mod benefit_risk;
 pub mod crystalbook;
+pub mod dataframe;
+pub mod edit_distance;
+pub mod dtree;
+pub mod energy;
+pub mod entropy;
+pub mod epidemiology;
+pub mod fda_guidance;
+pub mod fhir;
+pub mod formula;
+pub mod game_theory;
+pub mod harm_taxonomy;
+pub mod heligram;
+pub mod helix;
+pub mod markov;
+pub mod marketing;
 pub mod metering;
+pub mod molecular_weight;
+pub mod phenotype;
+pub mod preemptive_pv;
 pub mod pricing;
+pub mod primitives;
 pub mod protocol;
+pub mod pvdsl;
 pub mod rate_limit;
+pub mod relay;
 pub mod router;
 pub mod science;
 pub mod server;
@@ -23,8 +51,14 @@ pub mod server_combined;
 pub mod server_http;
 pub mod server_sse;
 pub mod server_streamable;
+pub mod signal_pipeline;
+pub mod signal_theory;
+pub mod stem;
+pub mod stoichiometry;
 pub mod telemetry;
+pub mod tov;
 pub mod usage_store;
+pub mod zeta;
 
 /// Shutdown signal — resolves on SIGTERM (Cloud Run) or CTRL+C (local dev).
 ///

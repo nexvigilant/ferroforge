@@ -1,0 +1,45 @@
+{
+  "domain": "pvdsl.nexvigilant.com",
+  "private": false,
+  "copyright": "\u00a9 2026 NexVigilant, LLC. PVDSL is a proprietary pharmacovigilance domain-specific language.",
+  "title": "PVDSL \u2014 Pharmacovigilance Domain-Specific Language",
+  "description": "Compile, evaluate, parse, and introspect PVDSL expressions. PVDSL provides a domain-focused scripting language for signal detection (PRR, ROR, IC, EBGM), causality assessment (Naranjo, WHO-UMC), string similarity (Levenshtein), and mathematical operations. Pure Rust via nexcore-pvdsl.",
+  "proxy": "rust-native",
+  "tools": [
+    {
+      "name": "compile",
+      "description": "Compile a PVDSL expression to bytecode and return the instruction listing. Validates syntax without executing. Useful for pre-flight checks before evaluation.",
+      "parameters": [
+        { "name": "source", "type": "string", "description": "PVDSL source code to compile", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "instruction_count": { "type": "integer" }, "instructions": { "type": "array" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "evaluate",
+      "description": "Evaluate a PVDSL expression with optional variable bindings and return the result. Supports arithmetic, signal detection (signal::prr, signal::ror, signal::ic, signal::ebgm), causality (causality::naranjo), string similarity (meddra::levenshtein), math functions, and chemistry-based capability assessment.",
+      "parameters": [
+        { "name": "source", "type": "string", "description": "PVDSL source code to evaluate", "required": true },
+        { "name": "variables", "type": "object", "description": "Variable bindings as key-value pairs (values must be numbers, strings, or booleans)", "required": false }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "result": {}, "result_type": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "functions",
+      "description": "List all available PVDSL native functions organized by namespace. Namespaces: signal (prr, ror, ic, ebgm, chi_square, fisher, sprt, maxsprt, cusum, mgps), causality (naranjo, who_umc, rucam), meddra (levenshtein, similarity), risk (sar, es, monte_carlo), date (now, diff_days), classify (hartwig_siegel), math (abs, sqrt, pow, log, ln, exp, min, max, floor, ceil, round), chem (arrhenius, michaelis, hill, henderson, halflife, sqi).",
+      "parameters": [],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "namespaces": { "type": "object" }, "total_functions": { "type": "integer" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "parse",
+      "description": "Parse and validate a PVDSL expression, returning the abstract syntax tree (AST). Shows the program structure including statements, expressions, and metadata without executing.",
+      "parameters": [
+        { "name": "source", "type": "string", "description": "PVDSL source code to parse", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "statement_count": { "type": "integer" }, "ast": { "type": "object" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}

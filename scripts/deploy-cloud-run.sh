@@ -43,9 +43,14 @@ if $DRY_RUN; then
     exit 0
 fi
 
+# Build station binary locally (nexcore path deps require local build)
+echo "--- Building station binary locally ---"
+cd "$(dirname "$0")/.."
+cargo build -p nexvigilant-station --release
+echo "Binary built: $(ls -lh target/release/nexvigilant-station | awk '{print $5}')"
+
 # Build container image
 echo "--- Building container image ---"
-cd "$(dirname "$0")/.."
 gcloud builds submit \
     --project="$PROJECT" \
     --tag="$IMAGE" \

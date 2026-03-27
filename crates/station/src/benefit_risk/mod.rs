@@ -10,7 +10,7 @@ use crate::protocol::{ContentBlock, ToolCallResult};
 /// Try to handle a benefit-risk tool call.
 pub fn try_handle(tool_name: &str, args: &Value) -> Option<ToolCallResult> {
     let bare = tool_name
-        .strip_prefix("benefit_risk_nexvigilant_com_")?
+        .strip_prefix("benefit-risk_nexvigilant_com_")?
         .replace('_', "-");
 
     let result = handle(&bare, args)?;

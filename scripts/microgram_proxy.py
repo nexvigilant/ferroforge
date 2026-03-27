@@ -33,7 +33,71 @@ CHAIN_TOOLS = {
         "accumulate": True,
     },
     "run-benefit-risk-assessment": {
-        "chain_file": "benefit-risk-assessment",
+        "chain": "benefit-risk-gate -> benefit-risk-ratio",
+        "accumulate": True,
+    },
+    # Tier 1: Station-integration chains (designed to consume Station tool outputs)
+    "run-station-dailymed-pipeline": {
+        "chain": "config-dailymed-adr-risk -> adapt-risk-tier -> signal-to-causality",
+        "accumulate": True,
+    },
+    "run-station-pubmed-pipeline": {
+        "chain": "config-pubmed-signal-strength -> adapt-evidence-to-signal -> signal-to-causality",
+        "accumulate": True,
+    },
+    "run-station-openvigil-pipeline": {
+        "chain": "config-openvigil-triage -> adapt-signal-strength -> signal-to-causality",
+        "accumulate": True,
+    },
+    "run-station-trial-pipeline": {
+        "chain": "config-trial-sae-triage -> adapt-safety-concern -> signal-to-causality",
+        "accumulate": True,
+    },
+    "run-station-drugbank-pipeline": {
+        "chain": "config-drugbank-ddi-gate -> adapt-interaction-severity -> signal-to-causality",
+        "accumulate": True,
+    },
+    "run-station-rxnav-pipeline": {
+        "chain": "config-rxnav-interaction-severity -> adapt-interaction-severity -> signal-to-causality",
+        "accumulate": True,
+    },
+    "run-station-recall-pipeline": {
+        "chain": "config-fda-recall-severity -> adapt-risk-tier -> signal-to-causality",
+        "accumulate": True,
+    },
+    # Tier 2: Core clinical decision chains
+    "run-seriousness-to-deadline": {
+        "chain": "case-seriousness -> transform-seriousness-to-bool",
+        "accumulate": True,
+    },
+    "run-adr-severity-escalation": {
+        "chain": "adr-severity -> escalation-router",
+        "accumulate": True,
+    },
+    "run-confidence-deadline": {
+        "chain": "confidence-gate -> deadline-alert",
+        "accumulate": True,
+    },
+    "run-investigation-prioritization": {
+        "chain": "transbeyesian-propagator -> eig-priority-ranker",
+        "accumulate": True,
+    },
+    "run-signal-deep-validation": {
+        "chain": "multi-signal-combiner -> signal-validation-gate -> signal-trend-detector -> signal-recurrence-detector",
+        "accumulate": True,
+    },
+    "run-bradford-hill-evidence": {
+        "chain": "signal-comparator -> dose-response-classifier -> naranjo-quick",
+        "accumulate": True,
+    },
+    "run-bradford-hill-multi-criterion": {
+        "chain": "temporal-association -> signal-comparator -> dose-response-classifier -> rechallenge-evaluator -> naranjo-quick",
+        "accumulate": True,
+    },
+    # Helix Computing chains
+    "run-helix-system-health": {
+        "chain": "heligram -> crystalbook-4primitive -> crystalbook-8law",
+        "accumulate": True,
     },
 }
 
@@ -43,6 +107,13 @@ SINGLE_TOOLS = {
     "run-naranjo-quick": "naranjo-quick",
     "run-case-seriousness": "case-seriousness",
     "run-workflow-router": "workflow-router",
+    "run-crystalbook-4primitive": "crystalbook-4primitive",
+    "run-crystalbook-8law": "crystalbook-8law",
+    "run-crystalbook-diagnostic": "crystalbook-diagnostic",
+    "run-ich-q1a-stability-testing": "ich-q1a-stability-testing",
+    "run-ich-q1b-photostability": "ich-q1b-photostability",
+    "run-ich-e1-population-exposure": "ich-e1-population-exposure",
+    "run-heligram": "heligram",
 }
 
 

@@ -1,0 +1,80 @@
+{
+  "domain": "zeta.nexvigilant.com",
+  "private": false,
+  "copyright": "© 2026 NexVigilant, LLC. Riemann Zeta Function Computation.",
+  "title": "Zeta — Riemann Zeta Function and Zero Analysis",
+  "description": "Compute the Riemann zeta function ζ(s), find zeros on the critical line, verify the Riemann Hypothesis to a given height, and analyze zero spacing statistics against GUE random matrix predictions. Pure Rust via nexcore-zeta + stem-complex.",
+  "proxy": "rust-native",
+  "tools": [
+    {
+      "name": "evaluate",
+      "description": "Evaluate ζ(s) at a complex point s = σ + it. Returns real and imaginary parts of the result. Uses Euler-Maclaurin summation for accuracy.",
+      "parameters": [
+        { "name": "sigma", "type": "number", "description": "Real part σ of s", "required": true },
+        { "name": "t", "type": "number", "description": "Imaginary part t of s", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "real": { "type": "number" }, "imag": { "type": "number" }, "magnitude": { "type": "number" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "find-zeros",
+      "description": "Find zeros of ζ(s) on the critical line (σ=1/2) between t_low and t_high. Returns a list of zero locations with refined positions.",
+      "parameters": [
+        { "name": "t_low", "type": "number", "description": "Lower bound of imaginary part to search", "required": true },
+        { "name": "t_high", "type": "number", "description": "Upper bound of imaginary part to search", "required": true },
+        { "name": "step", "type": "number", "description": "Search step size (default 0.5)", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "zeros": { "type": "array" }, "count": { "type": "integer" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "verify-rh",
+      "description": "Verify the Riemann Hypothesis up to a given height T on the critical line. Counts expected vs found zeros and checks for any off-line zeros.",
+      "parameters": [
+        { "name": "height", "type": "number", "description": "Maximum height T to verify RH (recommended: 50-200)", "required": true },
+        { "name": "step", "type": "number", "description": "Search step size (default 0.1)", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "rh_holds": { "type": "boolean" }, "zeros_found": { "type": "integer" }, "zeros_expected": { "type": "number" }, "height": { "type": "number" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "z-function",
+      "description": "Evaluate the Riemann-Siegel Z function Z(t), which is real-valued on the critical line. Sign changes of Z(t) indicate zeros of ζ(1/2 + it).",
+      "parameters": [
+        { "name": "t", "type": "number", "description": "Height on the critical line", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "z_value": { "type": "number" }, "theta": { "type": "number" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "gue-comparison",
+      "description": "Compare zero spacings against GUE (Gaussian Unitary Ensemble) random matrix theory predictions. Tests the Montgomery-Odlyzko conjecture that zeros behave like eigenvalues of random unitary matrices.",
+      "parameters": [
+        { "name": "t_low", "type": "number", "description": "Lower bound for zero search", "required": true },
+        { "name": "t_high", "type": "number", "description": "Upper bound for zero search", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "ks_statistic": { "type": "number" }, "mean_spacing": { "type": "number" }, "zeros_analyzed": { "type": "integer" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}
