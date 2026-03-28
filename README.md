@@ -1,55 +1,206 @@
-# Ferro Forge
+# NexVigilant Station
 
-**NexVigilant Station + Borrow Miner** — A Rust workspace powering pharmacovigilance agent infrastructure and educational gaming.
+Pharmacovigilance intelligence for AI agents. **347 tools** across **50 domains** for drug safety data, signal detection, causality assessment, and regulatory intelligence. Open, no auth required.
 
-## NexVigilant Station
+**Production:** [mcp.nexvigilant.com](https://mcp.nexvigilant.com)
 
-MCP (Model Context Protocol) server that routes AI agent traffic through pharmacovigilance tooling. Drop a config file → expose tools to any MCP-compatible agent.
+## Connect
 
-### What It Does
+### Claude.ai / Claude Code
+
+Add as a connector in Claude.ai Settings or `~/.claude.json`:
 
 ```
-Agent connects → Station loads configs/ → Agent discovers 174 PV tools → Agent calls tools
+URL: https://mcp.nexvigilant.com/mcp
+Auth: None
+Protocol: MCP 2025-03-26 (Streamable HTTP)
 ```
 
-**23 domain configs. 174 tools. One binary.** (17 public configs / 6 private)
+### Any MCP Client
+
+```json
+{
+  "mcpServers": {
+    "nexvigilant-station": {
+      "url": "https://mcp.nexvigilant.com/mcp"
+    }
+  }
+}
+```
+
+### HTTP REST (No MCP Required)
+
+```bash
+# List all tools
+curl https://mcp.nexvigilant.com/tools
+
+# Call a tool directly
+curl -X POST https://mcp.nexvigilant.com/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"api_fda_gov_search_adverse_events","arguments":{"drug":"metformin","limit":5}}}'
+
+# Health check
+curl https://mcp.nexvigilant.com/health
+```
+
+### Transports
+
+| Transport | Endpoint | Spec |
+|-----------|----------|------|
+| Streamable HTTP | `POST /mcp` | MCP 2025-03-26 |
+| SSE | `GET /sse` + `POST /message` | MCP legacy |
+| HTTP REST | `GET /tools`, `POST /rpc` | Direct REST |
+| Health | `GET /health` | Liveness + stats |
+
+All transports on a single endpoint. CORS enabled for browser-based agents.
+
+## Guided Research Courses
+
+Don't know where to start? Call `nexvigilant_chart_course` with a course name. It returns the exact sequence of tools to call with parameters for any drug safety question.
+
+| Course | Steps | What It Does |
+|--------|-------|-------------|
+| `drug-safety-profile` | 6 | RxNorm resolve, FAERS query, DailyMed labeling, PubMed literature, EudraVigilance, VigiAccess |
+| `signal-investigation` | 6 | FAERS search, disproportionality (PRR/ROR), EU signals, case reports, trial SAEs, PRAC review |
+| `causality-assessment` | 4 | FAERS counts, disproportionality, WHO-UMC causality, case reports |
+| `benefit-risk-assessment` | 4 | Trial safety endpoints, FAERS outcomes, label ADRs, EU risk management |
+| `regulatory-intelligence` | 3 | ICH guidelines, EMA EPAR, FDA approval history |
+| `competitive-landscape` | 3 | Drug targets, head-to-head disproportionality, clinical pipeline |
+
+**Example:** Investigate a safety signal for metformin:
+
+```
+1. Call nexvigilant_chart_course(course="signal-investigation", drug="metformin")
+2. Follow the returned steps — each step names the exact tool and parameters
+```
+
+## Tool Catalog
+
+### Safety Databases (8 domains, 56 tools)
+
+| Domain | Tools | Data Source |
+|--------|-------|------------|
+| `api.fda.gov` | 8 | FDA FAERS adverse events, drug counts, outcomes, timelines |
+| `eudravigilance.ema.europa.eu` | 7 | EU spontaneous reports, signal summaries, demographics |
+| `vigiaccess.org` | 7 | WHO global safety reports (VigiBase) |
+| `open-vigil.fr` | 7 | Disproportionality analysis, drug comparison, rankings |
+| `who-umc.org` | 7 | Uppsala Monitoring Centre — causality, signal methodology |
+| `accessdata.fda.gov` | 6 | FDA approvals, Orange Book, REMS, recalls |
+| `www.fda.gov` | 7 | Safety communications, MedWatch alerts, boxed warnings |
+| `www.ema.europa.eu` | 6 | EPARs, PRAC signals, PSURs, RMPs, referrals |
+
+### Drug Information (3 domains, 19 tools)
+
+| Domain | Tools | Data Source |
+|--------|-------|------------|
+| `dailymed.nlm.nih.gov` | 6 | Drug labels, adverse reactions, interactions |
+| `rxnav.nlm.nih.gov` | 6 | RxNorm identifiers, drug interactions, NDCs, classes |
+| `go.drugbank.com` | 7 | Pharmacology, targets, ADRs, classification |
+
+### Literature & Trials (2 domains, 14 tools)
+
+| Domain | Tools | Data Source |
+|--------|-------|------------|
+| `pubmed.ncbi.nlm.nih.gov` | 7 | Articles, case reports, signal literature, citations |
+| `clinicaltrials.gov` | 7 | Trial search, safety endpoints, SAEs, study design |
+
+### Regulatory Guidance (3 domains, 21 tools)
+
+| Domain | Tools | Data Source |
+|--------|-------|------------|
+| `ich.org` | 7 | ICH guidelines (E2x PV series, quality, safety) |
+| `meddra.org` | 7 | MedDRA terminology — hierarchy, SOC, SMQ, multiaxiality |
+| `cioms.ch` | 7 | CIOMS working groups, forms, publications, causality categories |
+
+### Signal Detection & Computation (4 domains, 38 tools)
+
+| Domain | Tools | What It Computes |
+|--------|-------|-----------------|
+| `calculate.nexvigilant.com` | 17 | PRR, ROR, IC, EBGM, Naranjo, WHO-UMC, benefit-risk, NNH, seriousness, time-to-onset |
+| `signal-theory.nexvigilant.com` | 8 | Signal detection framework — cascade, parallel, pipeline, conservation |
+| `preemptive-pv.nexvigilant.com` | 10 | Three-tier signal detection — reactive, predictive, preemptive |
+| `compliance.nexvigilant.com` | 3 | Regulatory compliance assessment against ICH catalog |
+
+### Decision Trees (1 domain, 33 tools)
+
+| Domain | Tools | What It Runs |
+|--------|-------|-------------|
+| `microgram.nexvigilant.com` | 33 | Self-testing decision programs: case assessment, signal-to-action, Bradford Hill, Naranjo quick, seriousness-to-deadline, and 28 more |
+
+### Chemical Safety (1 domain, 13 tools)
+
+| Domain | Tools | What It Does |
+|--------|-------|-------------|
+| `chemivigilance.nexvigilant.com` | 13 | SMILES parsing, structural alerts, toxicity prediction, metabolite prediction, molecular descriptors |
+
+### Epidemiology & Benefit-Risk (2 domains, 17 tools)
+
+| Domain | Tools | What It Computes |
+|--------|-------|-----------------|
+| `epidemiology.nexvigilant.com` | 11 | Relative risk, odds ratio, NNT/NNH, Kaplan-Meier, attributable fraction, SMR |
+| `benefit-risk.nexvigilant.com` | 6 | Quantitative Benefit-Risk Index (QBRI), therapeutic window |
+
+### Reference & Knowledge (4 domains, 25 tools)
 
 | Domain | Tools | Coverage |
-|--------|-------|----------|
-| api.fda.gov | 7 | FAERS adverse event search, drug counts, outcomes |
-| accessdata.fda.gov | 6 | Approvals, Orange Book, REMS, recalls, labeling changes |
-| www.fda.gov | 7 | Safety communications, MedWatch, boxed warnings |
-| dailymed.nlm.nih.gov | 6 | Drug labels, adverse reactions, interactions, search |
-| clinicaltrials.gov | 7 | Trial search, safety endpoints, SAEs, study design |
-| www.ema.europa.eu | 6 | EPARs, PRAC signals, PSURs, RMPs, referrals |
-| eudravigilance.ema.europa.eu | 7 | EU ICSRs, signal summaries, case counts, demographics |
-| vigiaccess.org | 7 | WHO global reports, demographics, regions, reporters |
-| who-umc.org | 7 | VigiBase, causality assessment, signal methodology |
-| ich.org | 7 | ICH guidelines, E2x PV series, MedDRA, quality |
-| meddra.org | 7 | Term search, hierarchy, SOC, SMQs, multiaxiality |
-| pubmed.ncbi.nlm.nih.gov | 7 | Articles, case reports, signal literature, citations |
-| rxnav.nlm.nih.gov | 6 | RxNorm, drug interactions, NDCs, classes |
-| go.drugbank.com | 7 | Pharmacology, interactions, targets, ADRs, classification |
-| open-vigil.fr | 7 | Disproportionality (PRR/ROR/IC), compare drugs, rankings |
-| cioms.ch | 7 | Working groups, CIOMS forms, publications, causality |
-| calculate.nexvigilant.com | 17 | PRR, ROR, IC, EBGM, Naranjo, WHO-UMC, benefit-risk, NNH |
+|--------|-------|---------|
+| `crystalbook.nexvigilant.com` | 7 | Eight Laws of System Homeostasis |
+| `harm-taxonomy.nexvigilant.com` | 6 | 8-type harm classification from conservation law violations |
+| `en.wikipedia.org` | 6 | Article search, sections, summaries, references |
+| `vigilance.nexvigilant.com` | 5 | Harm classification and risk scoring |
 
-Plus 4 Rust meta-tools: `nexvigilant_chart_course`, `nexvigilant_capabilities`, `nexvigilant_directory`, `nexvigilant_station_health`.
+### STEM Computing (22 domains, 101 tools)
 
-### Research Courses
+Computational tools spanning mathematics, biology, and information theory:
 
-6 predefined multi-tool workflows via `nexvigilant_chart_course`:
-
-| Course | Steps | Description |
+| Domain | Tools | What It Does |
 |--------|-------|-------------|
-| `drug-safety-profile` | 6 | RxNorm → FAERS → DailyMed → PubMed → EudraVigilance → VigiAccess |
-| `signal-investigation` | 6 | FAERS → disproportionality → EU signals → case reports → trial SAEs → PRAC |
-| `causality-assessment` | 4 | FAERS → disproportionality → WHO-UMC causality → case reports |
-| `benefit-risk-assessment` | 4 | Trial endpoints → FAERS outcomes → label ADRs → EU RMP |
-| `regulatory-intelligence` | 3 | ICH guidelines → EMA EPAR → FDA approval history |
-| `competitive-landscape` | 3 | Drug targets → head-to-head comparison → clinical pipeline |
+| `combinatorics.nexvigilant.com` | 12 | Binomial, Catalan, derangement, Josephus, grid paths |
+| `stoichiometry.nexvigilant.com` | 8 | Primitive equation encoding/decoding, isomer detection |
+| `dna.nexvigilant.com` | 6 | Codon translation, sequence alignment, evolution simulation |
+| `energy.nexvigilant.com` | 6 | Token budget management via ATP/ADP biochemistry |
+| `formula.nexvigilant.com` | 5 | Signal strength, flywheel velocity, spectral overlap |
+| `zeta.nexvigilant.com` | 5 | Riemann zeta function, zero analysis, GUE comparison |
+| `helix.nexvigilant.com` | 5 | Conservation law as computable geometry |
+| `dtree.nexvigilant.com` | 5 | Decision tree training, prediction, pruning |
+| `cccp.nexvigilant.com` | 5 | PV competency framework evaluation |
+| `molecular-weight.nexvigilant.com` | 4 | Concept mass, periodic table, transfer prediction |
+| `pvdsl.nexvigilant.com` | 4 | Domain-specific language compilation and evaluation |
+| `relay.nexvigilant.com` | 4 | Pipeline fidelity analysis |
+| `heligram.nexvigilant.com` | 4 | Helical decision programs |
+| `edit-distance.nexvigilant.com` | 4 | String similarity (Levenshtein, traceback) |
+| `dataframe.nexvigilant.com` | 7 | Columnar data operations (filter, group, join, sort) |
+| `tov.nexvigilant.com` | 3 | Signal strength and system stability |
+| `game-theory.nexvigilant.com` | 3 | Nash equilibria, payoff matrices |
+| `bicone.nexvigilant.com` | 3 | Shape analysis for convergent-divergent systems |
+| `markov.nexvigilant.com` | 2 | Markov chain analysis |
+| `algovigilance.nexvigilant.com` | 6 | AI/ML safety monitoring, triage, deduplication |
+| `entropy.nexvigilant.com` | 1 | Shannon entropy |
+| `marketing.nexvigilant.com` | 6 | Capability discovery and onboarding workflows |
 
-### Quick Start
+### Meta Tools (5 tools)
+
+| Tool | What It Does |
+|------|-------------|
+| `nexvigilant_chart_course` | Returns step-by-step workflows for any drug safety question |
+| `nexvigilant_capabilities` | Lists all available tool domains and capabilities |
+| `nexvigilant_directory` | Domain directory with tool counts and descriptions |
+| `nexvigilant_station_health` | Server health, uptime, error rates, latency |
+| `nexvigilant_ring_health` | Ring topology health across all domains |
+
+## Tool Naming Convention
+
+All tools follow the pattern `{domain_underscored}_{tool_name}`:
+
+```
+api_fda_gov_search_adverse_events
+calculate_nexvigilant_com_compute_prr
+pubmed_ncbi_nlm_nih_gov_search_articles
+```
+
+## Self-Hosting
+
+Build from source and run locally:
 
 ```bash
 # Build
@@ -59,29 +210,11 @@ cargo build -p nexvigilant-station --release
 ./target/release/nexvigilant-station --config-dir configs
 
 # Test MCP protocol
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | ./target/release/nexvigilant-station --config-dir configs
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | \
+  ./target/release/nexvigilant-station --config-dir configs
 ```
 
-### Production — Cloud Run
-
-Live at `mcp.nexvigilant.com`. Combined transport (Streamable HTTP + SSE + HTTP REST). CORS enabled. 129 public tools (125 from configs + 4 meta-tools).
-
-```bash
-# Deploy
-./scripts/deploy-cloud-run.sh
-
-# Health check
-curl https://mcp.nexvigilant.com/health
-
-# Tool count
-curl https://mcp.nexvigilant.com/tools | python3 -c "import sys,json; print(len(json.load(sys.stdin)))"
-```
-
-**Claude.ai Connector:** `https://mcp.nexvigilant.com/mcp` — authless, MCP 2025-03-26 Streamable HTTP.
-
-### MCP Integration
-
-Add to your MCP client config (e.g., `~/.claude.json`):
+Add to your local MCP client:
 
 ```json
 {
@@ -94,104 +227,35 @@ Add to your MCP client config (e.g., `~/.claude.json`):
 }
 ```
 
-### Adding Tools
-
-Drop a JSON file in `configs/`:
-
-```json
-{
-  "domain": "example.com",
-  "title": "My Tools",
-  "tools": [
-    {
-      "name": "get-data",
-      "description": "Extract structured data",
-      "parameters": [
-        {"name": "query", "type": "string", "required": true}
-      ],
-      "stub_response": "{\"status\": \"ok\"}"
-    }
-  ]
-}
-```
-
-Tools are instantly available to any connected agent. No rebuild needed.
-
-### Architecture
+## Architecture
 
 ```
 configs/*.json  →  ConfigRegistry  →  MCP tools/list  →  Agent discovery
                                    →  MCP tools/call  →  Router  →  Handler
 ```
 
-### Validation
+- **58 JSON config files** define tool schemas, parameters, and routing
+- **22 proxy scripts** handle live API calls (Python, routed via `dispatch.py`)
+- **17 Rust-native handlers** run computation in-process (sub-millisecond)
+- **5 meta-tools** provide discovery, health, and guided workflows
 
-53 integration tests covering protocol, config loading, routing, auth, and real config verification.
+136 tests (75 integration + 47 unit + 14 lib).
 
-```bash
-cargo test -p nexvigilant-station
-```
+## MCP Spec Compliance
+
+- Protocol: MCP 2025-03-26
+- All tools have `outputSchema` defined
+- All tools annotated: `readOnlyHint: true`, `destructiveHint: false`
+- Session tracking: optional (stateless by default)
 
 ---
 
 ## Borrow Miner
 
-Educational arcade game teaching Rust ownership through gameplay. Built with Bevy.
-
-```bash
-# Requires: libasound2-dev libudev-dev pkg-config
-cargo run -p borrow_miner
-```
-
-See `crates/borrow_miner/README.md` for full documentation.
-
----
-
-## Workspace Structure
-
-```
-ferroforge/
-├── Cargo.toml              # Workspace root
-├── configs/                # Hub config files (23 domains, 174 tools)
-│   ├── openfda.json
-│   ├── dailymed.json
-│   ├── clinicaltrials.json
-│   ├── ema.json
-│   ├── eudravigilance.json
-│   ├── vigiaccess.json
-│   ├── ich.json
-│   ├── meddra.json
-│   ├── pubmed.json
-│   ├── rxnav.json
-│   ├── drugbank.json
-│   ├── openvigilfrance.json
-│   ├── fda-accessdata.json
-│   ├── fda-safety.json
-│   ├── who-umc.json
-│   ├── cioms.json
-│   ├── calculation.json
-│   ├── primitives.json       (private)
-│   ├── linkedin.json         (private)
-│   ├── wikipedia.json        (private)
-│   ├── science-hexim1.json   (private)
-│   ├── science-drug-targets.json (private)
-│   └── science-genomics.json (private)
-└── crates/
-    ├── station/            # NexVigilant Station MCP server
-    │   ├── src/
-    │   │   ├── lib.rs      # Public API
-    │   │   ├── main.rs     # CLI entry point
-    │   │   ├── config.rs   # HubConfig schema + ConfigRegistry
-    │   │   ├── protocol.rs # JSON-RPC 2.0 + MCP types
-    │   │   ├── router.rs   # Tool dispatch
-    │   │   └── server.rs   # Stdio MCP server loop
-    │   └── tests/
-    │       └── integration.rs  # 53 tests
-    └── borrow_miner/       # Educational Rust game
-```
+This workspace also includes an educational Rust ownership game built with Bevy. See `crates/borrow_miner/README.md`.
 
 ## License
 
 MIT — NexVigilant LLC
 
-*"Empowerment Through Vigilance"*
+*Empowerment Through Vigilance* — [nexvigilant.com](https://nexvigilant.com)
