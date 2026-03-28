@@ -164,10 +164,14 @@ fn handle_assemble(args: &Value) -> Value {
     };
 
     match asm::assemble(source) {
-        Ok(program) => ok(json!({
-            "instruction_count": program.instructions.len(),
-            "program_dna": program.to_string(),
-        })),
+        Ok(program) => {
+            let code_len = program.code.len() / 3; // codons = instructions
+            ok(json!({
+                "instruction_count": code_len,
+                "data_size": program.data.len(),
+                "program_dna": program.code.to_string(),
+            }))
+        },
         Err(e) => err(&format!("Assembly failed: {e}")),
     }
 }
@@ -189,6 +193,7 @@ fn handle_evolve(args: &Value) -> Value {
         mutation_rate: args.get("mutation_rate").and_then(|v| v.as_f64()).unwrap_or(0.01),
         crossover_rate: 0.7,
         tournament_size: 3,
+        elitism: 1,
     };
 
     let result = evolve(&seed_refs, target, config);

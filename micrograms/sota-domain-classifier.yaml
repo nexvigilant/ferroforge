@@ -1,0 +1,183 @@
+name: sota-domain-classifier
+description: 'SOTA Tracker: classifies a PV domain and returns its threshold authority, comparison method, and current frontier definition'
+version: 0.1.0
+primitive_signature:
+  dominant: boundary
+  expression: "μ(domain → {authority, comparison, frontier})"
+  primes: [boundary, mapping, identity]
+  arguments: [domain]
+
+interface:
+  inputs:
+    domain:
+      type: string
+      required: true
+      description: "PV domain: signal_detection, causality, benefit_risk, case_processing, regulatory"
+  outputs:
+    domain_label:
+      type: string
+    threshold_authority:
+      type: string
+    authority_level:
+      type: string
+    comparison_method:
+      type: string
+    current_frontier:
+      type: string
+    detection_sources:
+      type: string
+    drift_velocity:
+      type: string
+
+tree:
+  start: check_signal
+  nodes:
+    check_signal:
+      type: condition
+      variable: domain
+      operator: eq
+      value: signal_detection
+      true_next: signal_detection
+      false_next: check_causality
+
+    check_causality:
+      type: condition
+      variable: domain
+      operator: eq
+      value: causality
+      true_next: causality_assessment
+      false_next: check_benefit_risk
+
+    check_benefit_risk:
+      type: condition
+      variable: domain
+      operator: eq
+      value: benefit_risk
+      true_next: benefit_risk
+      false_next: check_case
+
+    check_case:
+      type: condition
+      variable: domain
+      operator: eq
+      value: case_processing
+      true_next: case_processing
+      false_next: check_regulatory
+
+    check_regulatory:
+      type: condition
+      variable: domain
+      operator: eq
+      value: regulatory
+      true_next: regulatory_reporting
+      false_next: unknown_domain
+
+    # === Domain definitions with threshold-authority declarations ===
+
+    signal_detection:
+      type: return
+      value:
+        domain_label: Signal Detection
+        threshold_authority: "CIOMS VIII Working Group + EMA PRAC Signal Committee"
+        authority_level: "International consensus body + regulatory committee"
+        comparison_method: "Disproportionality metrics (PRR/ROR/IC/EBGM) validated against known drug-event pairs with sensitivity/specificity benchmarks"
+        current_frontier: "Multi-item gamma Poisson shrinker (MGPS/EBGM), Bayesian IC with temporal pattern analysis, tree-based scan statistics"
+        detection_sources: "PubMed signal methodology, EMA PRAC minutes, FDA Sentinel publications, Drug Safety journal"
+        drift_velocity: "SLOW — regulatory-gated, 2-5 year adoption cycles for new methods"
+
+    causality_assessment:
+      type: return
+      value:
+        domain_label: Causality Assessment
+        threshold_authority: "WHO-UMC Causality Assessment Committee + ICH E2A/E2B guidelines"
+        authority_level: "WHO programme + ICH tripartite harmonization"
+        comparison_method: "Structured algorithms (Naranjo, WHO-UMC) scored against expert consensus panels with inter-rater reliability (kappa)"
+        current_frontier: "WHO-UMC system (certain/probable/possible/unlikely), Naranjo algorithm, Bradford Hill criteria for population-level inference"
+        detection_sources: "WHO Drug Information, ICH guideline revisions, Pharmacoepidemiology & Drug Safety journal"
+        drift_velocity: "VERY_SLOW — WHO/ICH consensus cycles, 5-10 year revision intervals"
+
+    benefit_risk:
+      type: return
+      value:
+        domain_label: Benefit-Risk Assessment
+        threshold_authority: "EMA Benefit-Risk Methodology Project (PROTECT) + FDA Benefit-Risk Framework"
+        authority_level: "Regulatory framework (EMA + FDA parallel adoption)"
+        comparison_method: "Quantitative benefit-risk frameworks (MCDA, SMAA, QBR) validated against regulatory decision outcomes with concordance scoring"
+        current_frontier: "IMI PROTECT multi-criteria frameworks, FDA structured benefit-risk (2013+), EMA PrOACT-URL, quantitative BRI scoring"
+        detection_sources: "EMA Science Medicines Health journal, FDA guidance documents, Value in Health journal, ISPOR publications"
+        drift_velocity: "MODERATE — regulatory framework updates every 3-5 years, academic methods faster"
+
+    case_processing:
+      type: return
+      value:
+        domain_label: Case Processing
+        threshold_authority: "ICH E2B(R3) standard + EMA/FDA electronic submission requirements"
+        authority_level: "ICH technical standard (mandatory for market authorization holders)"
+        comparison_method: "ICSR completeness (VigiGrade), timeliness vs regulatory deadlines (7/15-day), MedDRA coding accuracy vs expert panel"
+        current_frontier: "E2B(R3) XML, automated MedDRA coding, NLP-assisted narrative extraction, duplicate detection algorithms"
+        detection_sources: "ICH E2B revisions, EudraVigilance technical documents, FDA FAERS updates, MedDRA version releases"
+        drift_velocity: "SLOW — ICH revision cycles 5-8 years, but MedDRA updates biannually"
+
+    regulatory_reporting:
+      type: return
+      value:
+        domain_label: Regulatory Reporting
+        threshold_authority: "ICH E2C(R2)/E2E + regional regulatory requirements (FDA 21 CFR 314.80, EMA GVP Module VII)"
+        authority_level: "ICH harmonized guideline + regional statutory requirements"
+        comparison_method: "Compliance rate (% reports meeting timeline), PSUR/PBRER assessment outcomes, inspection findings as quality proxy"
+        current_frontier: "PSUR/PBRER (ICH E2C R2), aggregate signal evaluation, risk management plans (EU-RMP), REMS (US), electronic PSUR submission"
+        detection_sources: "ICH guideline updates, EMA GVP module revisions, FDA Federal Register, MHRA guidance"
+        drift_velocity: "VERY_SLOW — statutory/regulatory change cycles, 5-10 years between major revisions"
+
+    unknown_domain:
+      type: return
+      value:
+        domain_label: UNKNOWN
+        threshold_authority: "Not classified"
+        authority_level: "N/A"
+        comparison_method: "N/A"
+        current_frontier: "N/A"
+        detection_sources: "N/A"
+        drift_velocity: "N/A"
+
+tests:
+  - input:
+      domain: signal_detection
+    expect:
+      domain_label: Signal Detection
+      drift_velocity: "SLOW — regulatory-gated, 2-5 year adoption cycles for new methods"
+
+  - input:
+      domain: causality
+    expect:
+      domain_label: Causality Assessment
+      drift_velocity: "VERY_SLOW — WHO/ICH consensus cycles, 5-10 year revision intervals"
+
+  - input:
+      domain: benefit_risk
+    expect:
+      domain_label: Benefit-Risk Assessment
+      drift_velocity: "MODERATE — regulatory framework updates every 3-5 years, academic methods faster"
+
+  - input:
+      domain: case_processing
+    expect:
+      domain_label: Case Processing
+      drift_velocity: "SLOW — ICH revision cycles 5-8 years, but MedDRA updates biannually"
+
+  - input:
+      domain: regulatory
+    expect:
+      domain_label: Regulatory Reporting
+      drift_velocity: "VERY_SLOW — statutory/regulatory change cycles, 5-10 years between major revisions"
+
+  - input:
+      domain: unknown_thing
+    expect:
+      domain_label: UNKNOWN
+      threshold_authority: "Not classified"
+
+  - input: {}
+    expect:
+      domain_label: UNKNOWN
+      threshold_authority: "Not classified"

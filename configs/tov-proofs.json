@@ -1,0 +1,77 @@
+{
+  "domain": "tov-proofs.nexvigilant.com",
+  "private": false,
+  "copyright": "© 2026 NexVigilant, LLC. Attenuation Theorem via nexcore-tov-proofs.",
+  "title": "ToV Proofs — Harm Attenuation Theorem (T10.2)",
+  "description": "The Attenuation Theorem: under the Markov assumption, harm probability decreases exponentially with protective depth. Compute harm propagation, attenuation rates, protective depth requirements, and verify the attenuation property. Pure Rust via nexcore-tov-proofs.",
+  "proxy": "rust-native",
+  "tools": [
+    {
+      "name": "harm-probability",
+      "description": "Compute combined harm probability from a chain of propagation probabilities. Under Axiom 5 (Markov), ℙ(H|δs₁) = ∏ᵢP_{i→i+1}. Each probability must be in (0, 1).",
+      "parameters": [
+        { "name": "probabilities", "type": "array", "description": "Array of propagation probabilities, each in (0, 1). Example: [0.5, 0.3, 0.2]", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "harm_probability": { "type": "number" }, "layer_count": { "type": "integer" }, "attenuation_rate": { "type": "number" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "exponential-harm",
+      "description": "Compute harm probability using exponential decay formula ℙ(H) = e^{-α(H-1)} where α is the attenuation rate and H is the harm level (depth).",
+      "parameters": [
+        { "name": "alpha", "type": "number", "description": "Attenuation rate α (must be positive)", "required": true },
+        { "name": "harm_level", "type": "integer", "description": "Harm level H (depth in the propagation chain, ≥ 1)", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "harm_probability": { "type": "number" }, "alpha": { "type": "number" }, "harm_level": { "type": "integer" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "protective-depth",
+      "description": "Compute minimum protective depth H such that ℙ(H) < target_probability. Formula: H ≥ 1 + log(1/ε)/α. Answers: 'how many safety layers do I need?'",
+      "parameters": [
+        { "name": "target_probability", "type": "number", "description": "Target probability threshold ε, in (0, 1). Example: 0.05 for 5% residual risk", "required": true },
+        { "name": "attenuation_rate", "type": "number", "description": "Attenuation rate α (must be positive)", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "min_depth": { "type": "integer" }, "achieved_probability": { "type": "number" }, "target_probability": { "type": "number" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "verify-attenuation",
+      "description": "Verify the attenuation property holds: harm probability strictly decreases with each additional protective layer. Returns true if ℙ(H₁) > ℙ(H₂) > ... > ℙ(Hₙ).",
+      "parameters": [
+        { "name": "probabilities", "type": "array", "description": "Array of propagation probabilities, each in (0, 1)", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "attenuation_holds": { "type": "boolean" }, "layer_count": { "type": "integer" }, "uniform_bound": { "type": "number" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "attenuation-rate",
+      "description": "Compute the attenuation rate α = -log(P̄) where P̄ is the geometric mean of propagation probabilities. Higher α means stronger attenuation (safer).",
+      "parameters": [
+        { "name": "probabilities", "type": "array", "description": "Array of propagation probabilities, each in (0, 1)", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": { "status": { "type": "string" }, "alpha": { "type": "number" }, "geometric_mean": { "type": "number" }, "interpretation": { "type": "string" } },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}

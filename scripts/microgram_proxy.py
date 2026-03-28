@@ -99,6 +99,15 @@ CHAIN_TOOLS = {
         "chain": "heligram -> crystalbook-4primitive -> crystalbook-8law",
         "accumulate": True,
     },
+    # Guardian SOTA Tracker
+    "run-sota-drift-detection": {
+        "chain": "sota-domain-classifier -> sota-frontier-check -> drift-alert-classifier",
+        "accumulate": True,
+    },
+    "run-sota-pubmed-pipeline": {
+        "chain": "sota-pubmed-triage -> sota-domain-classifier -> sota-frontier-check -> drift-alert-classifier",
+        "accumulate": True,
+    },
 }
 
 # Single microgram tools: tool name → microgram filename (without .yaml)
@@ -114,6 +123,7 @@ SINGLE_TOOLS = {
     "run-ich-q1b-photostability": "ich-q1b-photostability",
     "run-ich-e1-population-exposure": "ich-e1-population-exposure",
     "run-heligram": "heligram",
+    "run-sota-authority-decompose": "sota-authority-decompose",
 }
 
 
@@ -142,16 +152,24 @@ def run_single(microgram: str, input_json: dict) -> dict:
 def run_chain(spec: dict, input_json: dict) -> dict:
     """Execute a microgram chain via rsk mcg chain."""
     if "chain_file" in spec:
-        # Use chain YAML file
+        # Read chain YAML to extract steps, then run as inline chain
+        import yaml  # noqa: E402 — deferred import, only needed for chain files
         chain_path = CHAINS_DIR / f"{spec['chain_file']}.yaml"
         if not chain_path.exists():
             return {"status": "error", "message": f"Chain file not found: {spec['chain_file']}"}
-
+        with open(chain_path) as f:
+            chain_def = yaml.safe_load(f)
+        steps = chain_def.get("steps", [])
+        if not steps:
+            return {"status": "error", "message": f"No steps in chain: {spec['chain_file']}"}
+        chain_str = " -> ".join(steps)
+        mcg_dir = chain_path.parent / chain_def.get("micrograms_dir", "../micrograms")
         cmd = [
             str(RSK_BINARY), "mcg", "chain",
             "-i", json.dumps(input_json),
+            "-d", str(mcg_dir.resolve()),
             "--accumulate",
-            str(chain_path),
+            chain_str,
         ]
     else:
         # Inline chain spec

@@ -1,0 +1,279 @@
+name: sota-authority-decompose
+description: 'SOTA Tracker: decomposes threshold authority into its T2-C primitives — consensus, credential, evidence, institutional power — and scores defensibility'
+version: 0.1.0
+primitive_signature:
+  dominant: threshold
+  expression: "∂(authority) → {consensus, credential, evidence, power}"
+  primes: [threshold, boundary, comparison, identity]
+  arguments: [consensus_level, credential_strength, evidence_basis, institutional_backing]
+
+interface:
+  inputs:
+    consensus_level:
+      type: int
+      required: true
+      description: "Breadth of agreement: 1=single author, 2=research group, 3=professional society, 4=multi-society, 5=international harmonization (ICH/WHO)"
+    credential_strength:
+      type: int
+      required: true
+      description: "Credentialing depth: 1=self-declared, 2=peer-recognized, 3=board-certified, 4=regulatory-designated, 5=statutory mandate"
+    evidence_basis:
+      type: int
+      required: true
+      description: "Evidence grounding: 1=assertion only, 2=case-based, 3=empirical study, 4=validated framework, 5=replicated multi-site"
+    institutional_backing:
+      type: int
+      required: true
+      description: "Institutional power: 1=individual, 2=academic dept, 3=professional body, 4=national regulator, 5=supranational (WHO/ICH/EMA)"
+  outputs:
+    authority_class:
+      type: string
+    defensibility:
+      type: string
+    vulnerability:
+      type: string
+    authority_score:
+      type: int
+    recommendation:
+      type: string
+
+tree:
+  start: check_evidence_basis
+  nodes:
+    # Gate 1: Evidence basis is the foundation — no authority without evidence
+    check_evidence_basis:
+      type: condition
+      variable: evidence_basis
+      operator: gte
+      value: 3
+      true_next: check_consensus
+      false_next: check_assertion_only
+
+    check_assertion_only:
+      type: condition
+      variable: evidence_basis
+      operator: lte
+      value: 1
+      true_next: naked_assertion
+      false_next: weak_evidence
+
+    # Gate 2: Consensus breadth
+    check_consensus:
+      type: condition
+      variable: consensus_level
+      operator: gte
+      value: 4
+      true_next: check_sovereign
+      false_next: check_local_consensus
+
+    check_local_consensus:
+      type: condition
+      variable: consensus_level
+      operator: gte
+      value: 2
+      true_next: check_credential_mid
+      false_next: lone_authority
+
+    # Branch: Sovereign authority (international consensus + statutory mandate)
+    check_sovereign:
+      type: condition
+      variable: institutional_backing
+      operator: gte
+      value: 4
+      true_next: check_sovereign_credential
+      false_next: check_established
+
+    check_sovereign_credential:
+      type: condition
+      variable: credential_strength
+      operator: gte
+      value: 4
+      true_next: sovereign_authority
+      false_next: check_established
+
+    # Branch: Established authority (professional consensus + regulatory)
+    check_established:
+      type: condition
+      variable: credential_strength
+      operator: gte
+      value: 3
+      true_next: established_authority
+      false_next: emerging_authority
+
+    # Branch: Mid-tier (local consensus + credentials)
+    check_credential_mid:
+      type: condition
+      variable: credential_strength
+      operator: gte
+      value: 3
+      true_next: established_authority
+      false_next: check_credential_low
+
+    check_credential_low:
+      type: condition
+      variable: credential_strength
+      operator: gte
+      value: 2
+      true_next: emerging_authority
+      false_next: contested_authority
+
+    # Return nodes — each declares vulnerability (the Takeda diagnostic)
+    sovereign_authority:
+      type: return
+      value:
+        authority_class: SOVEREIGN
+        defensibility: MAXIMUM
+        vulnerability: "Slow to update — consensus cycles of 5-10 years can lag behind frontier movement"
+        authority_score: 95
+        recommendation: "Accepted as definitive. Challenge only with evidence_basis >= 4 AND consensus_level >= 4."
+
+    established_authority:
+      type: return
+      value:
+        authority_class: ESTABLISHED
+        defensibility: HIGH
+        vulnerability: "Regional bias — may reflect one regulatory tradition over another. Check cross-jurisdictional alignment."
+        authority_score: 75
+        recommendation: "Strong but verify cross-jurisdictional. Accepted for single-market decisions."
+
+    emerging_authority:
+      type: return
+      value:
+        authority_class: EMERGING
+        defensibility: MODERATE
+        vulnerability: "Credential-evidence gap — authority may exceed evidence base. Verify evidence_basis independently."
+        authority_score: 50
+        recommendation: "Provisional. Monitor for consensus convergence. Do not use as sole basis for standard-setting."
+
+    contested_authority:
+      type: return
+      value:
+        authority_class: CONTESTED
+        defensibility: LOW
+        vulnerability: "Consensus deficit — local agreement without broad validation. Takeda-pattern risk: authority asserted without defensible criteria."
+        authority_score: 25
+        recommendation: "Do not accept as threshold authority. Require evidence_basis >= 3 AND consensus_level >= 3 before recognition."
+
+    lone_authority:
+      type: return
+      value:
+        authority_class: LONE
+        defensibility: MINIMAL
+        vulnerability: "Single-source authority — no consensus check, no peer validation. Maximum Takeda risk."
+        authority_score: 10
+        recommendation: "Reject as threshold authority. Individual expertise informs but cannot define frontier."
+
+    weak_evidence:
+      type: return
+      value:
+        authority_class: UNGROUNDED
+        defensibility: NONE
+        vulnerability: "Case-based only — insufficient evidence to establish authority claim. Anecdote is not frontier."
+        authority_score: 5
+        recommendation: "Reject. Authority claims require minimum observational evidence (level 3)."
+
+    naked_assertion:
+      type: return
+      value:
+        authority_class: ASSERTION
+        defensibility: NONE
+        vulnerability: "Pure assertion — no evidence, no consensus, no institutional backing. The definition of indefensible authority."
+        authority_score: 0
+        recommendation: "Reject immediately. This is opinion presented as standard. Flag as Takeda-pattern violation."
+
+tests:
+  # ICH/WHO — sovereign
+  - input:
+      consensus_level: 5
+      credential_strength: 5
+      evidence_basis: 5
+      institutional_backing: 5
+    expect:
+      authority_class: SOVEREIGN
+      authority_score: 95
+
+  # FDA — established
+  - input:
+      consensus_level: 3
+      credential_strength: 4
+      evidence_basis: 4
+      institutional_backing: 4
+    expect:
+      authority_class: ESTABLISHED
+      authority_score: 75
+
+  # Professional society guideline — established
+  - input:
+      consensus_level: 4
+      credential_strength: 3
+      evidence_basis: 4
+      institutional_backing: 3
+    expect:
+      authority_class: ESTABLISHED
+      authority_score: 75
+
+  # Academic research group — emerging
+  - input:
+      consensus_level: 2
+      credential_strength: 2
+      evidence_basis: 4
+      institutional_backing: 2
+    expect:
+      authority_class: EMERGING
+      authority_score: 50
+
+  # Industry KOL — contested (Takeda pattern)
+  - input:
+      consensus_level: 2
+      credential_strength: 1
+      evidence_basis: 3
+      institutional_backing: 2
+    expect:
+      authority_class: CONTESTED
+      authority_score: 25
+
+  # Solo expert opinion — lone
+  - input:
+      consensus_level: 1
+      credential_strength: 3
+      evidence_basis: 4
+      institutional_backing: 1
+    expect:
+      authority_class: LONE
+      authority_score: 10
+
+  # Blog post claiming SOTA — naked assertion
+  - input:
+      consensus_level: 1
+      credential_strength: 1
+      evidence_basis: 1
+      institutional_backing: 1
+    expect:
+      authority_class: ASSERTION
+      authority_score: 0
+
+  # Case series without consensus — ungrounded
+  - input:
+      consensus_level: 3
+      credential_strength: 3
+      evidence_basis: 2
+      institutional_backing: 3
+    expect:
+      authority_class: UNGROUNDED
+      authority_score: 5
+
+  # Null safety — missing values treated as null, fail evidence gate, route to weak_evidence (null is not lte 1)
+  - input: {}
+    expect:
+      authority_class: UNGROUNDED
+      authority_score: 5
+
+  # High consensus but assertion-only evidence — still naked
+  - input:
+      consensus_level: 5
+      credential_strength: 5
+      evidence_basis: 1
+      institutional_backing: 5
+    expect:
+      authority_class: ASSERTION
+      authority_score: 0

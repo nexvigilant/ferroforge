@@ -281,6 +281,9 @@ fn route_tool_call_inner(
     if let Some(result) = crate::energy::try_handle(tool_name, arguments) {
         return result;
     }
+    if let Some(result) = crate::dna_compute::try_handle(tool_name, arguments) {
+        return result;
+    }
     if let Some(result) = crate::dtree::try_handle(tool_name, arguments) {
         return result;
     }
@@ -291,6 +294,9 @@ fn route_tool_call_inner(
         return result;
     }
     if let Some(result) = crate::tov::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::tov_proofs::try_handle(tool_name, arguments) {
         return result;
     }
     if let Some(result) = crate::compliance::try_handle(tool_name, arguments) {

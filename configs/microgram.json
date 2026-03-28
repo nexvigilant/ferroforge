@@ -652,6 +652,99 @@
         "required": ["existence_class", "weakest", "can_advance"]
       },
       "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-sota-drift-detection",
+      "description": "Guardian SOTA Tracker — detect frontier movement in a pharmacovigilance domain. Classifies the PV domain (signal detection, causality, benefit-risk, case processing, regulatory), evaluates a finding against the current frontier using evidence level and authority weight, and reports drift severity with recommended action. Returns threshold authority (who defines SOTA), comparison method, drift velocity, and frontier movement classification (PARADIGM_SHIFT, SIGNIFICANT, INCREMENTAL, NONE, UNQUALIFIED).",
+      "parameters": [
+        {"name": "domain", "type": "string", "description": "PV domain: signal_detection, causality, benefit_risk, case_processing, regulatory", "required": true},
+        {"name": "evidence_level", "type": "integer", "description": "Strength of evidence: 1=opinion, 2=case series, 3=observational, 4=RCT, 5=systematic review/meta-analysis", "required": true},
+        {"name": "authority_weight", "type": "integer", "description": "Threshold authority recognition: 1=preprint, 2=peer-reviewed, 3=guideline-cited, 4=regulatory-adopted, 5=ICH/WHO standard", "required": true},
+        {"name": "novelty_score", "type": "integer", "description": "Novelty vs current frontier: 0=known, 25=incremental, 50=significant, 75=paradigm-adjacent, 100=paradigm-shift", "required": true},
+        {"name": "prr_change_pct", "type": "integer", "description": "Observed PRR change percentage for drift severity classification (0 if not applicable)", "required": false},
+        {"name": "time_window_days", "type": "integer", "description": "Time window in days over which the change was observed (90 if not applicable)", "required": false}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "final_output": {
+            "type": "object",
+            "properties": {
+              "domain_label": {"type": "string", "description": "Human-readable PV domain name"},
+              "threshold_authority": {"type": "string", "description": "Who adjudicates SOTA in this domain"},
+              "comparison_method": {"type": "string", "description": "How findings are ranked against the frontier"},
+              "current_frontier": {"type": "string", "description": "Description of current SOTA methods"},
+              "drift_velocity": {"type": "string", "description": "How fast the frontier typically moves"},
+              "frontier_movement": {"type": "string", "description": "PARADIGM_SHIFT, SIGNIFICANT, INCREMENTAL, NONE, or UNQUALIFIED"},
+              "combined_score": {"type": "integer", "description": "Composite frontier movement score (0-100)"},
+              "severity": {"type": "string", "description": "Drift severity from CRITICAL_DRIFT to STABLE"},
+              "alert_level": {"type": "string", "description": "P0/P1/P2/P3/NONE"},
+              "action": {"type": "string", "description": "Recommended response to the frontier finding"}
+            }
+          },
+          "steps": {"type": "array", "description": "Per-step decision trace through domain→frontier→drift"},
+          "total_duration_us": {"type": "integer", "description": "Total execution time in microseconds"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-sota-authority-decompose",
+      "description": "Decompose threshold authority into primitives — consensus breadth, credential strength, evidence basis, institutional backing — and score defensibility. Detects Takeda-pattern authority assertions (claims without defensible criteria). Returns authority class (SOVEREIGN/ESTABLISHED/EMERGING/CONTESTED/LONE/UNGROUNDED/ASSERTION), defensibility rating, vulnerability analysis, and recommendation.",
+      "parameters": [
+        {"name": "consensus_level", "type": "integer", "description": "Breadth of agreement: 1=single author, 2=research group, 3=professional society, 4=multi-society, 5=international harmonization (ICH/WHO)", "required": true},
+        {"name": "credential_strength", "type": "integer", "description": "Credentialing depth: 1=self-declared, 2=peer-recognized, 3=board-certified, 4=regulatory-designated, 5=statutory mandate", "required": true},
+        {"name": "evidence_basis", "type": "integer", "description": "Evidence grounding: 1=assertion only, 2=case-based, 3=empirical study, 4=validated framework, 5=replicated multi-site", "required": true},
+        {"name": "institutional_backing", "type": "integer", "description": "Institutional power: 1=individual, 2=academic dept, 3=professional body, 4=national regulator, 5=supranational (WHO/ICH/EMA)", "required": true}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "authority_class": {"type": "string", "description": "SOVEREIGN, ESTABLISHED, EMERGING, CONTESTED, LONE, UNGROUNDED, or ASSERTION"},
+          "defensibility": {"type": "string", "description": "MAXIMUM, HIGH, MODERATE, LOW, MINIMAL, or NONE"},
+          "vulnerability": {"type": "string", "description": "Specific weakness of this authority type"},
+          "authority_score": {"type": "integer", "description": "Composite score 0-95"},
+          "recommendation": {"type": "string", "description": "How to handle this authority level"}
+        },
+        "required": ["authority_class", "defensibility", "authority_score"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-sota-pubmed-pipeline",
+      "description": "PubMed → SOTA pipeline: triage a publication for frontier relevance, classify its PV domain, check frontier movement, and assess drift severity. Feed article metadata from a PubMed search and get back a full SOTA drift assessment including whether the finding warrants frontier review. Chain: pubmed-triage → domain-classifier → frontier-check → drift-alert.",
+      "parameters": [
+        {"name": "article_type", "type": "string", "description": "PubMed article type: meta_analysis, systematic_review, rct, observational, case_series, case_report, editorial, letter", "required": true},
+        {"name": "pub_year", "type": "integer", "description": "Publication year (e.g., 2026)", "required": true},
+        {"name": "domain", "type": "string", "description": "PV domain: signal_detection, causality, benefit_risk, case_processing, regulatory", "required": true},
+        {"name": "novelty_score", "type": "integer", "description": "Novelty vs current frontier: 0=known, 25=incremental, 50=significant, 75=paradigm-adjacent, 100=paradigm-shift", "required": true},
+        {"name": "citation_count", "type": "integer", "description": "Number of citations (0 if new)", "required": false},
+        {"name": "is_guideline_cited", "type": "integer", "description": "1 if cited in a guideline/regulatory document, 0 otherwise", "required": false},
+        {"name": "prr_change_pct", "type": "integer", "description": "Observed PRR change percentage (0 if not applicable)", "required": false},
+        {"name": "time_window_days", "type": "integer", "description": "Observation time window in days (90 if not applicable)", "required": false}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "final_output": {
+            "type": "object",
+            "properties": {
+              "triage_action": {"type": "string", "description": "EVALUATE, MONITOR, or SKIP"},
+              "domain_label": {"type": "string"},
+              "frontier_movement": {"type": "string"},
+              "severity": {"type": "string"},
+              "alert_level": {"type": "string"}
+            }
+          },
+          "steps": {"type": "array"},
+          "total_duration_us": {"type": "integer"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
     }
   ]
 }

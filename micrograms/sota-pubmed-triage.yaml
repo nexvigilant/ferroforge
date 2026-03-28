@@ -1,0 +1,256 @@
+name: sota-pubmed-triage
+description: 'SOTA Tracker: triages a PubMed finding for frontier relevance based on article type, recency, and citation signals'
+version: 0.1.0
+primitive_signature:
+  dominant: comparison
+  expression: "κ(article_type, recency) → {evidence_level, authority_weight, novelty_score}"
+  primes: [comparison, time, boundary, threshold]
+  arguments: [article_type, pub_year, citation_count, is_guideline_cited]
+
+interface:
+  inputs:
+    article_type:
+      type: string
+      required: true
+      description: "PubMed article type: meta_analysis, systematic_review, rct, observational, case_series, case_report, editorial, letter"
+    pub_year:
+      type: int
+      required: true
+      description: "Publication year (e.g., 2026)"
+    citation_count:
+      type: int
+      required: false
+      description: "Number of citations (0 if new)"
+    is_guideline_cited:
+      type: int
+      required: false
+      description: "1 if cited in a guideline/regulatory document, 0 otherwise"
+  outputs:
+    evidence_level:
+      type: int
+    authority_weight:
+      type: int
+    novelty_estimate:
+      type: string
+    triage_action:
+      type: string
+
+tree:
+  start: check_article_type
+  nodes:
+    # Map article type to evidence level
+    check_article_type:
+      type: condition
+      variable: article_type
+      operator: eq
+      value: meta_analysis
+      true_next: evidence_5
+      false_next: check_sr
+
+    check_sr:
+      type: condition
+      variable: article_type
+      operator: eq
+      value: systematic_review
+      true_next: evidence_5
+      false_next: check_rct
+
+    check_rct:
+      type: condition
+      variable: article_type
+      operator: eq
+      value: rct
+      true_next: evidence_4
+      false_next: check_observational
+
+    check_observational:
+      type: condition
+      variable: article_type
+      operator: eq
+      value: observational
+      true_next: evidence_3
+      false_next: check_case_series
+
+    check_case_series:
+      type: condition
+      variable: article_type
+      operator: eq
+      value: case_series
+      true_next: evidence_2
+      false_next: evidence_1
+
+    # Evidence level → authority check
+    evidence_5:
+      type: condition
+      variable: is_guideline_cited
+      operator: eq
+      value: 1
+      true_next: high_evidence_guideline
+      false_next: high_evidence_peer
+
+    evidence_4:
+      type: condition
+      variable: is_guideline_cited
+      operator: eq
+      value: 1
+      true_next: rct_guideline
+      false_next: rct_peer
+
+    evidence_3:
+      type: condition
+      variable: pub_year
+      operator: gte
+      value: 2024
+      true_next: observational_recent
+      false_next: observational_old
+
+    evidence_2:
+      type: condition
+      variable: pub_year
+      operator: gte
+      value: 2024
+      true_next: case_series_recent
+      false_next: skip_old
+
+    evidence_1:
+      type: condition
+      variable: pub_year
+      operator: gte
+      value: 2024
+      true_next: low_evidence_recent
+      false_next: skip_old
+
+    # Return nodes — pre-scored for SOTA chain input
+    high_evidence_guideline:
+      type: return
+      value:
+        evidence_level: 5
+        authority_weight: 4
+        novelty_estimate: HIGH
+        triage_action: "EVALUATE — systematic review/meta-analysis cited in guidelines. Run SOTA drift detection."
+
+    high_evidence_peer:
+      type: return
+      value:
+        evidence_level: 5
+        authority_weight: 2
+        novelty_estimate: MODERATE
+        triage_action: "EVALUATE — systematic review/meta-analysis, peer-reviewed. Run SOTA drift detection."
+
+    rct_guideline:
+      type: return
+      value:
+        evidence_level: 4
+        authority_weight: 4
+        novelty_estimate: HIGH
+        triage_action: "EVALUATE — RCT cited in guidelines. Run SOTA drift detection."
+
+    rct_peer:
+      type: return
+      value:
+        evidence_level: 4
+        authority_weight: 2
+        novelty_estimate: MODERATE
+        triage_action: "EVALUATE — RCT, peer-reviewed. Run SOTA drift detection if methodology is novel."
+
+    observational_recent:
+      type: return
+      value:
+        evidence_level: 3
+        authority_weight: 2
+        novelty_estimate: LOW
+        triage_action: "MONITOR — recent observational study. Log for periodic SOTA review."
+
+    observational_old:
+      type: return
+      value:
+        evidence_level: 3
+        authority_weight: 2
+        novelty_estimate: NONE
+        triage_action: "SKIP — older observational study. Below frontier relevance threshold."
+
+    case_series_recent:
+      type: return
+      value:
+        evidence_level: 2
+        authority_weight: 1
+        novelty_estimate: NONE
+        triage_action: "SKIP — case series insufficient for frontier assessment."
+
+    low_evidence_recent:
+      type: return
+      value:
+        evidence_level: 1
+        authority_weight: 1
+        novelty_estimate: NONE
+        triage_action: "SKIP — editorial/letter/case report. Not frontier-relevant."
+
+    skip_old:
+      type: return
+      value:
+        evidence_level: 1
+        authority_weight: 1
+        novelty_estimate: NONE
+        triage_action: "SKIP — older low-evidence publication. Not frontier-relevant."
+
+tests:
+  - input:
+      article_type: meta_analysis
+      pub_year: 2025
+      citation_count: 12
+      is_guideline_cited: 1
+    expect:
+      evidence_level: 5
+      authority_weight: 4
+      triage_action: "EVALUATE — systematic review/meta-analysis cited in guidelines. Run SOTA drift detection."
+
+  - input:
+      article_type: systematic_review
+      pub_year: 2026
+      citation_count: 0
+      is_guideline_cited: 0
+    expect:
+      evidence_level: 5
+      authority_weight: 2
+      triage_action: "EVALUATE — systematic review/meta-analysis, peer-reviewed. Run SOTA drift detection."
+
+  - input:
+      article_type: rct
+      pub_year: 2025
+      citation_count: 5
+      is_guideline_cited: 0
+    expect:
+      evidence_level: 4
+      authority_weight: 2
+
+  - input:
+      article_type: observational
+      pub_year: 2025
+      citation_count: 2
+      is_guideline_cited: 0
+    expect:
+      evidence_level: 3
+      triage_action: "MONITOR — recent observational study. Log for periodic SOTA review."
+
+  - input:
+      article_type: editorial
+      pub_year: 2026
+      citation_count: 0
+      is_guideline_cited: 0
+    expect:
+      evidence_level: 1
+      triage_action: "SKIP — editorial/letter/case report. Not frontier-relevant."
+
+  - input:
+      article_type: case_report
+      pub_year: 2020
+      citation_count: 3
+      is_guideline_cited: 0
+    expect:
+      evidence_level: 1
+      triage_action: "SKIP — older low-evidence publication. Not frontier-relevant."
+
+  - input: {}
+    expect:
+      evidence_level: 1
+      authority_weight: 1

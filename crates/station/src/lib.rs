@@ -21,6 +21,7 @@ pub mod config;
 pub mod crystalbook;
 pub mod dataframe;
 pub mod edit_distance;
+pub mod dna_compute;
 pub mod dtree;
 pub mod energy;
 pub mod entropy;
@@ -57,6 +58,7 @@ pub mod stem;
 pub mod stoichiometry;
 pub mod telemetry;
 pub mod tov;
+pub mod tov_proofs;
 pub mod usage_store;
 pub mod zeta;
 

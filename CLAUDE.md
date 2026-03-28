@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## FerroForge — NexVigilant Station
 
-Rust MCP server + 26 PV domain configs (198 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio (source: `ls configs/*.json | wc -l` = 26, tool count from JSON parsing = 198 tools total across all configs, plus ~18 Rust compute tools = 216 total including meta-tools, measured 2026-03-24).
+Rust MCP server + 58 domain configs (414 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio, SSE, and Streamable HTTP (source: `ls configs/*.json | wc -l` = 58, tool count from JSON parsing = 414 tools total across all configs, measured 2026-03-28).
 
 ## Build & Test
 
 ```bash
 cargo build -p nexvigilant-station --release    # Build station binary
-cargo test -p nexvigilant-station               # 75 integration tests
+cargo test -p nexvigilant-station               # 136 tests (75 integration + 47 unit + 14 lib)
 cargo clippy -p nexvigilant-station -- -D warnings
 
 # MCP protocol test
@@ -35,18 +35,22 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 | `crates/station/src/server.rs` | Stdio MCP server loop |
 | `crates/station/src/telemetry.rs` | Per-tool-call metrics (timestamp, domain, duration_ms, status) |
 | `scripts/dispatch.py` | Unified proxy router — routes by domain prefix to per-domain proxy scripts |
-| `scripts/*_proxy.py` | Per-domain API proxy scripts (23 files — source: measured 2026-03-24) |
+| `scripts/*_proxy.py` | Per-domain API proxy scripts (22 files — source: measured 2026-03-28) |
 | `scripts/config_forge.py` | Config generator + hub deployer (self-hosted or Cloud Run) |
 
-## Config Inventory (26 configs, 198 tools — source: measured 2026-03-24)
+## Config Inventory (58 configs, 414 tools — source: measured 2026-03-28)
 
-**Proxy scripts with HTTP calls (10):** openfda, clinicaltrials, pubmed, dailymed, rxnav, openvigilfrance, fda-accessdata, eudravigilance, fda-safety, science
+**Live API proxies (10):** openfda, clinicaltrials, pubmed, dailymed, rxnav, openvigilfrance, fda-accessdata, eudravigilance, fda-safety, science
 
-**Pure computation proxy (1):** calculation (17 tools — PRR/ROR/IC/EBGM, disproportionality table, Naranjo, WHO-UMC, ICH E2A, QBR, reporting rate, signal half-life, expectedness, time-to-onset, case completeness, NNH, Wilson CI, signal trend)
+**Pure computation proxies (3):** calculation (17 tools), microgram (33 tools — chains + singles including SOTA tracker), primitives
 
-**All configs have proxy scripts** — 0 stubs remaining (measured 2026-03-08)
+**Rust-native handlers (17):** signal-theory, preemptive-pv, epidemiology, stoichiometry, molecular-weight, game-theory, entropy, combinatorics, formula, markov, relay, brain, marketing, crystalbook, bicone, helix, heligram
 
-**NOTE:** Matthew reclassified proxies (2026-03-06) into 3 tiers: clean live (real API data) / partial (some mocked tools) / new-untested. The above 10 are files containing `requests.get/post` calls. For per-proxy tier classification, see MEMORY.md FerroForge section.
+**Reference configs:** ich, cioms, who-umc, meddra, drugbank, vigiaccess, ema, fda-safety, wikipedia, compliance, algovigilance, chemivigilance, cccp, harm-taxonomy, tov, pvdsl, dtree, dataframe, edit-distance, energy, zeta, dna, benefit-risk, vigilance
+
+**All 58 configs have proxy scripts or Rust-native handlers** — 0 stubs remaining. 22 proxy files serve 58 configs (some proxies route multiple configs).
+
+**Metering:** Live toll billing at 1.30x harness premium. `/billing/usage`, `/billing/rates`, `/billing/balance` endpoints. Per-key usage tracking with token estimation and cost computation.
 
 ## Adding a New Config
 
@@ -58,7 +62,7 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 
 ## Production Deployment — Cloud Run (`mcp.nexvigilant.com`)
 
-**Primary deployment target.** The station binary runs on Google Cloud Run with combined transport (SSE + HTTP REST), CORS enabled, and all 193 tools annotated with MCP annotations (`readOnlyHint: true`, `destructiveHint: false`).
+**Primary deployment target.** The station binary runs on Google Cloud Run with combined transport (Streamable HTTP + SSE + HTTP REST), CORS enabled, and all tools annotated with MCP annotations (`readOnlyHint: true`, `destructiveHint: false`).
 
 ```bash
 # Build container and deploy
@@ -93,13 +97,13 @@ Add as connector in Claude.ai Settings → Connectors:
 - **URL:** `https://mcp.nexvigilant.com/mcp`
 - **Auth:** None (authless — `NEXVIGILANT_API_KEYS` not set on Cloud Run)
 - **Protocol:** MCP 2025-03-26 Streamable HTTP
-- **Tools visible:** 129 (public configs only — `--exclude-private` filters 6 private configs)
+- **Tools visible:** ~340 (public configs only — `--exclude-private` filters private configs)
 
 Source: `crates/station/src/server_streamable.rs`. Session-optional design: Claude.ai doesn't forward `Mcp-Session-Id` header, so all requests process statelessly.
 
 ### Public vs Private Configs
 
-`--exclude-private` flag in Dockerfile CMD filters configs with `"private": true`. 17 public configs (125 config tools + 4 Rust meta-tools = 129 served) are exposed on Cloud Run. 6 private configs (49 tools) are available locally via stdio/mcp-lazy-proxy but not on the public endpoint.
+`--exclude-private` flag in Dockerfile CMD filters configs with `"private": true`. Public configs are exposed on Cloud Run (~340 tools). Private configs are available locally via stdio but not on the public endpoint.
 
 **DO NOT deploy to webmcp-hub.com.** The third-party hub has a 50-config cap and is no longer the primary deployment target. All agent traffic routes through `mcp.nexvigilant.com`.
 
@@ -133,14 +137,14 @@ python3 hub/seed.py --direct
 |------|------|
 | `hub/app.py` | FastAPI server (local dev only) |
 | `hub/seed.py` | Seeds hub.db from `configs/` directory |
-| `hub/hub.db` | SQLite database (25 configs, 193 tools) |
+| `hub/hub.db` | SQLite database (legacy — local dev only) |
 
 ## Key Gotchas
 
 - **MCP client caching:** After rebuilding the binary, must `/mcp` restart in Claude Code or stale process returns old tools
 - **Tool naming:** `{domain_underscored}_{tool_name_underscored}` (e.g., `api_fda_gov_search_adverse_events`)
-- **outputSchema:** All 193 tools have outputSchema defined — required for MCP spec compliance
-- **MCP annotations:** All 193 tools have `readOnlyHint: true`, `destructiveHint: false` — required for agent auto-approval
+- **outputSchema:** All tools have outputSchema defined — required for MCP spec compliance
+- **MCP annotations:** All tools have `readOnlyHint: true`, `destructiveHint: false` — required for agent auto-approval
 - **dispatch.py routes by domain prefix** — 8/8 domain prefixes smoke-tested
 - **Science configs** route via `science_proxy.py`, not individual proxy files
 - **Telemetry JSONL** at `~/ferroforge/station-telemetry.jsonl` — owner dashboard via `nexvigilant_station_health` meta-tool
