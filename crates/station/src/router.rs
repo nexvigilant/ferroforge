@@ -125,7 +125,7 @@ pub fn route_tool_call(
 
         let input_tokens = metering::estimate_tokens(input_bytes);
         let output_tokens = metering::estimate_tokens(output_bytes);
-        let cost = crate::pricing::compute_cost(None, input_tokens, output_tokens);
+        let cost = crate::pricing::compute_cost(Some("default"), input_tokens, output_tokens);
 
         meter.record(MeteringRecord {
             timestamp: now_iso8601(),

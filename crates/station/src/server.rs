@@ -52,7 +52,7 @@ pub fn run_stdio(registry: ConfigRegistry, telemetry: &StationTelemetry) -> Resu
             }
         };
 
-        let response = handle_request(&registry, telemetry, &auth_gate, &request, None);
+        let response = handle_request(&registry, telemetry, None, &auth_gate, &request, None, None);
 
         // Notifications (no id) get no response
         if request.id.is_none() {
@@ -72,11 +72,13 @@ pub fn run_stdio(registry: ConfigRegistry, telemetry: &StationTelemetry) -> Resu
 pub fn handle_request(
     registry: &ConfigRegistry,
     telemetry: &StationTelemetry,
+    meter: Option<&crate::metering::StationMeter>,
     auth_gate: &ApiKeyGate,
     req: &JsonRpcRequest,
     event_tx: Option<&broadcast::Sender<StationEvent>>,
+    auth_header: Option<&str>,
 ) -> Option<JsonRpcResponse> {
-    handle_request_with_auth(registry, telemetry, None, auth_gate, req, event_tx, None)
+    handle_request_with_auth(registry, telemetry, meter, auth_gate, req, event_tx, auth_header)
 }
 
 pub fn handle_request_with_auth(

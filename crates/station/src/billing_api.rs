@@ -4,17 +4,32 @@
 //!   GET /billing/usage   — usage summary for authenticated caller
 //!   GET /billing/rates   — public rate card (no auth required)
 //!   GET /billing/balance — pre-paid credit balance (placeholder)
+//!
+//! All stateful handlers receive `Arc<AppState>` from the combined server
+//! and extract `meter` for usage lookups via the `HasMeter` trait.
 
+use std::sync::Arc;
+
+use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use axum::Json;
 use serde_json::json;
 use tracing::info;
 
+use crate::metering::StationMeter;
 use crate::pricing;
 
+/// Trait for any state type that provides access to the metering engine.
+pub trait HasMeter {
+    fn meter(&self) -> &Arc<StationMeter>;
+}
+
 /// GET /billing/usage — requires Bearer auth, returns usage for the caller's key prefix.
-pub async fn handle_usage(headers: HeaderMap) -> impl IntoResponse {
+pub async fn handle_usage<S: HasMeter>(
+    State(state): State<Arc<S>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
     let auth_header = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
@@ -32,20 +47,43 @@ pub async fn handle_usage(headers: HeaderMap) -> impl IntoResponse {
 
     info!(client = %client_id, "Billing usage request");
 
-    // In metering-only mode, return placeholder
-    // Full implementation reads from Firestore via usage_store
-    (StatusCode::OK, Json(json!({
-        "client_id": client_id,
-        "period": "current",
-        "input_tokens": 0,
-        "output_tokens": 0,
-        "tool_calls": 0,
-        "estimated_cost_microcents": 0,
-        "estimated_cost_usd": "$0.0000",
-        "harness_markup_pct": pricing::harness_markup_pct(),
-        "status": "metering_only",
-        "message": "Usage data is being collected. Full reporting available after metering validation."
-    }))).into_response()
+    let usage = state.meter().get_usage(&client_id);
+
+    match usage {
+        Some(u) => {
+            let total_tokens = u.total_input_tokens + u.total_output_tokens;
+            let cost_usd = u.total_cost_microcents as f64 / 100_000_000.0;
+            (StatusCode::OK, Json(json!({
+                "client_id": client_id,
+                "period": u.period,
+                "input_tokens": u.total_input_tokens,
+                "output_tokens": u.total_output_tokens,
+                "total_tokens": total_tokens,
+                "tool_calls": u.total_tool_calls,
+                "cost_microcents": u.total_cost_microcents,
+                "cost_usd": format!("${:.4}", cost_usd),
+                "harness_markup_pct": pricing::harness_markup_pct(),
+                "tool_breakdown": u.tool_breakdown,
+                "status": "active"
+            }))).into_response()
+        }
+        None => {
+            (StatusCode::OK, Json(json!({
+                "client_id": client_id,
+                "period": "current",
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "tool_calls": 0,
+                "cost_microcents": 0,
+                "cost_usd": "$0.0000",
+                "harness_markup_pct": pricing::harness_markup_pct(),
+                "tool_breakdown": {},
+                "status": "active",
+                "message": "No usage recorded yet for this key."
+            }))).into_response()
+        }
+    }
 }
 
 /// GET /billing/rates — public rate card, no auth required.
@@ -68,7 +106,10 @@ pub async fn handle_rates() -> impl IntoResponse {
 }
 
 /// GET /billing/balance — pre-paid credit balance (placeholder for Stripe integration).
-pub async fn handle_balance(headers: HeaderMap) -> impl IntoResponse {
+pub async fn handle_balance<S: HasMeter>(
+    State(state): State<Arc<S>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
     let auth_header = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
@@ -86,11 +127,17 @@ pub async fn handle_balance(headers: HeaderMap) -> impl IntoResponse {
 
     info!(client = %client_id, "Billing balance request");
 
+    let usage = state.meter().get_usage(&client_id);
+    let accrued = usage.map(|u| u.total_cost_microcents).unwrap_or(0);
+    let accrued_usd = accrued as f64 / 100_000_000.0;
+
     (StatusCode::OK, Json(json!({
         "client_id": client_id,
+        "accrued_cost_microcents": accrued,
+        "accrued_cost_usd": format!("${:.4}", accrued_usd),
         "balance_microcents": 0,
         "balance_usd": "$0.00",
-        "status": "pre_launch",
-        "message": "Billing is in metering-only mode. Credits and payments coming soon."
+        "status": "metering",
+        "message": "Usage is being metered. Payment integration coming soon."
     }))).into_response()
 }

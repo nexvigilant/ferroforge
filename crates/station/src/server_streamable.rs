@@ -343,9 +343,11 @@ async fn handle_streamable_initialize(
     let response = handle_request(
         &state.registry,
         &state.telemetry,
+        Some(&state.meter),
         &state.auth_gate,
         &request,
         Some(&state.event_tx),
+        None,
     );
 
     match response {

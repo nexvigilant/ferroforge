@@ -80,7 +80,7 @@ async fn handle_rpc(
         }
     }
 
-    let response = handle_request(&state.registry, &state.telemetry, &state.auth_gate, &request, Some(&state.event_tx));
+    let response = handle_request(&state.registry, &state.telemetry, None, &state.auth_gate, &request, Some(&state.event_tx), None);
     match response {
         Some(resp) => (StatusCode::OK, Json(resp)).into_response(),
         None => StatusCode::ACCEPTED.into_response(),
@@ -125,7 +125,7 @@ async fn handle_tool_call(
         })),
     };
 
-    let response = handle_request(&state.registry, &state.telemetry, &state.auth_gate, &request, Some(&state.event_tx));
+    let response = handle_request(&state.registry, &state.telemetry, None, &state.auth_gate, &request, Some(&state.event_tx), None);
     match response {
         Some(resp) => {
             // Unwrap the JSON-RPC envelope for REST clients

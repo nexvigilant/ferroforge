@@ -50,6 +50,12 @@ struct AppState {
     meter: Arc<crate::metering::StationMeter>,
 }
 
+impl crate::billing_api::HasMeter for AppState {
+    fn meter(&self) -> &Arc<crate::metering::StationMeter> {
+        &self.meter
+    }
+}
+
 /// Run the combined MCP server — SSE + HTTP REST on one port.
 ///
 /// Serves ALL transport surfaces simultaneously:
@@ -73,7 +79,21 @@ pub async fn run_combined(
     let registry_arc = Arc::new(registry);
     let telemetry_arc = Arc::new(telemetry);
 
-    let meter = Arc::new(crate::metering::StationMeter::new(None, None));
+    // Production (Cloud Run): persist to Firestore + JSONL log
+    // Local dev: in-memory only
+    let project_id = std::env::var("GOOGLE_CLOUD_PROJECT").ok()
+        .or_else(|| std::env::var("GCP_PROJECT").ok());
+    let usage_store = project_id.map(|pid| {
+        Arc::new(crate::usage_store::UsageStore::new(Some(pid)))
+    });
+    let meter_log = if std::env::var("K_SERVICE").is_ok() {
+        // Cloud Run: log to /tmp (ephemeral, but captured by Cloud Logging via structured stderr)
+        Some(std::path::PathBuf::from("/tmp/station-metering.jsonl"))
+    } else {
+        // Local dev: log next to telemetry
+        Some(std::path::PathBuf::from("station-metering.jsonl"))
+    };
+    let meter = Arc::new(crate::metering::StationMeter::new(meter_log, usage_store));
 
     let state = Arc::new(AppState {
         registry: Arc::clone(&registry_arc),
@@ -154,10 +174,10 @@ pub async fn run_combined(
         .route("/rpc", post(handle_rpc))
         .route("/tools", get(handle_list_tools))
         .route("/tools/{name}", post(handle_tool_call))
-        // Billing API (outside rate limiter)
-        .route("/billing/usage", get(crate::billing_api::handle_usage))
+        // Billing API (uses AppState via HasMeter trait)
         .route("/billing/rates", get(crate::billing_api::handle_rates))
-        .route("/billing/balance", get(crate::billing_api::handle_balance))
+        .route("/billing/usage", get(crate::billing_api::handle_usage::<AppState>))
+        .route("/billing/balance", get(crate::billing_api::handle_balance::<AppState>))
         // Health + Stats (excluded from rate limiting below via middleware ordering)
         .route("/", get(handle_root))
         .route("/.well-known/mcp.json", get(handle_well_known_mcp))
@@ -257,13 +277,13 @@ async fn handle_message(
     Json(request): Json<JsonRpcRequest>,
 ) -> impl IntoResponse {
     let session_id = &query.session_id;
+    let auth_header = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok().map(|s| s.to_string()));
 
     // Auth gate: check tools/call requests (before locking sessions)
     if request.method == "tools/call" {
-        let auth_header = headers
-            .get(axum::http::header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok());
-        let result = state.auth_gate.check_rpc(auth_header, request.params.as_ref());
+        let result = state.auth_gate.check_rpc(auth_header.as_deref(), request.params.as_ref());
         if !matches!(result, AuthResult::Allowed) {
             warn!(session_id = %session_id, "Unauthorized tool call attempt");
             return StatusCode::UNAUTHORIZED;
@@ -287,7 +307,7 @@ async fn handle_message(
         "SSE message received"
     );
 
-    let response = handle_request(&state.registry, &state.telemetry, &state.auth_gate, &request, Some(&state.event_tx));
+    let response = handle_request(&state.registry, &state.telemetry, Some(&state.meter), &state.auth_gate, &request, Some(&state.event_tx), auth_header.as_deref());
 
     if let Some(resp) = response {
         let json = match serde_json::to_string(&resp) {
@@ -318,19 +338,19 @@ async fn handle_rpc(
     Json(request): Json<JsonRpcRequest>,
 ) -> impl IntoResponse {
     debug!(method = %request.method, "HTTP RPC request");
+    let auth_header = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok().map(|s| s.to_string()));
 
     // Auth gate: check tools/call requests for non-meta tools
     if request.method == "tools/call" {
-        let auth_header = headers
-            .get(axum::http::header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok());
-        let result = state.auth_gate.check_rpc(auth_header, request.params.as_ref());
+        let result = state.auth_gate.check_rpc(auth_header.as_deref(), request.params.as_ref());
         if !matches!(result, AuthResult::Allowed) {
             return (StatusCode::UNAUTHORIZED, Json(auth::auth_error_json(&result))).into_response();
         }
     }
 
-    let response = handle_request(&state.registry, &state.telemetry, &state.auth_gate, &request, Some(&state.event_tx));
+    let response = handle_request(&state.registry, &state.telemetry, Some(&state.meter), &state.auth_gate, &request, Some(&state.event_tx), auth_header.as_deref());
     match response {
         Some(resp) => (StatusCode::OK, Json(resp)).into_response(),
         None => StatusCode::ACCEPTED.into_response(),
@@ -361,8 +381,8 @@ async fn handle_tool_call(
     // Auth gate: check tool access
     let auth_header = headers
         .get(axum::http::header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
-    let result = state.auth_gate.check(auth_header, &name);
+        .and_then(|v| v.to_str().ok().map(|s| s.to_string()));
+    let result = state.auth_gate.check(auth_header.as_deref(), &name);
     if !matches!(result, AuthResult::Allowed) {
         return (StatusCode::UNAUTHORIZED, Json(auth::auth_error_json(&result))).into_response();
     }
@@ -377,7 +397,7 @@ async fn handle_tool_call(
         })),
     };
 
-    let response = handle_request(&state.registry, &state.telemetry, &state.auth_gate, &request, Some(&state.event_tx));
+    let response = handle_request(&state.registry, &state.telemetry, Some(&state.meter), &state.auth_gate, &request, Some(&state.event_tx), auth_header.as_deref());
     match response {
         Some(resp) => {
             if let Some(result) = resp.result {

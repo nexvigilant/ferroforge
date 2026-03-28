@@ -381,7 +381,7 @@ fn test_route_unique_request_ids() {
 fn test_handle_initialize() {
     let reg = test_registry();
     let req = make_request(Some(json!(1)), "initialize", Some(json!({})));
-    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), &req, None, None).expect("should respond");
     let result = resp.result.expect("should have result");
     assert_eq!(result["protocolVersion"], "2025-03-26");
     assert_eq!(result["serverInfo"]["name"], "nexvigilant-station");
@@ -392,7 +392,7 @@ fn test_handle_initialize() {
 fn test_handle_tools_list() {
     let reg = test_registry();
     let req = make_request(Some(json!(2)), "tools/list", None);
-    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), &req, None, None).expect("should respond");
     let result = resp.result.expect("should have result");
     let tools = result["tools"].as_array().expect("tools array");
     // 3 config tools + 5 meta tools
@@ -410,7 +410,7 @@ fn test_handle_tools_call_with_stub() {
             "arguments": {"drug_name": "aspirin"}
         })),
     );
-    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), &req, None, None).expect("should respond");
     let result = resp.result.expect("should have result");
     let content = result["content"].as_array().expect("content");
     assert_eq!(content.len(), 1);
@@ -421,7 +421,7 @@ fn test_handle_tools_call_with_stub() {
 fn test_handle_tools_call_missing_name() {
     let reg = test_registry();
     let req = make_request(Some(json!(4)), "tools/call", Some(json!({"arguments": {}})));
-    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), &req, None, None).expect("should respond");
     let err = resp.error.expect("should have error");
     assert_eq!(err.code, INVALID_PARAMS);
 }
@@ -430,7 +430,7 @@ fn test_handle_tools_call_missing_name() {
 fn test_handle_ping() {
     let reg = test_registry();
     let req = make_request(Some(json!(5)), "ping", None);
-    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), &req, None, None).expect("should respond");
     assert!(resp.result.is_some());
     assert!(resp.error.is_none());
 }
@@ -439,7 +439,7 @@ fn test_handle_ping() {
 fn test_handle_unknown_method() {
     let reg = test_registry();
     let req = make_request(Some(json!(6)), "bogus/method", None);
-    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("should respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), &req, None, None).expect("should respond");
     let err = resp.error.expect("should have error");
     assert_eq!(err.code, METHOD_NOT_FOUND);
 }
@@ -448,7 +448,7 @@ fn test_handle_unknown_method() {
 fn test_handle_notification_returns_none() {
     let reg = test_registry();
     let req = make_request(None, "notifications/initialized", None);
-    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None);
+    let resp = server::handle_request(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), &req, None, None);
     assert!(resp.is_none(), "notifications should return None");
 }
 
@@ -461,7 +461,7 @@ fn test_e2e_json_roundtrip_initialize() {
     let raw = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}"#;
     let req: JsonRpcRequest = serde_json::from_str(raw).expect("parse");
     let reg = test_registry();
-    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), &req, None, None).expect("respond");
     let json_str = serde_json::to_string(&resp).expect("serialize");
     let reparsed: Value = serde_json::from_str(&json_str).expect("reparse");
     assert_eq!(reparsed["jsonrpc"], "2.0");
@@ -474,7 +474,7 @@ fn test_e2e_json_roundtrip_tools_call() {
     let raw = r#"{"jsonrpc":"2.0","id":99,"method":"tools/call","params":{"name":"dailymed_nlm_nih_gov_get_drug_label","arguments":{"drug_name":"metformin"}}}"#;
     let req: JsonRpcRequest = serde_json::from_str(raw).expect("parse");
     let reg = test_registry();
-    let resp = server::handle_request(&reg, &test_telemetry(), &ApiKeyGate::new(None), &req, None).expect("respond");
+    let resp = server::handle_request(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), &req, None, None).expect("respond");
     let json_str = serde_json::to_string(&resp).expect("serialize");
     let reparsed: Value = serde_json::from_str(&json_str).expect("reparse");
     assert_eq!(reparsed["id"], 99);

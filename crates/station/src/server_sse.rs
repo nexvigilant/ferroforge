@@ -211,7 +211,7 @@ async fn handle_message(
         "SSE message received"
     );
 
-    let response = handle_request(&state.registry, &state.telemetry, &state.auth_gate, &request, Some(&state.event_tx));
+    let response = handle_request(&state.registry, &state.telemetry, None, &state.auth_gate, &request, Some(&state.event_tx), None);
 
     if let Some(resp) = response {
         let json = match serde_json::to_string(&resp) {
