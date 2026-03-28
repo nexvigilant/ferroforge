@@ -80,6 +80,35 @@ PARAMETER_ALIGNMENT: dict[str, dict[str, str]] = {
     "ich_proxy.py":              {**_query_alias_map("query")},
     "cioms_proxy.py":            {**_query_alias_map("query")},
     "wikipedia_proxy.py":        {**_query_alias_map("query")},
+    # --- Pharma proxy accepts query alias ---
+    "pharma_proxy.py":           {**_query_alias_map("query")},
+    # --- Lilly proxy expects "product" for drug queries ---
+    "lilly_proxy.py":            {**_drug_alias_map("product"), **_query_alias_map("product")},
+    # --- Novartis proxy expects "product_name" for drug queries ---
+    "novartis_proxy.py":         {**_drug_alias_map("product_name"), **_query_alias_map("query")},
+}
+
+
+# ---------------------------------------------------------------------------
+# Pharma Company Injection: shared proxy needs company_key in arguments
+# ---------------------------------------------------------------------------
+
+COMPANY_INJECTION: dict[str, str] = {
+    "www_pfizer_com_": "pfizer",
+    "www_novartis_com_": "novartis",
+    "www_roche_com_": "roche",
+    "www_jnj_com_": "jnj",
+    "www_merck_com_": "merck",
+    "www_astrazeneca_com_": "astrazeneca",
+    "www_gsk_com_": "gsk",
+    "www_sanofi_com_": "sanofi",
+    "www_abbvie_com_": "abbvie",
+    "www_lilly_com_": "lilly",
+    "www_bms_com_": "bms",
+    "www_novonordisk_com_": "novonordisk",
+    "www_amgen_com_": "amgen",
+    "www_gilead_com_": "gilead",
+    "www_bayer_com_": "bayer",
 }
 
 
@@ -153,6 +182,13 @@ def _discover_routes() -> dict[str, str]:
 
 
 DOMAIN_ROUTES: dict[str, str] = _discover_routes()
+
+# Override self-referential routes: pharma configs point to dispatch.py in
+# their proxy field (so the Rust router sends the full prefixed name here),
+# but dispatch must forward them to pharma_proxy.py, not back to itself.
+for _prefix in COMPANY_INJECTION:
+    if _prefix in DOMAIN_ROUTES and DOMAIN_ROUTES[_prefix] == "dispatch.py":
+        DOMAIN_ROUTES[_prefix] = "pharma_proxy.py"
 
 # Ordered by prefix length (longest first) so that more-specific prefixes win
 # when two prefixes share a common stem (e.g. future sub-domain variants).
@@ -299,6 +335,14 @@ def dispatch(envelope: dict) -> dict:
         }
 
     aligned_args = align_parameters(proxy_path, arguments)
+
+    # Inject company_key for pharma configs sharing a single proxy
+    if Path(proxy_path).name == "pharma_proxy.py":
+        for prefix, company_key in COMPANY_INJECTION.items():
+            if tool_name.startswith(prefix):
+                aligned_args["company_key"] = company_key
+                break
+
     return call_proxy(proxy_path, unprefixed, aligned_args, request_id)
 
 
