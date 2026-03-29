@@ -92,10 +92,16 @@ def call_nexcore(tool_name: str, arguments: dict) -> dict:
         proc.stdin.write(notif)
         proc.stdin.flush()
 
-        # Step 3: tools/call
+        # Step 3: tools/call via the `nexcore` unified dispatcher
+        # The nexcore-mcp binary registers tools via #[tool] on the server handler,
+        # but the 1,378 unified dispatch tools are only accessible through the
+        # `nexcore` mega-tool which routes internally via unified.rs match table.
         call_req = json.dumps({
             "jsonrpc": "2.0", "id": 2, "method": "tools/call",
-            "params": {"name": tool_name, "arguments": arguments},
+            "params": {
+                "name": "nexcore",
+                "arguments": {"command": tool_name, "params": arguments},
+            },
         }) + "\n"
         proc.stdin.write(call_req)
         proc.stdin.flush()
