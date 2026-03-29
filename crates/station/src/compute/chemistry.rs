@@ -1,5 +1,6 @@
 //! Chemistry computation tools — Hill, Arrhenius, decay, equilibrium, thermodynamics.
 
+use std::f64::consts::{LN_2, LN_10};
 use serde_json::{Value, json};
 
 pub fn handle(bare_name: &str, args: &Value) -> Option<Value> {
@@ -90,7 +91,7 @@ fn decay(args: &Value) -> Value {
     // Accept either half_life or decay_constant
     let lambda = if let Some(hl) = get_f64(args, "half_life") {
         if hl <= 0.0 { return err("Half-life must be positive"); }
-        0.693147 / hl
+        LN_2 / hl
     } else if let Some(l) = get_f64(args, "decay_constant") {
         if l <= 0.0 { return err("Decay constant must be positive"); }
         l
@@ -100,7 +101,7 @@ fn decay(args: &Value) -> Value {
 
     let remaining = n0 * (-lambda * t).exp();
     let fraction_remaining = remaining / n0;
-    let half_life = 0.693147 / lambda;
+    let half_life = LN_2 / lambda;
 
     json!({
         "status": "ok",
@@ -112,7 +113,7 @@ fn decay(args: &Value) -> Value {
         "time": t,
         "half_life": half_life,
         "decay_constant": lambda,
-        "time_to_10pct": 2.302585 / lambda,
+        "time_to_10pct": LN_10 / lambda,
         "time_to_1pct": 4.60517 / lambda,
     })
 }

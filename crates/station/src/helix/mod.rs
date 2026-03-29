@@ -7,7 +7,7 @@ use nexcore_helix::{
     ConservationInput, Turn,
     conservation, derivatives, helix_position, mutualism_test,
     can_advance, binding_laws, vice_risk,
-    dna::{Codon, Strand},
+    dna::Codon,
 };
 use serde_json::{Value, json};
 use tracing::info;

@@ -390,7 +390,7 @@ fn map_to_tov(args: &Value) -> Value {
         None => return err("Missing 'level' (integer 1-8)"),
     };
 
-    if level < 1 || level > 8 {
+    if !(1..=8).contains(&level) {
         return err("'level' must be an integer between 1 and 8");
     }
 

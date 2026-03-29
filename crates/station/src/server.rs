@@ -95,6 +95,7 @@ pub fn handle_request_with_auth(
 }
 
 /// Handle request with proxy cache for FAERS total count acceleration.
+#[allow(clippy::too_many_arguments)]
 pub fn handle_request_cached(
     registry: &ConfigRegistry,
     telemetry: &StationTelemetry,
@@ -108,6 +109,7 @@ pub fn handle_request_cached(
     handle_request_core(registry, telemetry, meter, auth_gate, req, event_tx, auth_header, Some(proxy_cache))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_request_core(
     registry: &ConfigRegistry,
     telemetry: &StationTelemetry,

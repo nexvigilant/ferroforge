@@ -155,10 +155,10 @@ fn read_json_rpc(reader: &mut dyn Read, expected_id: i64) -> anyhow::Result<Valu
         if buf_reader.read_line(&mut line)? == 0 {
             break;
         }
-        if let Ok(val) = serde_json::from_str::<Value>(&line) {
-            if val.get("id").and_then(|v| v.as_i64()) == Some(expected_id) {
-                return Ok(val);
-            }
+        if let Ok(val) = serde_json::from_str::<Value>(&line)
+            && val.get("id").and_then(|v| v.as_i64()) == Some(expected_id)
+        {
+            return Ok(val);
         }
     }
     Err(anyhow::anyhow!("Timeout or protocol error waiting for RPC id {}", expected_id))

@@ -17,7 +17,7 @@ use uuid::Uuid;
 use crate::auth::{self, ApiKeyGate, AuthResult};
 use crate::config::ConfigRegistry;
 use crate::protocol::{JsonRpcRequest, StationEvent, StationEventNotification};
-use crate::server::{handle_request, handle_request_cached};
+use crate::server::handle_request_cached;
 use crate::server_streamable::StreamableState;
 use crate::telemetry::StationTelemetry;
 
@@ -598,7 +598,7 @@ async fn handle_configs_lookup(
     let query_lower = query.to_lowercase();
     let matched: Vec<Value> = state.registry.configs.iter()
         .filter(|c| c.domain.to_lowercase().contains(&query_lower))
-        .map(|c| config_to_moltbook_json(c))
+        .map(config_to_moltbook_json)
         .collect();
 
     Json(serde_json::json!({ "configs": matched }))
@@ -661,13 +661,11 @@ fn config_to_moltbook_json(config: &crate::config::HubConfig) -> Value {
         "eudravigilance-live.ema.europa.eu", "www.ema.europa.eu",
         "vigiaccess.org", "en.wikipedia.org", "claude.ai", "www.linkedin.com",
     ].iter().any(|&d| domain_lower == d)
-    {
-        "live-api"
-    } else if domain_lower.starts_with("www.") && [
-        "abbvie", "amgen", "astrazeneca", "bayer", "bms", "gilead",
-        "gsk", "jnj", "lilly", "merck", "novartis", "novonordisk",
-        "pfizer", "roche", "sanofi", "fda.gov",
-    ].iter().any(|company| domain_lower.contains(company))
+        || (domain_lower.starts_with("www.") && [
+            "abbvie", "amgen", "astrazeneca", "bayer", "bms", "gilead",
+            "gsk", "jnj", "lilly", "merck", "novartis", "novonordisk",
+            "pfizer", "roche", "sanofi", "fda.gov",
+        ].iter().any(|company| domain_lower.contains(company)))
     {
         "live-api"
     } else {

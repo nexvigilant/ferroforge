@@ -1,5 +1,6 @@
 //! Pharmacokinetics computation tools — AUC, clearance, half-life, steady state.
 
+use std::f64::consts::LN_2;
 use serde_json::{Value, json};
 
 pub fn handle(bare_name: &str, args: &Value) -> Option<Value> {
@@ -106,7 +107,7 @@ fn pk_half_life(args: &Value) -> Value {
     // Can compute from ke or from two concentration points
     if let Some(ke) = get_f64(args, "ke") {
         if ke <= 0.0 { return err("ke must be positive"); }
-        let t_half = 0.693147 / ke;
+        let t_half = LN_2 / ke;
         return json!({
             "status": "ok",
             "method": "half_life_from_ke",
@@ -126,7 +127,7 @@ fn pk_half_life(args: &Value) -> Value {
     if dt <= 0.0 { return err("t2 must be greater than t1"); }
 
     let ke = (c1 / c2).ln() / dt;
-    let t_half = 0.693147 / ke;
+    let t_half = LN_2 / ke;
 
     json!({
         "status": "ok",
@@ -147,7 +148,7 @@ fn pk_steady_state(args: &Value) -> Value {
         if cl <= 0.0 { return err("Clearance must be positive"); }
         let css_avg = (bioavailability * dose) / (cl * interval);
         let ke = cl / vd;
-        let t_half = 0.693147 / ke;
+        let t_half = LN_2 / ke;
         let time_to_ss = 4.0 * t_half; // ~94% of Css
 
         return json!({
@@ -166,7 +167,7 @@ fn pk_steady_state(args: &Value) -> Value {
         if ke <= 0.0 { return err("ke must be positive"); }
         let vd = get_f64(args, "vd").unwrap_or(1.0);
         let css_avg = (bioavailability * dose) / (vd * ke * interval);
-        let t_half = 0.693147 / ke;
+        let t_half = LN_2 / ke;
 
         return json!({
             "status": "ok",

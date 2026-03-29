@@ -4,7 +4,6 @@
 //! 6 tools: dedup_pair, dedup_batch, triage_decay, triage_reinforce, triage_queue, status.
 
 use nexcore_algovigilance::dedup::tokenizer::narrative_similarity;
-use nexcore_algovigilance::dedup::types::DedupConfig;
 use nexcore_algovigilance::triage::decay::apply_decay;
 use nexcore_algovigilance::triage::queue::SignalQueue;
 use nexcore_algovigilance::triage::types::TriageConfig;

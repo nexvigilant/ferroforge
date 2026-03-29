@@ -46,9 +46,7 @@ fn classify_source(domain: &str) -> &'static str {
         "accessdata.fda.gov", "eudravigilance.ema.europa.eu",
         "eudravigilance-live.ema.europa.eu", "www.ema.europa.eu",
         "vigiaccess.org", "en.wikipedia.org",
-    ].iter().any(|&x| d == x) {
-        "live-api"
-    } else if d.starts_with("www.") {
+    ].iter().any(|&x| d == x) || d.starts_with("www.") {
         "live-api"
     } else {
         "reference"
@@ -91,7 +89,7 @@ fn handle_lookup(args: &Value, registry: &ConfigRegistry) -> Value {
     let query_lower = query.to_lowercase();
     let matched: Vec<Value> = registry.configs.iter()
         .filter(|c| c.domain.to_lowercase().contains(&query_lower))
-        .map(|c| config_to_json(c))
+        .map(config_to_json)
         .collect();
 
     json!({
@@ -247,7 +245,7 @@ fn handle_watch(registry: &ConfigRegistry) -> Value {
 
         let stub_count = config.tools.iter().filter(|t| t.stub_response.is_some()).count();
         let status = if proxy_status == "missing_proxy" { "degraded" }
-            else if stub_count == config.tools.len() && config.tools.len() > 0 { "stub_only" }
+            else if stub_count == config.tools.len() && !config.tools.is_empty() { "stub_only" }
             else if stub_count > 0 { "partial" }
             else { "healthy" };
 

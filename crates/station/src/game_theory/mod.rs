@@ -60,11 +60,11 @@ fn to_2x2(arr: &Value) -> Option<[[f64; 2]; 2]> {
 }
 
 fn handle_nash_2x2(args: &Value) -> Value {
-    let row = match args.get("row_payoffs").and_then(|v| to_2x2(v)) {
+    let row = match args.get("row_payoffs").and_then(to_2x2) {
         Some(m) => m,
         None => return err("row_payoffs must be a 2x2 matrix [[a,b],[c,d]]"),
     };
-    let col = match args.get("col_payoffs").and_then(|v| to_2x2(v)) {
+    let col = match args.get("col_payoffs").and_then(to_2x2) {
         Some(m) => m,
         None => return err("col_payoffs must be a 2x2 matrix [[e,f],[g,h]]"),
     };

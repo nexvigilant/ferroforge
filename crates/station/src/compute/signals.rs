@@ -8,6 +8,7 @@
 //!    Drug-       c         d       c+d
 //! ```
 
+use std::f64::consts::LN_2;
 use serde_json::{Value, json};
 
 pub fn handle(bare_name: &str, args: &Value) -> Option<Value> {
@@ -271,7 +272,7 @@ fn z_quantile(p: f64) -> f64 {
     if p >= 1.0 { return f64::INFINITY; }
     let a = [
         -3.969683028665376e+01, 2.209460984245205e+02,
-        -2.759285104469687e+02, 1.383577518672690e+02,
+        -2.759285104469687e+02, 1.383_577_518_672_69e2,
         -3.066479806614716e+01, 2.506628277459239e+00,
     ];
     let b = [
@@ -453,7 +454,7 @@ fn signal_half_life(args: &Value) -> Value {
         if decay_rate <= 0.0 {
             return err("decay_rate must be positive");
         }
-        let half_life = 0.693147 / decay_rate;
+        let half_life = LN_2 / decay_rate;
         let threshold = get_f64(args, "detection_threshold").unwrap_or(1.0);
         let months_until = if initial > threshold && decay_rate > 0.0 {
             (initial / threshold).ln() / decay_rate
@@ -524,7 +525,7 @@ fn signal_half_life(args: &Value) -> Value {
         });
     }
 
-    let half_life = -0.693147 / slope;
+    let half_life = -LN_2 / slope;
 
     json!({
         "status": "ok",
@@ -640,7 +641,7 @@ fn time_to_onset(args: &Value) -> Value {
     let median = {
         let mut sorted = data.clone();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        if sorted.len() % 2 == 0 {
+        if sorted.len().is_multiple_of(2) {
             (sorted[sorted.len() / 2 - 1] + sorted[sorted.len() / 2]) / 2.0
         } else {
             sorted[sorted.len() / 2]

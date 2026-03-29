@@ -21,6 +21,12 @@ pub struct ProxyCache {
 
 const PROXY_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(3600);
 
+impl Default for ProxyCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProxyCache {
     pub fn new() -> Self {
         Self {
@@ -41,10 +47,10 @@ impl ProxyCache {
 
     /// Update cached FAERS total from a proxy response.
     fn update_faers_total(&self, n: u64) {
-        if n > 0 {
-            if let Ok(mut guard) = self.faers_total.lock() {
-                *guard = (n, std::time::Instant::now());
-            }
+        if n > 0
+            && let Ok(mut guard) = self.faers_total.lock()
+        {
+            *guard = (n, std::time::Instant::now());
         }
     }
 
@@ -54,6 +60,7 @@ impl ProxyCache {
 ///
 /// Auth enforcement lives here — the single chokepoint for all transports.
 /// Pass `None` for `auth_header` in stdio/dev mode (auth gate handles it).
+#[allow(clippy::too_many_arguments)]
 pub fn route_tool_call(
     registry: &ConfigRegistry,
     telemetry: &StationTelemetry,
@@ -527,12 +534,11 @@ fn execute_proxy(
     // 2.2s N query on repeat calls. The proxy reads _cached_faers_total from
     // the envelope and skips the upstream fetch when present.
     let is_openvigil = tool_name.contains("open_vigil") || tool_name.contains("open-vigil");
-    if is_openvigil {
-        if let Some(cache) = proxy_cache {
-            if let Some(n) = cache.faers_total() {
-                envelope["_cached_faers_total"] = Value::from(n);
-            }
-        }
+    if is_openvigil
+        && let Some(cache) = proxy_cache
+        && let Some(n) = cache.faers_total()
+    {
+        envelope["_cached_faers_total"] = Value::from(n);
     }
 
     let envelope_str = serde_json::to_string(&envelope).unwrap_or_else(|_| "{}".into());
@@ -608,15 +614,13 @@ fn execute_proxy(
             } else if let Ok(json) = serde_json::from_str::<Value>(stdout.trim()) {
                 // Update proxy cache from OpenVigil responses (FAERS total count).
                 // Reuse the already-parsed `json` value instead of re-parsing stdout.
-                if is_openvigil {
-                    if let Some(cache) = proxy_cache {
-                        if let Some(n) = json.get("contingency_table")
-                            .and_then(|ct| ct.get("total_reports"))
-                            .and_then(|v| v.as_u64())
-                        {
-                            cache.update_faers_total(n);
-                        }
-                    }
+                if is_openvigil
+                    && let Some(cache) = proxy_cache
+                    && let Some(n) = json.get("contingency_table")
+                        .and_then(|ct| ct.get("total_reports"))
+                        .and_then(|v| v.as_u64())
+                {
+                    cache.update_faers_total(n);
                 }
                 serde_json::to_string_pretty(&json).unwrap_or(stdout)
             } else {

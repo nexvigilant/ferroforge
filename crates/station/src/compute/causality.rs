@@ -139,9 +139,9 @@ fn who_umc(args: &Value) -> Value {
     let alternative = get_any(args, &["alternative_causes", "alternative_explanation"])
         .map_or("unknown", parse_answer);
     let known_response = get_any(args, &["known_response_pattern", "known_response"])
-        .map_or(false, |v| v.as_bool().unwrap_or(parse_answer(v) == "yes"));
+        .is_some_and(|v| v.as_bool().unwrap_or(parse_answer(v) == "yes"));
     let plausible = get_any(args, &["pharmacologically_plausible", "sufficient_information"])
-        .map_or(false, |v| v.as_bool().unwrap_or(parse_answer(v) == "yes"));
+        .is_some_and(|v| v.as_bool().unwrap_or(parse_answer(v) == "yes"));
 
     let category = if temporal == "yes" && dechallenge == "yes" && rechallenge == "yes"
         && alternative == "no" && known_response

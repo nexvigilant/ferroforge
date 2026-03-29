@@ -437,7 +437,7 @@ fn handle_join(args: &Value) -> Value {
         Err(e) => return err(&format!("right: {e}")),
     };
 
-    let on_refs: Vec<&str> = on_cols.iter().copied().collect();
+    let on_refs: Vec<&str> = on_cols.to_vec();
     let result = match left_df.join(&right_df, &on_refs, how) {
         Ok(d) => d,
         Err(e) => return err(&format!("{e}")),

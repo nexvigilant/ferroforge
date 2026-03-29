@@ -69,7 +69,7 @@ fn handle_run(args: &Value) -> Value {
         None => return err(&format!("heligram not found: {name}. Use heligram_nexvigilant_com_list to see available heligrams.")),
     };
 
-    match std::process::Command::new(&rsk_binary())
+    match std::process::Command::new(rsk_binary())
         .args(["heligram", "run", &path, "-i", &input_str])
         .output()
     {
@@ -100,7 +100,7 @@ fn handle_test(args: &Value) -> Value {
         None => return err(&format!("heligram not found: {name}")),
     };
 
-    match std::process::Command::new(&rsk_binary())
+    match std::process::Command::new(rsk_binary())
         .args(["heligram", "test", &path])
         .output()
     {
@@ -121,7 +121,7 @@ fn handle_test(args: &Value) -> Value {
 }
 
 fn handle_list() -> Value {
-    match std::process::Command::new(&rsk_binary())
+    match std::process::Command::new(rsk_binary())
         .args(["heligram", "list", HELIGRAM_DIR])
         .output()
     {
@@ -142,7 +142,7 @@ fn handle_list() -> Value {
 }
 
 fn handle_test_all() -> Value {
-    match std::process::Command::new(&rsk_binary())
+    match std::process::Command::new(rsk_binary())
         .args(["heligram", "test-all", HELIGRAM_DIR])
         .output()
     {

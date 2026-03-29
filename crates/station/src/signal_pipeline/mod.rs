@@ -107,8 +107,8 @@ fn handle_detect(args: &Value) -> Value {
 
     let table = ContingencyTable::new(a, b, c, d);
     let metrics = nexcore_signal_pipeline::stats::compute_all(&table);
-    let detected = metrics.prr.as_ref().map_or(false, |p| p.0 >= 2.0)
-        || metrics.ror.as_ref().map_or(false, |r| r.0 >= 2.0);
+    let detected = metrics.prr.as_ref().is_some_and(|p| p.0 >= 2.0)
+        || metrics.ror.as_ref().is_some_and(|r| r.0 >= 2.0);
 
     ok(json!({
         "detected": detected,

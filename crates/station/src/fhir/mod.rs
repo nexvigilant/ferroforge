@@ -120,8 +120,7 @@ fn handle_validate(args: &Value) -> Value {
             let has_resource_type = v.get("resourceType").is_some();
             let rt_matches = v
                 .get("resourceType")
-                .and_then(|r| r.as_str())
-                .map_or(false, |r| r == resource_type);
+                .and_then(|r| r.as_str()) == Some(resource_type);
             ok(json!({
                 "valid_json": true,
                 "has_resource_type": has_resource_type,

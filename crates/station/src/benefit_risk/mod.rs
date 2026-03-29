@@ -314,7 +314,7 @@ fn compute_therapeutic_window(args: &Value) -> Value {
         Err(e) => return err(&e.to_string()),
     };
 
-    let n = if bounds.intervals % 2 != 0 { bounds.intervals + 1 } else { bounds.intervals };
+    let n = if !bounds.intervals.is_multiple_of(2) { bounds.intervals + 1 } else { bounds.intervals };
     let eff_auc = nexcore_qbr::simpson_integrate(
         |d| hill_response(d, efficacy.k_half, efficacy.n_hill), bounds.dose_min, bounds.dose_max, n,
     ).unwrap_or(0.0);

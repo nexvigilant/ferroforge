@@ -4,9 +4,8 @@
 //! 5 tools: gap_analysis, plan, epa_readiness, evaluate, phase_info.
 
 use nexcore_cccp::assess::GapAnalysis;
-use nexcore_cccp::follow_up::{Achievement, ObjectiveEvaluation, OutcomeEvaluation};
 use nexcore_cccp::plan::EngagementPlan;
-use nexcore_vigilance::caba::{DomainCategory, DomainStateVector, ProficiencyLevel};
+use nexcore_vigilance::caba::{DomainStateVector, ProficiencyLevel};
 use serde_json::{Value, json};
 use tracing::info;
 
@@ -217,7 +216,7 @@ fn handle_evaluate(args: &Value) -> Value {
         .and_then(|v| v.as_u64())
         .unwrap_or(3) as u8;
 
-    let current_vec = DomainStateVector::new(current);
+    let _current_vec = DomainStateVector::new(current);
     let target = level_from_u8(target_level);
 
     // Count domains at or above target
@@ -276,7 +275,7 @@ fn handle_phase_info(args: &Value) -> Value {
             .filter(|p| {
                 p.get("phase")
                     .and_then(|v| v.as_str())
-                    .map_or(false, |v| v.contains(phase))
+                    .is_some_and(|v| v.contains(phase))
             })
             .collect()
     };

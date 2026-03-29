@@ -15,7 +15,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tracing::{info, warn};
+use tracing::info;
 
 /// Metering record for a single tool call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,33 +85,32 @@ impl StationMeter {
     /// Record a metered tool call.
     pub fn record(&self, record: MeteringRecord) {
         // Update in-memory summary
-        if let Some(ref client_id) = record.client_id {
-            if let Ok(mut summaries) = self.summaries.lock() {
-                let summary = summaries
-                    .entry(client_id.clone())
-                    .or_insert_with(|| UsageSummary {
-                        client_id: client_id.clone(),
-                        period: current_period(),
-                        ..Default::default()
-                    });
-                summary.total_input_tokens += record.input_tokens;
-                summary.total_output_tokens += record.output_tokens;
-                summary.total_tool_calls += 1;
-                summary.total_cost_microcents += record.cost_microcents.unwrap_or(0);
-                *summary
-                    .tool_breakdown
-                    .entry(record.tool_name.clone())
-                    .or_insert(0) += 1;
-            }
+        if let Some(ref client_id) = record.client_id
+            && let Ok(mut summaries) = self.summaries.lock()
+        {
+            let summary = summaries
+                .entry(client_id.clone())
+                .or_insert_with(|| UsageSummary {
+                    client_id: client_id.clone(),
+                    period: current_period(),
+                    ..Default::default()
+                });
+            summary.total_input_tokens += record.input_tokens;
+            summary.total_output_tokens += record.output_tokens;
+            summary.total_tool_calls += 1;
+            summary.total_cost_microcents += record.cost_microcents.unwrap_or(0);
+            *summary
+                .tool_breakdown
+                .entry(record.tool_name.clone())
+                .or_insert(0) += 1;
         }
 
         // Write to JSONL log
-        if let Some(ref path) = self.log_path {
-            if let Ok(json) = serde_json::to_string(&record) {
-                if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
-                    let _ = writeln!(file, "{json}");
-                }
-            }
+        if let Some(ref path) = self.log_path
+            && let Ok(json) = serde_json::to_string(&record)
+            && let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path)
+        {
+            let _ = writeln!(file, "{json}");
         }
 
         // Buffer for batch flush to external store

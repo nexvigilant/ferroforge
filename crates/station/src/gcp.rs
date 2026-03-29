@@ -36,12 +36,11 @@ impl GcpClient {
     /// Get an access token from the Cloud Run metadata server.
     pub fn get_access_token(&self) -> Option<String> {
         // Check cache first
-        if let Ok(cache) = self.token_cache.lock() {
-            if let Some(ref cached) = *cache {
-                if SystemTime::now() < cached.expires_at {
-                    return Some(cached.access_token.clone());
-                }
-            }
+        if let Ok(cache) = self.token_cache.lock()
+            && let Some(ref cached) = *cache
+            && SystemTime::now() < cached.expires_at
+        {
+            return Some(cached.access_token.clone());
         }
 
         // Try Cloud Run metadata server (automatic identity on GCP)

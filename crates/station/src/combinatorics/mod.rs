@@ -51,7 +51,7 @@ fn handle_catalan_table() -> Value {
 }
 fn handle_cycle_decomposition(args: &Value) -> Value {
     let p = match get_usize_arr(args, "permutation") { Some(v) => v, None => return err("missing: permutation") };
-    ok(serde_json::to_value(&nexcore_combinatorics::cycle_decomposition(&p)).unwrap_or_default())
+    ok(serde_json::to_value(nexcore_combinatorics::cycle_decomposition(&p)).unwrap_or_default())
 }
 fn handle_min_transpositions(args: &Value) -> Value {
     let p = match get_usize_arr(args, "permutation") { Some(v) => v, None => return err("missing: permutation") };

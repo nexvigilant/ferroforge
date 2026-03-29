@@ -58,7 +58,7 @@ fn round6(v: f64) -> f64 {
 }
 
 fn build_joint(flat: &[f64], rows: usize) -> Option<Vec<Vec<f64>>> {
-    if rows == 0 || flat.len() % rows != 0 { return None; }
+    if rows == 0 || !flat.len().is_multiple_of(rows) { return None; }
     let cols = flat.len() / rows;
     Some(flat.chunks(cols).map(|c| c.to_vec()).collect())
 }

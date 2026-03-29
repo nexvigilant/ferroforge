@@ -153,7 +153,7 @@ impl UsageStore {
             let date = record.timestamp.get(..10).unwrap_or("unknown").to_string();
             let entry = aggregates
                 .entry((client_id, date))
-                .or_insert_with(AggregatedUsage::default);
+                .or_default();
             entry.input_tokens += record.input_tokens as i64;
             entry.output_tokens += record.output_tokens as i64;
             entry.tool_calls += 1;
@@ -246,12 +246,11 @@ impl UsageStore {
     /// Get an access token from the Cloud Run metadata server or local credentials.
     fn get_access_token(&self) -> Option<String> {
         // Check cache first
-        if let Ok(cache) = self.token_cache.lock() {
-            if let Some(ref cached) = *cache {
-                if SystemTime::now() < cached.expires_at {
-                    return Some(cached.access_token.clone());
-                }
-            }
+        if let Ok(cache) = self.token_cache.lock()
+            && let Some(ref cached) = *cache
+            && SystemTime::now() < cached.expires_at
+        {
+            return Some(cached.access_token.clone());
         }
 
         // Try Cloud Run metadata server (automatic identity on GCP)

@@ -4,7 +4,7 @@
 //! 3 tools: assess, catalog_ich, check_exclusion.
 
 use nexcore_compliance::dsl::{Assessment, ComplianceResult, Finding, FindingSeverity};
-use nexcore_compliance::oscal::{Control, ControlCatalog, ControlStatus};
+use nexcore_compliance::oscal::{Control, ControlStatus};
 use serde_json::{Value, json};
 use tracing::info;
 
@@ -42,10 +42,6 @@ fn ok(v: Value) -> Value {
         map.insert("status".into(), json!("ok"));
     }
     obj
-}
-
-fn err(msg: &str) -> Value {
-    json!({ "status": "error", "error": msg })
 }
 
 fn get_str<'a>(args: &'a Value, key: &str) -> Option<&'a str> {
