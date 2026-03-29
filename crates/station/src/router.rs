@@ -233,6 +233,19 @@ fn extract_status(result: &ToolCallResult) -> (String, bool, Option<String>) {
     }
 }
 
+/// Hopper entry point — route a tool call without telemetry overhead.
+/// Used by the Easter Bunny hopper engine for in-process chain execution.
+pub fn route_tool_call_for_hopper(
+    registry: &ConfigRegistry,
+    tool_name: &str,
+    arguments: &Value,
+    station_root: &str,
+) -> ToolCallResult {
+    let telemetry = StationTelemetry::new(None);
+    let request_id = uuid::Uuid::new_v4().to_string();
+    route_tool_call_inner(registry, &telemetry, tool_name, arguments, &request_id, None)
+}
+
 /// Inner routing logic (no telemetry wrapping).
 fn route_tool_call_inner(
     registry: &ConfigRegistry,
@@ -257,6 +270,9 @@ fn route_tool_call_inner(
     }
     if tool_name == "nexvigilant_forge_diagnose" {
         return handle_forge_diagnose(registry);
+    }
+    if tool_name == "nexvigilant_hop" {
+        return handle_hop(registry, arguments);
     }
 
     // Rust-native handlers — no Python proxy needed
@@ -1111,6 +1127,75 @@ fn handle_ring_health(registry: &ConfigRegistry) -> ToolCallResult {
             text: serde_json::to_string_pretty(&result).unwrap_or_default(),
         }],
         is_error: None,
+    }
+}
+
+/// Meta-tool: Hop — execute a relay chain through the hopper engine.
+/// Easter Bunny technology: hops between tools at native speed, carrying the basket forward.
+fn handle_hop(registry: &ConfigRegistry, arguments: &Value) -> ToolCallResult {
+    let chain_name = arguments.get("chain").and_then(|c| c.as_str()).unwrap_or("");
+    let station_root = &registry.station_root;
+
+    // Load chain from relays/ directory
+    let relays_dir = std::path::Path::new(station_root).join("relays");
+    let chain_path = relays_dir.join(format!("{chain_name}.yaml"));
+
+    if !chain_path.exists() {
+        // List available chains
+        let available: Vec<String> = std::fs::read_dir(&relays_dir)
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().extension().is_some_and(|ext| ext == "yaml"))
+                    .filter_map(|e| e.path().file_stem().map(|s| s.to_string_lossy().to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let result = serde_json::json!({
+            "status": "error",
+            "message": format!("Chain '{chain_name}' not found"),
+            "available_chains": available,
+        });
+
+        return ToolCallResult {
+            content: vec![ContentBlock::Text {
+                text: serde_json::to_string_pretty(&result).unwrap_or_default(),
+            }],
+            is_error: Some(true),
+        };
+    }
+
+    let chain = match crate::hopper::load_chain(&chain_path) {
+        Ok(c) => c,
+        Err(e) => {
+            return ToolCallResult {
+                content: vec![ContentBlock::Text {
+                    text: serde_json::json!({"status": "error", "message": e}).to_string(),
+                }],
+                is_error: Some(true),
+            };
+        }
+    };
+
+    // Build initial basket from arguments (excluding "chain" key)
+    let mut basket = crate::hopper::Basket::new();
+    if let Some(obj) = arguments.as_object() {
+        for (k, v) in obj {
+            if k != "chain" {
+                basket.insert(k.clone(), v.clone());
+            }
+        }
+    }
+
+    let result = crate::hopper::execute(&chain, basket, registry, station_root);
+    let json = serde_json::to_value(&result).unwrap_or_default();
+
+    ToolCallResult {
+        content: vec![ContentBlock::Text {
+            text: serde_json::to_string_pretty(&json).unwrap_or_default(),
+        }],
+        is_error: if result.fidelity < 0.5 { Some(true) } else { None },
     }
 }
 

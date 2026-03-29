@@ -33,6 +33,7 @@ pub mod fhir;
 pub mod formula;
 pub mod game_theory;
 pub mod gcp;
+pub mod hopper;
 pub mod harm_taxonomy;
 pub mod heligram;
 pub mod helix;

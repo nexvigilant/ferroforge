@@ -191,6 +191,11 @@ COMPANY_REGISTRY = {
         "openfda_manufacturer": ["INCYTE", "INCYTE CORPORATION"],
         "ct_sponsor": "Incyte Corporation",
     },
+    "eisai": {
+        "display_name": "Eisai Co.",
+        "openfda_manufacturer": ["EISAI", "EISAI INC"],
+        "ct_sponsor": "Eisai Co.",
+    },
 }
 
 

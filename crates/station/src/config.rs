@@ -254,6 +254,30 @@ impl ConfigRegistry {
                     "properties": {},
                 }),
                 output_schema: None,
+                annotations: meta_annotations.clone(),
+            },
+            ToolInfo {
+                name: "nexvigilant_hop".into(),
+                description: "[NexVigilant Station] Hopper engine — execute a relay chain at native speed. Hops between tools carrying context forward. Pass chain name + initial variables. Returns per-hop results with fidelity score.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "chain": {
+                            "type": "string",
+                            "description": "Chain name (e.g., 'signal-pipeline', 'causality-chain', 'drug-profile')"
+                        },
+                        "drug": {
+                            "type": "string",
+                            "description": "Drug name (passed to chain as $drug)"
+                        },
+                        "event": {
+                            "type": "string",
+                            "description": "Adverse event (passed to chain as $event)"
+                        }
+                    },
+                    "required": ["chain"]
+                }),
+                output_schema: None,
                 annotations: meta_annotations,
             },
         ];
@@ -365,7 +389,7 @@ impl ConfigRegistry {
     /// Total tool count across all configs + Rust-native meta-tools.
     /// Must match len(tool_infos()) to avoid /health vs tools/list mismatch.
     pub fn tool_count(&self) -> usize {
-        const META_TOOLS: usize = 6; // chart_course, directory, capabilities, station_health, ring_health, forge_diagnose
+        const META_TOOLS: usize = 7; // chart_course, directory, capabilities, station_health, ring_health, forge_diagnose, hop
         META_TOOLS + self.configs.iter().map(|c| c.tools.len()).sum::<usize>()
     }
 
