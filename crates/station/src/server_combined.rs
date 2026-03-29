@@ -146,17 +146,30 @@ pub async fn run_combined(
     StreamableState::spawn_reaper(Arc::clone(&streamable_state));
 
     let cors = CorsLayer::new()
-        .allow_origin("*".parse::<HeaderValue>().expect("valid header"))
+        .allow_origin(
+            "*".parse::<HeaderValue>()
+                .map_err(|e| anyhow::anyhow!("invalid CORS origin header value: {e}"))?,
+        )
         .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
         .allow_headers([
             axum::http::header::CONTENT_TYPE,
             axum::http::header::AUTHORIZATION,
-            "mcp-session-id".parse().expect("valid header name"),
+            "mcp-session-id"
+                .parse()
+                .map_err(|e: axum::http::header::InvalidHeaderName| {
+                    anyhow::anyhow!("invalid allow header name: {e}")
+                })?,
         ])
         .expose_headers([
-            "mcp-session-id".parse::<axum::http::HeaderName>().expect("valid header name"),
-            "x-request-id".parse::<axum::http::HeaderName>().expect("valid header name"),
-            "x-station-version".parse::<axum::http::HeaderName>().expect("valid header name"),
+            "mcp-session-id"
+                .parse::<axum::http::HeaderName>()
+                .map_err(|e| anyhow::anyhow!("invalid expose header mcp-session-id: {e}"))?,
+            "x-request-id"
+                .parse::<axum::http::HeaderName>()
+                .map_err(|e| anyhow::anyhow!("invalid expose header x-request-id: {e}"))?,
+            "x-station-version"
+                .parse::<axum::http::HeaderName>()
+                .map_err(|e| anyhow::anyhow!("invalid expose header x-station-version: {e}"))?,
         ]);
 
     // Streamable HTTP routes (Claude.ai Connectors)

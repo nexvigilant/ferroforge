@@ -78,20 +78,27 @@ pub async fn shutdown_signal() {
 
     #[cfg(unix)]
     {
-        let mut sigterm = tokio::signal::unix::signal(
-            tokio::signal::unix::SignalKind::terminate(),
-        )
-        .expect("failed to install SIGTERM handler");
-
-        tokio::select! {
-            _ = ctrl_c => info!("CTRL+C received, shutting down"),
-            _ = sigterm.recv() => info!("SIGTERM received, shutting down"),
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sigterm) => {
+                tokio::select! {
+                    _ = ctrl_c => info!("CTRL+C received, shutting down"),
+                    _ = sigterm.recv() => info!("SIGTERM received, shutting down"),
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to install SIGTERM handler, falling back to CTRL+C only");
+                let _ = ctrl_c.await;
+                info!("CTRL+C received, shutting down");
+            }
         }
     }
 
     #[cfg(not(unix))]
     {
-        ctrl_c.await.expect("failed to listen for CTRL+C");
-        info!("CTRL+C received, shutting down");
+        if let Err(e) = ctrl_c.await {
+            tracing::warn!(error = %e, "Failed to listen for CTRL+C signal");
+        } else {
+            info!("CTRL+C received, shutting down");
+        }
     }
 }
