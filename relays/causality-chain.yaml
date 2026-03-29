@@ -1,0 +1,31 @@
+name: causality-chain
+description: Drug+Event → FAERS evidence → PRR signal → Naranjo causality → Seriousness
+
+hops:
+  - tool: open-vigil_fr_compute_disproportionality
+    args: { drug: "$drug", event: "$event" }
+    extract: { prr: "scores.PRR", ror: "scores.ROR", signal: "signal_assessment", cases: "contingency_table.a_drug_event" }
+
+  - tool: calculate_nexvigilant_com_assess_naranjo_causality
+    args:
+      previous_reports: true
+      after_drug: true
+      improved_on_withdrawal: "yes"
+      reappeared_on_rechallenge: "not_done"
+      alternative_causes: false
+      placebo_reaction: "not_done"
+      drug_detected: "not_done"
+      dose_related: "not_done"
+      previous_exposure: false
+      objective_evidence: true
+    extract: { naranjo_score: "total_score", naranjo_category: "category" }
+
+  - tool: calculate_nexvigilant_com_classify_seriousness
+    args:
+      resulted_in_death: false
+      life_threatening: false
+      required_hospitalization: true
+      resulted_in_disability: false
+      congenital_anomaly: false
+      medically_important: true
+    extract: { serious: "is_serious", criteria_met: "criteria_met" }

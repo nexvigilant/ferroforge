@@ -1,0 +1,22 @@
+name: regulatory-intel
+description: Drug → ICH guidelines → EMA EPAR → FDA approvals → boxed warnings
+
+hops:
+  - tool: ich_org_search_guidelines
+    args: { query: "pharmacovigilance" }
+    extract: { guideline_count: "count" }
+
+  - tool: www_ema_europa_eu_search_medicines
+    args: { query: "$drug" }
+    extract: { ema_status: "status" }
+    continue_on_error: true
+
+  - tool: accessdata_fda_gov_search_approvals
+    args: { drug_name: "$drug" }
+    extract: { fda_status: "status" }
+    continue_on_error: true
+
+  - tool: www_fda_gov_get_boxed_warning
+    args: { drug_name: "$drug" }
+    extract: { boxed_warning_status: "status" }
+    continue_on_error: true
