@@ -1,0 +1,97 @@
+{
+  "domain": "eudravigilance-live.ema.europa.eu",
+  "url_pattern": "/*",
+  "title": "EudraVigilance Live (MoltBrowser)",
+  "description": "Live data extraction from EudraVigilance OBIEE dashboards via headless browser. Phase 2: actual case counts, SOC breakdowns, and demographics from adrreports.eu.",
+  "proxy": "scripts/moltbrowser_eudravigilance.py",
+  "tools": [
+    {
+      "name": "extract-case-counts",
+      "description": "Extract actual ICSR case counts from the EudraVigilance OBIEE dashboard via headless browser. Returns total cases, serious/non-serious split, and raw table data.",
+      "parameters": [
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Active substance name (e.g., metformin, semaglutide)",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "description": "ok | error" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "substance": { "type": "string" },
+              "substance_code": { "type": "string" },
+              "total_cases": { "type": "string" },
+              "raw_table_data": { "type": "array" },
+              "dashboard_url": { "type": "string" },
+              "extraction_method": { "type": "string" }
+            }
+          }
+        },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "extract-soc-breakdown",
+      "description": "Extract System Organ Class breakdown with actual case counts from EudraVigilance dashboard. Returns per-SOC serious/non-serious counts.",
+      "parameters": [
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Active substance name",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "substance": { "type": "string" },
+              "soc_breakdown": { "type": "array" },
+              "extraction_method": { "type": "string" }
+            }
+          }
+        },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "extract-demographics",
+      "description": "Extract age group and sex distribution from EudraVigilance dashboard. Returns actual demographic case counts.",
+      "parameters": [
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Active substance name",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "substance": { "type": "string" },
+              "age_distribution": {},
+              "sex_distribution": {},
+              "extraction_method": { "type": "string" }
+            }
+          }
+        },
+        "required": ["status"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}

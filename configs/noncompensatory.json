@@ -1,0 +1,271 @@
+{
+  "domain": "noncompensatory.nexvigilant.com",
+  "private": false,
+  "url_pattern": "/noncompensatory/*",
+  "title": "Non-Compensatory Risk Scoring",
+  "copyright": "\u00a9 2026 NexVigilant, LLC. Geometric mean aggregation methodology and Bayesian-heavy weight calibration are proprietary. Based on ASDF v2.0 composite indicator construction (OECD methodology).",
+  "description": "Non-compensatory PV risk scoring via weighted geometric mean aggregation. A zero in any evidence dimension (PRR, ROR, IC025, EBGM05) collapses the composite score \u2014 one strong metric cannot mask weak evidence. Three modes: geometric (Bayesian-heavy weights), additive (legacy), dual (side-by-side with masking detection). Thresholds from Evans et al. (2001).",
+  "tools": [
+    {
+      "name": "score-geometric",
+      "description": "Compute non-compensatory risk score using weighted geometric mean. Default Bayesian-heavy weights [PRR=0.15, ROR=0.15, IC025=0.35, EBGM05=0.35] maximize signal-to-noise discrimination (validated via 40-scenario simulation). A near-zero dimension collapses the composite.",
+      "parameters": [
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Drug name",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "Adverse event",
+          "required": true
+        },
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "Proportional Reporting Ratio",
+          "required": true
+        },
+        {
+          "name": "ror_lower",
+          "type": "number",
+          "description": "ROR lower 95% confidence interval",
+          "required": true
+        },
+        {
+          "name": "ic025",
+          "type": "number",
+          "description": "Information Component 2.5th percentile",
+          "required": true
+        },
+        {
+          "name": "eb05",
+          "type": "number",
+          "description": "EBGM 5th percentile",
+          "required": true
+        },
+        {
+          "name": "n",
+          "type": "integer",
+          "description": "Number of cases",
+          "required": true
+        },
+        {
+          "name": "weights",
+          "type": "string",
+          "description": "Custom weights as comma-separated: PRR,ROR,IC025,EBGM05 (must sum to 1.0). Default: 0.15,0.15,0.35,0.35",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error"
+          },
+          "mode": {
+            "type": "string",
+            "description": "geometric_noncompensatory"
+          },
+          "composite_score": {
+            "type": "number",
+            "description": "Geometric mean composite score (0-100)"
+          },
+          "level": {
+            "type": "string",
+            "description": "Risk level: Low | Medium | High | Critical"
+          },
+          "signals_detected": {
+            "type": "string",
+            "description": "N/4 dimensions above threshold"
+          },
+          "dimensions": {
+            "type": "array",
+            "description": "Per-dimension breakdown",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "raw_value": {
+                  "type": "number"
+                },
+                "threshold": {
+                  "type": "number"
+                },
+                "normalized": {
+                  "type": "number"
+                },
+                "weight": {
+                  "type": "number"
+                },
+                "signal_detected": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "n_weight": {
+            "type": "number",
+            "description": "Case count weight factor"
+          },
+          "weights_used": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "score-dual",
+      "description": "Compare additive (legacy) and geometric (non-compensatory) risk scores side-by-side. Detects compensatory masking where one strong metric inflates the additive score while geometric correctly identifies imbalanced evidence. Divergence > 1 level = masking detected.",
+      "parameters": [
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Drug name",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "Adverse event",
+          "required": true
+        },
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "Proportional Reporting Ratio",
+          "required": true
+        },
+        {
+          "name": "ror_lower",
+          "type": "number",
+          "description": "ROR lower 95% confidence interval",
+          "required": true
+        },
+        {
+          "name": "ic025",
+          "type": "number",
+          "description": "Information Component 2.5th percentile",
+          "required": true
+        },
+        {
+          "name": "eb05",
+          "type": "number",
+          "description": "EBGM 5th percentile",
+          "required": true
+        },
+        {
+          "name": "n",
+          "type": "integer",
+          "description": "Number of cases",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "description": "dual_comparison"
+          },
+          "additive": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "number"
+              },
+              "level": {
+                "type": "string"
+              }
+            }
+          },
+          "geometric": {
+            "type": "object",
+            "properties": {
+              "composite_score": {
+                "type": "number"
+              },
+              "level": {
+                "type": "string"
+              },
+              "signals_detected": {
+                "type": "string"
+              }
+            }
+          },
+          "divergence": {
+            "type": "number",
+            "description": "Level rank difference (0 = agree, 2+ = masking)"
+          },
+          "compensatory_masking": {
+            "type": "boolean",
+            "description": "True if additive inflates beyond geometric by 2+ levels"
+          },
+          "divergence_explanation": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "get-weights",
+      "description": "Return the default Bayesian-heavy weight configuration with calibration provenance. Weights: PRR=0.15, ROR=0.15, IC025=0.35, EBGM05=0.35. Derived from 40-scenario simulation (8 PV signal profiles \u00d7 5 weight configs) showing Bayesian-heavy achieves best signal-to-noise discrimination (76.0 vs 73.1 for equal weights).",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "weights": {
+            "type": "object",
+            "properties": {
+              "PRR": {
+                "type": "number"
+              },
+              "ROR_lower": {
+                "type": "number"
+              },
+              "IC025": {
+                "type": "number"
+              },
+              "EBGM05": {
+                "type": "number"
+              }
+            }
+          },
+          "calibration": {
+            "type": "string"
+          },
+          "discrimination_score": {
+            "type": "number"
+          },
+          "methodology": {
+            "type": "string"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    }
+  ],
+  "proxy": "rust-native"
+}

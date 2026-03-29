@@ -115,6 +115,82 @@ COMPANY_REGISTRY = {
         "openfda_manufacturer": ["BAYER", "BAYER HEALTHCARE", "BAYER PHARMA"],
         "ct_sponsor": "Bayer",
     },
+    # --- Tier 2: Mid-cap pharma + biotech ---
+    "regeneron": {
+        "display_name": "Regeneron Pharmaceuticals",
+        "openfda_manufacturer": ["REGENERON", "REGENERON PHARMACEUTICALS"],
+        "ct_sponsor": "Regeneron Pharmaceuticals",
+    },
+    "biogen": {
+        "display_name": "Biogen Inc.",
+        "openfda_manufacturer": ["BIOGEN", "BIOGEN INC", "BIOGEN IDEC"],
+        "ct_sponsor": "Biogen",
+    },
+    "moderna": {
+        "display_name": "Moderna Inc.",
+        "openfda_manufacturer": ["MODERNA", "MODERNA INC", "MODERNA US", "MODERNATX"],
+        "ct_sponsor": "ModernaTX",
+    },
+    "vertex": {
+        "display_name": "Vertex Pharmaceuticals",
+        "openfda_manufacturer": ["VERTEX", "VERTEX PHARMACEUTICALS"],
+        "ct_sponsor": "Vertex Pharmaceuticals Incorporated",
+    },
+    "alexion": {
+        "display_name": "Alexion (AstraZeneca Rare Disease)",
+        "openfda_manufacturer": ["ALEXION", "ALEXION PHARMACEUTICALS"],
+        "ct_sponsor": "Alexion",
+    },
+    "takeda": {
+        "display_name": "Takeda Pharmaceutical",
+        "openfda_manufacturer": ["TAKEDA", "TAKEDA PHARMACEUTICALS", "TAKEDA PHARMACEUTICAL"],
+        "ct_sponsor": "Takeda",
+    },
+    "boehringer": {
+        "display_name": "Boehringer Ingelheim",
+        "openfda_manufacturer": ["BOEHRINGER INGELHEIM", "BOEHRINGER"],
+        "ct_sponsor": "Boehringer Ingelheim",
+    },
+    "teva": {
+        "display_name": "Teva Pharmaceutical",
+        "openfda_manufacturer": ["TEVA", "TEVA PHARMACEUTICALS", "TEVA PHARMACEUTICAL"],
+        "ct_sponsor": "Teva Pharmaceutical Industries",
+    },
+    "astellas": {
+        "display_name": "Astellas Pharma",
+        "openfda_manufacturer": ["ASTELLAS", "ASTELLAS PHARMA"],
+        "ct_sponsor": "Astellas Pharma",
+    },
+    "daiichi": {
+        "display_name": "Daiichi Sankyo",
+        "openfda_manufacturer": ["DAIICHI SANKYO", "DAIICHI-SANKYO"],
+        "ct_sponsor": "Daiichi Sankyo",
+    },
+    "ucb": {
+        "display_name": "UCB S.A.",
+        "openfda_manufacturer": ["UCB", "UCB INC"],
+        "ct_sponsor": "UCB Pharma",
+    },
+    "jazz": {
+        "display_name": "Jazz Pharmaceuticals",
+        "openfda_manufacturer": ["JAZZ", "JAZZ PHARMACEUTICALS"],
+        "ct_sponsor": "Jazz Pharmaceuticals",
+    },
+    "ipsen": {
+        "display_name": "Ipsen Biopharmaceuticals",
+        "openfda_manufacturer": ["IPSEN", "IPSEN BIOPHARMACEUTICALS"],
+        "ct_sponsor": "Ipsen",
+    },
+    "seagen": {
+        "display_name": "Seagen (Pfizer Oncology)",
+        "openfda_manufacturer": ["SEAGEN", "SEATTLE GENETICS"],
+        "ct_sponsor": "Seagen Inc.",
+    },
+    "incyte": {
+        "display_name": "Incyte Corporation",
+        "openfda_manufacturer": ["INCYTE", "INCYTE CORPORATION"],
+        "ct_sponsor": "Incyte Corporation",
+    },
 }
 
 
