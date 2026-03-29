@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## FerroForge — NexVigilant Station
 
-Rust MCP server + 58 domain configs (414 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio, SSE, and Streamable HTTP (source: `ls configs/*.json | wc -l` = 58, tool count from JSON parsing = 414 tools total across all configs, measured 2026-03-28).
+Rust MCP server + 208 domain configs (1,810 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio, SSE, and Streamable HTTP. Forge pipeline: `forge.py` (YAML→config), `forge_from_crates.py` (nexcore→config), `forge_nucleus.py` (config→page). Nexcore bridge proxy covers 115 rust-native gap configs via `nexcore_proxy.py`. (measured 2026-03-29)
 
 ## Build & Test
 
@@ -35,10 +35,14 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 | `crates/station/src/server.rs` | Stdio MCP server loop |
 | `crates/station/src/telemetry.rs` | Per-tool-call metrics (timestamp, domain, duration_ms, status) |
 | `scripts/dispatch.py` | Unified proxy router — routes by domain prefix to per-domain proxy scripts |
-| `scripts/*_proxy.py` | Per-domain API proxy scripts (22 files — source: measured 2026-03-28) |
+| `scripts/*_proxy.py` | Per-domain API proxy scripts (39 files — source: measured 2026-03-29) |
+| `scripts/forge.py` | Config generator from YAML specs |
+| `scripts/forge_from_crates.py` | Config generator from nexcore MCP tool introspection |
+| `scripts/forge_nucleus.py` | Nucleus page scaffolder from Station configs |
+| `scripts/nexcore_proxy.py` | Bridge proxy: routes rust-native gaps to nexcore-mcp binary |
 | `scripts/config_forge.py` | Config generator + hub deployer (self-hosted or Cloud Run) |
 
-## Config Inventory (58 configs, 414 tools — source: measured 2026-03-28)
+## Config Inventory (208 configs, 1,810 tools — source: measured 2026-03-29)
 
 **Live API proxies (10):** openfda, clinicaltrials, pubmed, dailymed, rxnav, openvigilfrance, fda-accessdata, eudravigilance, fda-safety, science
 
@@ -48,12 +52,28 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 
 **Reference configs:** ich, cioms, who-umc, meddra, drugbank, vigiaccess, ema, fda-safety, wikipedia, compliance, algovigilance, chemivigilance, cccp, harm-taxonomy, tov, pvdsl, dtree, dataframe, edit-distance, energy, zeta, dna, benefit-risk, vigilance
 
-**All 58 configs have proxy scripts or Rust-native handlers** — 0 stubs remaining. 22 proxy files serve 58 configs (some proxies route multiple configs).
+**All 208 configs have proxy scripts or Rust-native handlers** — 0 stubs remaining. 39 proxy files serve 208 configs. 115 rust-native gap configs routed through nexcore bridge proxy (`nexcore_proxy.py` → `nexcore-mcp` binary via stdio JSON-RPC).
 
 **Metering:** Live toll billing at 1.30x harness premium. `/billing/usage`, `/billing/rates`, `/billing/balance` endpoints. Per-key usage tracking with token estimation and cost computation.
 
-## Adding a New Config
+## Adding New Configs
 
+**Preferred: Forge pipeline (fast path)**
+```bash
+# From nexcore crate tools (auto-introspect unified.rs)
+python3 scripts/forge_from_crates.py generate
+
+# From YAML spec (external APIs)
+python3 scripts/forge.py from-spec domains/spec.yaml
+
+# Scaffold Nucleus pages for new configs
+python3 scripts/forge_nucleus.py batch
+
+# Audit for gaps
+python3 scripts/forge.py audit
+```
+
+**Manual path:**
 1. Create `configs/{domain}.json` following the HubConfig schema (see `config.rs:9-58`)
 2. Add proxy script at `scripts/{domain}_proxy.py` if tool needs live API calls
 3. Wire domain prefix in `scripts/dispatch.py`
