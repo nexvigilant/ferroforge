@@ -50,7 +50,10 @@ def domain_to_slug(domain: str) -> str:
 def domain_to_pascal(domain: str) -> str:
     """Convert domain to PascalCase: pv-compute.nexvigilant.com → PvCompute"""
     slug = domain_to_slug(domain)
-    return "".join(word.capitalize() for word in slug.split("-"))
+    # Replace any non-alphanumeric chars (including /) before splitting
+    import re
+    clean = re.sub(r'[^a-zA-Z0-9]', '-', slug)
+    return "".join(word.capitalize() for word in clean.split("-") if word)
 
 
 def tool_to_label(name: str) -> str:
@@ -250,12 +253,12 @@ export function ToolForm({{ toolName, params }}: ToolFormProps) {{
     setResult(null)
     try {{
       // Call via pv-compute client-side or API route
-      const res = await fetch("/api/station/call", {{
+      const res = await fetch("/api/station", {{
         method: "POST",
         headers: {{ "Content-Type": "application/json" }},
         body: JSON.stringify({{
           tool: `{station_domain}_${{toolName.replace(/-/g, "_")}}`,
-          arguments: values,
+          args: values,
         }}),
       }})
       const data = await res.json()
