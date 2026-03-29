@@ -10,82 +10,180 @@
       "name": "triangulate-signal",
       "description": "Full cross-database signal triangulation. Queries FAERS + EudraVigilance + VigiAccess + DailyMed + PubMed + ClinicalTrials.gov for a drug-event pair. Returns disproportionality scores, case counts from each database, label status, literature count, causality assessment, concordance score, and verdict. The only PV signal tool that cross-references US + EU + WHO databases in one call.",
       "parameters": [
-        { "name": "drug", "type": "string", "description": "Drug name (generic preferred, e.g., 'metformin', 'semaglutide')", "required": true },
-        { "name": "event", "type": "string", "description": "Adverse event MedDRA preferred term (e.g., 'lactic acidosis', 'thyroid cancer')", "required": true }
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Drug name (generic preferred, e.g., 'metformin', 'semaglutide')",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "Adverse event MedDRA preferred term (e.g., 'lactic acidosis', 'thyroid cancer')",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "status": { "type": "string", "description": "ok | partial | error" },
-          "drug": { "type": "string" },
-          "event": { "type": "string" },
+          "status": {
+            "type": "string",
+            "description": "ok | partial | error"
+          },
+          "drug": {
+            "type": "string"
+          },
+          "event": {
+            "type": "string"
+          },
           "databases": {
             "type": "object",
             "description": "Per-database results",
             "properties": {
-              "faers": { "type": "object" },
-              "eudravigilance": { "type": "object" },
-              "vigiaccess": { "type": "object" }
+              "faers": {
+                "type": "object"
+              },
+              "eudravigilance": {
+                "type": "object"
+              },
+              "vigiaccess": {
+                "type": "object"
+              }
             }
           },
           "disproportionality": {
             "type": "object",
             "description": "PRR, ROR, IC, chi-squared from FAERS 2x2 table"
           },
-          "label_status": { "type": "string", "description": "on_label | not_on_label | unknown" },
-          "literature_count": { "type": "integer" },
-          "causality": { "type": "object", "description": "Naranjo score and WHO-UMC category" },
+          "label_status": {
+            "type": "string",
+            "description": "on_label | not_on_label | unknown"
+          },
+          "literature_count": {
+            "type": "integer"
+          },
+          "causality": {
+            "type": "object",
+            "description": "Naranjo score and WHO-UMC category"
+          },
           "concordance": {
             "type": "object",
             "description": "Cross-database agreement score and details"
           },
-          "verdict": { "type": "string", "description": "CONFIRMED_SIGNAL | PROBABLE_SIGNAL | POSSIBLE_SIGNAL | INSUFFICIENT_DATA | NO_SIGNAL" },
-          "recommendation": { "type": "string" },
-          "data_sources": { "type": "array", "items": { "type": "string" } }
+          "verdict": {
+            "type": "string",
+            "description": "CONFIRMED_SIGNAL | PROBABLE_SIGNAL | POSSIBLE_SIGNAL | INSUFFICIENT_DATA | NO_SIGNAL"
+          },
+          "recommendation": {
+            "type": "string"
+          },
+          "data_sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         },
-        "required": ["status", "drug", "event", "verdict"]
+        "required": [
+          "status",
+          "drug",
+          "event",
+          "verdict"
+        ]
       },
-      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "quick-triangulate",
-      "description": "Fast triangulation — FAERS disproportionality + DailyMed label check only. No browser-based extraction. Sub-5-second response for rapid screening.",
+      "description": "Fast triangulation \u2014 FAERS disproportionality + DailyMed label check only. No browser-based extraction. Sub-5-second response for rapid screening.",
       "parameters": [
-        { "name": "drug", "type": "string", "description": "Drug name", "required": true },
-        { "name": "event", "type": "string", "description": "Adverse event term", "required": true }
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Drug name",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "Adverse event term",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "status": { "type": "string" },
-          "prr": { "type": "number" },
-          "ror": { "type": "number" },
-          "cases": { "type": "integer" },
-          "on_label": { "type": "boolean" },
-          "signal_strength": { "type": "string" },
-          "verdict": { "type": "string" }
+          "status": {
+            "type": "string"
+          },
+          "prr": {
+            "type": "number"
+          },
+          "ror": {
+            "type": "number"
+          },
+          "cases": {
+            "type": "integer"
+          },
+          "on_label": {
+            "type": "boolean"
+          },
+          "signal_strength": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          }
         },
-        "required": ["status", "verdict"]
+        "required": [
+          "status",
+          "verdict"
+        ]
       },
-      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "batch-triangulate",
-      "description": "Batch signal triangulation — screen multiple drug-event pairs in one call. Uses quick-triangulate for each pair, flags any with signal strength >= moderate for full triangulation.",
+      "description": "Batch signal triangulation \u2014 screen multiple drug-event pairs in one call. Uses quick-triangulate for each pair, flags any with signal strength >= moderate for full triangulation.",
       "parameters": [
-        { "name": "pairs", "type": "array", "description": "Array of {drug, event} objects to screen", "required": true }
+        {
+          "name": "pairs",
+          "type": "array",
+          "description": "Array of {drug, event} objects to screen",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "status": { "type": "string" },
-          "results": { "type": "array" },
-          "flagged_count": { "type": "integer" },
-          "total_screened": { "type": "integer" }
+          "status": {
+            "type": "string"
+          },
+          "results": {
+            "type": "array"
+          },
+          "flagged_count": {
+            "type": "integer"
+          },
+          "total_screened": {
+            "type": "integer"
+          }
         },
-        "required": ["status"]
+        "required": [
+          "status"
+        ]
       },
-      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     }
-  ]
+  ],
+  "url_pattern": "/*"
 }

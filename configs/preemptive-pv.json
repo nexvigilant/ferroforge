@@ -6,15 +6,448 @@
   "description": "Proactive safety signal detection beyond reactive PRR. Three tiers: Reactive (standard disproportionality), Predictive (severity-weighted PRR), Preemptive (Gibbs thermodynamic energy modeling). Plus trajectory amplification, noise floor correction, and competitive inhibition intervention modeling. Pure Rust via nexcore-preemptive-pv.",
   "proxy": "rust-native",
   "tools": [
-    { "name": "reactive", "description": "Tier 1: Standard reactive signal detection from a 2x2 contingency table. Returns PRR, chi-squared, and detection verdict.", "parameters": [{"name":"a","type":"integer","required":true,"description":"Drug+Event+ count"},{"name":"b","type":"integer","required":true,"description":"Drug+Event- count"},{"name":"c","type":"integer","required":true,"description":"Drug-Event+ count"},{"name":"d","type":"integer","required":true,"description":"Drug-Event- count"}], "outputSchema":{"type":"object","properties":{"status":{"type":"string"},"prr":{"type":"number"},"signal_detected":{"type":"boolean"}},"required":["status"]}, "annotations":{"readOnlyHint":true,"destructiveHint":false} },
-    { "name": "predictive", "description": "Tier 2: Severity-weighted predictive detection. Multiplies PRR by seriousness omega weight (ICH E2A criteria). More serious events get amplified signals.", "parameters": [{"name":"a","type":"integer","required":true},{"name":"b","type":"integer","required":true},{"name":"c","type":"integer","required":true},{"name":"d","type":"integer","required":true},{"name":"seriousness","type":"string","description":"non_serious, hospitalization, disability, life_threatening, or fatal","required":false}], "outputSchema":{"type":"object","properties":{"status":{"type":"string"},"weighted_prr":{"type":"number"},"omega":{"type":"number"}},"required":["status"]}, "annotations":{"readOnlyHint":true,"destructiveHint":false} },
-    { "name": "gibbs", "description": "Tier 3: Preemptive detection via Gibbs free energy thermodynamic model. Negative delta-G = spontaneous signal (drug-event association is thermodynamically favorable). Models signal as chemical reaction equilibrium.", "parameters": [{"name":"prr","type":"number","required":true,"description":"PRR value"},{"name":"n","type":"number","required":true,"description":"Number of reports"},{"name":"seriousness","type":"string","required":false,"description":"Seriousness level"},{"name":"temperature","type":"number","required":false,"description":"System temperature (default 1.0)"}], "outputSchema":{"type":"object","properties":{"status":{"type":"string"},"delta_g":{"type":"number"},"spontaneous":{"type":"boolean"},"energy_class":{"type":"string"}},"required":["status"]}, "annotations":{"readOnlyHint":true,"destructiveHint":false} },
-    { "name": "evaluate", "description": "Full three-tier evaluation: runs reactive, predictive, AND preemptive detection in one call. Returns results from all tiers plus overall tier classification and recommendation.", "parameters": [{"name":"a","type":"integer","required":true},{"name":"b","type":"integer","required":true},{"name":"c","type":"integer","required":true},{"name":"d","type":"integer","required":true},{"name":"seriousness","type":"string","required":false},{"name":"temperature","type":"number","required":false}], "outputSchema":{"type":"object","properties":{"status":{"type":"string"},"tier":{"type":"string"},"recommendation":{"type":"string"}},"required":["status"]}, "annotations":{"readOnlyHint":true,"destructiveHint":false} },
-    { "name": "trajectory", "description": "Trajectory amplification: detect accelerating reporting trends using Hill curve amplification on time-series data. Reports slope, amplified slope, and whether the signal is accelerating.", "parameters": [{"name":"data","type":"array","required":true,"description":"Array of {time, rate} data points (minimum 2)"},{"name":"n_hill","type":"number","required":false,"description":"Hill coefficient for amplification (default 2.0)"}], "outputSchema":{"type":"object","properties":{"status":{"type":"string"},"accelerating":{"type":"boolean"},"amplified_slope":{"type":"number"}},"required":["status"]}, "annotations":{"readOnlyHint":true,"destructiveHint":false} },
-    { "name": "severity", "description": "Get the severity weight (omega) for a seriousness level. Returns the ICH E2A-based weight used in predictive and preemptive tiers.", "parameters": [{"name":"seriousness","type":"string","required":true,"description":"non_serious, hospitalization, disability, life_threatening, or fatal"}], "outputSchema":{"type":"object","properties":{"status":{"type":"string"},"omega":{"type":"number"},"label":{"type":"string"}},"required":["status"]}, "annotations":{"readOnlyHint":true,"destructiveHint":false} },
-    { "name": "noise", "description": "Noise floor correction: compute corrected signal by subtracting background noise and testing statistical significance.", "parameters": [{"name":"observed","type":"number","required":true},{"name":"background","type":"number","required":true},{"name":"alpha","type":"number","required":false,"description":"Significance level (default 0.05)"}], "outputSchema":{"type":"object","properties":{"status":{"type":"string"},"corrected_signal":{"type":"number"},"above_noise":{"type":"boolean"}},"required":["status"]}, "annotations":{"readOnlyHint":true,"destructiveHint":false} },
-    { "name": "intervention", "description": "Model competitive inhibition intervention: compute residual signal after applying an intervention of given strength. Based on enzyme inhibition kinetics.", "parameters": [{"name":"signal_strength","type":"number","required":true},{"name":"intervention_strength","type":"number","required":true},{"name":"ki","type":"number","required":false,"description":"Inhibition constant (default 1.0)"}], "outputSchema":{"type":"object","properties":{"status":{"type":"string"},"residual_signal":{"type":"number"},"reduction_pct":{"type":"number"},"effective":{"type":"boolean"}},"required":["status"]}, "annotations":{"readOnlyHint":true,"destructiveHint":false} },
-    { "name": "required-strength", "description": "Compute the intervention strength needed to achieve a target signal reduction.", "parameters": [{"name":"signal_strength","type":"number","required":true},{"name":"target_reduction","type":"number","required":false,"description":"Target reduction fraction (default 0.5 = 50%)"},{"name":"ki","type":"number","required":false}], "outputSchema":{"type":"object","properties":{"status":{"type":"string"},"required_strength":{"type":"number"},"achievable":{"type":"boolean"}},"required":["status"]}, "annotations":{"readOnlyHint":true,"destructiveHint":false} },
-    { "name": "omega-table", "description": "Reference table of all seriousness omega weights used in predictive and preemptive tiers.", "parameters": [], "outputSchema":{"type":"object","properties":{"status":{"type":"string"},"omega_weights":{"type":"array"}},"required":["status"]}, "annotations":{"readOnlyHint":true,"destructiveHint":false} }
-  ]
+    {
+      "name": "reactive",
+      "description": "Tier 1: Standard reactive signal detection from a 2x2 contingency table. Returns PRR, chi-squared, and detection verdict.",
+      "parameters": [
+        {
+          "name": "a",
+          "type": "integer",
+          "required": true,
+          "description": "Drug+Event+ count"
+        },
+        {
+          "name": "b",
+          "type": "integer",
+          "required": true,
+          "description": "Drug+Event- count"
+        },
+        {
+          "name": "c",
+          "type": "integer",
+          "required": true,
+          "description": "Drug-Event+ count"
+        },
+        {
+          "name": "d",
+          "type": "integer",
+          "required": true,
+          "description": "Drug-Event- count"
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "prr": {
+            "type": "number"
+          },
+          "signal_detected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "predictive",
+      "description": "Tier 2: Severity-weighted predictive detection. Multiplies PRR by seriousness omega weight (ICH E2A criteria). More serious events get amplified signals.",
+      "parameters": [
+        {
+          "name": "a",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "b",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "c",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "d",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "seriousness",
+          "type": "string",
+          "description": "non_serious, hospitalization, disability, life_threatening, or fatal",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "weighted_prr": {
+            "type": "number"
+          },
+          "omega": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "gibbs",
+      "description": "Tier 3: Preemptive detection via Gibbs free energy thermodynamic model. Negative delta-G = spontaneous signal (drug-event association is thermodynamically favorable). Models signal as chemical reaction equilibrium.",
+      "parameters": [
+        {
+          "name": "prr",
+          "type": "number",
+          "required": true,
+          "description": "PRR value"
+        },
+        {
+          "name": "n",
+          "type": "number",
+          "required": true,
+          "description": "Number of reports"
+        },
+        {
+          "name": "seriousness",
+          "type": "string",
+          "required": false,
+          "description": "Seriousness level"
+        },
+        {
+          "name": "temperature",
+          "type": "number",
+          "required": false,
+          "description": "System temperature (default 1.0)"
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "delta_g": {
+            "type": "number"
+          },
+          "spontaneous": {
+            "type": "boolean"
+          },
+          "energy_class": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "evaluate",
+      "description": "Full three-tier evaluation: runs reactive, predictive, AND preemptive detection in one call. Returns results from all tiers plus overall tier classification and recommendation.",
+      "parameters": [
+        {
+          "name": "a",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "b",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "c",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "d",
+          "type": "integer",
+          "required": true
+        },
+        {
+          "name": "seriousness",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "temperature",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "tier": {
+            "type": "string"
+          },
+          "recommendation": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "trajectory",
+      "description": "Trajectory amplification: detect accelerating reporting trends using Hill curve amplification on time-series data. Reports slope, amplified slope, and whether the signal is accelerating.",
+      "parameters": [
+        {
+          "name": "data",
+          "type": "array",
+          "required": true,
+          "description": "Array of {time, rate} data points (minimum 2)"
+        },
+        {
+          "name": "n_hill",
+          "type": "number",
+          "required": false,
+          "description": "Hill coefficient for amplification (default 2.0)"
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "accelerating": {
+            "type": "boolean"
+          },
+          "amplified_slope": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "severity",
+      "description": "Get the severity weight (omega) for a seriousness level. Returns the ICH E2A-based weight used in predictive and preemptive tiers.",
+      "parameters": [
+        {
+          "name": "seriousness",
+          "type": "string",
+          "required": true,
+          "description": "non_serious, hospitalization, disability, life_threatening, or fatal"
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "omega": {
+            "type": "number"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "noise",
+      "description": "Noise floor correction: compute corrected signal by subtracting background noise and testing statistical significance.",
+      "parameters": [
+        {
+          "name": "observed",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "background",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "alpha",
+          "type": "number",
+          "required": false,
+          "description": "Significance level (default 0.05)"
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "corrected_signal": {
+            "type": "number"
+          },
+          "above_noise": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "intervention",
+      "description": "Model competitive inhibition intervention: compute residual signal after applying an intervention of given strength. Based on enzyme inhibition kinetics.",
+      "parameters": [
+        {
+          "name": "signal_strength",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "intervention_strength",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "ki",
+          "type": "number",
+          "required": false,
+          "description": "Inhibition constant (default 1.0)"
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "residual_signal": {
+            "type": "number"
+          },
+          "reduction_pct": {
+            "type": "number"
+          },
+          "effective": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "required-strength",
+      "description": "Compute the intervention strength needed to achieve a target signal reduction.",
+      "parameters": [
+        {
+          "name": "signal_strength",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "target_reduction",
+          "type": "number",
+          "required": false,
+          "description": "Target reduction fraction (default 0.5 = 50%)"
+        },
+        {
+          "name": "ki",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "required_strength": {
+            "type": "number"
+          },
+          "achievable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "omega-table",
+      "description": "Reference table of all seriousness omega weights used in predictive and preemptive tiers.",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "omega_weights": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    }
+  ],
+  "url_pattern": "/*"
 }

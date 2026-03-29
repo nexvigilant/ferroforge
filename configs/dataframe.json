@@ -2,7 +2,7 @@
   "domain": "dataframe.nexvigilant.com",
   "private": false,
   "copyright": "\u00a9 2026 NexVigilant, LLC.",
-  "title": "DataFrame — Columnar Data Operations",
+  "title": "DataFrame \u2014 Columnar Data Operations",
   "description": "Sovereign columnar DataFrame engine: create tables from JSON, compute summary statistics (mean, std, min, max, count, median), filter rows by condition, group by columns with aggregation, sort, select/drop columns, and join two DataFrames on shared keys. Pure Rust via nexcore-dataframe.",
   "proxy": "rust-native",
   "tools": [
@@ -10,78 +10,338 @@
       "name": "create",
       "description": "Create a DataFrame from JSON column data. Input: object mapping column names to arrays of values. Returns schema and row count.",
       "parameters": [
-        { "name": "columns", "type": "object", "description": "Column name to array of values, e.g. {\"drug\": [\"ASP\",\"MET\"], \"count\": [10,5]}", "required": true }
+        {
+          "name": "columns",
+          "type": "object",
+          "description": "Column name to array of values, e.g. {\"drug\": [\"ASP\",\"MET\"], \"count\": [10,5]}",
+          "required": true
+        }
       ],
-      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "columns": { "type": "array" }, "height": { "type": "integer" }, "width": { "type": "integer" } }, "required": ["status"] },
-      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array"
+          },
+          "height": {
+            "type": "integer"
+          },
+          "width": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "describe",
       "description": "Compute summary statistics for a numeric column: count, non_null, mean, std_dev, min, max, median. Provide the full DataFrame as columns and the target column name.",
       "parameters": [
-        { "name": "columns", "type": "object", "description": "Column name to array of values", "required": true },
-        { "name": "column", "type": "string", "description": "Name of the column to describe", "required": true }
+        {
+          "name": "columns",
+          "type": "object",
+          "description": "Column name to array of values",
+          "required": true
+        },
+        {
+          "name": "column",
+          "type": "string",
+          "description": "Name of the column to describe",
+          "required": true
+        }
       ],
-      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "count": { "type": "integer" }, "mean": { "type": "number" }, "std_dev": { "type": "number" }, "min": { "type": "number" }, "max": { "type": "number" }, "median": { "type": "number" } }, "required": ["status"] },
-      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "mean": {
+            "type": "number"
+          },
+          "std_dev": {
+            "type": "number"
+          },
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          },
+          "median": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "filter",
       "description": "Filter rows where a column meets a condition. Operators: eq, neq, gt, gte, lt, lte, contains (string substring). Returns the filtered DataFrame as JSON.",
       "parameters": [
-        { "name": "columns", "type": "object", "description": "Column name to array of values", "required": true },
-        { "name": "column", "type": "string", "description": "Column to filter on", "required": true },
-        { "name": "operator", "type": "string", "description": "Comparison: eq, neq, gt, gte, lt, lte, contains", "required": true },
-        { "name": "value", "type": "string", "description": "Value to compare against (numbers as strings)", "required": true }
+        {
+          "name": "columns",
+          "type": "object",
+          "description": "Column name to array of values",
+          "required": true
+        },
+        {
+          "name": "column",
+          "type": "string",
+          "description": "Column to filter on",
+          "required": true
+        },
+        {
+          "name": "operator",
+          "type": "string",
+          "description": "Comparison: eq, neq, gt, gte, lt, lte, contains",
+          "required": true
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "description": "Value to compare against (numbers as strings)",
+          "required": true
+        }
       ],
-      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "columns": { "type": "object" }, "height": { "type": "integer" } }, "required": ["status"] },
-      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "object"
+          },
+          "height": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "group-by",
       "description": "Group rows by one or more columns and compute aggregations. Agg types: sum, mean, min, max, count, first, last, n_unique. Each agg specifies type and target column.",
       "parameters": [
-        { "name": "columns", "type": "object", "description": "Column name to array of values", "required": true },
-        { "name": "group_cols", "type": "array", "description": "Column names to group by", "required": true },
-        { "name": "aggs", "type": "array", "description": "Array of {\"type\": \"sum\"|\"mean\"|..., \"column\": \"col_name\"} (column omitted for count)", "required": true }
+        {
+          "name": "columns",
+          "type": "object",
+          "description": "Column name to array of values",
+          "required": true
+        },
+        {
+          "name": "group_cols",
+          "type": "array",
+          "description": "Column names to group by",
+          "required": true
+        },
+        {
+          "name": "aggs",
+          "type": "array",
+          "description": "Array of {\"type\": \"sum\"|\"mean\"|..., \"column\": \"col_name\"} (column omitted for count)",
+          "required": true
+        }
       ],
-      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "columns": { "type": "object" }, "height": { "type": "integer" } }, "required": ["status"] },
-      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "object"
+          },
+          "height": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "sort",
       "description": "Sort a DataFrame by a column. Returns sorted rows as JSON.",
       "parameters": [
-        { "name": "columns", "type": "object", "description": "Column name to array of values", "required": true },
-        { "name": "by", "type": "string", "description": "Column name to sort by", "required": true },
-        { "name": "descending", "type": "boolean", "description": "Sort descending (default false)", "required": false },
-        { "name": "limit", "type": "integer", "description": "Return only first N rows after sorting (head)", "required": false }
+        {
+          "name": "columns",
+          "type": "object",
+          "description": "Column name to array of values",
+          "required": true
+        },
+        {
+          "name": "by",
+          "type": "string",
+          "description": "Column name to sort by",
+          "required": true
+        },
+        {
+          "name": "descending",
+          "type": "boolean",
+          "description": "Sort descending (default false)",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "type": "integer",
+          "description": "Return only first N rows after sorting (head)",
+          "required": false
+        }
       ],
-      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "columns": { "type": "object" }, "height": { "type": "integer" } }, "required": ["status"] },
-      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "object"
+          },
+          "height": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "select",
       "description": "Select a subset of columns from a DataFrame, optionally dropping columns instead.",
       "parameters": [
-        { "name": "columns", "type": "object", "description": "Column name to array of values", "required": true },
-        { "name": "keep", "type": "array", "description": "Column names to keep (mutually exclusive with drop)", "required": false },
-        { "name": "drop", "type": "array", "description": "Column names to drop (mutually exclusive with keep)", "required": false }
+        {
+          "name": "columns",
+          "type": "object",
+          "description": "Column name to array of values",
+          "required": true
+        },
+        {
+          "name": "keep",
+          "type": "array",
+          "description": "Column names to keep (mutually exclusive with drop)",
+          "required": false
+        },
+        {
+          "name": "drop",
+          "type": "array",
+          "description": "Column names to drop (mutually exclusive with keep)",
+          "required": false
+        }
       ],
-      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "columns": { "type": "object" }, "height": { "type": "integer" }, "width": { "type": "integer" } }, "required": ["status"] },
-      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "object"
+          },
+          "height": {
+            "type": "integer"
+          },
+          "width": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "join",
       "description": "Join two DataFrames on shared key columns. Join types: inner, left, right, outer, semi, anti. Provide left and right DataFrames as separate column objects and the key column names.",
       "parameters": [
-        { "name": "left", "type": "object", "description": "Left DataFrame: column name to array of values", "required": true },
-        { "name": "right", "type": "object", "description": "Right DataFrame: column name to array of values", "required": true },
-        { "name": "on", "type": "array", "description": "Key column names present in both DataFrames", "required": true },
-        { "name": "how", "type": "string", "description": "Join type: inner (default), left, right, outer, semi, anti", "required": false }
+        {
+          "name": "left",
+          "type": "object",
+          "description": "Left DataFrame: column name to array of values",
+          "required": true
+        },
+        {
+          "name": "right",
+          "type": "object",
+          "description": "Right DataFrame: column name to array of values",
+          "required": true
+        },
+        {
+          "name": "on",
+          "type": "array",
+          "description": "Key column names present in both DataFrames",
+          "required": true
+        },
+        {
+          "name": "how",
+          "type": "string",
+          "description": "Join type: inner (default), left, right, outer, semi, anti",
+          "required": false
+        }
       ],
-      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "columns": { "type": "object" }, "height": { "type": "integer" }, "width": { "type": "integer" } }, "required": ["status"] },
-      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "object"
+          },
+          "height": {
+            "type": "integer"
+          },
+          "width": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     }
-  ]
+  ],
+  "url_pattern": "/*"
 }
