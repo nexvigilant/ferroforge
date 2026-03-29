@@ -93,20 +93,31 @@ def _build_2x2(drug: str, event: str) -> dict:
     a_plus_b = reports with drug (any event)
     a_plus_c = reports with event (any drug)
     N = total reports in FAERS
+
+    All 4 queries run in parallel via ThreadPoolExecutor to cut latency ~4x.
     """
+    from concurrent.futures import ThreadPoolExecutor
+
     drug_q = f'patient.drug.openfda.generic_name:"{_quote(drug)}"'
     event_q = f'patient.reaction.reactionmeddrapt:"{_quote(event)}"'
 
-    a = _get_count(f"{drug_q}+AND+{event_q}")
-    a_plus_b = _get_count(drug_q)
-    a_plus_c = _get_count(event_q)
+    def _get_total() -> int:
+        try:
+            total_data = _fetch(f"{BASE_URL}?search=_exists_:safetyreportid&limit=1")
+            return total_data.get("meta", {}).get("results", {}).get("total", 0)
+        except RuntimeError:
+            return 0
 
-    # Total FAERS reports — use a broad count endpoint
-    try:
-        total_data = _fetch(f"{BASE_URL}?search=_exists_:safetyreportid&limit=1")
-        n = total_data.get("meta", {}).get("results", {}).get("total", 0)
-    except RuntimeError:
-        n = 0
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        fut_a = pool.submit(_get_count, f"{drug_q}+AND+{event_q}")
+        fut_ab = pool.submit(_get_count, drug_q)
+        fut_ac = pool.submit(_get_count, event_q)
+        fut_n = pool.submit(_get_total)
+
+        a = fut_a.result()
+        a_plus_b = fut_ab.result()
+        a_plus_c = fut_ac.result()
+        n = fut_n.result()
 
     if n == 0 or a_plus_b == 0 or a_plus_c == 0:
         return {"error": "Insufficient data to build contingency table", "a": a, "a_plus_b": a_plus_b, "a_plus_c": a_plus_c, "N": n}
