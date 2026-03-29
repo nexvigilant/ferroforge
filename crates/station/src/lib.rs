@@ -7,7 +7,9 @@ pub const SSE_STREAM_HEADERS: [(&str, &str); 2] = [
 ];
 
 pub mod algovigilance;
+pub mod academy;
 pub mod auth;
+pub mod autopilot;
 pub mod benefit_risk;
 pub mod billing_api;
 pub mod bicone;
@@ -30,13 +32,16 @@ pub mod fda_guidance;
 pub mod fhir;
 pub mod formula;
 pub mod game_theory;
+pub mod gcp;
 pub mod harm_taxonomy;
 pub mod heligram;
 pub mod helix;
 pub mod markov;
 pub mod marketing;
 pub mod metering;
+pub mod moltbook;
 pub mod molecular_weight;
+pub mod nexcore_bridge;
 pub mod phenotype;
 pub mod preemptive_pv;
 pub mod pricing;

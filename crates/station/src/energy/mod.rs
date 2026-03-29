@@ -9,12 +9,12 @@ use serde_json::{Value, json};
 pub fn try_handle(tool_name: &str, args: &Value) -> Option<ToolCallResult> {
     let bare = tool_name.strip_prefix("energy_nexvigilant_com_")?;
     let result = match bare {
-        "compute_energy_charge" => handle_compute_ec(args),
-        "classify_regime" => handle_classify_regime(args),
-        "recommend_strategy" => handle_recommend_strategy(args),
-        "analyze_waste" => handle_analyze_waste(args),
-        "temporal_metrics" => handle_temporal_metrics(args),
-        "classify_waste" => handle_classify_waste(args),
+        "compute-energy-charge" => handle_compute_ec(args),
+        "classify-regime" => handle_classify_regime(args),
+        "recommend-strategy" => handle_recommend_strategy(args),
+        "analyze-waste" => handle_analyze_waste(args),
+        "temporal-metrics" => handle_temporal_metrics(args),
+        "classify-waste" => handle_classify_waste(args),
         _ => return None,
     };
     Some(ToolCallResult {

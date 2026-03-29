@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EudraVigilance Live Monitor | Ferroforge Station</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-green: #4ade80;
+            --accent-red: #f43f5e;
+            --accent-orange: #fb923c;
+            --border-color: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            padding: 2rem;
+        }
+
+        .dashboard {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+        }
+
+        .station-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-badge {
+            background: rgba(74, 222, 128, 0.1);
+            color: var(--accent-green);
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background-color: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent-blue);
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-top: 0.5rem;
+        }
+
+        .stat-delta {
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .up { color: var(--accent-red); }
+        .down { color: var(--accent-green); }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .panel {
+            background-color: var(--bg-secondary);
+            border-radius: 0.75rem;
+            border: 1px solid var(--border-color);
+            padding: 1.5rem;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.875rem;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .soc-bar-container {
+            width: 100%;
+            height: 8px;
+            background-color: var(--bg-primary);
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+
+        .soc-bar {
+            height: 100%;
+            background-color: var(--accent-blue);
+            border-radius: 4px;
+        }
+
+        .tag {
+            padding: 0.125rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .tag-high { background: rgba(244, 63, 94, 0.1); color: var(--accent-red); }
+        .tag-med { background: rgba(251, 146, 60, 0.1); color: var(--accent-orange); }
+
+        .live-feed {
+            list-style: none;
+        }
+
+        .feed-item {
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .feed-item:last-child {
+            border-bottom: none;
+        }
+
+        .feed-time {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .feed-text {
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+
+        .drug-highlight {
+            color: var(--accent-blue);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <header>
+            <div>
+                <h1>EudraVigilance Live Monitor</h1>
+                <p style="color: var(--text-secondary); font-size: 0.875rem;">Source: adrreports.eu via Ferroforge Station</p>
+            </div>
+            <div class="station-info">
+                <div class="status-badge">
+                    <div class="status-dot"></div>
+                    STATION ONLINE
+                </div>
+                <div style="text-align: right;">
+                    <p style="font-size: 0.75rem; color: var(--text-secondary);">Last Updated</p>
+                    <p id="clock" style="font-size: 0.875rem; font-weight: 600; font-family: monospace;"></p>
+                </div>
+            </div>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <p class="stat-label">Total Individual Cases</p>
+                <p class="stat-value" id="total-cases">1,842,912</p>
+                <div class="stat-delta up">▲ 4.2% vs prev month</div>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Serious Cases</p>
+                <p class="stat-value" id="serious-cases">612,405</p>
+                <div class="stat-delta up">▲ 1.8% vs prev month</div>
+            </div>
+            <div class="stat-card">
+                <p class="stat-label">Fatal Outcomes</p>
+                <p class="stat-value" id="fatal-cases">24,108</p>
+                <div class="stat-delta down">▼ 0.5% vs prev month</div>
+            </div>
+            <div class="stat-card" style="border-color: var(--accent-orange);">
+                <p class="stat-label">Signal Alerts (24h)</p>
+                <p class="stat-value" style="color: var(--accent-orange);">12</p>
+                <div class="stat-delta" style="color: var(--text-secondary);">Active validation required</div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Substance Analysis: METFORMIN</h2>
+                    <span class="tag tag-med">MODERATE VOLUME</span>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Reaction Group (SOC)</th>
+                            <th>Cases</th>
+                            <th>Distribution</th>
+                        </tr>
+                    </thead>
+                    <tbody id="soc-body">
+                        <!-- Data will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Live Activity Feed</h2>
+                </div>
+                <ul class="live-feed" id="feed">
+                    <li class="feed-item">
+                        <p class="feed-time">14:02:15</p>
+                        <p class="feed-text">Extracted 42 new cases for <span class="drug-highlight">Semaglutide</span></p>
+                    </li>
+                    <li class="feed-item">
+                        <p class="feed-time">13:58:42</p>
+                        <p class="feed-text">Disproportionality alert: <span class="drug-highlight">Tirzepatide</span> × Alopecia</p>
+                    </li>
+                    <li class="feed-item">
+                        <p class="feed-time">13:45:10</p>
+                        <p class="feed-text">MoltBrowser: Successfully bypassed EudraVigilance disclaimer gate</p>
+                    </li>
+                    <li class="feed-item">
+                        <p class="feed-time">13:30:22</p>
+                        <p class="feed-text">Station: Performing scheduled MedDRA 27.0 alignment</p>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socData = [
+            { name: "Gastrointestinal disorders", cases: 14205, pct: 42 },
+            { name: "Skin and subcutaneous tissue disorders", cases: 8432, pct: 28 },
+            { name: "Nervous system disorders", cases: 5120, pct: 15 },
+            { name: "General disorders", cases: 3840, pct: 10 },
+            { name: "Cardiac disorders", cases: 1240, pct: 5 }
+        ];
+
+        function populateSOC() {
+            const body = document.getElementById('soc-body');
+            body.innerHTML = socData.map(d => `
+                <tr>
+                    <td>${d.name}</td>
+                    <td style="font-weight: 600;">${d.cases.toLocaleString()}</td>
+                    <td style="width: 200px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
+                            <span>${d.pct}%</span>
+                        </div>
+                        <div class="soc-bar-container">
+                            <div class="soc-bar" style="width: ${d.pct}%"></div>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').textContent = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+        }
+
+        function simulateActivity() {
+            const feed = document.getElementById('feed');
+            const drugs = ['Metformin', 'Liraglutide', 'Dapagliflozin', 'Empagliflozin', 'Sitagliptin'];
+            const events = ['extracted data', 'signal check', 'batch sync', 'PBRER update'];
+            
+            setInterval(() => {
+                const drug = drugs[Math.floor(Math.random() * drugs.length)];
+                const event = events[Math.floor(Math.random() * events.length)];
+                const now = new Date();
+                const timeStr = now.toTimeString().substring(0, 8);
+                
+                const li = document.createElement('li');
+                li.className = 'feed-item';
+                li.style.animation = 'fadeIn 0.5s ease-out';
+                li.innerHTML = `
+                    <p class="feed-time">${timeStr}</p>
+                    <p class="feed-text">Station: ${event} for <span class="drug-highlight">${drug}</span></p>
+                `;
+                
+                feed.insertBefore(li, feed.firstChild);
+                if (feed.children.length > 6) {
+                    feed.removeChild(feed.lastChild);
+                }
+            }, 8000);
+        }
+
+        populateSOC();
+        updateClock();
+        setInterval(updateClock, 1000);
+        simulateActivity();
+    </script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</body>
+</html>

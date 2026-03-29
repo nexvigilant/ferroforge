@@ -244,6 +244,16 @@ impl ConfigRegistry {
                     "properties": {},
                 }),
                 output_schema: None,
+                annotations: meta_annotations.clone(),
+            },
+            ToolInfo {
+                name: "nexvigilant_forge_diagnose".into(),
+                description: "[NexVigilant Station] Forge diagnostic — reports coverage gaps across configs, Rust handlers, and proxy scripts. Shows which domains have live handlers vs config-only stubs, lists missing outputSchema and annotations, and provides forge commands to close gaps.".into(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {},
+                }),
+                output_schema: None,
                 annotations: meta_annotations,
             },
         ];
@@ -355,7 +365,7 @@ impl ConfigRegistry {
     /// Total tool count across all configs + Rust-native meta-tools.
     /// Must match len(tool_infos()) to avoid /health vs tools/list mismatch.
     pub fn tool_count(&self) -> usize {
-        const META_TOOLS: usize = 5; // chart_course, directory, capabilities, station_health, ring_health
+        const META_TOOLS: usize = 6; // chart_course, directory, capabilities, station_health, ring_health, forge_diagnose
         META_TOOLS + self.configs.iter().map(|c| c.tools.len()).sum::<usize>()
     }
 

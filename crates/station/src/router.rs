@@ -248,6 +248,9 @@ fn route_tool_call_inner(
     if tool_name == "nexvigilant_ring_health" {
         return handle_ring_health(registry);
     }
+    if tool_name == "nexvigilant_forge_diagnose" {
+        return handle_forge_diagnose(registry);
+    }
 
     // Rust-native handlers — no Python proxy needed
     if let Some(result) = crate::compute::try_handle(tool_name, arguments) {
@@ -257,6 +260,9 @@ fn route_tool_call_inner(
         return result;
     }
     if let Some(result) = crate::crystalbook::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::autopilot::try_handle(tool_name, arguments) {
         return result;
     }
     if let Some(result) = crate::benefit_risk::try_handle(tool_name, arguments) {
@@ -313,6 +319,12 @@ fn route_tool_call_inner(
     if let Some(result) = crate::marketing::try_handle(tool_name, arguments) {
         return result;
     }
+    if let Some(result) = crate::moltbook::try_handle(tool_name, arguments, registry) {
+        return result;
+    }
+    if let Some(result) = crate::autopilot::try_handle(tool_name, arguments) {
+        return result;
+    }
     if let Some(result) = crate::dataframe::try_handle(tool_name, arguments) {
         return result;
     }
@@ -346,6 +358,9 @@ fn route_tool_call_inner(
     if let Some(result) = crate::algovigilance::try_handle(tool_name, arguments) {
         return result;
     }
+    if let Some(result) = crate::academy::try_handle(tool_name, arguments) {
+        return result;
+    }
     if let Some(result) = crate::chemivigilance::try_handle(tool_name, arguments) {
         return result;
     }
@@ -368,6 +383,12 @@ fn route_tool_call_inner(
         return result;
     }
     if let Some(result) = crate::zeta::try_handle(tool_name, arguments) {
+        return result;
+    }
+
+    // Catch-all for rust-native tools handled by the NexCore bridge.
+    // This handles 100+ tools that don't have a dedicated native handler yet.
+    if let Some(result) = crate::nexcore_bridge::try_handle(tool_name, arguments) {
         return result;
     }
 
@@ -405,19 +426,13 @@ fn execute_tool(
         .or(config.proxy.as_ref());
 
     if let Some(proxy) = proxy_path {
-        // "rust-native" is a sentinel, not a script path. If we reach here,
-        // the Rust try_handle() returned None (likely invalid parameters).
-        // Return a structured error instead of spawning a nonexistent script.
+        // "rust-native" sentinel: try_handle() returned None for this tool.
+        // Fall through to dispatch.py which has the nexcore bridge proxy —
+        // it calls the nexcore-mcp binary via stdio to handle the remaining
+        // rust-native configs that don't have dedicated try_handle wiring.
         if proxy == "rust-native" {
-            return ToolCallResult {
-                content: vec![ContentBlock::Text {
-                    text: format!(
-                        "Tool '{mcp_name}' is a Rust-native handler but returned no result. \
-                         Check that all required parameters are provided with valid values."
-                    ),
-                }],
-                is_error: Some(true),
-            };
+            let dispatch_proxy = "scripts/dispatch.py";
+            return execute_proxy(dispatch_proxy, mcp_name, arguments, station_root, request_id, proxy_cache);
         }
         return execute_proxy(proxy, mcp_name, arguments, station_root, request_id, proxy_cache);
     }
@@ -1084,6 +1099,103 @@ fn handle_ring_health(registry: &ConfigRegistry) -> ToolCallResult {
             "r_opt": r_opt,
             "source": "Crystalbook Part V — The Looking Glass",
             "chemistry_ref": "Krygowski & Cyranski, Chem. Rev. 2001, 101, 1385",
+        },
+    });
+
+    ToolCallResult {
+        content: vec![ContentBlock::Text {
+            text: serde_json::to_string_pretty(&result).unwrap_or_default(),
+        }],
+        is_error: None,
+    }
+}
+
+/// Meta-tool: Forge diagnostic — identify coverage gaps across configs, handlers, and proxies.
+fn handle_forge_diagnose(registry: &ConfigRegistry) -> ToolCallResult {
+    let rust_native_handlers: std::collections::HashSet<&str> = [
+        "calculate.nexvigilant.com", "science.nexvigilant.com",
+        "crystalbook.nexvigilant.com", "benefit-risk.nexvigilant.com",
+        "signal-theory.nexvigilant.com", "preemptive-pv.nexvigilant.com",
+        "epidemiology.nexvigilant.com", "stoichiometry.nexvigilant.com",
+        "molecular-weight.nexvigilant.com", "game-theory.nexvigilant.com",
+        "heligram.nexvigilant.com", "entropy.nexvigilant.com",
+        "bicone.nexvigilant.com", "combinatorics.nexvigilant.com",
+        "formula.nexvigilant.com", "harm-taxonomy.nexvigilant.com",
+        "helix.nexvigilant.com", "markov.nexvigilant.com",
+        "relay.nexvigilant.com", "brain.nexvigilant.com",
+        "marketing.nexvigilant.com", "tov.nexvigilant.com",
+        "tov-proofs.nexvigilant.com", "dna.nexvigilant.com",
+        "algovigilance.nexvigilant.com", "chemivigilance.nexvigilant.com",
+        "primitives.nexvigilant.com", "pvdsl.nexvigilant.com",
+        "dataframe.nexvigilant.com", "dtree.nexvigilant.com",
+        "edit-distance.nexvigilant.com", "energy.nexvigilant.com",
+        "compliance.nexvigilant.com", "cccp.nexvigilant.com",
+        "stem.nexvigilant.com", "zeta.nexvigilant.com",
+        "noncompensatory.nexvigilant.com", "vigilance.nexvigilant.com",
+    ].into_iter().collect();
+
+    let mut config_only: Vec<Value> = Vec::new();
+    let mut rust_handled: Vec<Value> = Vec::new();
+    let mut proxy_handled: Vec<Value> = Vec::new();
+    let mut issues: Vec<String> = Vec::new();
+
+    for config in &registry.configs {
+        let domain = &config.domain;
+        let tool_count = config.tools.len();
+        let proxy_str = config.proxy.as_deref().unwrap_or("(none)");
+
+        let entry = serde_json::json!({"domain": domain, "tools": tool_count});
+
+        if rust_native_handlers.contains(domain.as_str()) {
+            rust_handled.push(entry);
+        } else if proxy_str == "rust-native" {
+            config_only.push(serde_json::json!({
+                "domain": domain, "tools": tool_count,
+                "issue": "config says rust-native but no try_handle in router",
+            }));
+        } else if proxy_str.contains("dispatch.py") || proxy_str.contains("_proxy.py") {
+            proxy_handled.push(entry);
+        } else if proxy_str == "(none)" {
+            config_only.push(serde_json::json!({
+                "domain": domain, "tools": tool_count, "issue": "no proxy defined",
+            }));
+        } else {
+            proxy_handled.push(entry);
+        }
+
+        for tool in &config.tools {
+            if tool.output_schema.is_none() {
+                issues.push(format!("{domain}/{} missing outputSchema", tool.name));
+            }
+            if tool.annotations.is_none() {
+                issues.push(format!("{domain}/{} missing annotations", tool.name));
+            }
+        }
+    }
+
+    let truncated_issues: Vec<&str> = issues.iter().map(|s| s.as_str()).take(20).collect();
+
+    let result = serde_json::json!({
+        "status": "ok",
+        "summary": {
+            "total_configs": registry.configs.len(),
+            "total_tools": registry.tool_count(),
+            "rust_native_handled": rust_handled.len(),
+            "proxy_handled": proxy_handled.len(),
+            "config_only_gaps": config_only.len(),
+            "issues_count": issues.len(),
+        },
+        "coverage": {
+            "rust_native": rust_handled,
+            "proxied": proxy_handled,
+            "gaps": config_only,
+        },
+        "issues": truncated_issues,
+        "forge_commands": {
+            "generate_configs": "python3 scripts/forge_from_crates.py generate",
+            "generate_pages": "python3 scripts/forge_nucleus.py batch",
+            "audit": "python3 scripts/forge.py audit",
+            "deploy": "gcloud run deploy nexvigilant-station --source . --region us-central1 --allow-unauthenticated",
         },
     });
 

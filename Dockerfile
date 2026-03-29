@@ -12,6 +12,11 @@ COPY target/release/nexvigilant-station /usr/local/bin/nexvigilant-station
 # Stable binaries first (change infrequently → better layer caching)
 COPY bin/rsk /usr/local/bin/rsk
 
+# NexCore MCP binary — enables the nexcore bridge proxy to handle
+# 114+ rust-native configs that lack dedicated Station try_handle wiring.
+# dispatch.py → nexcore_proxy.py → nexcore-mcp (stdio JSON-RPC)
+COPY bin/nexcore-mcp /usr/local/bin/nexcore-mcp
+
 # Config files + proxy scripts (change with each feature)
 COPY configs/ /app/configs/
 COPY scripts/ /app/scripts/

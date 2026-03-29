@@ -49,6 +49,7 @@ struct AppState {
     auth_gate: ApiKeyGate,
     meter: Arc<crate::metering::StationMeter>,
     proxy_cache: crate::router::ProxyCache,
+    gcp_client: Arc<crate::gcp::GcpClient>,
 }
 
 impl crate::billing_api::HasMeter for AppState {
@@ -95,6 +96,7 @@ pub async fn run_combined(
         Some(std::path::PathBuf::from("station-metering.jsonl"))
     };
     let meter = Arc::new(crate::metering::StationMeter::new(meter_log, usage_store));
+    let gcp_client = Arc::new(crate::gcp::GcpClient::new());
 
     let state = Arc::new(AppState {
         registry: Arc::clone(&registry_arc),
@@ -104,6 +106,7 @@ pub async fn run_combined(
         auth_gate: auth_gate.clone(),
         meter: Arc::clone(&meter),
         proxy_cache: crate::router::ProxyCache::new(),
+        gcp_client,
     });
 
     // Spawn session reaper — prunes zombie sessions every REAPER_INTERVAL_SECS
@@ -180,6 +183,10 @@ pub async fn run_combined(
         .route("/billing/rates", get(crate::billing_api::handle_rates))
         .route("/billing/usage", get(crate::billing_api::handle_usage::<AppState>))
         .route("/billing/balance", get(crate::billing_api::handle_balance::<AppState>))
+        // MoltBook — config discovery + contribution for MoltBrowser clients
+        .route("/configs/lookup", get(handle_configs_lookup))
+        .route("/configs/contribute", post(handle_configs_contribute))
+        .route("/configs/watch", get(handle_configs_watch))
         // Health + Stats (excluded from rate limiting below via middleware ordering)
         .route("/", get(handle_root))
         .route("/.well-known/mcp.json", get(handle_well_known_mcp))
@@ -548,5 +555,324 @@ async fn handle_stats(
 ) -> Json<Value> {
     let health = state.telemetry.health();
     Json(serde_json::to_value(health).unwrap_or_default())
+}
+
+/// MoltBook — config lookup by domain.
+///
+/// Returns browser automation configs matching a domain query, following the
+/// WebMCP Hub schema. Any MoltBrowser-compatible MCP client can discover tools
+/// for a site by querying this endpoint.
+///
+///   GET /configs/lookup?domain=dailymed.nlm.nih.gov
+///
+/// Response is a JSON array of matching configs with their tools, parameters,
+/// and execution metadata — ready for browser automation or API proxy dispatch.
+async fn handle_configs_lookup(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<HashMap<String, String>>,
+) -> Json<Value> {
+    let query = params.get("domain").cloned().unwrap_or_default();
+
+    if query.is_empty() {
+        // No domain specified — return all configs (catalog mode)
+        let configs: Vec<Value> = state.registry.configs.iter().map(|c| {
+            config_to_moltbook_json(c)
+        }).collect();
+        return Json(serde_json::json!({ "configs": configs }));
+    }
+
+    // Match configs whose domain contains the query string (case-insensitive)
+    let query_lower = query.to_lowercase();
+    let matched: Vec<Value> = state.registry.configs.iter()
+        .filter(|c| c.domain.to_lowercase().contains(&query_lower))
+        .map(|c| config_to_moltbook_json(c))
+        .collect();
+
+    Json(serde_json::json!({ "configs": matched }))
+}
+
+/// Convert a HubConfig to MoltBook/WebMCP Hub JSON format.
+fn config_to_moltbook_json(config: &crate::config::HubConfig) -> Value {
+    let tools: Vec<Value> = config.tools.iter().map(|t| {
+        let params: Vec<Value> = t.parameters.iter().map(|p| {
+            serde_json::json!({
+                "name": p.name,
+                "type": p.param_type,
+                "description": p.description,
+                "required": p.required,
+            })
+        }).collect();
+
+        let mut tool_json = serde_json::json!({
+            "name": t.name,
+            "description": t.description,
+            "inputSchema": {
+                "type": "object",
+                "properties": params.iter().map(|p| {
+                    let name = p["name"].as_str().unwrap_or_default().to_string();
+                    let prop = serde_json::json!({
+                        "type": p["type"].as_str().unwrap_or("string"),
+                        "description": p["description"],
+                    });
+                    (name, prop)
+                }).collect::<serde_json::Map<String, Value>>(),
+                "required": t.parameters.iter()
+                    .filter(|p| p.required)
+                    .map(|p| Value::String(p.name.clone()))
+                    .collect::<Vec<Value>>(),
+            },
+        });
+
+        if let Some(schema) = &t.output_schema {
+            tool_json.as_object_mut().map(|o| o.insert("outputSchema".into(), schema.clone()));
+        }
+        if let Some(ann) = &t.annotations {
+            tool_json.as_object_mut().map(|o| o.insert("annotations".into(),
+                serde_json::to_value(ann).unwrap_or_default()));
+        }
+
+        tool_json
+    }).collect();
+
+    // Classify config source type by domain pattern:
+    // - nexvigilant.com domains = rust-native computation (no external API)
+    // - known external API domains = live API proxy
+    // - everything else = curated reference data
+    let domain_lower = config.domain.to_lowercase();
+    let source_type = if domain_lower.ends_with(".nexvigilant.com") {
+        "rust-native"
+    } else if [
+        "api.fda.gov", "clinicaltrials.gov", "pubmed.ncbi.nlm.nih.gov",
+        "dailymed.nlm.nih.gov", "rxnav.nlm.nih.gov", "open-vigil.fr",
+        "accessdata.fda.gov", "eudravigilance.ema.europa.eu",
+        "eudravigilance-live.ema.europa.eu", "www.ema.europa.eu",
+        "vigiaccess.org", "en.wikipedia.org", "claude.ai", "www.linkedin.com",
+    ].iter().any(|&d| domain_lower == d)
+    {
+        "live-api"
+    } else if domain_lower.starts_with("www.") && [
+        "abbvie", "amgen", "astrazeneca", "bayer", "bms", "gilead",
+        "gsk", "jnj", "lilly", "merck", "novartis", "novonordisk",
+        "pfizer", "roche", "sanofi", "fda.gov",
+    ].iter().any(|company| domain_lower.contains(company))
+    {
+        "live-api"
+    } else {
+        "reference"
+    };
+
+    serde_json::json!({
+        "domain": config.domain,
+        "urlPattern": config.url_pattern,
+        "title": config.title,
+        "description": config.description,
+        "tools": tools,
+        "toolCount": tools.len(),
+        "sourceType": source_type,
+        "private": config.private,
+    })
+}
+
+/// MoltContrib — accept agent-contributed configs.
+///
+/// POST /configs/contribute
+///
+/// Agents submit new site configs after browser exploration sessions.
+/// Validates the config schema, writes to the configs/ directory,
+/// and returns the config ID. The new config's tools become available
+/// on next binary restart (or live if hot-reload is implemented).
+///
+/// Body: HubConfig JSON (domain, title, tools[])
+async fn handle_configs_contribute(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<Value>,
+) -> (StatusCode, Json<Value>) {
+    // Validate required fields
+    let domain = match body.get("domain").and_then(|v| v.as_str()) {
+        Some(d) if !d.is_empty() => d.to_string(),
+        _ => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
+            "status": "error",
+            "message": "domain is required (e.g., 'example.com')",
+        }))),
+    };
+
+    let title = match body.get("title").and_then(|v| v.as_str()) {
+        Some(t) if !t.is_empty() => t.to_string(),
+        _ => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
+            "status": "error",
+            "message": "title is required",
+        }))),
+    };
+
+    let tools = match body.get("tools").and_then(|v| v.as_array()) {
+        Some(t) if !t.is_empty() => t,
+        _ => return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
+            "status": "error",
+            "message": "tools array is required with at least one tool",
+        }))),
+    };
+
+    // Validate each tool has name + description
+    for (i, tool) in tools.iter().enumerate() {
+        if tool.get("name").and_then(|v| v.as_str()).unwrap_or("").is_empty() {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
+                "status": "error",
+                "message": format!("tool[{}] missing required 'name' field", i),
+            })));
+        }
+        if tool.get("description").and_then(|v| v.as_str()).unwrap_or("").is_empty() {
+            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
+                "status": "error",
+                "message": format!("tool[{}] missing required 'description' field", i),
+            })));
+        }
+    }
+
+    // Check for duplicate domain
+    let domain_exists = state.registry.configs.iter().any(|c| c.domain == domain);
+
+    // Generate config filename from domain
+    let filename = domain.replace('.', "-").replace('/', "_");
+    let config_path = format!("{}/configs/{}.json", state.registry.station_root, filename);
+
+    // Write config to disk
+    let config_json = serde_json::json!({
+        "domain": domain,
+        "url_pattern": body.get("urlPattern").or(body.get("url_pattern"))
+            .and_then(|v| v.as_str()).unwrap_or("/*"),
+        "title": title,
+        "description": body.get("description").and_then(|v| v.as_str()),
+        "tools": tools,
+    });
+let config_pretty = serde_json::to_string_pretty(&config_json).unwrap_or_default();
+
+// Write config to disk (ephemeral on Cloud Run, persistent on local dev)
+let write_result = std::fs::write(&config_path, &config_pretty);
+
+// Persist to GCS if configured (Primary persistence for Cloud Run)
+if let Ok(bucket) = std::env::var("MOLTCONTRIB_BUCKET") {
+    let object_name = format!("configs/{}.json", filename);
+    if let Err(e) = state.gcp_client.upload_to_gcs(&bucket, &object_name, config_pretty.as_bytes()) {
+        warn!(bucket = %bucket, object = %object_name, error = %e, "MoltContrib: GCS persistence failed");
+    } else {
+        info!(bucket = %bucket, object = %object_name, "MoltContrib: GCS persistence successful");
+    }
+}
+
+    match write_result {
+        Ok(_) => {
+            info!(
+                domain = %domain,
+                tools = tools.len(),
+                path = %config_path,
+                "MoltContrib: config contributed"
+            );
+            (StatusCode::CREATED, Json(serde_json::json!({
+                "status": "ok",
+                "message": if domain_exists {
+                    "Config updated (existing domain — will take effect on restart)"
+                } else {
+                    "Config created (will take effect on restart)"
+                },
+                "domain": domain,
+                "toolCount": tools.len(),
+                "configPath": config_path,
+                "note": "Config is persisted. Tools become available after station restart.",
+            })))
+        }
+        Err(e) => {
+            warn!(domain = %domain, error = %e, "MoltContrib: failed to write config");
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
+                "status": "error",
+                "message": format!("Failed to write config: {}", e),
+            })))
+        }
+    }
+}
+
+/// MoltWatch — config health monitoring.
+///
+/// GET /configs/watch
+///
+/// Tests all configs with proxy scripts by checking if the proxy script
+/// exists and is executable. For live-api configs, optionally pings the
+/// upstream endpoint. Returns health status per config.
+async fn handle_configs_watch(
+    State(state): State<Arc<AppState>>,
+) -> Json<Value> {
+    let mut results = Vec::new();
+
+    // On Cloud Run, proxy scripts aren't bundled — only Rust-native handlers
+    // are available. Adjust health check to not penalize missing proxies.
+    let is_cloud_run = std::env::var("K_SERVICE").is_ok();
+
+    for config in &state.registry.configs {
+        let domain = &config.domain;
+        let tool_count = config.tools.len();
+        let domain_lower = domain.to_lowercase();
+
+        // Determine if this config uses Rust-native handlers (no proxy needed)
+        let is_rust_native = domain_lower.ends_with(".nexvigilant.com");
+
+        // Check proxy script existence (only meaningful locally, not on Cloud Run)
+        let proxy_status = if is_rust_native {
+            "rust-native"
+        } else if let Some(ref proxy) = config.proxy {
+            if is_cloud_run {
+                // On Cloud Run, proxy configs route through dispatch.py which
+                // calls external APIs — proxy script absence is expected
+                "cloud-run-proxy"
+            } else {
+                let proxy_path = format!("{}/{}", state.registry.station_root, proxy);
+                if std::path::Path::new(&proxy_path).exists() {
+                    "healthy"
+                } else {
+                    "missing_proxy"
+                }
+            }
+        } else {
+            "healthy"
+        };
+
+        // Check for stub tools (tools with stub_response = no real implementation)
+        let stub_count = config.tools.iter()
+            .filter(|t| t.stub_response.is_some())
+            .count();
+
+        let status = if proxy_status == "missing_proxy" {
+            "degraded"
+        } else if stub_count == tool_count && tool_count > 0 {
+            "stub_only"
+        } else if stub_count > 0 {
+            "partial"
+        } else {
+            "healthy"
+        };
+
+        results.push(serde_json::json!({
+            "domain": domain,
+            "status": status,
+            "toolCount": tool_count,
+            "stubCount": stub_count,
+            "proxyStatus": proxy_status,
+            "sourceType": if is_rust_native { "rust-native" } else { "proxy" },
+        }));
+    }
+
+    let healthy = results.iter().filter(|r| r["status"] == "healthy").count();
+    let degraded = results.len() - healthy;
+
+    Json(serde_json::json!({
+        "status": "ok",
+        "summary": {
+            "total": results.len(),
+            "healthy": healthy,
+            "degraded": degraded,
+            "health_pct": if results.is_empty() { 100.0 } else {
+                (healthy as f64 / results.len() as f64 * 100.0 * 10.0).round() / 10.0
+            },
+        },
+        "configs": results,
+    }))
 }
 

@@ -117,16 +117,16 @@ fn test_jsonrpc_request_notification_no_id() {
 #[test]
 fn test_registry_tool_count() {
     let reg = test_registry();
-    // 3 config tools + 5 meta tools (directory, capabilities, station_health, chart_course, ring_health)
-    assert_eq!(reg.tool_count(), 8);
+    // 3 config tools + 6 meta tools (chart_course, directory, capabilities, station_health, ring_health, forge_diagnose)
+    assert_eq!(reg.tool_count(), 9);
 }
 
 #[test]
 fn test_registry_tool_infos_includes_meta_tools() {
     let reg = test_registry();
     let infos = reg.tool_infos();
-    // 3 config tools + 5 meta tools (directory + capabilities + station_health + chart_course + ring_health)
-    assert_eq!(infos.len(), 8);
+    // 3 config tools + 6 meta tools (chart_course + directory + capabilities + station_health + ring_health + forge_diagnose)
+    assert_eq!(infos.len(), 9);
     assert!(infos.iter().any(|t| t.name == "nexvigilant_directory"));
     assert!(infos.iter().any(|t| t.name == "nexvigilant_capabilities"));
     assert!(infos.iter().any(|t| t.name == "nexvigilant_station_health"));
@@ -201,8 +201,8 @@ fn test_load_from_empty_dir() {
     let dir = TempDir::new().expect("tmpdir");
     let reg = ConfigRegistry::load_from_dir(dir.path()).expect("should load");
     assert_eq!(reg.configs.len(), 0);
-    // 0 config tools + 5 meta tools
-    assert_eq!(reg.tool_count(), 5);
+    // 0 config tools + 6 meta tools
+    assert_eq!(reg.tool_count(), 6);
 }
 
 #[test]
@@ -222,8 +222,8 @@ fn test_load_json_config() {
     let reg = ConfigRegistry::load_from_dir(dir.path()).expect("should load");
     assert_eq!(reg.configs.len(), 1);
     assert_eq!(reg.configs[0].domain, "test.com");
-    // 1 config tool + 5 meta tools
-    assert_eq!(reg.tool_count(), 6);
+    // 1 config tool + 6 meta tools
+    assert_eq!(reg.tool_count(), 7);
 }
 
 #[test]
@@ -277,7 +277,7 @@ fn test_route_directory_meta_tool() {
     let parsed: Value = serde_json::from_str(text).expect("should be JSON");
     assert_eq!(parsed["station"], "NexVigilant Station");
     assert_eq!(parsed["total_domains"], 2);
-    assert_eq!(parsed["total_tools"], 8);
+    assert_eq!(parsed["total_tools"], 9);
 }
 
 #[test]
@@ -395,8 +395,8 @@ fn test_handle_tools_list() {
     let resp = server::handle_request(&reg, &test_telemetry(), None, &ApiKeyGate::new(None), &req, None, None).expect("should respond");
     let result = resp.result.expect("should have result");
     let tools = result["tools"].as_array().expect("tools array");
-    // 3 config tools + 5 meta tools
-    assert_eq!(tools.len(), 8);
+    // 3 config tools + 6 meta tools (chart_course, directory, capabilities, station_health, ring_health, forge_diagnose)
+    assert_eq!(tools.len(), 9);
 }
 
 #[test]

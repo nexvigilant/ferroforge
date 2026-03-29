@@ -69,6 +69,8 @@ PARAMETER_ALIGNMENT: dict[str, dict[str, str]] = {
     # --- Proxies expecting "drug" ---
     "openvigil_proxy.py":        {**_drug_alias_map("drug"), **_query_alias_map("drug")},
     "eudravigilance_proxy.py":   {**_drug_alias_map("drug"), **_query_alias_map("drug")},
+    "moltbrowser_eudravigilance.py": {**_drug_alias_map("drug"), **_query_alias_map("drug")},
+    "triangulate_proxy.py": {**_drug_alias_map("drug"), **_query_alias_map("drug")},
     "who_umc_proxy.py":          {**_drug_alias_map("drug"), **_query_alias_map("drug")},
     # --- Proxies expecting "medicine" ---
     "vigiaccess_proxy.py":       {**_drug_alias_map("medicine"), **_query_alias_map("medicine")},
@@ -321,7 +323,14 @@ def dispatch(envelope: dict) -> dict:
     if proxy_path is None:
         return stub_response(tool_name, arguments)
 
+    # Rust-native fallback: configs with proxy "rust-native" route to the
+    # nexcore bridge proxy which calls the nexcore-mcp binary via stdio.
     if not Path(proxy_path).exists():
+        if Path(proxy_path).name == "rust-native":
+            nexcore_bridge = str(SCRIPTS_DIR / "nexcore_proxy.py")
+            if Path(nexcore_bridge).exists():
+                # Pass the FULL tool name — nexcore_proxy strips the prefix itself
+                return call_proxy(nexcore_bridge, tool_name, arguments, request_id)
         # Proxy is registered but the file has not been created yet.
         return {
             "status": "stub",
