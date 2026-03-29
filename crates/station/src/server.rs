@@ -78,9 +78,10 @@ pub fn handle_request(
     event_tx: Option<&broadcast::Sender<StationEvent>>,
     auth_header: Option<&str>,
 ) -> Option<JsonRpcResponse> {
-    handle_request_with_auth(registry, telemetry, meter, auth_gate, req, event_tx, auth_header)
+    handle_request_core(registry, telemetry, meter, auth_gate, req, event_tx, auth_header, None)
 }
 
+/// Handle request with auth header — backward compat, no proxy cache.
 pub fn handle_request_with_auth(
     registry: &ConfigRegistry,
     telemetry: &StationTelemetry,
@@ -89,6 +90,33 @@ pub fn handle_request_with_auth(
     req: &JsonRpcRequest,
     event_tx: Option<&broadcast::Sender<StationEvent>>,
     auth_header: Option<&str>,
+) -> Option<JsonRpcResponse> {
+    handle_request_core(registry, telemetry, meter, auth_gate, req, event_tx, auth_header, None)
+}
+
+/// Handle request with proxy cache for FAERS total count acceleration.
+pub fn handle_request_cached(
+    registry: &ConfigRegistry,
+    telemetry: &StationTelemetry,
+    meter: Option<&crate::metering::StationMeter>,
+    auth_gate: &ApiKeyGate,
+    req: &JsonRpcRequest,
+    event_tx: Option<&broadcast::Sender<StationEvent>>,
+    auth_header: Option<&str>,
+    proxy_cache: &router::ProxyCache,
+) -> Option<JsonRpcResponse> {
+    handle_request_core(registry, telemetry, meter, auth_gate, req, event_tx, auth_header, Some(proxy_cache))
+}
+
+fn handle_request_core(
+    registry: &ConfigRegistry,
+    telemetry: &StationTelemetry,
+    meter: Option<&crate::metering::StationMeter>,
+    auth_gate: &ApiKeyGate,
+    req: &JsonRpcRequest,
+    event_tx: Option<&broadcast::Sender<StationEvent>>,
+    auth_header: Option<&str>,
+    proxy_cache: Option<&router::ProxyCache>,
 ) -> Option<JsonRpcResponse> {
     let id = req.id.clone();
 
@@ -170,7 +198,7 @@ pub fn handle_request_with_auth(
 
             info!(tool = %tool_name, "Tool call");
             let timer = telemetry::start_timer();
-            let result = router::route_tool_call(registry, telemetry, meter, auth_gate, auth_header, tool_name, &arguments);
+            let result = router::route_tool_call(registry, telemetry, meter, auth_gate, auth_header, tool_name, &arguments, proxy_cache);
             let duration_ms = telemetry::elapsed_ms(timer);
 
             // Emit station event to broadcast channel

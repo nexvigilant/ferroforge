@@ -1,5 +1,6 @@
 use serde_json::Value;
 use std::process::Command;
+use std::sync::Mutex;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -10,6 +11,44 @@ use crate::protocol::{ContentBlock, ToolCallResult};
 use crate::telemetry::{
     elapsed_ms, extract_domain, now_iso8601, start_timer, StationTelemetry, ToolCallRecord,
 };
+
+/// TTL-cached values injected into proxy envelopes to avoid redundant upstream queries.
+/// The station binary is long-lived on Cloud Run; proxies are fresh processes per call.
+pub struct ProxyCache {
+    /// FAERS total report count (N ≈ 20M). Changes slowly. 1-hour TTL.
+    faers_total: Mutex<(u64, std::time::Instant)>,
+}
+
+const PROXY_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(3600);
+
+impl ProxyCache {
+    pub fn new() -> Self {
+        Self {
+            faers_total: Mutex::new((0, std::time::Instant::now())),
+        }
+    }
+
+    /// Get cached FAERS total if fresh, or None.
+    fn faers_total(&self) -> Option<u64> {
+        let guard = self.faers_total.lock().ok()?;
+        let (n, ts) = *guard;
+        if n > 0 && ts.elapsed() < PROXY_CACHE_TTL {
+            Some(n)
+        } else {
+            None
+        }
+    }
+
+    /// Update cached FAERS total from a proxy response.
+    fn update_faers_total(&self, n: u64) {
+        if n > 0 {
+            if let Ok(mut guard) = self.faers_total.lock() {
+                *guard = (n, std::time::Instant::now());
+            }
+        }
+    }
+
+}
 
 /// Route a tool call to the appropriate handler, with auth, telemetry, and rate limiting.
 ///
@@ -23,6 +62,7 @@ pub fn route_tool_call(
     auth_header: Option<&str>,
     tool_name: &str,
     arguments: &Value,
+    proxy_cache: Option<&ProxyCache>,
 ) -> ToolCallResult {
     // Auth check FIRST — before rate limiting or execution
     let auth_result = auth_gate.check(auth_header, tool_name);
@@ -89,7 +129,7 @@ pub fn route_tool_call(
     }
 
     let timer = start_timer();
-    let mut result = route_tool_call_inner(registry, telemetry, tool_name, arguments, &request_id);
+    let mut result = route_tool_call_inner(registry, telemetry, tool_name, arguments, &request_id, proxy_cache);
     let duration_ms = elapsed_ms(timer);
 
     // Extract status and error detail from the result content
@@ -193,6 +233,7 @@ fn route_tool_call_inner(
     tool_name: &str,
     arguments: &Value,
     request_id: &str,
+    proxy_cache: Option<&ProxyCache>,
 ) -> ToolCallResult {
     // Meta-tools handled directly
     if tool_name == "nexvigilant_directory" {
@@ -331,7 +372,7 @@ fn route_tool_call_inner(
     }
 
     match registry.find_tool(tool_name) {
-        Some((config, tool)) => execute_tool(config, tool, tool_name, arguments, &registry.station_root, request_id),
+        Some((config, tool)) => execute_tool(config, tool, tool_name, arguments, &registry.station_root, request_id, proxy_cache),
         None => ToolCallResult {
             content: vec![ContentBlock::Text {
                 text: format!("Unknown tool: {tool_name}. Use nexvigilant_directory to list all available tools."),
@@ -349,6 +390,7 @@ fn execute_tool(
     arguments: &Value,
     station_root: &str,
     request_id: &str,
+    proxy_cache: Option<&ProxyCache>,
 ) -> ToolCallResult {
     info!(
         domain = %config.domain,
@@ -377,7 +419,7 @@ fn execute_tool(
                 is_error: Some(true),
             };
         }
-        return execute_proxy(proxy, mcp_name, arguments, station_root, request_id);
+        return execute_proxy(proxy, mcp_name, arguments, station_root, request_id, proxy_cache);
     }
 
     // Fall back to stub response if no proxy is available
@@ -424,6 +466,7 @@ fn execute_proxy(
     arguments: &Value,
     station_root: &str,
     request_id: &str,
+    proxy_cache: Option<&ProxyCache>,
 ) -> ToolCallResult {
     let resolved_path = if proxy_path.ends_with("dispatch.py") {
         format!("{}/scripts/dispatch.py", station_root)
@@ -447,7 +490,7 @@ fn execute_proxy(
 
     // For direct proxy: strip domain prefix to get bare tool name.
     // For dispatch: send the full MCP-prefixed name (dispatch parses it).
-    let envelope = if is_dispatch {
+    let mut envelope = if is_dispatch {
         serde_json::json!({
             "tool": tool_name,
             "arguments": arguments,
@@ -464,6 +507,19 @@ fn execute_proxy(
             "request_id": request_id,
         })
     };
+
+    // Inject cached FAERS total for open-vigil.fr proxies — eliminates the
+    // 2.2s N query on repeat calls. The proxy reads _cached_faers_total from
+    // the envelope and skips the upstream fetch when present.
+    let is_openvigil = tool_name.contains("open_vigil") || tool_name.contains("open-vigil");
+    if is_openvigil {
+        if let Some(cache) = proxy_cache {
+            if let Some(n) = cache.faers_total() {
+                envelope["_cached_faers_total"] = Value::from(n);
+            }
+        }
+    }
+
     let envelope_str = serde_json::to_string(&envelope).unwrap_or_else(|_| "{}".into());
 
     // Proxy timeout: 30 seconds. Upstream APIs should respond in <15s;
@@ -535,6 +591,18 @@ fn execute_proxy(
             let text = if stdout.trim().is_empty() {
                 "Proxy returned empty response".into()
             } else if let Ok(json) = serde_json::from_str::<Value>(stdout.trim()) {
+                // Update proxy cache from OpenVigil responses (FAERS total count).
+                // Reuse the already-parsed `json` value instead of re-parsing stdout.
+                if is_openvigil {
+                    if let Some(cache) = proxy_cache {
+                        if let Some(n) = json.get("contingency_table")
+                            .and_then(|ct| ct.get("total_reports"))
+                            .and_then(|v| v.as_u64())
+                        {
+                            cache.update_faers_total(n);
+                        }
+                    }
+                }
                 serde_json::to_string_pretty(&json).unwrap_or(stdout)
             } else {
                 stdout

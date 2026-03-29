@@ -28,6 +28,10 @@ DEFAULT_TOP_LIMIT = 10
 _RETRY_CODES = {429, 503}
 _MAX_RETRIES = 3
 
+# Rust-side cached FAERS total. Set from envelope's _cached_faers_total
+# before dispatching to handler. Eliminates the 2.2s N query on cache hit.
+_CACHED_FAERS_TOTAL: int | None = None
+
 
 def _fetch(url: str) -> dict:
     """Execute an HTTP GET and return parsed JSON."""
@@ -108,16 +112,20 @@ def _build_2x2(drug: str, event: str) -> dict:
         except RuntimeError:
             return 0
 
+    # Check for Rust-side cached FAERS total injected via envelope.
+    # When present, skip the 2.2s N query entirely.
+    cached_n = _CACHED_FAERS_TOTAL
+
     with ThreadPoolExecutor(max_workers=4) as pool:
         fut_a = pool.submit(_get_count, f"{drug_q}+AND+{event_q}")
         fut_ab = pool.submit(_get_count, drug_q)
         fut_ac = pool.submit(_get_count, event_q)
-        fut_n = pool.submit(_get_total)
+        fut_n = None if cached_n else pool.submit(_get_total)
 
         a = fut_a.result()
         a_plus_b = fut_ab.result()
         a_plus_c = fut_ac.result()
-        n = fut_n.result()
+        n = cached_n if cached_n else fut_n.result()
 
     if n == 0 or a_plus_b == 0 or a_plus_c == 0:
         return {"error": "Insufficient data to build contingency table", "a": a, "a_plus_b": a_plus_b, "a_plus_c": a_plus_c, "N": n}
@@ -591,6 +599,12 @@ def main() -> None:
 
     tool_name = payload.get("tool", "").strip()
     args = payload.get("arguments", payload.get("args", {}))
+
+    # Read Rust-side cached FAERS total from envelope (injected by station router)
+    global _CACHED_FAERS_TOTAL
+    cached = payload.get("_cached_faers_total")
+    if cached is not None and isinstance(cached, int) and cached > 0:
+        _CACHED_FAERS_TOTAL = cached
 
     if tool_name not in TOOL_DISPATCH:
         known = list(TOOL_DISPATCH.keys())
