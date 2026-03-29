@@ -25,6 +25,9 @@ COPY scripts/ /app/scripts/
 COPY micrograms/ /app/micrograms/
 COPY chains/ /app/chains/
 
+# Relay chain definitions for the hopper engine
+COPY relays/ /app/relays/
+
 WORKDIR /app
 
 # Cloud Run sends traffic to $PORT (default 8080)
