@@ -745,6 +745,99 @@
         "required": ["success"]
       },
       "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-caso-clinico-espanol",
+      "description": "Pipeline completo de evaluación de caso clínico en español. Grammar disambiguation (ser/estar + indicativo/subjuntivo) → temporal classification → epistemic weighting → ICH E2A seriousness → expectedness. 7-step chain preserving Spanish enrichment alongside standard ICSR outputs.",
+      "parameters": [
+        {"name": "forma_verbal", "type": "string", "description": "Ambiguous verb form to disambiguate (e.g. 'presente', 'cause')", "required": true},
+        {"name": "verbo", "type": "string", "description": "Ser/estar form: es/está/era/estaba/fue/estuvo etc.", "required": true},
+        {"name": "sintoma", "type": "string", "description": "Síntoma clínico en español / Clinical symptom", "required": false},
+        {"name": "verbo_contexto", "type": "string", "description": "Governing verb (creer/dudar/negar/esperar) for presente disambiguation", "required": false},
+        {"name": "modo_verbal", "type": "string", "description": "Verb mood indicator: indicativo/subjuntivo or conjugated form (tiene/tenga)", "required": true},
+        {"name": "death", "type": "boolean", "description": "ICH E2A: death occurred", "required": true},
+        {"name": "hospitalization", "type": "boolean", "description": "ICH E2A: hospitalization required", "required": true},
+        {"name": "disability", "type": "boolean", "description": "ICH E2A: persistent disability", "required": true},
+        {"name": "life_threatening", "type": "boolean", "description": "ICH E2A: life-threatening", "required": true},
+        {"name": "congenital_anomaly", "type": "boolean", "description": "ICH E2A: congenital anomaly", "required": true},
+        {"name": "medically_important", "type": "boolean", "description": "ICH E2A: medically important event", "required": true},
+        {"name": "event_in_label", "type": "boolean", "description": "Is the event listed in the drug label?", "required": true},
+        {"name": "event_class_in_label", "type": "boolean", "description": "Is the event class listed in the label?", "required": false},
+        {"name": "severity_in_label", "type": "boolean", "description": "Is the observed severity listed in the label?", "required": false}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "final_output": {
+            "type": "object",
+            "properties": {
+              "modo_resuelto": {"type": "string", "description": "INDICATIVO | SUBJUNTIVO | AMBIGUO"},
+              "clasificacion_temporal": {"type": "string", "description": "TRANSITORIO | PERMANENTE"},
+              "confianza_epistemica": {"type": "string", "description": "ALTA | BAJA"},
+              "serious": {"type": "boolean"},
+              "fatal": {"type": "boolean"},
+              "unexpected": {"type": "boolean"},
+              "expectedness": {"type": "string"},
+              "relevancia_causalidad": {"type": "integer"},
+              "peso_senal": {"type": "integer"}
+            }
+          },
+          "steps": {"type": "array"},
+          "total_duration_us": {"type": "integer"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-gramatica-causalidad-espanola",
+      "description": "Cadena de enriquecimiento de causalidad desde gramática española. Ser/estar temporal classification + indicativo/subjuntivo epistemic weighting. Returns temporality (TRANSITORIO/PERMANENTE) and confidence (ALTA/BAJA) for causality enrichment.",
+      "parameters": [
+        {"name": "verbo", "type": "string", "description": "Ser/estar form: es/está/era/estaba etc.", "required": true},
+        {"name": "sintoma", "type": "string", "description": "Clinical symptom in Spanish", "required": false},
+        {"name": "modo_verbal", "type": "string", "description": "Verb mood: indicativo/subjuntivo or conjugated form", "required": true}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "final_output": {
+            "type": "object",
+            "properties": {
+              "clasificacion_temporal": {"type": "string"},
+              "temporalidad": {"type": "string"},
+              "relevancia_causalidad": {"type": "integer"},
+              "confianza_epistemica": {"type": "string"},
+              "confidence_level": {"type": "string"},
+              "peso_senal": {"type": "integer"}
+            }
+          },
+          "steps": {"type": "array"},
+          "total_duration_us": {"type": "integer"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-presente-desambiguacion",
+      "description": "Desambigua formas verbales españolas entre indicativo y subjuntivo usando el verbo rector como árbitro. Resolves the presente/presenta collision where identical surface forms map to different grammatical moods.",
+      "parameters": [
+        {"name": "forma_verbal", "type": "string", "description": "Ambiguous verb form (e.g. 'presente', 'cause', 'tenga')", "required": true},
+        {"name": "verbo_contexto", "type": "string", "description": "Governing verb: creer/dudar/negar/esperar/afirmar/saber etc.", "required": false}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "modo_resuelto": {"type": "string"},
+          "resolved_mood": {"type": "string"},
+          "confianza_resolucion": {"type": "integer"},
+          "modo_verbal": {"type": "string"},
+          "razon": {"type": "string"}
+        }
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
     }
   ]
 }

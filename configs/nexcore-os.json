@@ -1,0 +1,149 @@
+{
+  "domain": "os.nexvigilant.com",
+  "url_pattern": "/*",
+  "title": "NexCore OS",
+  "description": "NexCore Operating System — secure boot, clearance levels, vault encryption, user management, and system services. The OS layer that runs the NexVigilant stack.",
+  "proxy": "rust-native",
+  "tools": [
+    {
+      "name": "secure-boot-status",
+      "description": "Get secure boot chain status — verified components, trust anchors, and boot integrity",
+      "parameters": [
+        { "name": "verbose", "type": "boolean", "description": "Include detailed component list", "required": false }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "secure-boot-verify",
+      "description": "Verify a component against the secure boot chain of trust",
+      "parameters": [
+        { "name": "component", "type": "string", "description": "Component name or path to verify", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "verified": { "type": "boolean" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "secure-boot-quote",
+      "description": "Generate a secure boot attestation quote for remote verification",
+      "parameters": [
+        { "name": "nonce", "type": "string", "description": "Random nonce for freshness", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "quote": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "clearance-evaluate",
+      "description": "Evaluate clearance level for an operation — returns GRANT or DENY with rationale",
+      "parameters": [
+        { "name": "operation", "type": "string", "description": "Operation to evaluate (e.g., 'write_config', 'deploy_station')", "required": true },
+        { "name": "actor", "type": "string", "description": "Actor requesting clearance", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "decision": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "clearance-policy-for",
+      "description": "Get the clearance policy for a specific resource or operation",
+      "parameters": [
+        { "name": "resource", "type": "string", "description": "Resource or operation name", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "clearance-validate-change",
+      "description": "Validate whether a proposed change meets clearance requirements",
+      "parameters": [
+        { "name": "change", "type": "string", "description": "Description of proposed change", "required": true },
+        { "name": "target", "type": "string", "description": "Target system or resource", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "clearance-level-info",
+      "description": "Get information about a specific clearance level — permissions, restrictions, and escalation paths",
+      "parameters": [
+        { "name": "level", "type": "string", "description": "Clearance level name or number", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "clearance-config",
+      "description": "Get the current clearance system configuration",
+      "parameters": [],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "vault-encrypt",
+      "description": "Encrypt data using the NexCore vault — AES-256-GCM with key derivation",
+      "parameters": [
+        { "name": "plaintext", "type": "string", "description": "Data to encrypt", "required": true },
+        { "name": "key_id", "type": "string", "description": "Key identifier for encryption", "required": false }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "ciphertext": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": false, "destructiveHint": false }
+    },
+    {
+      "name": "vault-decrypt",
+      "description": "Decrypt data from the NexCore vault",
+      "parameters": [
+        { "name": "ciphertext", "type": "string", "description": "Encrypted data to decrypt", "required": true },
+        { "name": "key_id", "type": "string", "description": "Key identifier used for encryption", "required": false }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "plaintext": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "vault-derive-key",
+      "description": "Derive an encryption key from a passphrase using Argon2",
+      "parameters": [
+        { "name": "passphrase", "type": "string", "description": "Passphrase for key derivation", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "key_id": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": false, "destructiveHint": false }
+    },
+    {
+      "name": "vault-generate-salt",
+      "description": "Generate a cryptographic salt for key derivation",
+      "parameters": [],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "salt": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": false, "destructiveHint": false }
+    },
+    {
+      "name": "vault-config-sample",
+      "description": "Get a sample vault configuration for reference",
+      "parameters": [],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "user-list",
+      "description": "List all registered system users",
+      "parameters": [],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "users": { "type": "array" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "user-status",
+      "description": "Get status of a specific user account",
+      "parameters": [
+        { "name": "username", "type": "string", "description": "Username to check", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "config-validate",
+      "description": "Validate a system configuration file for correctness",
+      "parameters": [
+        { "name": "path", "type": "string", "description": "Path to config file", "required": true }
+      ],
+      "outputSchema": { "type": "object", "properties": { "status": { "type": "string" }, "valid": { "type": "boolean" } }, "required": ["status"] },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}
