@@ -196,6 +196,56 @@ COMPANY_REGISTRY = {
         "openfda_manufacturer": ["EISAI", "EISAI INC"],
         "ct_sponsor": "Eisai Co.",
     },
+    "sunpharma": {
+        "display_name": "Sun Pharmaceutical",
+        "openfda_manufacturer": ["SUN PHARMA", "SUN PHARMACEUTICAL"],
+        "ct_sponsor": "Sun Pharmaceutical",
+    },
+    "drreddy": {
+        "display_name": "Dr. Reddy's Laboratories",
+        "openfda_manufacturer": ["DR. REDDY", "DR REDDYS"],
+        "ct_sponsor": "Dr. Reddy's Laboratories",
+    },
+    "cipla": {
+        "display_name": "Cipla Limited",
+        "openfda_manufacturer": ["CIPLA"],
+        "ct_sponsor": "Cipla Limited",
+    },
+    "hengrui": {
+        "display_name": "Jiangsu Hengrui",
+        "openfda_manufacturer": ["HENGRUI", "JIANGSU HENGRUI"],
+        "ct_sponsor": "Jiangsu Hengrui",
+    },
+    "samsungbioepis": {
+        "display_name": "Samsung Bioepis",
+        "openfda_manufacturer": ["SAMSUNG BIOEPIS", "SAMSUNG"],
+        "ct_sponsor": "Samsung Bioepis",
+    },
+    "celltrion": {
+        "display_name": "Celltrion Inc.",
+        "openfda_manufacturer": ["CELLTRION"],
+        "ct_sponsor": "Celltrion Inc.",
+    },
+    "cspc": {
+        "display_name": "CSPC Pharmaceutical",
+        "openfda_manufacturer": ["CSPC", "CSPC PHARMACEUTICAL"],
+        "ct_sponsor": "CSPC Pharmaceutical",
+    },
+    "lupin": {
+        "display_name": "Lupin Limited",
+        "openfda_manufacturer": ["LUPIN"],
+        "ct_sponsor": "Lupin Limited",
+    },
+    "menarini": {
+        "display_name": "Menarini Group",
+        "openfda_manufacturer": ["MENARINI", "A. MENARINI"],
+        "ct_sponsor": "Menarini Group",
+    },
+    "servier": {
+        "display_name": "Servier Laboratories",
+        "openfda_manufacturer": ["SERVIER"],
+        "ct_sponsor": "Servier Laboratories",
+    },
 }
 
 
