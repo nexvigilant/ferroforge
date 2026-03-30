@@ -1,0 +1,71 @@
+name: full-investigation
+description: Complete PV signal investigation — identity → evidence → signal → causality → label → literature → verdict
+
+hops:
+  - tool: rxnav_nlm_nih_gov_search_drugs
+    args:
+      query: "$drug"
+    extract:
+      rxcui: "results[0].rxcui"
+
+  - tool: api_fda_gov_search_adverse_events
+    args:
+      drug_name: "$drug"
+      serious: true
+      limit: 3
+    extract:
+      faers_total: "total_matching"
+      top_reaction: "results[0].reactions[0]"
+
+  - tool: open-vigil_fr_compute_disproportionality
+    args:
+      drug: "$drug"
+      event: "$event"
+    extract:
+      prr: "scores.PRR"
+      ror: "scores.ROR"
+      ic: "scores.IC"
+      signal: "signal_assessment"
+      cases: "contingency_table.a_drug_event"
+
+  - tool: calculate_nexvigilant_com_assess_naranjo_causality
+    args:
+      previous_reports: true
+      after_drug: true
+      improved_on_withdrawal: "yes"
+      reappeared_on_rechallenge: "not_done"
+      alternative_causes: false
+      placebo_reaction: "not_done"
+      drug_detected: "not_done"
+      dose_related: "not_done"
+      previous_exposure: false
+      objective_evidence: true
+    extract:
+      naranjo_score: "total_score"
+      naranjo_category: "category"
+
+  - tool: calculate_nexvigilant_com_classify_seriousness
+    args:
+      resulted_in_death: false
+      life_threatening: false
+      required_hospitalization: true
+      resulted_in_disability: false
+      congenital_anomaly: false
+      medically_important: true
+    extract:
+      serious: "is_serious"
+
+  - tool: dailymed_nlm_nih_gov_get_adverse_reactions
+    args:
+      drug_name: "$drug"
+    extract:
+      label_adrs: "status"
+    continue_on_error: true
+
+  - tool: pubmed_ncbi_nlm_nih_gov_search_case_reports
+    args:
+      drug_name: "$drug"
+      adverse_event: "$event"
+    extract:
+      case_report_count: "count"
+    continue_on_error: true

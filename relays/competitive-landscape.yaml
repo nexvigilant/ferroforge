@@ -1,0 +1,42 @@
+name: competitive-landscape
+description: Drug → class identification → head-to-head FAERS comparison → safety winner
+
+hops:
+  - tool: rxnav_nlm_nih_gov_get_drug_classes
+    args:
+      drug_name: "$drug"
+    extract:
+      drug_class: "status"
+    continue_on_error: true
+
+  - tool: api_fda_gov_search_adverse_events
+    args:
+      drug_name: "$drug"
+      serious: true
+      limit: 3
+    extract:
+      drug_faers_total: "total_matching"
+
+  - tool: api_fda_gov_search_adverse_events
+    args:
+      drug_name: "$competitor"
+      serious: true
+      limit: 3
+    extract:
+      competitor_faers_total: "total_matching"
+
+  - tool: open-vigil_fr_compute_disproportionality
+    args:
+      drug: "$drug"
+      event: "$event"
+    extract:
+      drug_prr: "scores.PRR"
+      drug_signal: "signal_assessment"
+
+  - tool: open-vigil_fr_compute_disproportionality
+    args:
+      drug: "$competitor"
+      event: "$event"
+    extract:
+      competitor_prr: "scores.PRR"
+      competitor_signal: "signal_assessment"

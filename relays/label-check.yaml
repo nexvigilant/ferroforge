@@ -1,0 +1,28 @@
+name: label-check
+description: Drug → DailyMed label → adverse reactions → boxed warning → REMS
+
+hops:
+  - tool: dailymed_nlm_nih_gov_search_drugs
+    args:
+      query: "$drug"
+    extract:
+      label_count: "count"
+
+  - tool: dailymed_nlm_nih_gov_get_adverse_reactions
+    args:
+      drug_name: "$drug"
+    extract:
+      adr_status: "status"
+
+  - tool: www_fda_gov_get_boxed_warning
+    args:
+      drug_name: "$drug"
+    extract:
+      boxed_status: "status"
+
+  - tool: accessdata_fda_gov_get_rems
+    args:
+      drug_name: "$drug"
+    extract:
+      rems_status: "status"
+    continue_on_error: true
