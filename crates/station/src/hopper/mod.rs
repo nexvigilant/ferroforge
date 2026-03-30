@@ -13,6 +13,8 @@
 //! Execution: in-process function calls for Rust-native tools,
 //! subprocess dispatch for proxy tools.
 
+pub mod extremis;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::HashMap;

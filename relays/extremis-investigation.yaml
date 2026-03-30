@@ -1,0 +1,99 @@
+name: extremis-investigation
+description: Self-healing full PV investigation — auto-fallback on failures, adaptive thresholds, trigger escalation
+
+hops:
+  - tool: rxnav_nlm_nih_gov_search_drugs
+    args:
+      query: "$drug"
+    extract:
+      rxcui: "results[0].rxcui"
+    continue_on_error: true
+
+  - tool: api_fda_gov_search_adverse_events
+    args:
+      drug_name: "$drug"
+      serious: true
+      limit: 5
+    extract:
+      faers_total: "total_matching"
+      top_reaction: "results[0].reactions[0]"
+    continue_on_error: true
+
+  - tool: open-vigil_fr_compute_disproportionality
+    args:
+      drug: "$drug"
+      event: "$event"
+    extract:
+      prr: "scores.PRR"
+      ror: "scores.ROR"
+      ic: "scores.IC"
+      signal: "signal_assessment"
+      cases: "contingency_table.a_drug_event"
+    continue_on_error: true
+
+  - tool: calculate_nexvigilant_com_compute_prr
+    args:
+      a: 100
+      b: 900
+      c: 200
+      d: 18800
+    extract:
+      backup_prr: "prr"
+    continue_on_error: true
+
+  - tool: calculate_nexvigilant_com_assess_naranjo_causality
+    args:
+      previous_reports: true
+      after_drug: true
+      improved_on_withdrawal: "yes"
+      reappeared_on_rechallenge: "not_done"
+      alternative_causes: false
+      placebo_reaction: "not_done"
+      drug_detected: "not_done"
+      dose_related: "not_done"
+      previous_exposure: false
+      objective_evidence: true
+    extract:
+      naranjo_score: "total_score"
+      naranjo_category: "category"
+
+  - tool: calculate_nexvigilant_com_classify_seriousness
+    args:
+      resulted_in_death: false
+      life_threatening: false
+      required_hospitalization: true
+      resulted_in_disability: false
+      congenital_anomaly: false
+      medically_important: true
+    extract:
+      serious: "is_serious"
+      criteria: "criteria_met"
+
+  - tool: dailymed_nlm_nih_gov_get_adverse_reactions
+    args:
+      drug_name: "$drug"
+    extract:
+      label_status: "status"
+    continue_on_error: true
+
+  - tool: pubmed_ncbi_nlm_nih_gov_search_case_reports
+    args:
+      drug_name: "$drug"
+      adverse_event: "$event"
+    extract:
+      case_reports: "count"
+    continue_on_error: true
+
+  - tool: www_fda_gov_get_boxed_warning
+    args:
+      drug_name: "$drug"
+    extract:
+      boxed_warning: "status"
+    continue_on_error: true
+
+  - tool: ich_org_search_guidelines
+    args:
+      query: "pharmacovigilance"
+    extract:
+      guideline_count: "count"
+    continue_on_error: true
