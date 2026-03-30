@@ -1,0 +1,78 @@
+name: bridge-openvigil-to-calculation
+description: 'Bridge: converts OpenVigil disproportionality output into calculation pipeline input'
+version: 0.1.0
+tree:
+  start: extract
+  nodes:
+    route:
+      type: return
+      value:
+        prr: '{{prr}}'
+        eb05: '{{eb05}}'
+        bridge: openvigil-to-calculation
+        ror_lower_ci: '{{ror_lower_ci}}'
+        ic025: '{{ic025}}'
+    extract:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 0
+      true_next: route
+      false_next: route
+tests:
+- input:
+    ror_lower_ci: 72.86
+    ic025: 4.8
+    prr: 71.42
+    eb05: 3.0
+  expect:
+    bridge: openvigil-to-calculation
+- input:
+    prr: 0
+  expect:
+    ror_lower_ci: 'null'
+    eb05: 'null'
+    bridge: openvigil-to-calculation
+    ic025: 'null'
+    prr: '0'
+- input:
+    prr: -1
+  expect:
+    ror_lower_ci: 'null'
+    eb05: 'null'
+    prr: '-1'
+    ic025: 'null'
+    bridge: openvigil-to-calculation
+- input:
+    prr: -1
+  expect:
+    bridge: openvigil-to-calculation
+    ror_lower_ci: 'null'
+    prr: '-1'
+    ic025: 'null'
+    eb05: 'null'
+- input:
+    prr: 1
+  expect:
+    eb05: 'null'
+    prr: '1'
+    bridge: openvigil-to-calculation
+    ic025: 'null'
+    ror_lower_ci: 'null'
+- input:
+    prr: 0
+  expect:
+    prr: '0'
+    ror_lower_ci: 'null'
+    ic025: 'null'
+    eb05: 'null'
+    bridge: openvigil-to-calculation
+- input: {}
+  expect:
+    prr: 'null'
+    ror_lower_ci: 'null'
+    bridge: openvigil-to-calculation
+    ic025: 'null'
+    eb05: 'null'
+interface: null
+primitive_signature: null

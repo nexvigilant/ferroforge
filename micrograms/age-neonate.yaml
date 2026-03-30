@@ -1,0 +1,36 @@
+name: age-neonate
+description: "Neonate age classifier. Identifies subjects aged 0-28 days (neonatal period)."
+version: 0.1.0
+tree:
+  start: check_age_days
+  nodes:
+    check_age_days:
+      type: condition
+      variable: age_days
+      operator: lte
+      value: 28
+      true_next: is_neonate
+      false_next: not_neonate
+    is_neonate:
+      type: return
+      value:
+        age_group: neonate
+        age_range: "0-28 days"
+        immature_systems: true
+        special_monitoring: required
+    not_neonate:
+      type: return
+      value:
+        age_group: other
+        is_neonate: false
+tests:
+  - input: { age_days: 7 }
+    expect: { age_group: neonate, immature_systems: true }
+  - input: { age_days: 28 }
+    expect: { age_group: neonate }
+  - input: { age_days: 29 }
+    expect: { age_group: other, is_neonate: false }
+  - input: { age_days: 0 }
+    expect: { age_group: neonate }
+  - input: {}
+    expect: {}

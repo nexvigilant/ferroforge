@@ -1,0 +1,166 @@
+name: e2a-sponsor-reporting-gate
+description: 'ICH E2A Section III.A: Clinical trial sponsor reporting gate — determines if sponsor must submit expedited safety report to regulatory authority based on study phase, case type, and applicable regulations'
+version: 1.0.0
+interface:
+  inputs:
+    is_interventional:
+      type: bool
+      required: false
+    is_susar:
+      type: bool
+      required: false
+    jurisdiction:
+      type: string
+      required: false
+    study_phase:
+      type: string
+      required: false
+  outputs:
+    authority_notification_required:
+      type: bool
+    ethics_notification_required:
+      type: bool
+    rationale:
+      type: string
+    regulatory_reference:
+      type: string
+    reporting_action:
+      type: string
+tree:
+  start: check_interventional
+  nodes:
+    check_interventional:
+      type: condition
+      variable: is_interventional
+      operator: eq
+      value: true
+      true_next: check_susar
+      false_next: observational_no_report
+    check_susar:
+      type: condition
+      variable: is_susar
+      operator: eq
+      value: true
+      true_next: check_study_phase
+      false_next: no_susar_no_expedited
+    check_study_phase:
+      type: condition
+      variable: study_phase
+      operator: eq
+      value: phase_1
+      true_next: report_all_authorities
+      false_next: check_phase_2_3
+    check_phase_2_3:
+      type: condition
+      variable: study_phase
+      operator: eq
+      value: phase_2
+      true_next: report_all_authorities
+      false_next: check_phase_3
+    check_phase_3:
+      type: condition
+      variable: study_phase
+      operator: eq
+      value: phase_3
+      true_next: report_all_authorities
+      false_next: report_all_authorities
+    report_all_authorities:
+      type: return
+      value:
+        authority_notification_required: true
+        ethics_notification_required: true
+        reporting_action: SUBMIT_SUSAR_EXPEDITED
+        rationale: Interventional trial with confirmed SUSAR — sponsor must notify regulatory authority and ethics committee within applicable timeline
+        regulatory_reference: ICH E2A Section III.A - Sponsor obligation to report SUSARs to competent authorities and ethics committees
+    no_susar_no_expedited:
+      type: return
+      value:
+        authority_notification_required: false
+        ethics_notification_required: false
+        reporting_action: PERIODIC_REPORTING_ONLY
+        rationale: Not a SUSAR — no expedited reporting obligation; include in annual safety report (IND/DSUR)
+        regulatory_reference: ICH E2A Section III.A - Non-SUSAR cases reported in annual line listings
+    observational_no_report:
+      type: return
+      value:
+        authority_notification_required: false
+        ethics_notification_required: false
+        reporting_action: NO_SPONSOR_REPORTING
+        rationale: Non-interventional/observational study — E2A sponsor expedited reporting obligations do not apply
+        regulatory_reference: ICH E2A Section I - Scope applies to clinical trials of investigational medicinal products
+primitive_signature:
+  dominant: '→'
+  expression: '→ — regulatory obligation routing: interventional × SUSAR × phase → authority notification'
+  primes: ['→', 'κ']
+  arguments: ['is_interventional', 'is_susar', 'study_phase']
+  chain_prediction: 'Receives is_susar from e2a-reporting-obligation. Feeds reporting_action and deadlines to workflow-router.'
+tests:
+# Interventional phase 3 SUSAR = report to all authorities
+- input:
+    is_interventional: true
+    is_susar: true
+    study_phase: phase_3
+    jurisdiction: EU
+  expect:
+    authority_notification_required: true
+    ethics_notification_required: true
+    reporting_action: SUBMIT_SUSAR_EXPEDITED
+    regulatory_reference: ICH E2A Section III.A - Sponsor obligation to report SUSARs to competent authorities and ethics committees
+# Interventional phase 1 SUSAR = report to all authorities
+- input:
+    is_interventional: true
+    is_susar: true
+    study_phase: phase_1
+    jurisdiction: US
+  expect:
+    authority_notification_required: true
+    ethics_notification_required: true
+    reporting_action: SUBMIT_SUSAR_EXPEDITED
+    regulatory_reference: ICH E2A Section III.A - Sponsor obligation to report SUSARs to competent authorities and ethics committees
+# Interventional phase 2 SUSAR = report to all authorities
+- input:
+    is_interventional: true
+    is_susar: true
+    study_phase: phase_2
+  expect:
+    authority_notification_required: true
+    ethics_notification_required: true
+    reporting_action: SUBMIT_SUSAR_EXPEDITED
+    regulatory_reference: ICH E2A Section III.A - Sponsor obligation to report SUSARs to competent authorities and ethics committees
+# Interventional but not SUSAR = periodic only
+- input:
+    is_interventional: true
+    is_susar: false
+    study_phase: phase_3
+  expect:
+    authority_notification_required: false
+    ethics_notification_required: false
+    reporting_action: PERIODIC_REPORTING_ONLY
+    regulatory_reference: ICH E2A Section III.A - Non-SUSAR cases reported in annual line listings
+# Observational study = no sponsor reporting
+- input:
+    is_interventional: false
+    is_susar: true
+    study_phase: observational
+  expect:
+    authority_notification_required: false
+    ethics_notification_required: false
+    reporting_action: NO_SPONSOR_REPORTING
+    regulatory_reference: ICH E2A Section I - Scope applies to clinical trials of investigational medicinal products
+# Empty input = no reporting (defaults false)
+- input: {}
+  expect:
+    authority_notification_required: false
+    ethics_notification_required: false
+    reporting_action: NO_SPONSOR_REPORTING
+    regulatory_reference: ICH E2A Section I - Scope applies to clinical trials of investigational medicinal products
+# Phase 4 = report to all authorities (post-approval studies)
+- input:
+    is_interventional: true
+    is_susar: true
+    study_phase: phase_4
+  expect:
+    authority_notification_required: true
+    ethics_notification_required: true
+    reporting_action: SUBMIT_SUSAR_EXPEDITED
+    regulatory_reference: ICH E2A Section III.A - Sponsor obligation to report SUSARs to competent authorities and ethics committees

@@ -1,0 +1,82 @@
+name: case-duplicate-check
+description: "Identify potential duplicate adverse event cases based on matching criteria"
+version: 0.1.0
+tree:
+  start: validate_case_identifiers
+  nodes:
+    validate_case_identifiers:
+      type: condition
+      variable: case_identifier
+      operator: is_not_null
+      value: null
+      true_next: check_match_score
+      false_next: duplicate_status_unknown
+    check_match_score:
+      type: condition
+      variable: duplicate_match_score
+      operator: gte
+      value: 95
+      true_next: definite_duplicate
+      false_next: check_probable_duplicate
+    check_probable_duplicate:
+      type: condition
+      variable: duplicate_match_score
+      operator: gte
+      value: 75
+      true_next: probable_duplicate
+      false_next: no_duplicate
+    definite_duplicate:
+      type: return
+      value:
+        duplicate_status: "definite_duplicate"
+        action_required: "consolidate_records"
+        confidence_level: "high"
+        reference_case_id: "case_identifier"
+        duplicate_compliant: true
+    probable_duplicate:
+      type: return
+      value:
+        duplicate_status: "probable_duplicate"
+        action_required: "manual_review"
+        confidence_level: "moderate"
+        reference_case_id: null
+        duplicate_compliant: true
+    no_duplicate:
+      type: return
+      value:
+        duplicate_status: "unique_case"
+        action_required: "process_as_new"
+        confidence_level: "high"
+        reference_case_id: null
+        duplicate_compliant: true
+    duplicate_status_unknown:
+      type: return
+      value:
+        duplicate_status: "unknown"
+        action_required: null
+        confidence_level: null
+        reference_case_id: null
+        duplicate_compliant: false
+tests:
+- input:
+    case_identifier: "case_2024_001"
+    duplicate_match_score: 98
+  expect:
+    duplicate_status: "definite_duplicate"
+    action_required: "consolidate_records"
+- input:
+    case_identifier: "case_2024_001"
+    duplicate_match_score: 80
+  expect:
+    duplicate_status: "probable_duplicate"
+    action_required: "manual_review"
+- input:
+    case_identifier: "case_2024_001"
+    duplicate_match_score: 30
+  expect:
+    duplicate_status: "unique_case"
+    action_required: "process_as_new"
+- input: {}
+  expect:
+    duplicate_status: "unknown"
+    duplicate_compliant: false

@@ -1,0 +1,49 @@
+name: tox-hematological
+description: "Hematological toxicity: ANC threshold"
+version: 0.1.0
+
+tree:
+  start: check_severe
+  nodes:
+    check_severe:
+      type: condition
+      variable: anc_cells_uL
+      operator: lte
+      value: 500
+      true_next: severe
+      false_next: check_mild
+    check_mild:
+      type: condition
+      variable: anc_cells_uL
+      operator: lte
+      value: 1500
+      true_next: mild
+      false_next: normal
+    severe:
+      type: return
+      value:
+        organ: "hematological"
+        severity: "severe"
+        action: "discontinue"
+    mild:
+      type: return
+      value:
+        organ: "hematological"
+        severity: "mild"
+        action: "monitor_closely"
+    normal:
+      type: return
+      value:
+        organ: "hematological"
+        severity: "normal"
+        action: "continue"
+
+tests:
+  - input: {anc_cells_uL: 400}
+    expect: {severity: "severe", action: "discontinue"}
+  - input: {anc_cells_uL: 1500}
+    expect: {severity: "mild", action: "monitor_closely"}
+  - input: {anc_cells_uL: 2500}
+    expect: {severity: "normal", action: "continue"}
+  - input: {}
+    expect: {severity: "normal", action: "continue"}

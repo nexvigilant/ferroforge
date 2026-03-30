@@ -1,0 +1,234 @@
+name: fda-otc-ae-reporting
+description: "FDA OTC postmarketing adverse event reporting obligations: routes by product status and seriousness per FDA Guidance 'Postmarketing AE Reporting for Nonprescription Human Drug Products Marketed Without an Approved Application' (2009) and Dietary Supplement and Nonprescription Drug Consumer Protection Act (2006)"
+version: 0.1.0
+interface:
+  inputs:
+    product_status:
+      type: string
+      required: true
+      description: "OTC product regulatory status: otc_monograph, approved_nda, unapproved_marketed, dietary_supplement"
+    serious:
+      type: bool
+      required: true
+      description: "Whether the adverse event meets serious criteria"
+    reporter_type:
+      type: string
+      required: false
+      description: "Who reported: consumer, healthcare_professional, manufacturer"
+  outputs:
+    reporting_required:
+      type: bool
+    report_type:
+      type: string
+    timeline_days:
+      type: int
+    submission_method:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_product_status
+  nodes:
+    check_product_status:
+      type: condition
+      variable: product_status
+      operator: eq
+      value: "approved_nda"
+      true_next: nda_serious_check
+      false_next: check_monograph
+
+    check_monograph:
+      type: condition
+      variable: product_status
+      operator: eq
+      value: "otc_monograph"
+      true_next: monograph_serious_check
+      false_next: check_dietary
+
+    check_dietary:
+      type: condition
+      variable: product_status
+      operator: eq
+      value: "dietary_supplement"
+      true_next: dietary_serious_check
+      false_next: unapproved_serious_check
+
+    # APPROVED NDA - full 314.80 applies
+    nda_serious_check:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: nda_serious
+      false_next: nda_nonserious
+
+    nda_serious:
+      type: return
+      value:
+        reporting_required: true
+        report_type: "15-DAY_EXPEDITED"
+        timeline_days: 15
+        submission_method: "E2B(R3) via FDA ESG or MedWatch 3500A"
+        regulatory_reference: "21 CFR 314.80(c)(1); FDA Guidance: Postmarketing AE Reporting for Nonprescription Products (2009)"
+
+    nda_nonserious:
+      type: return
+      value:
+        reporting_required: true
+        report_type: "PERIODIC"
+        timeline_days: 90
+        submission_method: "NDA Periodic Safety Report or MedWatch 3500A"
+        regulatory_reference: "21 CFR 314.80(c)(2); FDA Guidance: Postmarketing AE Reporting for Nonprescription Products (2009)"
+
+    # OTC MONOGRAPH - Consumer Protection Act applies
+    monograph_serious_check:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: monograph_serious
+      false_next: monograph_nonserious
+
+    monograph_serious:
+      type: return
+      value:
+        reporting_required: true
+        report_type: "MANDATORY_SERIOUS"
+        timeline_days: 15
+        submission_method: "MedWatch 3500A to FDA"
+        regulatory_reference: "Dietary Supplement and Nonprescription Drug Consumer Protection Act (2006); FDA Guidance (2009), Section III.B"
+
+    monograph_nonserious:
+      type: return
+      value:
+        reporting_required: false
+        report_type: "VOLUNTARY"
+        timeline_days: 0
+        submission_method: "MedWatch 3500B voluntary reporting encouraged"
+        regulatory_reference: "FDA Guidance: Postmarketing AE Reporting for Nonprescription Products (2009), Section III.C"
+
+    # DIETARY SUPPLEMENT - DSHEA + Consumer Protection Act
+    dietary_serious_check:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: dietary_serious
+      false_next: dietary_nonserious
+
+    dietary_serious:
+      type: return
+      value:
+        reporting_required: true
+        report_type: "MANDATORY_SERIOUS"
+        timeline_days: 15
+        submission_method: "MedWatch 3500A to FDA"
+        regulatory_reference: "Dietary Supplement and Nonprescription Drug Consumer Protection Act (2006), Section 761"
+
+    dietary_nonserious:
+      type: return
+      value:
+        reporting_required: false
+        report_type: "VOLUNTARY"
+        timeline_days: 0
+        submission_method: "MedWatch 3500B voluntary reporting encouraged"
+        regulatory_reference: "Dietary Supplement and Nonprescription Drug Consumer Protection Act (2006)"
+
+    # UNAPPROVED MARKETED - limited obligations
+    unapproved_serious_check:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: unapproved_serious
+      false_next: unapproved_nonserious
+
+    unapproved_serious:
+      type: return
+      value:
+        reporting_required: true
+        report_type: "MANDATORY_SERIOUS"
+        timeline_days: 15
+        submission_method: "MedWatch 3500A to FDA"
+        regulatory_reference: "Dietary Supplement and Nonprescription Drug Consumer Protection Act (2006); FDA Guidance (2009), Section IV"
+
+    unapproved_nonserious:
+      type: return
+      value:
+        reporting_required: false
+        report_type: "VOLUNTARY"
+        timeline_days: 0
+        submission_method: "MedWatch 3500B voluntary reporting encouraged"
+        regulatory_reference: "FDA Guidance: Postmarketing AE Reporting for Nonprescription Products (2009), Section IV"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(∂) — reporting obligation routing by regulatory boundary (product status) and seriousness threshold'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['product_status', 'serious']
+
+tests:
+# Approved NDA, serious -> expedited
+- input:
+    product_status: "approved_nda"
+    serious: true
+  expect:
+    reporting_required: true
+    report_type: "15-DAY_EXPEDITED"
+    timeline_days: 15
+
+# Approved NDA, non-serious -> periodic
+- input:
+    product_status: "approved_nda"
+    serious: false
+  expect:
+    reporting_required: true
+    report_type: "PERIODIC"
+    timeline_days: 90
+
+# OTC monograph, serious -> mandatory
+- input:
+    product_status: "otc_monograph"
+    serious: true
+  expect:
+    reporting_required: true
+    report_type: "MANDATORY_SERIOUS"
+    timeline_days: 15
+
+# OTC monograph, non-serious -> voluntary
+- input:
+    product_status: "otc_monograph"
+    serious: false
+  expect:
+    reporting_required: false
+    report_type: "VOLUNTARY"
+
+# Dietary supplement, serious
+- input:
+    product_status: "dietary_supplement"
+    serious: true
+  expect:
+    reporting_required: true
+    timeline_days: 15
+
+# Dietary supplement, non-serious
+- input:
+    product_status: "dietary_supplement"
+    serious: false
+  expect:
+    reporting_required: false
+    report_type: "VOLUNTARY"
+
+# Unapproved marketed, serious
+- input:
+    product_status: "unapproved_marketed"
+    serious: true
+  expect:
+    reporting_required: true
+    timeline_days: 15
+
+# Empty input
+- input: {}
+  expect:
+    reporting_required: false
+    report_type: "VOLUNTARY"

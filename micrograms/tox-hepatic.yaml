@@ -1,0 +1,112 @@
+name: tox-hepatic
+description: 'Hepatic toxicity gate: ALT_ULN thresholds for liver'
+version: 0.1.0
+tree:
+  start: check_severe
+  nodes:
+    check_mild:
+      type: condition
+      variable: ALT_ULN
+      operator: gte
+      value: 3
+      true_next: mild
+      false_next: normal
+    check_severe:
+      type: condition
+      variable: ALT_ULN
+      operator: gte
+      value: 10
+      true_next: severe
+      false_next: check_mild
+    mild:
+      type: return
+      value:
+        target: liver
+        organ: hepatic
+        severity: mild
+        action: monitor_closely
+    normal:
+      type: return
+      value:
+        severity: normal
+        target: liver
+        organ: hepatic
+        action: continue
+    severe:
+      type: return
+      value:
+        target: liver
+        organ: hepatic
+        severity: severe
+        action: discontinue
+tests:
+- input:
+    ALT_ULN: 11
+  expect:
+    severity: severe
+    organ: hepatic
+- input:
+    ALT_ULN: 3
+  expect:
+    organ: hepatic
+    severity: mild
+- input:
+    ALT_ULN: 0
+  expect:
+    organ: hepatic
+    severity: normal
+- input: {}
+  expect:
+    organ: hepatic
+    severity: normal
+- input:
+    ALT_ULN: -1
+  expect:
+    organ: hepatic
+    action: continue
+    severity: normal
+    target: liver
+- input:
+    ALT_ULN: 2
+  expect:
+    action: continue
+    organ: hepatic
+    severity: normal
+    target: liver
+- input:
+    ALT_ULN: 4
+  expect:
+    severity: mild
+    action: monitor_closely
+    target: liver
+    organ: hepatic
+- input:
+    ALT_ULN: 300
+  expect:
+    target: liver
+    action: discontinue
+    severity: severe
+    organ: hepatic
+- input:
+    ALT_ULN: -1
+  expect:
+    target: liver
+    severity: normal
+    organ: hepatic
+    action: continue
+- input:
+    ALT_ULN: 9
+  expect:
+    organ: hepatic
+    action: monitor_closely
+    target: liver
+    severity: mild
+- input:
+    ALT_ULN: 1000
+  expect:
+    severity: severe
+    organ: hepatic
+    action: discontinue
+    target: liver
+interface: null
+primitive_signature: null

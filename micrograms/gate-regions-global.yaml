@@ -1,0 +1,67 @@
+name: gate-regions-global
+description: Multi-region signal (global)
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    fail:
+      type: return
+      value:
+        gate: false
+        threshold: region_count
+        met: false
+    pass:
+      type: return
+      value:
+        gate: true
+        met: true
+        threshold: region_count
+    check:
+      type: condition
+      variable: region_count
+      operator: gte
+      value: 4
+      true_next: pass
+      false_next: fail
+tests:
+- input:
+    region_count: 4
+  expect:
+    gate: true
+    met: true
+- input: {}
+  expect:
+    gate: false
+    met: false
+- input:
+    region_count: 0
+  expect:
+    gate: false
+    threshold: region_count
+    met: false
+- input:
+    region_count: -1
+  expect:
+    gate: false
+    met: false
+    threshold: region_count
+- input:
+    region_count: 3
+  expect:
+    threshold: region_count
+    gate: false
+    met: false
+- input:
+    region_count: 5
+  expect:
+    gate: true
+    met: true
+    threshold: region_count
+- input:
+    region_count: 400
+  expect:
+    threshold: region_count
+    met: true
+    gate: true
+interface: null
+primitive_signature: null

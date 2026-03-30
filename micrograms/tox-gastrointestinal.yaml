@@ -1,0 +1,105 @@
+name: tox-gastrointestinal
+description: 'Gastrointestinal toxicity gate: ctcae_grade thresholds for gi'
+version: 0.1.0
+tree:
+  start: check_severe
+  nodes:
+    check_severe:
+      type: condition
+      variable: ctcae_grade
+      operator: gte
+      value: 3
+      true_next: severe
+      false_next: check_mild
+    check_mild:
+      type: condition
+      variable: ctcae_grade
+      operator: gte
+      value: 2
+      true_next: mild
+      false_next: normal
+    mild:
+      type: return
+      value:
+        target: gi
+        severity: mild
+        organ: gastrointestinal
+        action: monitor_closely
+    normal:
+      type: return
+      value:
+        organ: gastrointestinal
+        action: continue
+        severity: normal
+        target: gi
+    severe:
+      type: return
+      value:
+        severity: severe
+        action: discontinue
+        organ: gastrointestinal
+        target: gi
+tests:
+- input:
+    ctcae_grade: 4
+  expect:
+    organ: gastrointestinal
+    severity: severe
+- input:
+    ctcae_grade: 2
+  expect:
+    severity: mild
+    organ: gastrointestinal
+- input:
+    ctcae_grade: 0
+  expect:
+    severity: normal
+    organ: gastrointestinal
+- input: {}
+  expect:
+    organ: gastrointestinal
+    severity: normal
+- input:
+    ctcae_grade: -1
+  expect:
+    action: continue
+    severity: normal
+    organ: gastrointestinal
+    target: gi
+- input:
+    ctcae_grade: 300
+  expect:
+    organ: gastrointestinal
+    action: discontinue
+    target: gi
+    severity: severe
+- input:
+    ctcae_grade: -1
+  expect:
+    organ: gastrointestinal
+    severity: normal
+    action: continue
+    target: gi
+- input:
+    ctcae_grade: 1
+  expect:
+    organ: gastrointestinal
+    action: continue
+    severity: normal
+    target: gi
+- input:
+    ctcae_grade: 3
+  expect:
+    action: discontinue
+    organ: gastrointestinal
+    severity: severe
+    target: gi
+- input:
+    ctcae_grade: 200
+  expect:
+    action: discontinue
+    target: gi
+    severity: severe
+    organ: gastrointestinal
+interface: null
+primitive_signature: null

@@ -1,0 +1,90 @@
+name: case-coding
+description: 'PDC competency assessment: case-coding proficiency classifier'
+version: 0.1.0
+interface:
+  inputs:
+    knowledge_score:
+      type: int
+      required: false
+    skill_score:
+      type: int
+      required: false
+    behavior_score:
+      type: int
+      required: false
+  outputs:
+    competency_level:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_expert
+  nodes:
+    check_expert:
+      type: condition
+      variable: knowledge_score
+      operator: gte
+      value: 80
+      true_next: check_expert_skill
+      false_next: check_proficient
+    check_expert_skill:
+      type: condition
+      variable: skill_score
+      operator: gte
+      value: 80
+      true_next: expert
+      false_next: proficient
+    check_proficient:
+      type: condition
+      variable: knowledge_score
+      operator: gte
+      value: 50
+      true_next: check_prof_skill
+      false_next: check_novice
+    check_prof_skill:
+      type: condition
+      variable: skill_score
+      operator: gte
+      value: 50
+      true_next: proficient
+      false_next: developing
+    check_novice:
+      type: condition
+      variable: knowledge_score
+      operator: gte
+      value: 20
+      true_next: developing
+      false_next: novice
+    expert:
+      type: return
+      value:
+        competency_level: EXPERT
+        action: mentor_others
+    proficient:
+      type: return
+      value:
+        competency_level: PROFICIENT
+        action: independent_practice
+    developing:
+      type: return
+      value:
+        competency_level: DEVELOPING
+        action: supervised_practice
+    novice:
+      type: return
+      value:
+        competency_level: NOVICE
+        action: structured_learning
+tests:
+- input: {knowledge_score: 90, skill_score: 85, behavior_score: 80}
+  expect: {competency_level: EXPERT, action: mentor_others}
+- input: {knowledge_score: 60, skill_score: 55, behavior_score: 50}
+  expect: {competency_level: PROFICIENT, action: independent_practice}
+- input: {knowledge_score: 30, skill_score: 40, behavior_score: 30}
+  expect: {competency_level: DEVELOPING, action: supervised_practice}
+- input: {knowledge_score: 10, skill_score: 10, behavior_score: 10}
+  expect: {competency_level: NOVICE, action: structured_learning}
+- input: {knowledge_score: 85, skill_score: 40, behavior_score: 70}
+  expect: {competency_level: PROFICIENT, action: independent_practice}
+- input: {}
+  expect: {competency_level: NOVICE, action: structured_learning}

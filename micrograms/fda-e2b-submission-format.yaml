@@ -1,0 +1,202 @@
+name: fda-e2b-submission-format
+description: "FDA electronic safety report submission routing: determines format and gateway per FDA Guidance 'Providing Submissions in Electronic Format - Postmarketing Safety Reports' (2022) and FDA Regional Implementation Guide for E2B(R3) (2024)"
+version: 0.1.0
+interface:
+  inputs:
+    report_type:
+      type: string
+      required: true
+      description: "Type of safety report: expedited_15day, periodic_psur, annual_report, field_alert, vaccine_ae"
+    product_type:
+      type: string
+      required: true
+      description: "Product type: drug_nda, drug_anda, biologic_bla, vaccine, combination"
+    submission_format:
+      type: string
+      required: false
+      description: "Requested format override: e2b_r3, e2b_r2, paper"
+  outputs:
+    required_format:
+      type: string
+    submission_gateway:
+      type: string
+    message_type:
+      type: string
+    acknowledgment_expected:
+      type: bool
+    regulatory_reference:
+      type: string
+tree:
+  start: check_report_type
+  nodes:
+    check_report_type:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: "expedited_15day"
+      true_next: expedited_product_check
+      false_next: check_periodic
+
+    check_periodic:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: "periodic_psur"
+      true_next: periodic_format
+      false_next: check_annual
+
+    check_annual:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: "annual_report"
+      true_next: annual_format
+      false_next: check_field_alert
+
+    check_field_alert:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: "field_alert"
+      true_next: field_alert_format
+      false_next: check_vaccine
+
+    check_vaccine:
+      type: condition
+      variable: report_type
+      operator: eq
+      value: "vaccine_ae"
+      true_next: vaccine_format
+      false_next: default_format
+
+    # EXPEDITED 15-DAY REPORTS
+    expedited_product_check:
+      type: condition
+      variable: product_type
+      operator: eq
+      value: "vaccine"
+      true_next: vaccine_expedited
+      false_next: standard_expedited
+
+    standard_expedited:
+      type: return
+      value:
+        required_format: "E2B(R3) ICH ICSR XML"
+        submission_gateway: "FDA Electronic Submissions Gateway (ESG)"
+        message_type: "ichicsr"
+        acknowledgment_expected: true
+        regulatory_reference: "FDA Guidance: Providing Submissions in Electronic Format - Postmarketing Safety Reports (2022); E2B(R3) Regional Implementation Guide (2024)"
+
+    vaccine_expedited:
+      type: return
+      value:
+        required_format: "E2B(R3) ICH ICSR XML + VAERS"
+        submission_gateway: "FDA ESG for E2B(R3) + VAERS online portal"
+        message_type: "ichicsr"
+        acknowledgment_expected: true
+        regulatory_reference: "FDA Guidance (2022); 21 CFR 600.80; VAERS reporting per National Childhood Vaccine Injury Act"
+
+    # PERIODIC REPORTS (PSUR/PBRER)
+    periodic_format:
+      type: return
+      value:
+        required_format: "eCTD Module 2.7.4 / E2C(R2) format"
+        submission_gateway: "FDA ESG via eCTD submission"
+        message_type: "ectd"
+        acknowledgment_expected: true
+        regulatory_reference: "FDA Guidance: Providing Postmarket Periodic Safety Reports in ICH E2C(R2) Format (2016)"
+
+    # ANNUAL REPORTS
+    annual_format:
+      type: return
+      value:
+        required_format: "eCTD or paper (NDA/BLA dependent)"
+        submission_gateway: "FDA ESG via eCTD or paper to CDER/CBER"
+        message_type: "ectd"
+        acknowledgment_expected: true
+        regulatory_reference: "21 CFR 314.81(b)(2) (NDA) / 21 CFR 601.70 (BLA)"
+
+    # FIELD ALERTS
+    field_alert_format:
+      type: return
+      value:
+        required_format: "FDA Form 3331 + E2B(R3) if ICSR"
+        submission_gateway: "FDA ESG or direct submission to district office"
+        message_type: "field_alert"
+        acknowledgment_expected: false
+        regulatory_reference: "21 CFR 314.81(b)(1); FDA Guidance (2022)"
+
+    # VACCINE AE (non-expedited)
+    vaccine_format:
+      type: return
+      value:
+        required_format: "VAERS online form + E2B(R3)"
+        submission_gateway: "VAERS portal (vaers.hhs.gov) + FDA ESG"
+        message_type: "vaers"
+        acknowledgment_expected: true
+        regulatory_reference: "National Childhood Vaccine Injury Act; 21 CFR 600.80"
+
+    default_format:
+      type: return
+      value:
+        required_format: "E2B(R3) ICH ICSR XML"
+        submission_gateway: "FDA Electronic Submissions Gateway (ESG)"
+        message_type: "ichicsr"
+        acknowledgment_expected: true
+        regulatory_reference: "FDA Guidance: Providing Submissions in Electronic Format - Postmarketing Safety Reports (2022)"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(∂) — submission format routing by report type boundary and product classification'
+  primes: ['σ', '∂']
+  arguments: ['report_type', 'product_type']
+
+tests:
+# Expedited drug report -> E2B(R3) via ESG
+- input:
+    report_type: "expedited_15day"
+    product_type: "drug_nda"
+  expect:
+    required_format: "E2B(R3) ICH ICSR XML"
+    submission_gateway: "FDA Electronic Submissions Gateway (ESG)"
+
+# Expedited vaccine -> E2B(R3) + VAERS
+- input:
+    report_type: "expedited_15day"
+    product_type: "vaccine"
+  expect:
+    required_format: "E2B(R3) ICH ICSR XML + VAERS"
+
+# Periodic PSUR
+- input:
+    report_type: "periodic_psur"
+    product_type: "drug_nda"
+  expect:
+    required_format: "eCTD Module 2.7.4 / E2C(R2) format"
+    message_type: "ectd"
+
+# Annual report
+- input:
+    report_type: "annual_report"
+    product_type: "biologic_bla"
+  expect:
+    message_type: "ectd"
+
+# Field alert
+- input:
+    report_type: "field_alert"
+    product_type: "drug_nda"
+  expect:
+    acknowledgment_expected: false
+
+# Vaccine AE
+- input:
+    report_type: "vaccine_ae"
+    product_type: "vaccine"
+  expect:
+    submission_gateway: "VAERS portal (vaers.hhs.gov) + FDA ESG"
+
+# Empty input -> default E2B(R3)
+- input: {}
+  expect:
+    required_format: "E2B(R3) ICH ICSR XML"

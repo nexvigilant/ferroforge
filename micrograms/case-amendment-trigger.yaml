@@ -1,0 +1,84 @@
+name: case-amendment-trigger
+description: "Identify cases requiring amendment due to new information or corrections"
+version: 0.1.0
+tree:
+  start: validate_new_information
+  nodes:
+    validate_new_information:
+      type: condition
+      variable: new_information_received
+      operator: eq
+      value: true
+      true_next: check_material_change
+      false_next: no_amendment
+    check_material_change:
+      type: condition
+      variable: is_material_change
+      operator: eq
+      value: true
+      true_next: check_change_type
+      false_next: minor_update_only
+    check_change_type:
+      type: condition
+      variable: change_type
+      operator: eq
+      value: "outcome_change"
+      true_next: requires_amendment
+      false_next: check_causality_change
+    check_causality_change:
+      type: condition
+      variable: change_type
+      operator: eq
+      value: "causality_change"
+      true_next: requires_amendment
+      false_next: minor_update_only
+    requires_amendment:
+      type: return
+      value:
+        amendment_required: true
+        amendment_type: "substantial_amendment"
+        submission_required: true
+        submission_timeline_days: 30
+        amendment_compliant: true
+    minor_update_only:
+      type: return
+      value:
+        amendment_required: false
+        amendment_type: "minor_update"
+        submission_required: false
+        submission_timeline_days: 0
+        amendment_compliant: true
+    no_amendment:
+      type: return
+      value:
+        amendment_required: false
+        amendment_type: null
+        submission_required: false
+        submission_timeline_days: 0
+        amendment_compliant: true
+tests:
+- input:
+    new_information_received: true
+    is_material_change: true
+    change_type: "outcome_change"
+  expect:
+    amendment_required: true
+    amendment_type: "substantial_amendment"
+    submission_required: true
+- input:
+    new_information_received: true
+    is_material_change: true
+    change_type: "causality_change"
+  expect:
+    amendment_required: true
+    amendment_type: "substantial_amendment"
+- input:
+    new_information_received: true
+    is_material_change: false
+  expect:
+    amendment_required: false
+    amendment_type: "minor_update"
+- input: {}
+  expect:
+    amendment_required: false
+    amendment_compliant: true

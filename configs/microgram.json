@@ -838,6 +838,69 @@
         }
       },
       "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-disproportionality-consensus",
+      "description": "Consensus signal classifier across all 4 disproportionality measures (PRR, ROR, IC, EBGM). Counts how many methods detect a signal using standard thresholds and classifies as STRONG (4/4), MODERATE (3/4), WEAK (2/4), MARGINAL (1/4), or NONE (0/4). Feed pre-computed scores from compute_disproportionality_table or OpenVigil.",
+      "parameters": [
+        {"name": "prr", "type": "number", "description": "PRR value (signal threshold: >= 2.0)", "required": true},
+        {"name": "ror_ci_lower", "type": "number", "description": "ROR lower 95% CI (signal threshold: > 1.0)", "required": true},
+        {"name": "ic025", "type": "number", "description": "IC lower 95% credibility interval (signal threshold: > 0)", "required": true},
+        {"name": "eb05", "type": "number", "description": "EBGM 5th percentile (signal threshold: > 1.0)", "required": true},
+        {"name": "n_cases", "type": "integer", "description": "Number of reported cases (minimum 3 required)", "required": true}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "output": {
+            "type": "object",
+            "properties": {
+              "consensus": {"type": "string", "description": "STRONG/MODERATE/WEAK/MARGINAL/NONE/INSUFFICIENT"},
+              "signals_detected": {"type": "integer", "description": "Count of methods detecting signal (0-4)"},
+              "methods_triggered": {"type": "string", "description": "Which methods triggered (e.g. PRR+ROR+IC+EBGM)"},
+              "action": {"type": "string", "description": "Recommended action: expedited_review/standard_review/monitor/investigate/no_action/need_more_cases"},
+              "signal_detected": {"type": "boolean"}
+            }
+          }
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "run-signal-consensus-to-action",
+      "description": "End-to-end chain: 4-measure disproportionality consensus → signal-to-causality routing → Naranjo causality assessment → regulatory action with ICH E2B deadlines. Takes pre-computed disproportionality scores + Naranjo score + seriousness flag. Returns consensus classification, causality level, and regulatory action with deadline.",
+      "parameters": [
+        {"name": "prr", "type": "number", "description": "PRR value (signal threshold: >= 2.0)", "required": true},
+        {"name": "ror_ci_lower", "type": "number", "description": "ROR lower 95% CI (signal threshold: > 1.0)", "required": true},
+        {"name": "ic025", "type": "number", "description": "IC lower 95% credibility interval (signal threshold: > 0)", "required": true},
+        {"name": "eb05", "type": "number", "description": "EBGM 5th percentile (signal threshold: > 1.0)", "required": true},
+        {"name": "n_cases", "type": "integer", "description": "Number of reported cases (minimum 3 required)", "required": true},
+        {"name": "naranjo_score", "type": "integer", "description": "Naranjo ADR probability score (0-13)", "required": true},
+        {"name": "is_serious", "type": "boolean", "description": "Whether the adverse event meets ICH E2A seriousness criteria", "required": true}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "final_output": {
+            "type": "object",
+            "properties": {
+              "consensus": {"type": "string", "description": "STRONG/MODERATE/WEAK/MARGINAL/NONE"},
+              "signals_detected": {"type": "integer"},
+              "causality": {"type": "string", "description": "DEFINITE/PROBABLE/POSSIBLE/DOUBTFUL"},
+              "regulatory_action": {"type": "string"},
+              "deadline_days": {"type": "integer"},
+              "reporting_type": {"type": "string"}
+            }
+          },
+          "steps": {"type": "array", "description": "Per-step decision trace"},
+          "total_duration_us": {"type": "integer"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
     }
   ]
 }

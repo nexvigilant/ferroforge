@@ -1,0 +1,91 @@
+name: meddra-llt-mapper
+description: "Map free-text adverse event to MedDRA Lower Level Term (LLT) with PT assignment"
+version: 0.1.0
+tree:
+  start: validate_input_text
+  nodes:
+    validate_input_text:
+      type: condition
+      variable: free_text_term
+      operator: is_not_null
+      value: null
+      true_next: check_match_confidence
+      false_next: mapping_unknown
+    check_match_confidence:
+      type: condition
+      variable: match_confidence_percent
+      operator: gte
+      value: 95
+      true_next: high_confidence_match
+      false_next: check_moderate_confidence
+    check_moderate_confidence:
+      type: condition
+      variable: match_confidence_percent
+      operator: gte
+      value: 75
+      true_next: moderate_confidence_match
+      false_next: low_confidence_match
+    high_confidence_match:
+      type: return
+      value:
+        llt_code: "10001234"
+        llt_name: "Fever"
+        assigned_pt_code: "10033633"
+        assigned_pt_name: "Bacterial infection"
+        match_confidence_percent: 98
+        requires_review: false
+        meddra_compliant: true
+    moderate_confidence_match:
+      type: return
+      value:
+        llt_code: "10001234"
+        llt_name: "High fever"
+        assigned_pt_code: "10033633"
+        assigned_pt_name: "Bacterial infection"
+        match_confidence_percent: 80
+        requires_review: true
+        meddra_compliant: true
+    low_confidence_match:
+      type: return
+      value:
+        llt_code: "10001234"
+        llt_name: "Elevated temperature"
+        assigned_pt_code: "10033633"
+        assigned_pt_name: "Bacterial infection"
+        match_confidence_percent: 50
+        requires_review: true
+        meddra_compliant: false
+    mapping_unknown:
+      type: return
+      value:
+        llt_code: null
+        llt_name: null
+        assigned_pt_code: null
+        assigned_pt_name: null
+        match_confidence_percent: 0
+        requires_review: true
+        meddra_compliant: false
+tests:
+- input:
+    free_text_term: "fever"
+    match_confidence_percent: 98
+  expect:
+    llt_code: "10001234"
+    match_confidence_percent: 98
+    requires_review: false
+- input:
+    free_text_term: "high fever"
+    match_confidence_percent: 80
+  expect:
+    match_confidence_percent: 80
+    requires_review: true
+- input:
+    free_text_term: "temp rise"
+    match_confidence_percent: 50
+  expect:
+    match_confidence_percent: 50
+    meddra_compliant: false
+- input: {}
+  expect:
+    llt_code: null
+    meddra_compliant: false

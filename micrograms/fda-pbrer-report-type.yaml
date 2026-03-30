@@ -1,0 +1,215 @@
+name: fda-pbrer-report-type
+description: "FDA periodic safety report type selector: routes by product lifecycle stage and regulatory requirements per FDA Guidance 'Providing Postmarket Periodic Safety Reports in the ICH E2C(R2) Format' (2016) and E2C(R2) Q&A (2016)"
+version: 0.1.0
+interface:
+  inputs:
+    lifecycle_stage:
+      type: string
+      required: true
+      description: "Product lifecycle stage: premarket_ind, preapproval_nda, postapproval_initial, postapproval_mature, generic_anda"
+    international_birth_date_years:
+      type: int
+      required: false
+      description: "Years since international birth date (first marketing authorization worldwide)"
+    has_rems:
+      type: bool
+      required: false
+      description: "Whether the product has an active REMS"
+  outputs:
+    report_type:
+      type: string
+    report_format:
+      type: string
+    frequency:
+      type: string
+    content_requirements:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_stage
+  nodes:
+    check_stage:
+      type: condition
+      variable: lifecycle_stage
+      operator: eq
+      value: "premarket_ind"
+      true_next: dsur_required
+      false_next: check_preapproval
+
+    check_preapproval:
+      type: condition
+      variable: lifecycle_stage
+      operator: eq
+      value: "preapproval_nda"
+      true_next: dsur_required
+      false_next: check_postapproval_initial
+
+    check_postapproval_initial:
+      type: condition
+      variable: lifecycle_stage
+      operator: eq
+      value: "postapproval_initial"
+      true_next: check_ibd_years_initial
+      false_next: check_postapproval_mature
+
+    check_postapproval_mature:
+      type: condition
+      variable: lifecycle_stage
+      operator: eq
+      value: "postapproval_mature"
+      true_next: check_rems_mature
+      false_next: check_generic
+
+    check_generic:
+      type: condition
+      variable: lifecycle_stage
+      operator: eq
+      value: "generic_anda"
+      true_next: generic_reporting
+      false_next: default_pbrer
+
+    # PREMARKET - DSUR
+    dsur_required:
+      type: return
+      value:
+        report_type: "DSUR"
+        report_format: "ICH E2F Development Safety Update Report"
+        frequency: "Annually from DIBD (Development International Birth Date)"
+        content_requirements: "Cumulative safety data, line listings of SAEs, changes to Reference Safety Information, benefit-risk evaluation for ongoing trials"
+        regulatory_reference: "ICH E2F; 21 CFR 312.33; FDA Guidance: E2F Development Safety Update Report (2011)"
+
+    # POSTAPPROVAL INITIAL - frequency depends on IBD years
+    check_ibd_years_initial:
+      type: condition
+      variable: international_birth_date_years
+      operator: lte
+      value: 2
+      true_next: pbrer_6month
+      false_next: pbrer_annual
+
+    pbrer_6month:
+      type: return
+      value:
+        report_type: "PBRER"
+        report_format: "ICH E2C(R2) Periodic Benefit-Risk Evaluation Report"
+        frequency: "Every 6 months (first 2 years post-IBD)"
+        content_requirements: "Interval and cumulative safety data, signal evaluation, benefit-risk analysis, summary of safety concerns"
+        regulatory_reference: "FDA Guidance: Providing Postmarket Periodic Safety Reports in ICH E2C(R2) Format (2016), Section III"
+
+    pbrer_annual:
+      type: return
+      value:
+        report_type: "PBRER"
+        report_format: "ICH E2C(R2) Periodic Benefit-Risk Evaluation Report"
+        frequency: "Annually (years 3-5 post-IBD)"
+        content_requirements: "Interval and cumulative safety data, signal evaluation, benefit-risk analysis, summary of safety concerns"
+        regulatory_reference: "FDA Guidance: Providing Postmarket Periodic Safety Reports in ICH E2C(R2) Format (2016), Section III"
+
+    # POSTAPPROVAL MATURE - check REMS
+    check_rems_mature:
+      type: condition
+      variable: has_rems
+      operator: eq
+      value: true
+      true_next: pbrer_with_rems
+      false_next: pbrer_triennial
+
+    pbrer_with_rems:
+      type: return
+      value:
+        report_type: "PBRER + REMS_ASSESSMENT"
+        report_format: "ICH E2C(R2) + REMS Assessment Report"
+        frequency: "Per REMS assessment schedule (typically annually or as specified)"
+        content_requirements: "PBRER content plus REMS assessment: goal achievement, compliance metrics, outcome data, proposed modifications"
+        regulatory_reference: "FDA Guidance: E2C(R2) (2016); REMS Modifications and Revisions (2019)"
+
+    pbrer_triennial:
+      type: return
+      value:
+        report_type: "PBRER"
+        report_format: "ICH E2C(R2) Periodic Benefit-Risk Evaluation Report"
+        frequency: "Every 3 years (beyond 5 years post-IBD)"
+        content_requirements: "Interval and cumulative safety data, signal evaluation, benefit-risk analysis"
+        regulatory_reference: "FDA Guidance: Providing Postmarket Periodic Safety Reports in ICH E2C(R2) Format (2016), Section III"
+
+    # GENERIC / ANDA
+    generic_reporting:
+      type: return
+      value:
+        report_type: "ANDA_ANNUAL"
+        report_format: "ANDA Annual Report"
+        frequency: "Annually"
+        content_requirements: "Adverse event field reports received; no PBRER required unless FDA requests"
+        regulatory_reference: "21 CFR 314.98(a); 21 CFR 314.81(b)(2)"
+
+    default_pbrer:
+      type: return
+      value:
+        report_type: "PBRER"
+        report_format: "ICH E2C(R2) Periodic Benefit-Risk Evaluation Report"
+        frequency: "Per applicable schedule"
+        content_requirements: "Standard PBRER content per E2C(R2)"
+        regulatory_reference: "FDA Guidance: Providing Postmarket Periodic Safety Reports in ICH E2C(R2) Format (2016)"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(ν) — periodic report type routing by lifecycle frequency and regulatory obligations'
+  primes: ['σ', 'ν', '∂']
+  arguments: ['lifecycle_stage', 'international_birth_date_years', 'has_rems']
+
+tests:
+# Premarket IND -> DSUR
+- input:
+    lifecycle_stage: "premarket_ind"
+  expect:
+    report_type: "DSUR"
+    report_format: "ICH E2F Development Safety Update Report"
+
+# Preapproval NDA -> DSUR
+- input:
+    lifecycle_stage: "preapproval_nda"
+  expect:
+    report_type: "DSUR"
+
+# Postapproval initial, year 1 -> PBRER every 6 months
+- input:
+    lifecycle_stage: "postapproval_initial"
+    international_birth_date_years: 1
+  expect:
+    report_type: "PBRER"
+    frequency: "Every 6 months (first 2 years post-IBD)"
+
+# Postapproval initial, year 4 -> PBRER annual
+- input:
+    lifecycle_stage: "postapproval_initial"
+    international_birth_date_years: 4
+  expect:
+    report_type: "PBRER"
+    frequency: "Annually (years 3-5 post-IBD)"
+
+# Mature product with REMS
+- input:
+    lifecycle_stage: "postapproval_mature"
+    has_rems: true
+  expect:
+    report_type: "PBRER + REMS_ASSESSMENT"
+
+# Mature product no REMS -> triennial
+- input:
+    lifecycle_stage: "postapproval_mature"
+    has_rems: false
+  expect:
+    report_type: "PBRER"
+    frequency: "Every 3 years (beyond 5 years post-IBD)"
+
+# Generic ANDA
+- input:
+    lifecycle_stage: "generic_anda"
+  expect:
+    report_type: "ANDA_ANNUAL"
+
+# Empty input -> default PBRER
+- input: {}
+  expect:
+    report_type: "PBRER"

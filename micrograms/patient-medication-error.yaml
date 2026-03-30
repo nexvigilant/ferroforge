@@ -1,0 +1,83 @@
+name: patient-medication-error
+description: "Detect and classify medication error reports for patient safety assessment"
+version: 0.1.0
+tree:
+  start: validate_error_report
+  nodes:
+    validate_error_report:
+      type: condition
+      variable: error_type
+      operator: is_not_null
+      value: null
+      true_next: check_error_severity
+      false_next: error_unknown
+    check_error_severity:
+      type: condition
+      variable: error_severity
+      operator: eq
+      value: "serious_harm"
+      true_next: serious_error
+      false_next: check_moderate_error
+    check_moderate_error:
+      type: condition
+      variable: error_severity
+      operator: eq
+      value: "moderate"
+      true_next: moderate_error
+      false_next: minor_error
+    serious_error:
+      type: return
+      value:
+        error_category: "serious_medication_error"
+        patient_safety_risk: "high"
+        immediate_action: "notify_patients_and_healthcare_providers"
+        regulatory_reporting: "required"
+        patient_safety_compliant: true
+    moderate_error:
+      type: return
+      value:
+        error_category: "moderate_medication_error"
+        patient_safety_risk: "moderate"
+        immediate_action: "monitor_patient_closely"
+        regulatory_reporting: "recommended"
+        patient_safety_compliant: true
+    minor_error:
+      type: return
+      value:
+        error_category: "minor_medication_error"
+        patient_safety_risk: "low"
+        immediate_action: "document_and_review"
+        regulatory_reporting: "not_required"
+        patient_safety_compliant: true
+    error_unknown:
+      type: return
+      value:
+        error_category: null
+        patient_safety_risk: null
+        immediate_action: null
+        regulatory_reporting: null
+        patient_safety_compliant: false
+tests:
+- input:
+    error_type: "dose_error"
+    error_severity: "serious_harm"
+  expect:
+    error_category: "serious_medication_error"
+    patient_safety_risk: "high"
+    regulatory_reporting: "required"
+- input:
+    error_type: "dosing_schedule_error"
+    error_severity: "moderate"
+  expect:
+    error_category: "moderate_medication_error"
+    regulatory_reporting: "recommended"
+- input:
+    error_type: "minor_labeling_error"
+    error_severity: "minor"
+  expect:
+    error_category: "minor_medication_error"
+    patient_safety_risk: "low"
+- input: {}
+  expect:
+    error_category: null
+    patient_safety_compliant: false

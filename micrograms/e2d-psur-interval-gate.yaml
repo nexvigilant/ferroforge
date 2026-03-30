@@ -1,0 +1,187 @@
+name: e2d-psur-interval-gate
+description: 'ICH E2D Section 6 / ICH E2C(R2): Determines PSUR/PBRER submission interval and due date trigger based on product lifecycle and regulatory status'
+version: 0.1.0
+interface:
+  inputs:
+    years_since_first_approval:
+      type: int
+      required: false
+    ibdd_defined:
+      type: bool
+      required: false
+    under_additional_monitoring:
+      type: bool
+      required: false
+    eu_registered:
+      type: bool
+      required: false
+    signal_identified:
+      type: bool
+      required: false
+  outputs:
+    submission_interval_months:
+      type: int
+    report_type:
+      type: string
+    trigger:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_signal_identified
+  nodes:
+    check_signal_identified:
+      type: condition
+      variable: signal_identified
+      operator: eq
+      value: true
+      true_next: return_signal_triggered
+      false_next: check_additional_monitoring
+    check_additional_monitoring:
+      type: condition
+      variable: under_additional_monitoring
+      operator: eq
+      value: true
+      true_next: return_6_monthly
+      false_next: check_ibdd
+    check_ibdd:
+      type: condition
+      variable: ibdd_defined
+      operator: eq
+      value: true
+      true_next: check_years_since_approval
+      false_next: check_eu_registered
+    check_years_since_approval:
+      type: condition
+      variable: years_since_first_approval
+      operator: lte
+      value: 2
+      true_next: return_6_monthly
+      false_next: check_years_5
+    check_years_5:
+      type: condition
+      variable: years_since_first_approval
+      operator: lte
+      value: 5
+      true_next: return_annual
+      false_next: return_triennial
+    check_eu_registered:
+      type: condition
+      variable: eu_registered
+      operator: eq
+      value: true
+      true_next: return_annual_eu
+      false_next: return_annual
+    return_6_monthly:
+      type: return
+      value:
+        submission_interval_months: 6
+        report_type: PSUR_PBRER
+        trigger: IBDD_EARLY_PHASE_OR_ADDITIONAL_MONITORING
+        regulatory_reference: ICH E2C(R2) Section 4 / ICH E2D Section 6
+    return_annual:
+      type: return
+      value:
+        submission_interval_months: 12
+        report_type: PSUR_PBRER
+        trigger: IBDD_STANDARD_INTERVAL
+        regulatory_reference: ICH E2C(R2) Section 4 / ICH E2D Section 6
+    return_triennial:
+      type: return
+      value:
+        submission_interval_months: 36
+        report_type: PSUR_PBRER
+        trigger: IBDD_MATURE_PRODUCT
+        regulatory_reference: ICH E2C(R2) Section 4 / ICH E2D Section 6
+    return_annual_eu:
+      type: return
+      value:
+        submission_interval_months: 12
+        report_type: PSUR_EU_SINGLE_ASSESSMENT
+        trigger: EU_EURD_LIST
+        regulatory_reference: ICH E2C(R2) Section 4 / EU 726-2004 Article 107e
+    return_signal_triggered:
+      type: return
+      value:
+        submission_interval_months: 0
+        report_type: SIGNAL_TRIGGERED_PSUR
+        trigger: SAFETY_SIGNAL_DETECTED
+        regulatory_reference: ICH E2D Section 6 / ICH E2C(R2) Appendix
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — PSUR/PBRER submission interval determination per ICH E2C(R2) lifecycle rules'
+  primes: ['σ', '∂', 'κ', 'N']
+  arguments: ['years_since_first_approval', 'ibdd_defined', 'under_additional_monitoring', 'eu_registered', 'signal_identified']
+tests:
+- input:
+    years_since_first_approval: 1
+    ibdd_defined: true
+    under_additional_monitoring: false
+    eu_registered: false
+    signal_identified: false
+  expect:
+    submission_interval_months: 6
+    report_type: PSUR_PBRER
+    trigger: IBDD_EARLY_PHASE_OR_ADDITIONAL_MONITORING
+    regulatory_reference: ICH E2C(R2) Section 4 / ICH E2D Section 6
+- input:
+    years_since_first_approval: 3
+    ibdd_defined: true
+    under_additional_monitoring: false
+    eu_registered: false
+    signal_identified: false
+  expect:
+    submission_interval_months: 12
+    report_type: PSUR_PBRER
+    trigger: IBDD_STANDARD_INTERVAL
+    regulatory_reference: ICH E2C(R2) Section 4 / ICH E2D Section 6
+- input:
+    years_since_first_approval: 7
+    ibdd_defined: true
+    under_additional_monitoring: false
+    eu_registered: false
+    signal_identified: false
+  expect:
+    submission_interval_months: 36
+    report_type: PSUR_PBRER
+    trigger: IBDD_MATURE_PRODUCT
+    regulatory_reference: ICH E2C(R2) Section 4 / ICH E2D Section 6
+- input:
+    years_since_first_approval: 5
+    ibdd_defined: false
+    under_additional_monitoring: false
+    eu_registered: true
+    signal_identified: false
+  expect:
+    submission_interval_months: 12
+    report_type: PSUR_EU_SINGLE_ASSESSMENT
+    trigger: EU_EURD_LIST
+    regulatory_reference: ICH E2C(R2) Section 4 / EU 726-2004 Article 107e
+- input:
+    years_since_first_approval: 2
+    ibdd_defined: true
+    under_additional_monitoring: true
+    eu_registered: false
+    signal_identified: false
+  expect:
+    submission_interval_months: 6
+    report_type: PSUR_PBRER
+    trigger: IBDD_EARLY_PHASE_OR_ADDITIONAL_MONITORING
+    regulatory_reference: ICH E2C(R2) Section 4 / ICH E2D Section 6
+- input:
+    years_since_first_approval: 10
+    ibdd_defined: true
+    under_additional_monitoring: false
+    eu_registered: false
+    signal_identified: true
+  expect:
+    submission_interval_months: 0
+    report_type: SIGNAL_TRIGGERED_PSUR
+    trigger: SAFETY_SIGNAL_DETECTED
+    regulatory_reference: ICH E2D Section 6 / ICH E2C(R2) Appendix
+- input: {}
+  expect:
+    submission_interval_months: 12
+    report_type: PSUR_PBRER
+    trigger: IBDD_STANDARD_INTERVAL
+    regulatory_reference: "ICH E2C(R2) Section 4 / ICH E2D Section 6"

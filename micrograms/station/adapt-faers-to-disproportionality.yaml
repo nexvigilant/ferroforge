@@ -1,0 +1,128 @@
+name: adapt-faers-to-disproportionality
+description: >
+  Adapter: transforms openFDA FAERS drug_event counts into the input shape
+  needed by PRR/disproportionality computation. Takes raw FAERS counts
+  (drug_event, drug_total, event_total, all_total) and classifies whether
+  there is sufficient data to compute PRR, plus passes through for calculation.
+version: 0.1.0
+primitive_signature:
+  dominant: 'μ'
+  expression: 'μ(N → N) — maps FAERS count shape to disproportionality input shape'
+  primes: ['μ', 'N', '∂']
+  arguments: ['drug_event_count', 'drug_total', 'event_total', 'all_total']
+  chain_prediction: >
+    Bridge between openfda config (search_adverse_events output) and
+    calculation config (compute_prr input). Validates minimum case count
+    before allowing disproportionality computation.
+interface:
+  inputs:
+    drug_event_count:
+      type: int
+      required: true
+      description: "Count of reports with both the drug AND the event (cell A in 2x2 table)"
+    drug_total:
+      type: int
+      required: true
+      description: "Total reports for the drug (A+B)"
+    event_total:
+      type: int
+      required: true
+      description: "Total reports for the event (A+C)"
+    all_total:
+      type: int
+      required: true
+      description: "Total reports in database (A+B+C+D)"
+  outputs:
+    sufficient_data:
+      type: bool
+    action:
+      type: string
+    a:
+      type: int
+      description: "2x2 cell A (drug+event) — passthrough for PRR computation"
+    b:
+      type: int
+      description: "2x2 cell B (drug+no_event)"
+    c:
+      type: int
+      description: "2x2 cell C (no_drug+event)"
+    d:
+      type: int
+      description: "2x2 cell D (no_drug+no_event)"
+tree:
+  start: check_drug_event_present
+  nodes:
+    check_drug_event_present:
+      type: condition
+      variable: drug_event_count
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: check_minimum_cases
+
+    reject:
+      type: return
+      value:
+        sufficient_data: false
+        action: "REJECTED: drug_event_count is required"
+        a: 0
+        b: 0
+        c: 0
+        d: 0
+
+    check_minimum_cases:
+      type: condition
+      variable: drug_event_count
+      operator: gte
+      value: 3
+      true_next: sufficient
+      false_next: insufficient
+
+    insufficient:
+      type: return
+      value:
+        sufficient_data: false
+        action: "ACCUMULATE: fewer than 3 reports — insufficient for disproportionality"
+        a: 0
+        b: 0
+        c: 0
+        d: 0
+
+    sufficient:
+      type: return
+      value:
+        sufficient_data: true
+        action: "COMPUTE: sufficient data for PRR/ROR calculation"
+        a: 0
+        b: 0
+        c: 0
+        d: 0
+
+tests:
+- input:
+    drug_event_count: 50
+    drug_total: 5000
+    event_total: 200
+    all_total: 1000000
+  expect:
+    sufficient_data: true
+
+- input:
+    drug_event_count: 2
+    drug_total: 100
+    event_total: 50
+    all_total: 500000
+  expect:
+    sufficient_data: false
+
+- input:
+    drug_event_count: 3
+    drug_total: 200
+    event_total: 100
+    all_total: 800000
+  expect:
+    sufficient_data: true
+
+- input: {}
+  expect:
+    sufficient_data: false

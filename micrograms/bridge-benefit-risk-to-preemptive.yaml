@@ -1,0 +1,72 @@
+name: bridge-benefit-risk-to-preemptive
+description: 'Bridge: converts B/R assessment into preemptive PV trajectory input'
+version: 0.1.0
+tree:
+  start: check_action
+  nodes:
+    safe_trajectory:
+      type: return
+      value:
+        intervention_window_days: 90
+        trajectory_severity: low
+        bridge: benefit-risk-to-preemptive
+    moderate_trajectory:
+      type: return
+      value:
+        trajectory_severity: moderate
+        intervention_window_days: 14
+        bridge: benefit-risk-to-preemptive
+    critical_trajectory:
+      type: return
+      value:
+        intervention_window_days: 3
+        bridge: benefit-risk-to-preemptive
+        trajectory_severity: critical
+    check_action:
+      type: condition
+      variable: action
+      operator: eq
+      value: escalate
+      true_next: critical_trajectory
+      false_next: check_review
+    check_review:
+      type: condition
+      variable: action
+      operator: eq
+      value: review
+      true_next: moderate_trajectory
+      false_next: safe_trajectory
+tests:
+- input:
+    priority: critical
+    action: escalate
+  expect:
+    trajectory_severity: critical
+    bridge: benefit-risk-to-preemptive
+    intervention_window_days: 3
+- input:
+    priority: moderate
+    action: review
+  expect:
+    trajectory_severity: moderate
+    bridge: benefit-risk-to-preemptive
+    intervention_window_days: 14
+- input:
+    priority: low
+    action: approve
+  expect:
+    intervention_window_days: 90
+    bridge: benefit-risk-to-preemptive
+    trajectory_severity: low
+- input: {}
+  expect:
+    trajectory_severity: low
+    intervention_window_days: 90
+    bridge: benefit-risk-to-preemptive
+- input: {}
+  expect:
+    trajectory_severity: low
+    bridge: benefit-risk-to-preemptive
+    intervention_window_days: 90
+interface: null
+primitive_signature: null

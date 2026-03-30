@@ -1,0 +1,108 @@
+name: epi-relative-risk-tier
+description: "Classify relative risk (RR) result into epidemiologic tier category"
+version: 0.1.0
+tree:
+  start: validate_rr_value
+  nodes:
+    validate_rr_value:
+      type: condition
+      variable: relative_risk
+      operator: is_not_null
+      value: null
+      true_next: check_protective
+      false_next: rr_tier_unknown
+    check_protective:
+      type: condition
+      variable: relative_risk
+      operator: lt
+      value: 0.5
+      true_next: strong_protective
+      false_next: check_weak_protective
+    check_weak_protective:
+      type: condition
+      variable: relative_risk
+      operator: lt
+      value: 1
+      true_next: weak_protective
+      false_next: check_weak_increased
+    check_weak_increased:
+      type: condition
+      variable: relative_risk
+      operator: lt
+      value: 2
+      true_next: weak_increased_risk
+      false_next: check_moderate_increased
+    check_moderate_increased:
+      type: condition
+      variable: relative_risk
+      operator: lt
+      value: 5
+      true_next: moderate_increased_risk
+      false_next: strong_increased_risk
+    strong_protective:
+      type: return
+      value:
+        rr_category: "strong_protective_effect"
+        rr_tier: 1
+        clinical_significance: "strong_protective"
+        epi_compliant: true
+    weak_protective:
+      type: return
+      value:
+        rr_category: "weak_protective_effect"
+        rr_tier: 2
+        clinical_significance: "weak_protective"
+        epi_compliant: true
+    weak_increased_risk:
+      type: return
+      value:
+        rr_category: "weak_increased_risk"
+        rr_tier: 3
+        clinical_significance: "weak_increased"
+        epi_compliant: true
+    moderate_increased_risk:
+      type: return
+      value:
+        rr_category: "moderate_increased_risk"
+        rr_tier: 4
+        clinical_significance: "moderate_increased"
+        epi_compliant: true
+    strong_increased_risk:
+      type: return
+      value:
+        rr_category: "strong_increased_risk"
+        rr_tier: 5
+        clinical_significance: "strong_increased"
+        epi_compliant: true
+    rr_tier_unknown:
+      type: return
+      value:
+        rr_category: null
+        rr_tier: null
+        clinical_significance: null
+        epi_compliant: false
+tests:
+- input:
+    relative_risk: 0.3
+  expect:
+    rr_category: "strong_protective_effect"
+    rr_tier: 1
+- input:
+    relative_risk: 0.8
+  expect:
+    rr_category: "weak_protective_effect"
+    rr_tier: 2
+- input:
+    relative_risk: 1.5
+  expect:
+    rr_category: "weak_increased_risk"
+    rr_tier: 3
+- input:
+    relative_risk: 3
+  expect:
+    rr_category: "moderate_increased_risk"
+    rr_tier: 4
+- input: {}
+  expect:
+    rr_category: null
+    epi_compliant: false

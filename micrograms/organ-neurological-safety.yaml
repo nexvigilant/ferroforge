@@ -1,0 +1,65 @@
+name: organ-neurological-safety
+description: "Neurological safety assessment. Evaluates seizure risk, CNS depression, peripheral neuropathy, and neurotoxicity."
+version: 0.1.0
+tree:
+  start: check_seizure_history
+  nodes:
+    check_seizure_history:
+      type: condition
+      variable: has_uncontrolled_seizures
+      operator: eq
+      value: true
+      true_next: seizure_alert
+      false_next: check_cns_disease
+    seizure_alert:
+      type: return
+      value:
+        organ: nervous_system
+        risk_level: high
+        seizure_threshold_lowering: true
+        monitoring: required
+        message: "Uncontrolled seizures; seizure-threshold-lowering drugs require caution"
+    check_cns_disease:
+      type: condition
+      variable: has_severe_cns_disease
+      operator: eq
+      value: true
+      true_next: cns_alert
+      false_next: check_neuropathy
+    cns_alert:
+      type: return
+      value:
+        organ: nervous_system
+        risk_level: moderate
+        cns_monitoring: required
+        message: "Severe CNS disease; CNS-active drugs may worsen condition"
+    check_neuropathy:
+      type: condition
+      variable: has_peripheral_neuropathy
+      operator: eq
+      value: true
+      true_next: neuropathy_alert
+      false_next: standard_dosing
+    neuropathy_alert:
+      type: return
+      value:
+        organ: nervous_system
+        risk_level: moderate
+        neurotoxicity_risk: true
+        message: "Peripheral neuropathy; neurotoxic drugs require careful monitoring"
+    standard_dosing:
+      type: return
+      value:
+        organ: nervous_system
+        risk_level: low
+tests:
+  - input: { has_uncontrolled_seizures: true, has_severe_cns_disease: false, has_peripheral_neuropathy: false }
+    expect: { organ: nervous_system, risk_level: high, seizure_threshold_lowering: true }
+  - input: { has_uncontrolled_seizures: false, has_severe_cns_disease: true, has_peripheral_neuropathy: false }
+    expect: { organ: nervous_system, risk_level: moderate, cns_monitoring: required }
+  - input: { has_uncontrolled_seizures: false, has_severe_cns_disease: false, has_peripheral_neuropathy: true }
+    expect: { organ: nervous_system, risk_level: moderate, neurotoxicity_risk: true }
+  - input: { has_uncontrolled_seizures: false, has_severe_cns_disease: false, has_peripheral_neuropathy: false }
+    expect: { organ: nervous_system, risk_level: low }
+  - input: {}
+    expect: {}

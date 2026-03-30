@@ -1,0 +1,49 @@
+name: tox-pulmonary
+description: "Pulmonary toxicity: FEV1 threshold"
+version: 0.1.0
+
+tree:
+  start: check_severe
+  nodes:
+    check_severe:
+      type: condition
+      variable: fev1_pct
+      operator: lte
+      value: 50
+      true_next: severe
+      false_next: check_mild
+    check_mild:
+      type: condition
+      variable: fev1_pct
+      operator: lte
+      value: 80
+      true_next: mild
+      false_next: normal
+    severe:
+      type: return
+      value:
+        organ: "pulmonary"
+        severity: "severe"
+        action: "discontinue"
+    mild:
+      type: return
+      value:
+        organ: "pulmonary"
+        severity: "mild"
+        action: "monitor_closely"
+    normal:
+      type: return
+      value:
+        organ: "pulmonary"
+        severity: "normal"
+        action: "continue"
+
+tests:
+  - input: {fev1_pct: -50}
+    expect: {severity: "severe", action: "discontinue"}
+  - input: {fev1_pct: 80}
+    expect: {severity: "mild", action: "monitor_closely"}
+  - input: {fev1_pct: 1080}
+    expect: {severity: "normal", action: "continue"}
+  - input: {}
+    expect: {severity: "normal", action: "continue"}

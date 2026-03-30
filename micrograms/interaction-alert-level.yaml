@@ -1,0 +1,102 @@
+name: interaction-alert-level
+description: "Determine alert level and urgency for drug interaction warnings"
+version: 0.1.0
+tree:
+  start: validate_severity
+  nodes:
+    validate_severity:
+      type: condition
+      variable: interaction_severity
+      operator: is_not_null
+      value: null
+      true_next: check_critical_alert
+      false_next: alert_unknown
+    check_critical_alert:
+      type: condition
+      variable: interaction_severity
+      operator: eq
+      value: "contraindicated"
+      true_next: critical_alert
+      false_next: check_major_alert
+    check_major_alert:
+      type: condition
+      variable: interaction_severity
+      operator: eq
+      value: "major"
+      true_next: major_alert
+      false_next: check_moderate_alert
+    check_moderate_alert:
+      type: condition
+      variable: interaction_severity
+      operator: eq
+      value: "moderate"
+      true_next: moderate_alert
+      false_next: minor_alert
+    critical_alert:
+      type: return
+      value:
+        alert_level: "critical"
+        alert_color: "red"
+        notification_urgency: "immediate"
+        prescriber_action_required: true
+        alert_compliant: true
+    major_alert:
+      type: return
+      value:
+        alert_level: "major"
+        alert_color: "orange"
+        notification_urgency: "urgent"
+        prescriber_action_required: true
+        alert_compliant: true
+    moderate_alert:
+      type: return
+      value:
+        alert_level: "moderate"
+        alert_color: "yellow"
+        notification_urgency: "routine"
+        prescriber_action_required: false
+        alert_compliant: true
+    minor_alert:
+      type: return
+      value:
+        alert_level: "minor"
+        alert_color: "green"
+        notification_urgency: "informational"
+        prescriber_action_required: false
+        alert_compliant: true
+    alert_unknown:
+      type: return
+      value:
+        alert_level: "unknown"
+        alert_color: "gray"
+        notification_urgency: null
+        prescriber_action_required: null
+        alert_compliant: false
+tests:
+- input:
+    interaction_severity: "contraindicated"
+  expect:
+    alert_level: "critical"
+    alert_color: "red"
+    notification_urgency: "immediate"
+    prescriber_action_required: true
+- input:
+    interaction_severity: "major"
+  expect:
+    alert_level: "major"
+    alert_color: "orange"
+    notification_urgency: "urgent"
+- input:
+    interaction_severity: "moderate"
+  expect:
+    alert_level: "moderate"
+    alert_color: "yellow"
+- input:
+    interaction_severity: "minor"
+  expect:
+    alert_level: "minor"
+    alert_color: "green"
+- input: {}
+  expect:
+    alert_level: "unknown"
+    alert_compliant: false

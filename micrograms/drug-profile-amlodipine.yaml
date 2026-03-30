@@ -1,0 +1,62 @@
+name: drug-profile-amlodipine
+description: 'Safety triage for amlodipine: PRR-based signal routing (Type A)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: signal
+      false_next: no_signal
+    no_signal:
+      type: return
+      value:
+        expected_prr: 1.7
+        signal: false
+        action: monitor
+        drug: amlodipine
+        harm_type: A
+    signal:
+      type: return
+      value:
+        signal: true
+        action: investigate
+        harm_type: A
+        expected_prr: 1.7
+        drug: amlodipine
+tests:
+- input:
+    prr: 1.7
+  expect:
+    signal: false
+    drug: amlodipine
+- input:
+    prr: 0.5
+  expect:
+    signal: false
+    drug: amlodipine
+- input: {}
+  expect:
+    drug: amlodipine
+    signal: false
+- input:
+    prr: 1.999
+  expect:
+    action: monitor
+    signal: false
+    drug: amlodipine
+    harm_type: A
+    expected_prr: 1.7
+- input:
+    prr: 2.001
+  expect:
+    signal: true
+    expected_prr: 1.7
+    action: investigate
+    harm_type: A
+    drug: amlodipine
+interface: null
+primitive_signature: null

@@ -1,0 +1,66 @@
+name: organ-hematological-safety
+description: "Hematological safety assessment. Evaluates bleeding risk, bone marrow suppression, and thrombocytopenia."
+version: 0.1.0
+tree:
+  start: check_bleeding_history
+  nodes:
+    check_bleeding_history:
+      type: condition
+      variable: has_active_bleeding
+      operator: eq
+      value: true
+      true_next: bleeding_alert
+      false_next: check_platelet_count
+    bleeding_alert:
+      type: return
+      value:
+        organ: blood
+        risk_level: critical
+        contraindication: true
+        message: "Active bleeding; anticoagulant/antiplatelet drugs contraindicated"
+    check_platelet_count:
+      type: condition
+      variable: platelet_count_k_ul
+      operator: lt
+      value: 50
+      true_next: thrombocytopenia_alert
+      false_next: check_hemoglobin
+    thrombocytopenia_alert:
+      type: return
+      value:
+        organ: blood
+        risk_level: high
+        bleeding_risk: true
+        monitoring: required
+        message: "Thrombocytopenia <50K; myelosuppressive drugs contraindicated"
+    check_hemoglobin:
+      type: condition
+      variable: hemoglobin_g_dl
+      operator: lt
+      value: 8.0
+      true_next: anemia_alert
+      false_next: standard_dosing
+    anemia_alert:
+      type: return
+      value:
+        organ: blood
+        risk_level: moderate
+        bone_marrow_monitoring: required
+        message: "Severe anemia <8 g/dL; monitor bone marrow function"
+    standard_dosing:
+      type: return
+      value:
+        organ: blood
+        risk_level: low
+        baseline_cbc: recommended
+tests:
+  - input: { has_active_bleeding: true, platelet_count_k_ul: 150, hemoglobin_g_dl: 12 }
+    expect: { organ: blood, risk_level: critical, contraindication: true }
+  - input: { has_active_bleeding: false, platelet_count_k_ul: 40, hemoglobin_g_dl: 12 }
+    expect: { organ: blood, risk_level: high, bleeding_risk: true }
+  - input: { has_active_bleeding: false, platelet_count_k_ul: 150, hemoglobin_g_dl: 7.5 }
+    expect: { organ: blood, risk_level: moderate, bone_marrow_monitoring: required }
+  - input: { has_active_bleeding: false, platelet_count_k_ul: 200, hemoglobin_g_dl: 13 }
+    expect: { organ: blood, risk_level: low }
+  - input: {}
+    expect: {}

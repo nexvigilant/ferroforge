@@ -1,0 +1,74 @@
+name: timeline-us-15day
+description: US 15-day expedited
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    not_due:
+      type: return
+      value:
+        jurisdiction: US
+        report_type: expedited
+        due: false
+        action: schedule
+    check:
+      type: condition
+      variable: days_to_deadline
+      operator: lte
+      value: 15
+      true_next: due
+      false_next: not_due
+    due:
+      type: return
+      value:
+        due: true
+        jurisdiction: US
+        action: submit
+        report_type: expedited
+tests:
+- input:
+    days_to_deadline: 15
+  expect:
+    jurisdiction: US
+    due: true
+- input: {}
+  expect:
+    due: false
+    jurisdiction: US
+- input:
+    days_to_deadline: 0
+  expect:
+    action: submit
+    report_type: expedited
+    jurisdiction: US
+    due: true
+- input:
+    days_to_deadline: -1
+  expect:
+    action: submit
+    due: true
+    jurisdiction: US
+    report_type: expedited
+- input:
+    days_to_deadline: 14
+  expect:
+    due: true
+    jurisdiction: US
+    report_type: expedited
+    action: submit
+- input:
+    days_to_deadline: 16
+  expect:
+    jurisdiction: US
+    report_type: expedited
+    action: schedule
+    due: false
+- input:
+    days_to_deadline: 1500
+  expect:
+    action: schedule
+    due: false
+    jurisdiction: US
+    report_type: expedited
+interface: null
+primitive_signature: null

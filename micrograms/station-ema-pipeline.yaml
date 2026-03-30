@@ -1,0 +1,118 @@
+name: station-ema-pipeline
+description: 'Triage EMA data: route EPAR safety, PSUR assessments, referrals, and signal summaries'
+version: 0.1.0
+tree:
+  start: check_source
+  nodes:
+    check_psur:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: psur
+      true_next: psur_path
+      false_next: epar_path
+    psur_routine:
+      type: return
+      value:
+        action: review
+        route: periodic_review
+        priority: low
+        reason: PSUR routine — no benefit-risk change detected
+    signal_path:
+      type: condition
+      variable: signal_confirmed
+      operator: eq
+      value: true
+      true_next: confirmed_signal
+      false_next: unconfirmed_signal
+    psur_path:
+      type: condition
+      variable: benefit_risk_changed
+      operator: eq
+      value: true
+      true_next: psur_urgent
+      false_next: psur_routine
+    unconfirmed_signal:
+      type: return
+      value:
+        priority: moderate
+        reason: EMA unconfirmed signal — run disproportionality analysis
+        action: validate
+        route: signal_validation
+    epar_path:
+      type: return
+      value:
+        action: review
+        priority: low
+        route: label_comparison
+        reason: EPAR data — extract safety section for baseline comparison
+    check_source:
+      type: condition
+      variable: source_type
+      operator: eq
+      value: signal
+      true_next: signal_path
+      false_next: check_psur
+    psur_urgent:
+      type: return
+      value:
+        priority: critical
+        reason: PSUR shows changed benefit-risk — immediate regulatory review
+        route: benefit_risk_assessment
+        action: escalate
+    confirmed_signal:
+      type: return
+      value:
+        reason: EMA confirmed signal — cross-reference with FAERS and VigiBase
+        route: signal_investigation
+        action: investigate
+        priority: high
+tests:
+- input:
+    source_type: signal
+    signal_confirmed: true
+  expect:
+    action: investigate
+    priority: high
+    route: signal_investigation
+- input:
+    source_type: signal
+    signal_confirmed: false
+  expect:
+    route: signal_validation
+    priority: moderate
+    action: validate
+- input:
+    benefit_risk_changed: true
+    source_type: psur
+  expect:
+    action: escalate
+    route: benefit_risk_assessment
+    priority: critical
+- input:
+    source_type: psur
+    benefit_risk_changed: false
+  expect:
+    priority: low
+    route: periodic_review
+    action: review
+- input:
+    source_type: epar
+  expect:
+    action: review
+    priority: low
+    route: label_comparison
+- input: {}
+  expect:
+    action: review
+    route: label_comparison
+    priority: low
+    reason: EPAR data — extract safety section for baseline comparison
+- input: {}
+  expect:
+    priority: low
+    route: label_comparison
+    reason: EPAR data — extract safety section for baseline comparison
+    action: review
+interface: null
+primitive_signature: null

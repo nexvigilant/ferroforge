@@ -1,0 +1,47 @@
+name: workflow-compliance-audit
+description: "Select compliance audit chain by regulatory framework"
+version: 0.1.0
+
+tree:
+  start: check_framework
+  nodes:
+    check_framework:
+      type: "condition"
+      variable: "framework"
+      operator: "eq"
+      value: "ich"
+      true_next: "ich_audit"
+      false_next: "check_fda"
+    ich_audit:
+      type: "return"
+      value:
+        audit: "ich_compliance"
+        chain: "ich \u2192 compliance \u2192 cioms"
+        scope: "global"
+    check_fda:
+      type: "condition"
+      variable: "framework"
+      operator: "eq"
+      value: "fda"
+      true_next: "fda_audit"
+      false_next: "ema_audit"
+    fda_audit:
+      type: "return"
+      value:
+        audit: "fda_compliance"
+        chain: "fda-safety \u2192 fda-accessdata \u2192 compliance"
+        scope: "us"
+    ema_audit:
+      type: "return"
+      value:
+        audit: "ema_compliance"
+        chain: "ema \u2192 eudravigilance \u2192 compliance"
+        scope: "eu"
+
+tests:
+  - input: {"framework": "ich"}
+    expect: {"audit": "ich_compliance", "scope": "global"}
+  - input: {"framework": "fda"}
+    expect: {"audit": "fda_compliance", "scope": "us"}
+  - input: {"framework": "ema"}
+    expect: {"audit": "ema_compliance", "scope": "eu"}

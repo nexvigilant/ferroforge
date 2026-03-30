@@ -1,0 +1,67 @@
+name: convergence-time-consistent
+description: Signal consistent over time
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: quarters_positive
+      operator: gte
+      value: 3
+      true_next: converged
+      false_next: divergent
+    divergent:
+      type: return
+      value:
+        met: false
+        convergence: temporal_consistency
+        action: investigate_discrepancy
+    converged:
+      type: return
+      value:
+        action: escalate
+        convergence: temporal_consistency
+        met: true
+tests:
+- input:
+    quarters_positive: 3
+  expect:
+    convergence: temporal_consistency
+    met: true
+- input: {}
+  expect:
+    convergence: temporal_consistency
+    met: false
+- input:
+    quarters_positive: 0
+  expect:
+    action: investigate_discrepancy
+    met: false
+    convergence: temporal_consistency
+- input:
+    quarters_positive: -1
+  expect:
+    action: investigate_discrepancy
+    met: false
+    convergence: temporal_consistency
+- input:
+    quarters_positive: 2
+  expect:
+    met: false
+    convergence: temporal_consistency
+    action: investigate_discrepancy
+- input:
+    quarters_positive: 4
+  expect:
+    met: true
+    action: escalate
+    convergence: temporal_consistency
+- input:
+    quarters_positive: 300
+  expect:
+    convergence: temporal_consistency
+    met: true
+    action: escalate
+interface: null
+primitive_signature: null

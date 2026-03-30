@@ -1,0 +1,53 @@
+name: class-arb
+description: 'ARBs class safety: Hyperkalemia monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: potassium
+      operator: gte
+      value: 5.5
+      true_next: alert
+      false_next: safe
+    alert:
+      type: return
+      value:
+        action: class_effect_investigation
+        drug_class: ARBs
+        concern: Hyperkalemia
+        alert: true
+    safe:
+      type: return
+      value:
+        action: continue
+        alert: false
+        drug_class: ARBs
+        concern: Hyperkalemia
+tests:
+- input:
+    potassium: 5.5
+  expect:
+    drug_class: ARBs
+    alert: true
+- input: {}
+  expect:
+    drug_class: ARBs
+    alert: false
+- input:
+    potassium: 5.499
+  expect:
+    alert: false
+    concern: Hyperkalemia
+    action: continue
+    drug_class: ARBs
+- input:
+    potassium: 5.501
+  expect:
+    action: class_effect_investigation
+    concern: Hyperkalemia
+    alert: true
+    drug_class: ARBs
+interface: null
+primitive_signature: null

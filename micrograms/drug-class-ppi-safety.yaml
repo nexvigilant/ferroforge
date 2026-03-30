@@ -1,0 +1,62 @@
+name: drug-class-ppi-safety
+description: "Proton pump inhibitor safety. Monitors hypomagnesemia, vitamin B12 malabsorption, and osteoporosis risk."
+version: 0.1.0
+tree:
+  start: check_duration
+  nodes:
+    check_duration:
+      type: condition
+      variable: ppi_duration_months
+      operator: gte
+      value: 12
+      true_next: long_term_assessment
+      false_next: check_magnesium
+    long_term_assessment:
+      type: return
+      value:
+        risk_level: moderate
+        magnesium_monitoring: required
+        bone_density_screening: required
+        message: "Long-term PPI use; monitor magnesium, vitamin B12, and bone health"
+    check_magnesium:
+      type: condition
+      variable: serum_magnesium_mg_dl
+      operator: lt
+      value: 1.7
+      true_next: hypomagnesemia
+      false_next: check_b12
+    hypomagnesemia:
+      type: return
+      value:
+        risk_level: high
+        supplementation: required
+        message: "Hypomagnesemia detected; magnesium supplementation recommended"
+    check_b12:
+      type: condition
+      variable: vitamin_b12_pg_ml
+      operator: lt
+      value: 200
+      true_next: b12_deficiency
+      false_next: standard_dosing
+    b12_deficiency:
+      type: return
+      value:
+        risk_level: moderate
+        supplementation: required
+        message: "B12 deficiency detected; supplementation recommended"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard PPI dosing appropriate"
+tests:
+  - input: { ppi_duration_months: 24, serum_magnesium_mg_dl: 2.0, vitamin_b12_pg_ml: 250 }
+    expect: { risk_level: moderate, magnesium_monitoring: required }
+  - input: { ppi_duration_months: 6, serum_magnesium_mg_dl: 1.5, vitamin_b12_pg_ml: 250 }
+    expect: { risk_level: high, supplementation: required }
+  - input: { ppi_duration_months: 6, serum_magnesium_mg_dl: 2.0, vitamin_b12_pg_ml: 180 }
+    expect: { risk_level: moderate, supplementation: required }
+  - input: { ppi_duration_months: 3, serum_magnesium_mg_dl: 2.2, vitamin_b12_pg_ml: 300 }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

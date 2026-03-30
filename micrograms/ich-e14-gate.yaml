@@ -1,0 +1,33 @@
+name: ich-e14-gate
+description: "ICH E14 compliance: QT/QTc Prolongation"
+version: 0.1.0
+
+tree:
+  start: check
+  nodes:
+    check:
+      type: "condition"
+      variable: "qtc_study_done"
+      operator: "eq"
+      value: true
+      true_next: "compliant"
+      false_next: "gap"
+    compliant:
+      type: "return"
+      value:
+        guideline: "ICH E14"
+        compliant: true
+        action: "proceed"
+    gap:
+      type: "return"
+      value:
+        guideline: "ICH E14"
+        compliant: false
+        action: "remediate"
+        gap: "qtc_study_done"
+
+tests:
+  - input: {"qtc_study_done": true}
+    expect: {"compliant": true}
+  - input: {}
+    expect: {"compliant": false}

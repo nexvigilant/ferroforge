@@ -1,0 +1,61 @@
+name: drug-class-fluoroquinolone-safety
+description: "Fluoroquinolone safety assessment. Evaluates tendinopathy, QT prolongation, neuropathy, and myasthenia risk."
+version: 0.1.0
+tree:
+  start: check_myasthenia
+  nodes:
+    check_myasthenia:
+      type: condition
+      variable: has_myasthenia_gravis
+      operator: eq
+      value: true
+      true_next: myasthenia_alert
+      false_next: check_qpointer_prolongation
+    myasthenia_alert:
+      type: return
+      value:
+        risk_level: critical
+        contraindication: true
+        message: "Myasthenia gravis; fluoroquinolone contraindicated due to exacerbation risk"
+    check_qpointer_prolongation:
+      type: condition
+      variable: baseline_qt_ms
+      operator: gte
+      value: 450
+      true_next: qt_risk
+      false_next: check_age
+    qt_risk:
+      type: return
+      value:
+        risk_level: moderate
+        qt_monitoring: required
+        message: "Prolonged baseline QT; monitor for further prolongation"
+    check_age:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 60
+      true_next: elderly_tendon_risk
+      false_next: standard_dosing
+    elderly_tendon_risk:
+      type: return
+      value:
+        risk_level: moderate
+        tendon_monitoring: required
+        message: "Elderly patient; increased tendon rupture risk; avoid in tendon disease"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard fluoroquinolone dosing appropriate"
+tests:
+  - input: { has_myasthenia_gravis: true, baseline_qt_ms: 400, age_years: 50 }
+    expect: { risk_level: critical, contraindication: true }
+  - input: { has_myasthenia_gravis: false, baseline_qt_ms: 460, age_years: 50 }
+    expect: { risk_level: moderate, qt_monitoring: required }
+  - input: { has_myasthenia_gravis: false, baseline_qt_ms: 400, age_years: 65 }
+    expect: { risk_level: moderate, tendon_monitoring: required }
+  - input: { has_myasthenia_gravis: false, baseline_qt_ms: 400, age_years: 45 }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

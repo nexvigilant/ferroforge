@@ -1,0 +1,74 @@
+name: timeline-japan-30day
+description: Japan 30-day report
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    not_due:
+      type: return
+      value:
+        report_type: standard
+        action: schedule
+        jurisdiction: JP
+        due: false
+    check:
+      type: condition
+      variable: days_to_deadline
+      operator: lte
+      value: 30
+      true_next: due
+      false_next: not_due
+    due:
+      type: return
+      value:
+        action: submit
+        jurisdiction: JP
+        due: true
+        report_type: standard
+tests:
+- input:
+    days_to_deadline: 30
+  expect:
+    due: true
+    jurisdiction: JP
+- input: {}
+  expect:
+    jurisdiction: JP
+    due: false
+- input:
+    days_to_deadline: 0
+  expect:
+    jurisdiction: JP
+    report_type: standard
+    action: submit
+    due: true
+- input:
+    days_to_deadline: -1
+  expect:
+    report_type: standard
+    due: true
+    action: submit
+    jurisdiction: JP
+- input:
+    days_to_deadline: 29
+  expect:
+    report_type: standard
+    jurisdiction: JP
+    action: submit
+    due: true
+- input:
+    days_to_deadline: 31
+  expect:
+    jurisdiction: JP
+    action: schedule
+    report_type: standard
+    due: false
+- input:
+    days_to_deadline: 3000
+  expect:
+    jurisdiction: JP
+    due: false
+    action: schedule
+    report_type: standard
+interface: null
+primitive_signature: null

@@ -1,0 +1,62 @@
+name: drug-profile-erlotinib
+description: 'Safety triage for erlotinib: PRR-based signal routing (Type B)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5.0
+      true_next: signal
+      false_next: no_signal
+    no_signal:
+      type: return
+      value:
+        expected_prr: 5.9
+        signal: false
+        drug: erlotinib
+        action: monitor
+        harm_type: B
+    signal:
+      type: return
+      value:
+        action: investigate
+        drug: erlotinib
+        expected_prr: 5.9
+        signal: true
+        harm_type: B
+tests:
+- input:
+    prr: 5.9
+  expect:
+    drug: erlotinib
+    signal: true
+- input:
+    prr: 0.5
+  expect:
+    signal: false
+    drug: erlotinib
+- input: {}
+  expect:
+    drug: erlotinib
+    signal: false
+- input:
+    prr: 4.999
+  expect:
+    expected_prr: 5.9
+    action: monitor
+    signal: false
+    drug: erlotinib
+    harm_type: B
+- input:
+    prr: 5.001
+  expect:
+    action: investigate
+    expected_prr: 5.9
+    drug: erlotinib
+    harm_type: B
+    signal: true
+interface: null
+primitive_signature: null

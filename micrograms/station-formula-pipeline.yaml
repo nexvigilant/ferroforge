@@ -1,0 +1,74 @@
+name: station-formula-pipeline
+description: 'Route formula computations: signal strength, flywheel velocity, domain distance'
+version: 0.1.0
+tree:
+  start: check_type
+  nodes:
+    signal:
+      type: return
+      value:
+        priority: moderate
+        action: route
+        reason: Signal strength formula — feed to signal-theory pipeline
+        route: signal_detection
+    check_flywheel:
+      type: condition
+      variable: formula_type
+      operator: eq
+      value: flywheel_velocity
+      true_next: flywheel
+      false_next: generic
+    check_type:
+      type: condition
+      variable: formula_type
+      operator: eq
+      value: signal_strength
+      true_next: signal
+      false_next: check_flywheel
+    flywheel:
+      type: return
+      value:
+        reason: Flywheel velocity — feed to session health metrics
+        action: route
+        route: session_metrics
+        priority: moderate
+    generic:
+      type: return
+      value:
+        reason: Generic formula computation — return result
+        priority: low
+        action: compute
+        route: archive
+tests:
+- input:
+    formula_type: signal_strength
+  expect:
+    priority: moderate
+    route: signal_detection
+    action: route
+- input:
+    formula_type: flywheel_velocity
+  expect:
+    action: route
+    priority: moderate
+    route: session_metrics
+- input:
+    formula_type: domain_distance
+  expect:
+    route: archive
+    priority: low
+    action: compute
+- input: {}
+  expect:
+    reason: Generic formula computation — return result
+    priority: low
+    action: compute
+    route: archive
+- input: {}
+  expect:
+    priority: low
+    action: compute
+    reason: Generic formula computation — return result
+    route: archive
+interface: null
+primitive_signature: null

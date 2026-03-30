@@ -1,0 +1,209 @@
+name: fda-sponsor-ind-safety
+description: "FDA sponsor IND safety reporting assessment: determines reporting obligation from event characteristics per FDA Guidance 'Sponsor Responsibilities - Safety Reporting Requirements and Safety Assessment for IND and BA/BE Studies' (2025) and 21 CFR 312.32"
+version: 0.1.0
+interface:
+  inputs:
+    suspected_adverse_reaction:
+      type: bool
+      required: true
+      description: "Whether there is a reasonable possibility the drug caused the event"
+    serious:
+      type: bool
+      required: true
+      description: "Whether the event meets serious criteria per 21 CFR 312.32(a)"
+    unexpected:
+      type: bool
+      required: true
+      description: "Whether the event is not listed in the Investigator Brochure"
+    fatal_or_life_threatening:
+      type: bool
+      required: false
+      description: "Whether the event resulted in death or was life-threatening"
+    study_type:
+      type: string
+      required: false
+      description: "Type of study: ind, ba_be, ba_be_ind_exempt"
+  outputs:
+    reporting_required:
+      type: bool
+    report_type:
+      type: string
+    timeline_days:
+      type: int
+    notification_recipients:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_sar
+  nodes:
+    check_sar:
+      type: condition
+      variable: suspected_adverse_reaction
+      operator: eq
+      value: true
+      true_next: sar_serious_check
+      false_next: not_sar
+
+    not_sar:
+      type: return
+      value:
+        reporting_required: false
+        report_type: "NONE"
+        timeline_days: 0
+        notification_recipients: "N/A"
+        regulatory_reference: "21 CFR 312.32(c) - only suspected adverse reactions require IND safety reports"
+
+    sar_serious_check:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: serious_unexpected_check
+      false_next: nonserious_sar
+
+    nonserious_sar:
+      type: return
+      value:
+        reporting_required: false
+        report_type: "ANNUAL_REPORT"
+        timeline_days: 365
+        notification_recipients: "Include in IND Annual Report (21 CFR 312.33)"
+        regulatory_reference: "21 CFR 312.33; FDA Guidance: Sponsor Responsibilities (2025), Section III.A"
+
+    serious_unexpected_check:
+      type: condition
+      variable: unexpected
+      operator: eq
+      value: true
+      true_next: susar_fatal_check
+      false_next: serious_expected
+
+    serious_expected:
+      type: return
+      value:
+        reporting_required: false
+        report_type: "ANNUAL_REPORT"
+        timeline_days: 365
+        notification_recipients: "Include in IND Annual Report; update IB if frequency changes"
+        regulatory_reference: "21 CFR 312.32(c) - serious expected SARs reported in annual report; FDA Guidance (2025), Section III.B"
+
+    susar_fatal_check:
+      type: condition
+      variable: fatal_or_life_threatening
+      operator: eq
+      value: true
+      true_next: susar_7day
+      false_next: susar_study_type_check
+
+    susar_7day:
+      type: return
+      value:
+        reporting_required: true
+        report_type: "IND_SAFETY_7DAY"
+        timeline_days: 7
+        notification_recipients: "FDA + all participating investigators + IRBs"
+        regulatory_reference: "21 CFR 312.32(c)(2); FDA Guidance: Sponsor Responsibilities (2025), Section IV.A"
+
+    susar_study_type_check:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: "ba_be_ind_exempt"
+      true_next: susar_ba_be_exempt
+      false_next: susar_15day
+
+    susar_15day:
+      type: return
+      value:
+        reporting_required: true
+        report_type: "IND_SAFETY_15DAY"
+        timeline_days: 15
+        notification_recipients: "FDA + all participating investigators + IRBs"
+        regulatory_reference: "21 CFR 312.32(c)(1); FDA Guidance: Sponsor Responsibilities (2025), Section IV.B"
+
+    susar_ba_be_exempt:
+      type: return
+      value:
+        reporting_required: true
+        report_type: "BA_BE_EXEMPT_SAFETY"
+        timeline_days: 15
+        notification_recipients: "FDA via ESG electronic submission"
+        regulatory_reference: "FDA Guidance: Electronic Submission of Expedited Safety Reports From IND-Exempt BA/BE Studies (2024)"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(→, κ) — IND safety reporting routed by causality assessment and seriousness classification'
+  primes: ['σ', '→', 'κ', '∂']
+  arguments: ['suspected_adverse_reaction', 'serious', 'unexpected', 'fatal_or_life_threatening']
+
+tests:
+# SUSAR fatal -> 7-day
+- input:
+    suspected_adverse_reaction: true
+    serious: true
+    unexpected: true
+    fatal_or_life_threatening: true
+    study_type: "ind"
+  expect:
+    reporting_required: true
+    report_type: "IND_SAFETY_7DAY"
+    timeline_days: 7
+
+# SUSAR non-fatal -> 15-day
+- input:
+    suspected_adverse_reaction: true
+    serious: true
+    unexpected: true
+    fatal_or_life_threatening: false
+    study_type: "ind"
+  expect:
+    reporting_required: true
+    report_type: "IND_SAFETY_15DAY"
+    timeline_days: 15
+
+# SUSAR in IND-exempt BA/BE
+- input:
+    suspected_adverse_reaction: true
+    serious: true
+    unexpected: true
+    fatal_or_life_threatening: false
+    study_type: "ba_be_ind_exempt"
+  expect:
+    reporting_required: true
+    report_type: "BA_BE_EXEMPT_SAFETY"
+    timeline_days: 15
+
+# Serious expected SAR -> annual report
+- input:
+    suspected_adverse_reaction: true
+    serious: true
+    unexpected: false
+    fatal_or_life_threatening: false
+  expect:
+    reporting_required: false
+    report_type: "ANNUAL_REPORT"
+
+# Non-serious SAR -> annual report
+- input:
+    suspected_adverse_reaction: true
+    serious: false
+    unexpected: false
+  expect:
+    reporting_required: false
+    report_type: "ANNUAL_REPORT"
+
+# Not a suspected adverse reaction -> no report
+- input:
+    suspected_adverse_reaction: false
+    serious: true
+    unexpected: true
+  expect:
+    reporting_required: false
+    report_type: "NONE"
+
+# Empty input
+- input: {}
+  expect:
+    reporting_required: false
+    report_type: "NONE"

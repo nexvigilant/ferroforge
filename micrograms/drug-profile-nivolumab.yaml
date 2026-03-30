@@ -1,0 +1,62 @@
+name: drug-profile-nivolumab
+description: 'Safety triage for nivolumab: PRR-based signal routing (Type B)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    no_signal:
+      type: return
+      value:
+        signal: false
+        drug: nivolumab
+        action: monitor
+        expected_prr: 7.3
+        harm_type: B
+    signal:
+      type: return
+      value:
+        expected_prr: 7.3
+        action: investigate
+        harm_type: B
+        drug: nivolumab
+        signal: true
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5.0
+      true_next: signal
+      false_next: no_signal
+tests:
+- input:
+    prr: 7.3
+  expect:
+    signal: true
+    drug: nivolumab
+- input:
+    prr: 0.5
+  expect:
+    drug: nivolumab
+    signal: false
+- input: {}
+  expect:
+    signal: false
+    drug: nivolumab
+- input:
+    prr: 4.999
+  expect:
+    drug: nivolumab
+    harm_type: B
+    action: monitor
+    expected_prr: 7.3
+    signal: false
+- input:
+    prr: 5.001
+  expect:
+    action: investigate
+    drug: nivolumab
+    harm_type: B
+    expected_prr: 7.3
+    signal: true
+interface: null
+primitive_signature: null

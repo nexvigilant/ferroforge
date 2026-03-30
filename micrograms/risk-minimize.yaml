@@ -1,0 +1,83 @@
+name: risk-minimize
+description: "Develop risk minimization strategy based on identified risks"
+version: 0.1.0
+tree:
+  start: validate_risk
+  nodes:
+    validate_risk:
+      type: condition
+      variable: risk_identified
+      operator: eq
+      value: true
+      true_next: check_risk_level
+      false_next: minimization_unknown
+    check_risk_level:
+      type: condition
+      variable: risk_level
+      operator: eq
+      value: "high"
+      true_next: intensive_minimization
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: risk_level
+      operator: eq
+      value: "moderate"
+      true_next: standard_minimization
+      false_next: routine_minimization
+    intensive_minimization:
+      type: return
+      value:
+        minimization_strategy: "risk_management_plan"
+        elements: "label_update,healthcare_provider_education,patient_support_program"
+        monitoring_plan: "intensive"
+        review_frequency_months: 3
+        minimization_compliant: true
+    standard_minimization:
+      type: return
+      value:
+        minimization_strategy: "enhanced_monitoring"
+        elements: "label_update,routine_monitoring"
+        monitoring_plan: "standard"
+        review_frequency_months: 6
+        minimization_compliant: true
+    routine_minimization:
+      type: return
+      value:
+        minimization_strategy: "routine_pharmacovigilance"
+        elements: "standard_monitoring"
+        monitoring_plan: "routine"
+        review_frequency_months: 12
+        minimization_compliant: true
+    minimization_unknown:
+      type: return
+      value:
+        minimization_strategy: null
+        elements: null
+        monitoring_plan: null
+        review_frequency_months: null
+        minimization_compliant: false
+tests:
+- input:
+    risk_identified: true
+    risk_level: "high"
+  expect:
+    minimization_strategy: "risk_management_plan"
+    monitoring_plan: "intensive"
+    review_frequency_months: 3
+- input:
+    risk_identified: true
+    risk_level: "moderate"
+  expect:
+    minimization_strategy: "enhanced_monitoring"
+    review_frequency_months: 6
+- input:
+    risk_identified: true
+    risk_level: "low"
+  expect:
+    minimization_strategy: "routine_pharmacovigilance"
+    review_frequency_months: 12
+- input: {}
+  expect:
+    minimization_strategy: null
+    minimization_compliant: false

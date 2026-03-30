@@ -1,0 +1,87 @@
+{
+  "domain": "cybercinetics.nexvigilant.com",
+  "private": false,
+  "copyright": "\u00a9 2026 NexVigilant, LLC.",
+  "title": "Cybercinetics Feedback Controller",
+  "description": "Typed feedback-controlled kinetic governance \u2014 \u2202(\u2192(\u03bd, \u03c2, \u03c1)). Controller tick, registry health, and batch decay for hook-binary binding loops. Pure Rust via nexcore-cybercinetics.",
+  "proxy": "rust-native",
+  "tools": [
+    {
+      "name": "controller_tick",
+      "description": "Run one tick of the feedback controller. Evaluates frequency decay (\u03bd), causal chain fidelity (\u2192), and recursion saturation (\u03c1) to produce a verdict: STABLE, FREQ_DECAY, FIDELITY_DEGRADED, RECURSION_SATURATED, or COMPOUND.",
+      "parameters": [
+        { "name": "nu_rate", "type": "number", "description": "Current measured frequency (Hz or iterations/sec)", "required": true },
+        { "name": "nu_floor", "type": "number", "description": "Minimum acceptable frequency before decay verdict", "required": true },
+        { "name": "rho_ceiling", "type": "integer", "description": "Maximum recursion depth (default: 3)", "required": false },
+        { "name": "f_min", "type": "number", "description": "Minimum fidelity threshold for causal chain (default: 0.80)", "required": false },
+        { "name": "rho_depth", "type": "integer", "description": "Current recursion depth (default: 0)", "required": false },
+        {
+          "name": "causal_links",
+          "type": "array",
+          "description": "Array of {cause, effect, fidelity} objects forming the causal chain",
+          "required": false,
+          "items": {
+            "type": "object",
+            "properties": {
+              "cause": { "type": "string" },
+              "effect": { "type": "string" },
+              "fidelity": { "type": "number" }
+            }
+          }
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "verdict": { "type": "string" },
+          "stable": { "type": "boolean" },
+          "nu": { "type": "object" },
+          "rho": { "type": "object" },
+          "arrow": { "type": "object" }
+        },
+        "required": ["status", "verdict", "stable"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "registry_status",
+      "description": "Report hook-binary binding registry health. Shows aggregate fidelity and flags degraded bindings below threshold.",
+      "parameters": [
+        { "name": "bindings", "type": "array", "description": "Array of {hook, event, fidelity} binding objects", "required": true },
+        { "name": "degraded_threshold", "type": "number", "description": "Fidelity threshold below which bindings are flagged (default: 0.80)", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "total_bindings": { "type": "integer" },
+          "aggregate_fidelity": { "type": "number" },
+          "degraded_count": { "type": "integer" },
+          "degraded_bindings": { "type": "array" }
+        },
+        "required": ["status", "total_bindings", "aggregate_fidelity"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "decay_all",
+      "description": "Batch degrade all bindings that missed their execution window. Returns count of bindings degraded.",
+      "parameters": [
+        { "name": "bindings", "type": "array", "description": "Array of {hook, event, fidelity} binding objects", "required": true },
+        { "name": "factor", "type": "number", "description": "Degradation multiplier 0.0-1.0 (e.g., 0.9 = 10% degradation)", "required": true },
+        { "name": "floor", "type": "number", "description": "Minimum fidelity floor (bindings at or below floor are not degraded)", "required": true }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "degraded_count": { "type": "integer" },
+          "bindings_after": { "type": "array" }
+        },
+        "required": ["status", "degraded_count"]
+      },
+      "annotations": { "readOnlyHint": false, "destructiveHint": false }
+    }
+  ]
+}

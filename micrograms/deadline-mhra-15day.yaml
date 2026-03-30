@@ -1,0 +1,83 @@
+name: deadline-mhra-15day
+description: "Calculate MHRA (UK) 15-day serious adverse event reporting deadline"
+version: 0.1.0
+tree:
+  start: validate_event
+  nodes:
+    validate_event:
+      type: condition
+      variable: event_date
+      operator: is_not_null
+      value: null
+      true_next: check_seriousness
+      false_next: deadline_unknown
+    check_seriousness:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_unexpectedness
+      false_next: routine_deadline
+    check_unexpectedness:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: serious_unexpected_deadline
+      false_next: serious_expected_deadline
+    serious_unexpected_deadline:
+      type: return
+      value:
+        reporting_deadline_days: 15
+        event_category: "serious_unexpected_adverse_reaction"
+        regulatory_requirement: "MHRA_Yellow_Card"
+        urgent_submission: true
+        regulatory_compliant: true
+    serious_expected_deadline:
+      type: return
+      value:
+        reporting_deadline_days: 30
+        event_category: "serious_expected_adverse_reaction"
+        regulatory_requirement: "MHRA_Yellow_Card"
+        urgent_submission: false
+        regulatory_compliant: true
+    routine_deadline:
+      type: return
+      value:
+        reporting_deadline_days: 30
+        event_category: "non_serious"
+        regulatory_requirement: "MHRA_Yellow_Card"
+        urgent_submission: false
+        regulatory_compliant: true
+    deadline_unknown:
+      type: return
+      value:
+        reporting_deadline_days: null
+        event_category: null
+        regulatory_requirement: null
+        urgent_submission: null
+        regulatory_compliant: false
+tests:
+- input:
+    event_date: "2024-01-15"
+    is_serious: true
+    is_unexpected: true
+  expect:
+    reporting_deadline_days: 15
+    urgent_submission: true
+- input:
+    event_date: "2024-01-15"
+    is_serious: true
+    is_unexpected: false
+  expect:
+    reporting_deadline_days: 30
+    event_category: "serious_expected_adverse_reaction"
+- input:
+    event_date: "2024-01-15"
+    is_serious: false
+  expect:
+    reporting_deadline_days: 30
+- input: {}
+  expect:
+    reporting_deadline_days: null
+    regulatory_compliant: false

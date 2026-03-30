@@ -1,0 +1,62 @@
+name: drug-profile-vemurafenib
+description: 'Safety triage for vemurafenib: PRR-based signal routing (Type B)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    no_signal:
+      type: return
+      value:
+        expected_prr: 7.5
+        harm_type: B
+        action: monitor
+        drug: vemurafenib
+        signal: false
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5.0
+      true_next: signal
+      false_next: no_signal
+    signal:
+      type: return
+      value:
+        expected_prr: 7.5
+        harm_type: B
+        signal: true
+        drug: vemurafenib
+        action: investigate
+tests:
+- input:
+    prr: 7.5
+  expect:
+    drug: vemurafenib
+    signal: true
+- input:
+    prr: 0.5
+  expect:
+    drug: vemurafenib
+    signal: false
+- input: {}
+  expect:
+    signal: false
+    drug: vemurafenib
+- input:
+    prr: 4.999
+  expect:
+    expected_prr: 7.5
+    signal: false
+    harm_type: B
+    action: monitor
+    drug: vemurafenib
+- input:
+    prr: 5.001
+  expect:
+    harm_type: B
+    expected_prr: 7.5
+    drug: vemurafenib
+    action: investigate
+    signal: true
+interface: null
+primitive_signature: null

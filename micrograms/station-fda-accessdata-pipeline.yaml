@@ -1,0 +1,96 @@
+name: station-fda-accessdata-pipeline
+description: 'Triage FDA Accessdata results: route approvals, orange book, REMS by regulatory significance'
+version: 0.1.0
+tree:
+  start: check_source
+  nodes:
+    orange_book:
+      type: return
+      value:
+        route: archive
+        priority: low
+        action: reference
+        reason: Orange Book data — patent/exclusivity reference
+    check_approval:
+      type: condition
+      variable: data_type
+      operator: eq
+      value: approval
+      true_next: approval_path
+      false_next: orange_book
+    rems_path:
+      type: return
+      value:
+        route: risk_management
+        priority: high
+        action: escalate
+        reason: REMS program data — restricted distribution with safety requirements
+    check_source:
+      type: condition
+      variable: data_type
+      operator: eq
+      value: rems
+      true_next: rems_path
+      false_next: check_approval
+    accelerated_approval:
+      type: return
+      value:
+        priority: high
+        reason: Accelerated approval — postmarket commitments required, enhanced monitoring
+        action: flag
+        route: pmr_tracking
+    standard_approval:
+      type: return
+      value:
+        route: archive
+        priority: low
+        action: reference
+        reason: Standard approval — baseline safety profile established
+    approval_path:
+      type: condition
+      variable: accelerated
+      operator: eq
+      value: true
+      true_next: accelerated_approval
+      false_next: standard_approval
+tests:
+- input:
+    data_type: rems
+  expect:
+    route: risk_management
+    action: escalate
+    priority: high
+- input:
+    accelerated: true
+    data_type: approval
+  expect:
+    priority: high
+    action: flag
+    route: pmr_tracking
+- input:
+    data_type: approval
+    accelerated: false
+  expect:
+    action: reference
+    route: archive
+    priority: low
+- input:
+    data_type: orange_book
+  expect:
+    action: reference
+    route: archive
+    priority: low
+- input: {}
+  expect:
+    action: reference
+    priority: low
+    reason: Orange Book data — patent/exclusivity reference
+    route: archive
+- input: {}
+  expect:
+    priority: low
+    route: archive
+    reason: Orange Book data — patent/exclusivity reference
+    action: reference
+interface: null
+primitive_signature: null

@@ -1,0 +1,88 @@
+name: psur-section-router
+description: "Route content to appropriate PSUR section (executive summary, safety overview, etc.)"
+version: 0.1.0
+tree:
+  start: validate_content_type
+  nodes:
+    validate_content_type:
+      type: condition
+      variable: content_category
+      operator: is_not_null
+      value: null
+      true_next: check_content_category
+      false_next: section_unknown
+    check_content_category:
+      type: condition
+      variable: content_category
+      operator: eq
+      value: "executive_summary"
+      true_next: summary_section
+      false_next: check_safety_overview
+    check_safety_overview:
+      type: condition
+      variable: content_category
+      operator: eq
+      value: "safety_overview"
+      true_next: overview_section
+      false_next: check_signal_evaluation
+    check_signal_evaluation:
+      type: condition
+      variable: content_category
+      operator: eq
+      value: "signal_evaluation"
+      true_next: signal_section
+      false_next: other_section
+    summary_section:
+      type: return
+      value:
+        psur_section: "section_1_executive_summary"
+        required_content: "key_findings,major_changes"
+        page_limit: "2_to_3_pages"
+        psur_compliant: true
+    overview_section:
+      type: return
+      value:
+        psur_section: "section_2_safety_overview"
+        required_content: "summary_of_safety_profile,new_information"
+        page_limit: "5_to_10_pages"
+        psur_compliant: true
+    signal_section:
+      type: return
+      value:
+        psur_section: "section_3_signal_evaluation"
+        required_content: "identified_signals,investigations_results"
+        page_limit: "no_limit"
+        psur_compliant: true
+    other_section:
+      type: return
+      value:
+        psur_section: "section_other"
+        required_content: "supporting_data"
+        page_limit: "flexible"
+        psur_compliant: true
+    section_unknown:
+      type: return
+      value:
+        psur_section: null
+        required_content: null
+        page_limit: null
+        psur_compliant: false
+tests:
+- input:
+    content_category: "executive_summary"
+  expect:
+    psur_section: "section_1_executive_summary"
+    page_limit: "2_to_3_pages"
+- input:
+    content_category: "safety_overview"
+  expect:
+    psur_section: "section_2_safety_overview"
+    page_limit: "5_to_10_pages"
+- input:
+    content_category: "signal_evaluation"
+  expect:
+    psur_section: "section_3_signal_evaluation"
+- input: {}
+  expect:
+    psur_section: null
+    psur_compliant: false

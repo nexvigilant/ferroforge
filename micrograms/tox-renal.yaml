@@ -1,0 +1,91 @@
+name: tox-renal
+description: 'Renal toxicity gate: creatinine_ratio thresholds for kidney'
+version: 0.1.0
+tree:
+  start: check_severe
+  nodes:
+    normal:
+      type: return
+      value:
+        action: continue
+        organ: renal
+        severity: normal
+        target: kidney
+    severe:
+      type: return
+      value:
+        target: kidney
+        action: discontinue
+        organ: renal
+        severity: severe
+    check_mild:
+      type: condition
+      variable: creatinine_ratio
+      operator: gte
+      value: 1.5
+      true_next: mild
+      false_next: normal
+    mild:
+      type: return
+      value:
+        severity: mild
+        organ: renal
+        action: monitor_closely
+        target: kidney
+    check_severe:
+      type: condition
+      variable: creatinine_ratio
+      operator: gte
+      value: 3.0
+      true_next: severe
+      false_next: check_mild
+tests:
+- input:
+    creatinine_ratio: 4.0
+  expect:
+    organ: renal
+    severity: severe
+- input:
+    creatinine_ratio: 1.5
+  expect:
+    organ: renal
+    severity: mild
+- input:
+    creatinine_ratio: 0
+  expect:
+    severity: normal
+    organ: renal
+- input: {}
+  expect:
+    organ: renal
+    severity: normal
+- input:
+    creatinine_ratio: 1.499
+  expect:
+    action: continue
+    target: kidney
+    severity: normal
+    organ: renal
+- input:
+    creatinine_ratio: 1.501
+  expect:
+    organ: renal
+    target: kidney
+    severity: mild
+    action: monitor_closely
+- input:
+    creatinine_ratio: 2.999
+  expect:
+    severity: mild
+    action: monitor_closely
+    target: kidney
+    organ: renal
+- input:
+    creatinine_ratio: 3.001
+  expect:
+    target: kidney
+    organ: renal
+    severity: severe
+    action: discontinue
+interface: null
+primitive_signature: null

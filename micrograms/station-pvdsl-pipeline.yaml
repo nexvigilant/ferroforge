@@ -1,0 +1,77 @@
+name: station-pvdsl-pipeline
+description: 'Route PVDSL compilation results: parse errors, evaluation, and function coverage'
+version: 0.1.0
+tree:
+  start: check_parse
+  nodes:
+    success:
+      type: return
+      value:
+        reason: PVDSL compiles and evaluates — expression valid
+        route: archive
+        action: certify
+        priority: low
+    eval_error:
+      type: return
+      value:
+        reason: PVDSL parses but evaluation fails — runtime error in function
+        route: runtime_debug
+        action: debug
+        priority: moderate
+    parse_error:
+      type: return
+      value:
+        action: fix
+        reason: PVDSL parse failure — syntax error in expression
+        route: syntax_repair
+        priority: high
+    check_parse:
+      type: condition
+      variable: parse_success
+      operator: eq
+      value: true
+      true_next: check_eval
+      false_next: parse_error
+    check_eval:
+      type: condition
+      variable: eval_success
+      operator: eq
+      value: true
+      true_next: success
+      false_next: eval_error
+tests:
+- input:
+    parse_success: false
+    eval_success: false
+  expect:
+    priority: high
+    route: syntax_repair
+    action: fix
+- input:
+    eval_success: false
+    parse_success: true
+  expect:
+    priority: moderate
+    route: runtime_debug
+    action: debug
+- input:
+    eval_success: true
+    parse_success: true
+  expect:
+    action: certify
+    priority: low
+    route: archive
+- input: {}
+  expect:
+    reason: PVDSL parse failure — syntax error in expression
+    route: syntax_repair
+    action: fix
+    priority: high
+- input: {}
+  expect:
+    priority: high
+    action: fix
+    route: syntax_repair
+    reason: PVDSL parse failure — syntax error in expression
+interface: null
+primitive_signature: null

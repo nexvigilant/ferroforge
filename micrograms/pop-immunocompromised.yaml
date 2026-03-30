@@ -1,0 +1,71 @@
+name: pop-immunocompromised
+description: Immunocompromised — infection risk
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    at_risk:
+      type: return
+      value:
+        population: immunocompromised
+        action: special_monitoring
+        reason: Immunocompromised — infection risk
+        at_risk: true
+    standard:
+      type: return
+      value:
+        at_risk: false
+        action: standard_care
+        population: immunocompromised
+    check:
+      type: condition
+      variable: cd4_count
+      operator: lte
+      value: 200
+      true_next: at_risk
+      false_next: standard
+tests:
+- input:
+    cd4_count: 200
+  expect:
+    at_risk: true
+    population: immunocompromised
+- input: {}
+  expect:
+    population: immunocompromised
+    at_risk: false
+- input:
+    cd4_count: 0
+  expect:
+    population: immunocompromised
+    action: special_monitoring
+    at_risk: true
+    reason: Immunocompromised — infection risk
+- input:
+    cd4_count: -1
+  expect:
+    action: special_monitoring
+    at_risk: true
+    population: immunocompromised
+    reason: Immunocompromised — infection risk
+- input:
+    cd4_count: 199
+  expect:
+    at_risk: true
+    population: immunocompromised
+    action: special_monitoring
+    reason: Immunocompromised — infection risk
+- input:
+    cd4_count: 201
+  expect:
+    population: immunocompromised
+    action: standard_care
+    at_risk: false
+- input:
+    cd4_count: 20000
+  expect:
+    population: immunocompromised
+    at_risk: false
+    action: standard_care
+interface: null
+primitive_signature: null

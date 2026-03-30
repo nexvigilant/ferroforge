@@ -1,0 +1,136 @@
+name: station-chemivigilance-pipeline
+description: 'Triage molecular safety screening: classify structural alerts, toxicity predictions, and similarity flags'
+version: 0.1.0
+tree:
+  start: check_alerts
+  nodes:
+    high_alerts:
+      type: return
+      value:
+        priority: critical
+        action: halt
+        reason: 3+ structural alerts — high probability of reactive metabolite formation
+        route: chemistry_review
+    check_tox:
+      type: condition
+      variable: predicted_toxicity
+      operator: eq
+      value: high
+      true_next: tox_flag
+      false_next: check_similarity
+    tox_flag:
+      type: return
+      value:
+        reason: High predicted toxicity — in silico flag requires in vitro confirmation
+        route: toxicology_review
+        action: investigate
+        priority: high
+    check_similarity:
+      type: condition
+      variable: similar_to_withdrawn
+      operator: eq
+      value: true
+      true_next: withdrawn_similar
+      false_next: clean
+    withdrawn_similar:
+      type: return
+      value:
+        priority: high
+        reason: Structurally similar to withdrawn drug — investigate shared liability
+        action: flag
+        route: sar_analysis
+    clean:
+      type: return
+      value:
+        route: archive
+        priority: low
+        action: pass
+        reason: Clean molecular safety profile — no structural alerts or flags
+    check_alerts:
+      type: condition
+      variable: structural_alert_count
+      operator: gte
+      value: 3
+      true_next: high_alerts
+      false_next: check_tox
+tests:
+- input:
+    similar_to_withdrawn: true
+    predicted_toxicity: high
+    structural_alert_count: 5
+  expect:
+    route: chemistry_review
+    action: halt
+    priority: critical
+- input:
+    predicted_toxicity: high
+    structural_alert_count: 1
+    similar_to_withdrawn: false
+  expect:
+    action: investigate
+    route: toxicology_review
+    priority: high
+- input:
+    predicted_toxicity: low
+    similar_to_withdrawn: true
+    structural_alert_count: 0
+  expect:
+    priority: high
+    route: sar_analysis
+    action: flag
+- input:
+    structural_alert_count: 0
+    similar_to_withdrawn: false
+    predicted_toxicity: low
+  expect:
+    action: pass
+    priority: low
+    route: archive
+- input: {}
+  expect:
+    reason: Clean molecular safety profile — no structural alerts or flags
+    route: archive
+    action: pass
+    priority: low
+- input: {}
+  expect:
+    reason: Clean molecular safety profile — no structural alerts or flags
+    priority: low
+    action: pass
+    route: archive
+- input:
+    structural_alert_count: -1
+  expect:
+    reason: Clean molecular safety profile — no structural alerts or flags
+    priority: low
+    route: archive
+    action: pass
+- input:
+    structural_alert_count: 2
+  expect:
+    priority: low
+    action: pass
+    route: archive
+    reason: Clean molecular safety profile — no structural alerts or flags
+- input:
+    structural_alert_count: 4
+  expect:
+    action: halt
+    route: chemistry_review
+    reason: 3+ structural alerts — high probability of reactive metabolite formation
+    priority: critical
+- input:
+    structural_alert_count: 300
+  expect:
+    reason: 3+ structural alerts — high probability of reactive metabolite formation
+    priority: critical
+    route: chemistry_review
+    action: halt
+- input: {}
+  expect:
+    priority: low
+    action: pass
+    route: archive
+    reason: Clean molecular safety profile — no structural alerts or flags
+interface: null
+primitive_signature: null

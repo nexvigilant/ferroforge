@@ -1,0 +1,122 @@
+name: station-algovigilance-pipeline
+description: 'Triage algorithmovigilance signals: classify AI/ML drift, bias, and performance degradation'
+version: 0.1.0
+tree:
+  start: check_drift
+  nodes:
+    bias_alert:
+      type: return
+      value:
+        route: bias_audit
+        action: investigate
+        reason: Algorithmic bias detected — fairness audit required before continued use
+        priority: high
+    healthy:
+      type: return
+      value:
+        reason: No drift or bias detected — algorithm performing within parameters
+        route: archive
+        action: certify
+        priority: low
+    drift_severity:
+      type: condition
+      variable: drift_psi
+      operator: gte
+      value: 0.25
+      true_next: severe_drift
+      false_next: mild_drift
+    severe_drift:
+      type: return
+      value:
+        route: model_retrain
+        reason: PSI≥0.25 — significant distribution shift, model output unreliable
+        priority: critical
+        action: halt
+    mild_drift:
+      type: return
+      value:
+        action: monitor
+        reason: Drift detected but PSI<0.25 — monitor for acceleration
+        priority: moderate
+        route: drift_monitoring
+    check_bias:
+      type: condition
+      variable: bias_detected
+      operator: eq
+      value: true
+      true_next: bias_alert
+      false_next: healthy
+    check_drift:
+      type: condition
+      variable: drift_detected
+      operator: eq
+      value: true
+      true_next: drift_severity
+      false_next: check_bias
+tests:
+- input:
+    bias_detected: false
+    drift_detected: true
+    drift_psi: 0.4
+  expect:
+    action: halt
+    priority: critical
+    route: model_retrain
+- input:
+    bias_detected: false
+    drift_detected: true
+    drift_psi: 0.15
+  expect:
+    action: monitor
+    route: drift_monitoring
+    priority: moderate
+- input:
+    bias_detected: true
+    drift_detected: false
+    drift_psi: 0.0
+  expect:
+    action: investigate
+    priority: high
+    route: bias_audit
+- input:
+    drift_detected: false
+    bias_detected: false
+    drift_psi: 0.0
+  expect:
+    action: certify
+    priority: low
+    route: archive
+- input:
+    drift_psi: 0.249
+  expect:
+    route: archive
+    action: certify
+    priority: low
+    reason: No drift or bias detected — algorithm performing within parameters
+- input:
+    drift_psi: 0.251
+  expect:
+    reason: No drift or bias detected — algorithm performing within parameters
+    priority: low
+    action: certify
+    route: archive
+- input: {}
+  expect:
+    action: certify
+    reason: No drift or bias detected — algorithm performing within parameters
+    priority: low
+    route: archive
+- input: {}
+  expect:
+    action: certify
+    reason: No drift or bias detected — algorithm performing within parameters
+    route: archive
+    priority: low
+- input: {}
+  expect:
+    priority: low
+    action: certify
+    route: archive
+    reason: No drift or bias detected — algorithm performing within parameters
+interface: null
+primitive_signature: null

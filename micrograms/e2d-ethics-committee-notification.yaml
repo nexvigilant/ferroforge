@@ -1,0 +1,194 @@
+name: e2d-ethics-committee-notification
+description: 'ICH E2D Section 4.2: Determines whether a post-approval serious unexpected ADR requires notification to ethics committees and investigators'
+version: 0.1.0
+interface:
+  inputs:
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+    ongoing_study_involvement:
+      type: bool
+      required: false
+    is_fatal:
+      type: bool
+      required: false
+    is_life_threatening:
+      type: bool
+      required: false
+  outputs:
+    notify_ethics_committee:
+      type: bool
+    notify_investigators:
+      type: bool
+    notification_type:
+      type: string
+    notification_deadline_days:
+      type: int
+    regulatory_reference:
+      type: string
+tree:
+  start: check_serious
+  nodes:
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_unexpected
+      false_next: return_no_notification
+    check_unexpected:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: check_study_involvement
+      false_next: return_no_notification_expected
+    check_study_involvement:
+      type: condition
+      variable: ongoing_study_involvement
+      operator: eq
+      value: true
+      true_next: check_fatal_or_lt
+      false_next: return_no_study
+    check_fatal_or_lt:
+      type: condition
+      variable: is_fatal
+      operator: eq
+      value: true
+      true_next: return_urgent_7_day
+      false_next: check_lt
+    check_lt:
+      type: condition
+      variable: is_life_threatening
+      operator: eq
+      value: true
+      true_next: return_urgent_7_day
+      false_next: return_standard_15_day
+    return_urgent_7_day:
+      type: return
+      value:
+        notify_ethics_committee: true
+        notify_investigators: true
+        notification_type: URGENT_SAFETY_INFORMATION
+        notification_deadline_days: 7
+        regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators
+    return_standard_15_day:
+      type: return
+      value:
+        notify_ethics_committee: true
+        notify_investigators: true
+        notification_type: EXPEDITED_SAFETY_REPORT
+        notification_deadline_days: 15
+        regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators
+    return_no_study:
+      type: return
+      value:
+        notify_ethics_committee: false
+        notify_investigators: false
+        notification_type: NO_NOTIFICATION_NO_STUDY
+        notification_deadline_days: 0
+        regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators
+    return_no_notification:
+      type: return
+      value:
+        notify_ethics_committee: false
+        notify_investigators: false
+        notification_type: NO_NOTIFICATION_NON_SERIOUS
+        notification_deadline_days: 0
+        regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators
+    return_no_notification_expected:
+      type: return
+      value:
+        notify_ethics_committee: false
+        notify_investigators: false
+        notification_type: NO_NOTIFICATION_EXPECTED_REACTION
+        notification_deadline_days: 0
+        regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — ethics committee and investigator notification trigger per ICH E2D Section 4.2'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['is_serious', 'is_unexpected', 'ongoing_study_involvement', 'is_fatal', 'is_life_threatening']
+tests:
+- input:
+    is_serious: true
+    is_unexpected: true
+    ongoing_study_involvement: true
+    is_fatal: true
+    is_life_threatening: false
+  expect:
+    notify_ethics_committee: true
+    notify_investigators: true
+    notification_type: URGENT_SAFETY_INFORMATION
+    notification_deadline_days: 7
+    regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators
+- input:
+    is_serious: true
+    is_unexpected: true
+    ongoing_study_involvement: true
+    is_fatal: false
+    is_life_threatening: true
+  expect:
+    notify_ethics_committee: true
+    notify_investigators: true
+    notification_type: URGENT_SAFETY_INFORMATION
+    notification_deadline_days: 7
+    regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators
+- input:
+    is_serious: true
+    is_unexpected: true
+    ongoing_study_involvement: true
+    is_fatal: false
+    is_life_threatening: false
+  expect:
+    notify_ethics_committee: true
+    notify_investigators: true
+    notification_type: EXPEDITED_SAFETY_REPORT
+    notification_deadline_days: 15
+    regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators
+- input:
+    is_serious: true
+    is_unexpected: true
+    ongoing_study_involvement: false
+    is_fatal: true
+    is_life_threatening: false
+  expect:
+    notify_ethics_committee: false
+    notify_investigators: false
+    notification_type: NO_NOTIFICATION_NO_STUDY
+    notification_deadline_days: 0
+    regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators
+- input:
+    is_serious: false
+    is_unexpected: true
+    ongoing_study_involvement: true
+    is_fatal: false
+    is_life_threatening: false
+  expect:
+    notify_ethics_committee: false
+    notify_investigators: false
+    notification_type: NO_NOTIFICATION_NON_SERIOUS
+    notification_deadline_days: 0
+    regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators
+- input:
+    is_serious: true
+    is_unexpected: false
+    ongoing_study_involvement: true
+    is_fatal: true
+    is_life_threatening: false
+  expect:
+    notify_ethics_committee: false
+    notify_investigators: false
+    notification_type: NO_NOTIFICATION_EXPECTED_REACTION
+    notification_deadline_days: 0
+    regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators
+- input: {}
+  expect:
+    notify_ethics_committee: false
+    notify_investigators: false
+    notification_type: NO_NOTIFICATION_NON_SERIOUS
+    notification_deadline_days: 0
+    regulatory_reference: ICH E2D Section 4.2 - Reporting to Ethics Committees and Investigators

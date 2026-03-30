@@ -1,0 +1,74 @@
+name: timeline-who-15day
+description: WHO 15-day reporting
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    not_due:
+      type: return
+      value:
+        report_type: expedited
+        jurisdiction: WHO
+        action: schedule
+        due: false
+    check:
+      type: condition
+      variable: days_to_deadline
+      operator: lte
+      value: 15
+      true_next: due
+      false_next: not_due
+    due:
+      type: return
+      value:
+        action: submit
+        report_type: expedited
+        due: true
+        jurisdiction: WHO
+tests:
+- input:
+    days_to_deadline: 15
+  expect:
+    jurisdiction: WHO
+    due: true
+- input: {}
+  expect:
+    due: false
+    jurisdiction: WHO
+- input:
+    days_to_deadline: 0
+  expect:
+    report_type: expedited
+    action: submit
+    jurisdiction: WHO
+    due: true
+- input:
+    days_to_deadline: -1
+  expect:
+    report_type: expedited
+    jurisdiction: WHO
+    action: submit
+    due: true
+- input:
+    days_to_deadline: 14
+  expect:
+    action: submit
+    jurisdiction: WHO
+    due: true
+    report_type: expedited
+- input:
+    days_to_deadline: 16
+  expect:
+    jurisdiction: WHO
+    action: schedule
+    report_type: expedited
+    due: false
+- input:
+    days_to_deadline: 1500
+  expect:
+    due: false
+    action: schedule
+    jurisdiction: WHO
+    report_type: expedited
+interface: null
+primitive_signature: null

@@ -1,0 +1,67 @@
+name: trend-cluster-geographic
+description: Geographic case cluster
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: geo_concentration
+      operator: gte
+      value: 50
+      true_next: detected
+      false_next: not_detected
+    not_detected:
+      type: return
+      value:
+        action: continue_monitoring
+        pattern: geo_cluster
+        detected: false
+    detected:
+      type: return
+      value:
+        detected: true
+        action: investigate
+        pattern: geo_cluster
+tests:
+- input:
+    geo_concentration: 50
+  expect:
+    detected: true
+    pattern: geo_cluster
+- input: {}
+  expect:
+    pattern: geo_cluster
+    detected: false
+- input:
+    geo_concentration: 0
+  expect:
+    action: continue_monitoring
+    pattern: geo_cluster
+    detected: false
+- input:
+    geo_concentration: -1
+  expect:
+    pattern: geo_cluster
+    detected: false
+    action: continue_monitoring
+- input:
+    geo_concentration: 49
+  expect:
+    action: continue_monitoring
+    pattern: geo_cluster
+    detected: false
+- input:
+    geo_concentration: 51
+  expect:
+    action: investigate
+    detected: true
+    pattern: geo_cluster
+- input:
+    geo_concentration: 5000
+  expect:
+    pattern: geo_cluster
+    detected: true
+    action: investigate
+interface: null
+primitive_signature: null

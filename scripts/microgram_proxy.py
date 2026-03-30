@@ -3,21 +3,20 @@
 NexVigilant Microgram Proxy — Decision Tree Executor
 
 Routes MCP tool calls to the rsk binary for microgram and chain execution.
-Sub-microsecond PV logic: signal classification, causality, seriousness, regulatory action.
+Uses rsk_pool for path caching and pre-validated binary.
 
 Usage:
     echo '{"tool": "run-prr-signal", "arguments": {"prr": 8.5}}' | python3 microgram_proxy.py
 """
 
 import json
-import subprocess
-import sys
-from pathlib import Path
-
 import os
-RSK_BINARY = Path(os.environ.get("RSK_BINARY", str(Path.home() / "Projects" / "rsk-core" / "target" / "release" / "rsk")))
-MCG_DIR = Path(os.environ.get("MCG_DIR", str(Path.home() / "Projects" / "rsk-core" / "rsk" / "micrograms")))
-CHAINS_DIR = Path(os.environ.get("CHAINS_DIR", str(Path.home() / "Projects" / "rsk-core" / "rsk" / "chains")))
+import sys
+
+# Ensure sibling imports work regardless of cwd
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from rsk_pool import run_single, run_chain, run_chain_file, catalog, CHAINS_DIR
 
 # ---------------------------------------------------------------------------
 # Chain definitions: tool name → chain spec
@@ -26,87 +25,76 @@ CHAINS_DIR = Path(os.environ.get("CHAINS_DIR", str(Path.home() / "Projects" / "r
 CHAIN_TOOLS = {
     "run-pv-signal-to-action": {
         "chain": "prr-signal -> signal-to-causality -> naranjo-quick -> causality-to-action",
-        "accumulate": True,
     },
     "run-case-assessment-pipeline": {
         "chain": "case-validity -> case-seriousness -> signal-to-causality -> naranjo-quick -> causality-to-action",
-        "accumulate": True,
     },
     "run-benefit-risk-assessment": {
         "chain": "benefit-risk-gate -> benefit-risk-ratio",
-        "accumulate": True,
     },
-    # Tier 1: Station-integration chains (designed to consume Station tool outputs)
     "run-station-dailymed-pipeline": {
         "chain": "config-dailymed-adr-risk -> adapt-risk-tier -> signal-to-causality",
-        "accumulate": True,
     },
     "run-station-pubmed-pipeline": {
         "chain": "config-pubmed-signal-strength -> adapt-evidence-to-signal -> signal-to-causality",
-        "accumulate": True,
     },
     "run-station-openvigil-pipeline": {
         "chain": "config-openvigil-triage -> adapt-signal-strength -> signal-to-causality",
-        "accumulate": True,
     },
     "run-station-trial-pipeline": {
         "chain": "config-trial-sae-triage -> adapt-safety-concern -> signal-to-causality",
-        "accumulate": True,
     },
     "run-station-drugbank-pipeline": {
         "chain": "config-drugbank-ddi-gate -> adapt-interaction-severity -> signal-to-causality",
-        "accumulate": True,
     },
     "run-station-rxnav-pipeline": {
         "chain": "config-rxnav-interaction-severity -> adapt-interaction-severity -> signal-to-causality",
-        "accumulate": True,
     },
     "run-station-recall-pipeline": {
         "chain": "config-fda-recall-severity -> adapt-risk-tier -> signal-to-causality",
-        "accumulate": True,
     },
-    # Tier 2: Core clinical decision chains
     "run-seriousness-to-deadline": {
         "chain": "case-seriousness -> transform-seriousness-to-bool",
-        "accumulate": True,
     },
     "run-adr-severity-escalation": {
         "chain": "adr-severity -> escalation-router",
-        "accumulate": True,
     },
     "run-confidence-deadline": {
         "chain": "confidence-gate -> deadline-alert",
-        "accumulate": True,
     },
     "run-investigation-prioritization": {
         "chain": "transbeyesian-propagator -> eig-priority-ranker",
-        "accumulate": True,
     },
     "run-signal-deep-validation": {
         "chain": "multi-signal-combiner -> signal-validation-gate -> signal-trend-detector -> signal-recurrence-detector",
-        "accumulate": True,
     },
     "run-bradford-hill-evidence": {
         "chain": "signal-comparator -> dose-response-classifier -> naranjo-quick",
-        "accumulate": True,
     },
     "run-bradford-hill-multi-criterion": {
         "chain": "temporal-association -> signal-comparator -> dose-response-classifier -> rechallenge-evaluator -> naranjo-quick",
-        "accumulate": True,
     },
-    # Helix Computing chains
     "run-helix-system-health": {
         "chain": "heligram -> crystalbook-4primitive -> crystalbook-8law",
-        "accumulate": True,
     },
-    # Guardian SOTA Tracker
     "run-sota-drift-detection": {
         "chain": "sota-domain-classifier -> sota-frontier-check -> drift-alert-classifier",
-        "accumulate": True,
     },
     "run-sota-pubmed-pipeline": {
         "chain": "sota-pubmed-triage -> sota-domain-classifier -> sota-frontier-check -> drift-alert-classifier",
-        "accumulate": True,
+    },
+    "run-signal-consensus-to-action": {
+        "chain_file": "signal-consensus-to-action",
+    },
+    # Spanish grammar chains
+    "run-caso-clinico-espanol": {
+        "chain_file": "caso-clinico-espanol",
+    },
+    "run-gramatica-causalidad-espanola": {
+        "chain_file": "gramatica-causalidad-espanola",
+    },
+    "run-presente-desambiguacion": {
+        "chain_file": "presente-desambiguacion",
     },
 }
 
@@ -124,103 +112,16 @@ SINGLE_TOOLS = {
     "run-ich-e1-population-exposure": "ich-e1-population-exposure",
     "run-heligram": "heligram",
     "run-sota-authority-decompose": "sota-authority-decompose",
+    "run-disproportionality-consensus": "disproportionality-consensus",
 }
-
-
-def run_single(microgram: str, input_json: dict) -> dict:
-    """Execute a single microgram via rsk mcg run."""
-    mcg_path = MCG_DIR / f"{microgram}.yaml"
-    if not mcg_path.exists():
-        return {"status": "error", "message": f"Microgram not found: {microgram}"}
-
-    cmd = [
-        str(RSK_BINARY), "mcg", "run",
-        "-i", json.dumps(input_json),
-        str(mcg_path),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-
-    if result.returncode != 0:
-        return {"status": "error", "message": result.stderr.strip()[:500]}
-
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return {"status": "error", "message": f"Invalid JSON output: {result.stdout[:200]}"}
-
-
-def run_chain(spec: dict, input_json: dict) -> dict:
-    """Execute a microgram chain via rsk mcg chain."""
-    if "chain_file" in spec:
-        # Read chain YAML to extract steps, then run as inline chain
-        import yaml  # noqa: E402 — deferred import, only needed for chain files
-        chain_path = CHAINS_DIR / f"{spec['chain_file']}.yaml"
-        if not chain_path.exists():
-            return {"status": "error", "message": f"Chain file not found: {spec['chain_file']}"}
-        with open(chain_path) as f:
-            chain_def = yaml.safe_load(f)
-        steps = chain_def.get("steps", [])
-        if not steps:
-            return {"status": "error", "message": f"No steps in chain: {spec['chain_file']}"}
-        chain_str = " -> ".join(steps)
-        mcg_dir = chain_path.parent / chain_def.get("micrograms_dir", "../micrograms")
-        cmd = [
-            str(RSK_BINARY), "mcg", "chain",
-            "-i", json.dumps(input_json),
-            "-d", str(mcg_dir.resolve()),
-            "--accumulate",
-            chain_str,
-        ]
-    else:
-        # Inline chain spec
-        cmd = [
-            str(RSK_BINARY), "mcg", "chain",
-            "-i", json.dumps(input_json),
-            "-d", str(MCG_DIR),
-        ]
-        if spec.get("accumulate"):
-            cmd.append("--accumulate")
-        cmd.append(spec["chain"])
-
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-
-    if result.returncode != 0:
-        return {"status": "error", "message": result.stderr.strip()[:500]}
-
-    try:
-        return json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return {"status": "error", "message": f"Invalid JSON output: {result.stdout[:200]}"}
-
-
-def list_micrograms() -> dict:
-    """List available micrograms via rsk mcg catalog."""
-    cmd = [str(RSK_BINARY), "mcg", "catalog", str(MCG_DIR)]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-
-    if result.returncode != 0:
-        return {"status": "error", "message": result.stderr.strip()[:500]}
-
-    try:
-        data = json.loads(result.stdout)
-        entries = data.get("entries", [])
-        return {
-            "status": "ok",
-            "micrograms": data.get("total_micrograms", len(entries)),
-            "total_tests": data.get("total_tests", 0),
-            "all_pass": data.get("all_pass", False),
-            "catalog": entries,
-        }
-    except json.JSONDecodeError:
-        return {"status": "ok", "micrograms": 0, "catalog": []}
 
 
 def list_chains() -> dict:
     """List available chain files."""
+    import yaml
     chains = []
     for f in sorted(CHAINS_DIR.glob("*.yaml")):
         try:
-            import yaml
             with open(f) as fh:
                 data = yaml.safe_load(fh)
             chains.append({
@@ -230,18 +131,20 @@ def list_chains() -> dict:
             })
         except Exception:
             chains.append({"name": f.stem, "description": "", "steps": []})
-
     return {"status": "ok", "chains": chains}
 
 
 def dispatch(tool: str, args: dict) -> dict:
     """Route tool call to the correct handler."""
     if tool in CHAIN_TOOLS:
-        return run_chain(CHAIN_TOOLS[tool], args)
+        spec = CHAIN_TOOLS[tool]
+        if "chain_file" in spec:
+            return run_chain_file(spec["chain_file"], args)
+        return run_chain(spec["chain"], args, accumulate=True)
     elif tool in SINGLE_TOOLS:
         return run_single(SINGLE_TOOLS[tool], args)
     elif tool == "list-micrograms":
-        return list_micrograms()
+        return catalog()
     elif tool == "list-chains":
         return list_chains()
     else:

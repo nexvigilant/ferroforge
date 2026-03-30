@@ -1,0 +1,71 @@
+name: pop-pediatric-neonate
+description: Neonatal safety — immature metabolism
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: age_days
+      operator: lte
+      value: 28
+      true_next: at_risk
+      false_next: standard
+    at_risk:
+      type: return
+      value:
+        action: special_monitoring
+        at_risk: true
+        reason: Neonatal safety — immature metabolism
+        population: pediatric-neonate
+    standard:
+      type: return
+      value:
+        at_risk: false
+        population: pediatric-neonate
+        action: standard_care
+tests:
+- input:
+    age_days: 28
+  expect:
+    population: pediatric-neonate
+    at_risk: true
+- input: {}
+  expect:
+    at_risk: false
+    population: pediatric-neonate
+- input:
+    age_days: 0
+  expect:
+    reason: Neonatal safety — immature metabolism
+    action: special_monitoring
+    at_risk: true
+    population: pediatric-neonate
+- input:
+    age_days: -1
+  expect:
+    population: pediatric-neonate
+    at_risk: true
+    reason: Neonatal safety — immature metabolism
+    action: special_monitoring
+- input:
+    age_days: 27
+  expect:
+    population: pediatric-neonate
+    at_risk: true
+    action: special_monitoring
+    reason: Neonatal safety — immature metabolism
+- input:
+    age_days: 29
+  expect:
+    population: pediatric-neonate
+    at_risk: false
+    action: standard_care
+- input:
+    age_days: 2800
+  expect:
+    at_risk: false
+    population: pediatric-neonate
+    action: standard_care
+interface: null
+primitive_signature: null

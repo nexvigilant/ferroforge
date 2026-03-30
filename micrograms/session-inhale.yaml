@@ -1,0 +1,365 @@
+name: session-inhale
+description: Start codon — assess session readiness from carry-forward state, arc position, helix debt, and active bonds. Produces a breathing assessment and session purpose recommendation.
+version: 0.1.0
+primitive_signature:
+  dominant: 'ς'
+  expression: 'ς(σ(arc) + π(carry) + ν(helix) + ∂(bonds)) — measures session state from four intake channels'
+  primes: ['ς', 'σ', 'π', 'ν', '∂']
+  arguments: ['sessions_today', 'carry_forward_hours', 'sessions_since_helix', 'active_bonds', 'last_verdict_score']
+  chain_prediction: 'Inhale measures readiness. Chains to session-kpi-score at session end for the full breath cycle.'
+interface:
+  inputs:
+    sessions_today:
+      type: int
+      required: true
+      description: "Sessions already completed today (0 = first session)"
+    carry_forward_hours:
+      type: int
+      required: true
+      description: "Hours since last carry-forward was written (0 = fresh, 999 = none exists)"
+    sessions_since_helix:
+      type: int
+      required: true
+      description: "Sessions since last helix turn (0 = just did one)"
+    active_bonds:
+      type: int
+      required: true
+      description: "Dangling bonds less than 48h old (TODO/BLOCKED/TBD in active artifacts)"
+    last_verdict_score:
+      type: int
+      required: true
+      description: "Last session verdict: 3=fully, 2=partially, 1=not, 0=unmeasured"
+  outputs:
+    arc_phase:
+      type: string
+      description: "DREAM / REALIZE / CRITIQUE"
+    airway:
+      type: string
+      description: "CLEAR / RESTRICTED / OBSTRUCTED"
+    helix_due:
+      type: string
+      description: "YES / NO"
+    tidal_volume:
+      type: string
+      description: "FULL / PARTIAL / SHALLOW — how much context to load"
+    recommendation:
+      type: string
+      description: "What this session should do"
+    law_v:
+      type: string
+      description: "OK / EXCEEDED — sessions today vs 5 limit"
+tree:
+  start: check_inputs
+  nodes:
+    check_inputs:
+      type: condition
+      variable: sessions_today
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: compute_arc
+
+    reject:
+      type: return
+      value:
+        arc_phase: UNKNOWN
+        airway: OBSTRUCTED
+        helix_due: UNKNOWN
+        tidal_volume: SHALLOW
+        recommendation: "All 5 inputs required."
+        law_v: UNKNOWN
+
+    # ── Arc Position ────────────────────────────────────
+    compute_arc:
+      type: condition
+      variable: sessions_today
+      operator: lte
+      value: 0
+      true_next: arc_dream
+      false_next: arc_mod_check
+
+    arc_dream:
+      type: condition
+      variable: sessions_since_helix
+      operator: gte
+      value: 10
+      true_next: helix_due_dream
+      false_next: check_bonds_dream
+
+    helix_due_dream:
+      type: condition
+      variable: active_bonds
+      operator: gte
+      value: 3
+      true_next: obstructed_helix_bonds
+      false_next: restricted_helix
+
+    obstructed_helix_bonds:
+      type: return
+      value:
+        arc_phase: DREAM
+        airway: OBSTRUCTED
+        helix_due: YES
+        tidal_volume: SHALLOW
+        recommendation: "Helix turn overdue AND active bonds. Run /helix first, then pair bonds. Do not start new work."
+        law_v: OK
+
+    restricted_helix:
+      type: return
+      value:
+        arc_phase: DREAM
+        airway: RESTRICTED
+        helix_due: YES
+        tidal_volume: PARTIAL
+        recommendation: "Helix turn overdue. Run /helix 5-point checklist before starting new work."
+        law_v: OK
+
+    check_bonds_dream:
+      type: condition
+      variable: active_bonds
+      operator: gte
+      value: 3
+      true_next: restricted_bonds_dream
+      false_next: clear_dream
+
+    restricted_bonds_dream:
+      type: return
+      value:
+        arc_phase: DREAM
+        airway: RESTRICTED
+        helix_due: NO
+        tidal_volume: PARTIAL
+        recommendation: "Active bonds need pairing before starting new DREAM work. Run /pair-bonds."
+        law_v: OK
+
+    clear_dream:
+      type: condition
+      variable: carry_forward_hours
+      operator: lte
+      value: 48
+      true_next: dream_with_carry
+      false_next: dream_fresh
+
+    dream_with_carry:
+      type: return
+      value:
+        arc_phase: DREAM
+        airway: CLEAR
+        helix_due: NO
+        tidal_volume: FULL
+        recommendation: "Fresh carry-forward available. Load it and continue the thread."
+        law_v: OK
+
+    dream_fresh:
+      type: return
+      value:
+        arc_phase: DREAM
+        airway: CLEAR
+        helix_due: NO
+        tidal_volume: FULL
+        recommendation: "Clean slate. Decompose, measure, plan."
+        law_v: OK
+
+    # ── Arc modulo routing ──────────────────────────────
+    arc_mod_check:
+      type: condition
+      variable: sessions_today
+      operator: gte
+      value: 6
+      true_next: law_v_exceeded
+      false_next: arc_mod_1
+
+    law_v_exceeded:
+      type: condition
+      variable: last_verdict_score
+      operator: gte
+      value: 2
+      true_next: exceeded_productive
+      false_next: exceeded_stalled
+
+    exceeded_productive:
+      type: return
+      value:
+        arc_phase: CRITIQUE
+        airway: RESTRICTED
+        helix_due: NO
+        tidal_volume: SHALLOW
+        recommendation: "Law V exceeded but last session was productive. If continuing, make it a CRITIQUE — verify and close."
+        law_v: EXCEEDED
+
+    exceeded_stalled:
+      type: return
+      value:
+        arc_phase: CRITIQUE
+        airway: OBSTRUCTED
+        helix_due: NO
+        tidal_volume: SHALLOW
+        recommendation: "Law V exceeded and last session underdelivered. Stop. Rest enables the next DREAM."
+        law_v: EXCEEDED
+
+    # sessions 1-2: check mod 3
+    arc_mod_1:
+      type: condition
+      variable: sessions_today
+      operator: lte
+      value: 1
+      true_next: arc_realize
+      false_next: arc_mod_2
+
+    arc_mod_2:
+      type: condition
+      variable: sessions_today
+      operator: lte
+      value: 2
+      true_next: arc_critique
+      false_next: arc_dream_2
+
+    arc_realize:
+      type: condition
+      variable: carry_forward_hours
+      operator: lte
+      value: 48
+      true_next: realize_with_carry
+      false_next: realize_no_carry
+
+    realize_with_carry:
+      type: return
+      value:
+        arc_phase: REALIZE
+        airway: CLEAR
+        helix_due: NO
+        tidal_volume: FULL
+        recommendation: "REALIZE phase with carry-forward. Build, implement, wire."
+        law_v: OK
+
+    realize_no_carry:
+      type: return
+      value:
+        arc_phase: REALIZE
+        airway: CLEAR
+        helix_due: NO
+        tidal_volume: PARTIAL
+        recommendation: "REALIZE phase but no recent carry-forward. Check what the DREAM session planned."
+        law_v: OK
+
+    arc_critique:
+      type: return
+      value:
+        arc_phase: CRITIQUE
+        airway: CLEAR
+        helix_due: NO
+        tidal_volume: PARTIAL
+        recommendation: "CRITIQUE phase. Verify, exhale, close loops. Do not start new work."
+        law_v: OK
+
+    arc_dream_2:
+      type: return
+      value:
+        arc_phase: DREAM
+        airway: CLEAR
+        helix_due: NO
+        tidal_volume: FULL
+        recommendation: "New triplet arc begins. Decompose, measure, plan."
+        law_v: OK
+
+tests:
+# ── First session, clean state
+- input:
+    sessions_today: 0
+    carry_forward_hours: 999
+    sessions_since_helix: 5
+    active_bonds: 0
+    last_verdict_score: 3
+  expect:
+    arc_phase: DREAM
+    airway: CLEAR
+    tidal_volume: FULL
+    law_v: OK
+
+# ── First session with carry-forward
+- input:
+    sessions_today: 0
+    carry_forward_hours: 12
+    sessions_since_helix: 5
+    active_bonds: 0
+    last_verdict_score: 3
+  expect:
+    arc_phase: DREAM
+    airway: CLEAR
+    tidal_volume: FULL
+
+# ── Helix overdue
+- input:
+    sessions_today: 0
+    carry_forward_hours: 999
+    sessions_since_helix: 379
+    active_bonds: 0
+    last_verdict_score: 2
+  expect:
+    arc_phase: DREAM
+    airway: RESTRICTED
+    helix_due: YES
+
+# ── Helix overdue + active bonds = obstructed
+- input:
+    sessions_today: 0
+    carry_forward_hours: 999
+    sessions_since_helix: 50
+    active_bonds: 5
+    last_verdict_score: 1
+  expect:
+    arc_phase: DREAM
+    airway: OBSTRUCTED
+    helix_due: YES
+
+# ── Second session = REALIZE
+- input:
+    sessions_today: 1
+    carry_forward_hours: 2
+    sessions_since_helix: 3
+    active_bonds: 0
+    last_verdict_score: 3
+  expect:
+    arc_phase: REALIZE
+    airway: CLEAR
+    law_v: OK
+
+# ── Third session = CRITIQUE
+- input:
+    sessions_today: 2
+    carry_forward_hours: 5
+    sessions_since_helix: 3
+    active_bonds: 0
+    last_verdict_score: 3
+  expect:
+    arc_phase: CRITIQUE
+    law_v: OK
+
+# ── Law V exceeded, productive
+- input:
+    sessions_today: 7
+    carry_forward_hours: 1
+    sessions_since_helix: 3
+    active_bonds: 0
+    last_verdict_score: 3
+  expect:
+    arc_phase: CRITIQUE
+    airway: RESTRICTED
+    law_v: EXCEEDED
+
+# ── Law V exceeded, stalled
+- input:
+    sessions_today: 8
+    carry_forward_hours: 100
+    sessions_since_helix: 3
+    active_bonds: 0
+    last_verdict_score: 0
+  expect:
+    arc_phase: CRITIQUE
+    airway: OBSTRUCTED
+    law_v: EXCEEDED
+
+# ── Missing input
+- input: {}
+  expect:
+    airway: OBSTRUCTED

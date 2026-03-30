@@ -1,0 +1,43 @@
+name: age-adult
+description: "Adult age classifier. Identifies subjects aged 18-64 years."
+version: 0.1.0
+tree:
+  start: check_lower_bound
+  nodes:
+    check_lower_bound:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 18
+      true_next: check_upper_bound
+      false_next: not_adult
+    check_upper_bound:
+      type: condition
+      variable: age_years
+      operator: lte
+      value: 64
+      true_next: is_adult
+      false_next: not_adult
+    is_adult:
+      type: return
+      value:
+        age_group: adult
+        age_range: "18-64 years"
+        category: working_age
+        normal_dosing: true
+    not_adult:
+      type: return
+      value:
+        age_group: other
+        is_adult: false
+tests:
+  - input: { age_years: 35 }
+    expect: { age_group: adult, category: working_age }
+  - input: { age_years: 18 }
+    expect: { age_group: adult }
+  - input: { age_years: 64 }
+    expect: { age_group: adult }
+  - input: { age_years: 65 }
+    expect: { age_group: other, is_adult: false }
+  - input: {}
+    expect: {}

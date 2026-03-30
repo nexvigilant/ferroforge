@@ -1,0 +1,180 @@
+name: e2d-followup-obligation
+description: 'ICH E2D Section 5: MAH follow-up obligation for incomplete serious adverse drug reaction reports — determines if active follow-up is required and the deadline'
+version: 0.1.0
+interface:
+  inputs:
+    report_complete:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+    followup_attempted:
+      type: bool
+      required: false
+    days_since_initial:
+      type: int
+      required: false
+  outputs:
+    followup_required:
+      type: bool
+    followup_action:
+      type: string
+    followup_deadline_days:
+      type: int
+    regulatory_reference:
+      type: string
+tree:
+  start: check_serious
+  nodes:
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_unexpected
+      false_next: return_no_followup
+    check_unexpected:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: check_complete
+      false_next: return_no_followup_expected
+    check_complete:
+      type: condition
+      variable: report_complete
+      operator: eq
+      value: true
+      true_next: return_complete
+      false_next: check_followup_attempted
+    check_followup_attempted:
+      type: condition
+      variable: followup_attempted
+      operator: eq
+      value: true
+      true_next: check_days_overdue
+      false_next: return_initiate_followup
+    check_days_overdue:
+      type: condition
+      variable: days_since_initial
+      operator: gte
+      value: 90
+      true_next: return_close_incomplete
+      false_next: return_continue_followup
+    return_initiate_followup:
+      type: return
+      value:
+        followup_required: true
+        followup_action: INITIATE_FOLLOWUP
+        followup_deadline_days: 30
+        regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+    return_continue_followup:
+      type: return
+      value:
+        followup_required: true
+        followup_action: CONTINUE_FOLLOWUP
+        followup_deadline_days: 30
+        regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+    return_close_incomplete:
+      type: return
+      value:
+        followup_required: false
+        followup_action: CLOSE_AS_INCOMPLETE
+        followup_deadline_days: 0
+        regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+    return_complete:
+      type: return
+      value:
+        followup_required: false
+        followup_action: NONE_REPORT_COMPLETE
+        followup_deadline_days: 0
+        regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+    return_no_followup:
+      type: return
+      value:
+        followup_required: false
+        followup_action: NONE_NON_SERIOUS
+        followup_deadline_days: 0
+        regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+    return_no_followup_expected:
+      type: return
+      value:
+        followup_required: false
+        followup_action: NONE_EXPECTED_REACTION
+        followup_deadline_days: 0
+        regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — MAH follow-up obligation gate for incomplete SUSAR reports per ICH E2D Section 5'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['report_complete', 'is_serious', 'is_unexpected', 'followup_attempted', 'days_since_initial']
+tests:
+- input:
+    is_serious: true
+    is_unexpected: true
+    report_complete: false
+    followup_attempted: false
+  expect:
+    followup_required: true
+    followup_action: INITIATE_FOLLOWUP
+    followup_deadline_days: 30
+    regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+- input:
+    is_serious: true
+    is_unexpected: true
+    report_complete: false
+    followup_attempted: true
+    days_since_initial: 45
+  expect:
+    followup_required: true
+    followup_action: CONTINUE_FOLLOWUP
+    followup_deadline_days: 30
+    regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+- input:
+    is_serious: true
+    is_unexpected: true
+    report_complete: false
+    followup_attempted: true
+    days_since_initial: 95
+  expect:
+    followup_required: false
+    followup_action: CLOSE_AS_INCOMPLETE
+    followup_deadline_days: 0
+    regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+- input:
+    is_serious: true
+    is_unexpected: true
+    report_complete: true
+  expect:
+    followup_required: false
+    followup_action: NONE_REPORT_COMPLETE
+    followup_deadline_days: 0
+    regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+- input:
+    is_serious: false
+    is_unexpected: true
+    report_complete: false
+  expect:
+    followup_required: false
+    followup_action: NONE_NON_SERIOUS
+    followup_deadline_days: 0
+    regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+- input:
+    is_serious: true
+    is_unexpected: false
+    report_complete: false
+  expect:
+    followup_required: false
+    followup_action: NONE_EXPECTED_REACTION
+    followup_deadline_days: 0
+    regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+- input: {}
+  expect:
+    followup_required: false
+    followup_action: NONE_NON_SERIOUS
+    followup_deadline_days: 0
+    regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports

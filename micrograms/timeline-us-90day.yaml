@@ -1,0 +1,74 @@
+name: timeline-us-90day
+description: US 90-day periodic
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    not_due:
+      type: return
+      value:
+        report_type: periodic
+        jurisdiction: US
+        due: false
+        action: schedule
+    check:
+      type: condition
+      variable: days_to_deadline
+      operator: lte
+      value: 90
+      true_next: due
+      false_next: not_due
+    due:
+      type: return
+      value:
+        report_type: periodic
+        jurisdiction: US
+        action: submit
+        due: true
+tests:
+- input:
+    days_to_deadline: 90
+  expect:
+    jurisdiction: US
+    due: true
+- input: {}
+  expect:
+    jurisdiction: US
+    due: false
+- input:
+    days_to_deadline: 0
+  expect:
+    action: submit
+    report_type: periodic
+    jurisdiction: US
+    due: true
+- input:
+    days_to_deadline: -1
+  expect:
+    jurisdiction: US
+    action: submit
+    report_type: periodic
+    due: true
+- input:
+    days_to_deadline: 89
+  expect:
+    jurisdiction: US
+    action: submit
+    due: true
+    report_type: periodic
+- input:
+    days_to_deadline: 91
+  expect:
+    report_type: periodic
+    jurisdiction: US
+    due: false
+    action: schedule
+- input:
+    days_to_deadline: 9000
+  expect:
+    report_type: periodic
+    jurisdiction: US
+    action: schedule
+    due: false
+interface: null
+primitive_signature: null

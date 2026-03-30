@@ -1,0 +1,105 @@
+name: ich-m4-ctd-section
+description: "ICH M4: Route documentation content to appropriate CTD section (Module 2-5)"
+version: 0.1.0
+tree:
+  start: validate_document_type
+  nodes:
+    validate_document_type:
+      type: condition
+      variable: document_type
+      operator: is_not_null
+      value: null
+      true_next: check_document_category
+      false_next: section_unknown
+    check_document_category:
+      type: condition
+      variable: document_category
+      operator: eq
+      value: "administrative"
+      true_next: route_to_module2
+      false_next: check_chemistry
+    check_chemistry:
+      type: condition
+      variable: document_category
+      operator: eq
+      value: "chemistry"
+      true_next: route_to_module3
+      false_next: check_nonclinical
+    check_nonclinical:
+      type: condition
+      variable: document_category
+      operator: eq
+      value: "nonclinical"
+      true_next: route_to_module4
+      false_next: check_clinical
+    check_clinical:
+      type: condition
+      variable: document_category
+      operator: eq
+      value: "clinical"
+      true_next: route_to_module5
+      false_next: section_unknown
+    route_to_module2:
+      type: return
+      value:
+        ctd_module: 2
+        module_name: "summaries"
+        ctd_location: "2.1 administrative_info"
+        ich_m4_compliant: true
+    route_to_module3:
+      type: return
+      value:
+        ctd_module: 3
+        module_name: "quality"
+        ctd_location: "3.2.S chemistry"
+        ich_m4_compliant: true
+    route_to_module4:
+      type: return
+      value:
+        ctd_module: 4
+        module_name: "nonclinical"
+        ctd_location: "4.2 nonclinical_reports"
+        ich_m4_compliant: true
+    route_to_module5:
+      type: return
+      value:
+        ctd_module: 5
+        module_name: "clinical"
+        ctd_location: "5.3 clinical_reports"
+        ich_m4_compliant: true
+    section_unknown:
+      type: return
+      value:
+        ctd_module: null
+        module_name: null
+        ctd_location: null
+        ich_m4_compliant: false
+tests:
+- input:
+    document_type: "marketing_authorization"
+    document_category: "administrative"
+  expect:
+    ctd_module: 2
+    module_name: "summaries"
+- input:
+    document_type: "stability_report"
+    document_category: "chemistry"
+  expect:
+    ctd_module: 3
+    module_name: "quality"
+- input:
+    document_type: "toxicology_study"
+    document_category: "nonclinical"
+  expect:
+    ctd_module: 4
+    module_name: "nonclinical"
+- input:
+    document_type: "clinical_trial_report"
+    document_category: "clinical"
+  expect:
+    ctd_module: 5
+    module_name: "clinical"
+- input: {}
+  expect:
+    ctd_module: null
+    ich_m4_compliant: false

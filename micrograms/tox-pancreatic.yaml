@@ -1,0 +1,112 @@
+name: tox-pancreatic
+description: 'Pancreatic toxicity gate: lipase_ratio thresholds for pancreas'
+version: 0.1.0
+tree:
+  start: check_severe
+  nodes:
+    check_severe:
+      type: condition
+      variable: lipase_ratio
+      operator: gte
+      value: 5
+      true_next: severe
+      false_next: check_mild
+    severe:
+      type: return
+      value:
+        action: discontinue
+        target: pancreas
+        severity: severe
+        organ: pancreatic
+    check_mild:
+      type: condition
+      variable: lipase_ratio
+      operator: gte
+      value: 3
+      true_next: mild
+      false_next: normal
+    mild:
+      type: return
+      value:
+        organ: pancreatic
+        severity: mild
+        action: monitor_closely
+        target: pancreas
+    normal:
+      type: return
+      value:
+        severity: normal
+        action: continue
+        organ: pancreatic
+        target: pancreas
+tests:
+- input:
+    lipase_ratio: 6
+  expect:
+    severity: severe
+    organ: pancreatic
+- input:
+    lipase_ratio: 3
+  expect:
+    organ: pancreatic
+    severity: mild
+- input:
+    lipase_ratio: 0
+  expect:
+    organ: pancreatic
+    severity: normal
+- input: {}
+  expect:
+    severity: normal
+    organ: pancreatic
+- input:
+    lipase_ratio: -1
+  expect:
+    organ: pancreatic
+    severity: normal
+    action: continue
+    target: pancreas
+- input:
+    lipase_ratio: 4
+  expect:
+    action: monitor_closely
+    severity: mild
+    organ: pancreatic
+    target: pancreas
+- input:
+    lipase_ratio: 500
+  expect:
+    organ: pancreatic
+    severity: severe
+    action: discontinue
+    target: pancreas
+- input:
+    lipase_ratio: -1
+  expect:
+    action: continue
+    organ: pancreatic
+    severity: normal
+    target: pancreas
+- input:
+    lipase_ratio: 2
+  expect:
+    organ: pancreatic
+    target: pancreas
+    action: continue
+    severity: normal
+- input:
+    lipase_ratio: 4
+  expect:
+    target: pancreas
+    organ: pancreatic
+    action: monitor_closely
+    severity: mild
+- input:
+    lipase_ratio: 300
+  expect:
+    target: pancreas
+    organ: pancreatic
+    severity: severe
+    action: discontinue
+interface: null
+primitive_signature: null

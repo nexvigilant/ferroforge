@@ -1,0 +1,202 @@
+name: e2d-signal-communication
+description: 'ICH E2D Section 7: Determines the regulatory communication action required when a safety signal is identified post-approval — from routine PSUR inclusion to urgent Dear Healthcare Professional letter'
+version: 0.1.0
+interface:
+  inputs:
+    signal_strength:
+      type: string
+      required: false
+    affects_labeling:
+      type: bool
+      required: false
+    imminent_patient_risk:
+      type: bool
+      required: false
+    signal_confirmed:
+      type: bool
+      required: false
+    authority_notified:
+      type: bool
+      required: false
+  outputs:
+    communication_action:
+      type: string
+    urgency:
+      type: string
+    deadline_days:
+      type: int
+    regulatory_reference:
+      type: string
+tree:
+  start: check_imminent_risk
+  nodes:
+    check_imminent_risk:
+      type: condition
+      variable: imminent_patient_risk
+      operator: eq
+      value: true
+      true_next: return_urgent_dhpc
+      false_next: check_confirmed
+    check_confirmed:
+      type: condition
+      variable: signal_confirmed
+      operator: eq
+      value: true
+      true_next: check_labeling
+      false_next: check_strength
+    check_labeling:
+      type: condition
+      variable: affects_labeling
+      operator: eq
+      value: true
+      true_next: return_label_update
+      false_next: check_authority_notified
+    check_authority_notified:
+      type: condition
+      variable: authority_notified
+      operator: eq
+      value: true
+      true_next: return_psur_inclusion
+      false_next: return_notify_authority
+    check_strength:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: strong
+      true_next: return_expedited_signal
+      false_next: check_strength_moderate
+    check_strength_moderate:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: moderate
+      true_next: return_enhanced_monitoring
+      false_next: return_routine_monitoring
+    return_urgent_dhpc:
+      type: return
+      value:
+        communication_action: DEAR_HCP_LETTER
+        urgency: URGENT
+        deadline_days: 7
+        regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+    return_label_update:
+      type: return
+      value:
+        communication_action: LABEL_UPDATE_VARIATION
+        urgency: HIGH
+        deadline_days: 15
+        regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+    return_notify_authority:
+      type: return
+      value:
+        communication_action: NOTIFY_REGULATORY_AUTHORITY
+        urgency: HIGH
+        deadline_days: 15
+        regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+    return_psur_inclusion:
+      type: return
+      value:
+        communication_action: PSUR_SIGNAL_SECTION
+        urgency: STANDARD
+        deadline_days: 90
+        regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+    return_expedited_signal:
+      type: return
+      value:
+        communication_action: EXPEDITED_SIGNAL_REPORT
+        urgency: HIGH
+        deadline_days: 15
+        regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+    return_enhanced_monitoring:
+      type: return
+      value:
+        communication_action: ENHANCED_MONITORING_PSUR
+        urgency: STANDARD
+        deadline_days: 90
+        regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+    return_routine_monitoring:
+      type: return
+      value:
+        communication_action: ROUTINE_PSUR_MONITORING
+        urgency: LOW
+        deadline_days: 180
+        regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — safety signal communication action router per ICH E2D Section 7'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['signal_strength', 'affects_labeling', 'imminent_patient_risk', 'signal_confirmed', 'authority_notified']
+tests:
+- input:
+    imminent_patient_risk: true
+    signal_confirmed: true
+    affects_labeling: true
+    authority_notified: false
+  expect:
+    communication_action: DEAR_HCP_LETTER
+    urgency: URGENT
+    deadline_days: 7
+    regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+- input:
+    imminent_patient_risk: false
+    signal_confirmed: true
+    affects_labeling: true
+    authority_notified: false
+  expect:
+    communication_action: LABEL_UPDATE_VARIATION
+    urgency: HIGH
+    deadline_days: 15
+    regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+- input:
+    imminent_patient_risk: false
+    signal_confirmed: true
+    affects_labeling: false
+    authority_notified: false
+  expect:
+    communication_action: NOTIFY_REGULATORY_AUTHORITY
+    urgency: HIGH
+    deadline_days: 15
+    regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+- input:
+    imminent_patient_risk: false
+    signal_confirmed: true
+    affects_labeling: false
+    authority_notified: true
+  expect:
+    communication_action: PSUR_SIGNAL_SECTION
+    urgency: STANDARD
+    deadline_days: 90
+    regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+- input:
+    imminent_patient_risk: false
+    signal_confirmed: false
+    signal_strength: strong
+  expect:
+    communication_action: EXPEDITED_SIGNAL_REPORT
+    urgency: HIGH
+    deadline_days: 15
+    regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+- input:
+    imminent_patient_risk: false
+    signal_confirmed: false
+    signal_strength: moderate
+  expect:
+    communication_action: ENHANCED_MONITORING_PSUR
+    urgency: STANDARD
+    deadline_days: 90
+    regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+- input:
+    imminent_patient_risk: false
+    signal_confirmed: false
+    signal_strength: weak
+  expect:
+    communication_action: ROUTINE_PSUR_MONITORING
+    urgency: LOW
+    deadline_days: 180
+    regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+- input: {}
+  expect:
+    communication_action: ROUTINE_PSUR_MONITORING
+    urgency: LOW
+    deadline_days: 180
+    regulatory_reference: ICH E2D Section 7 - Safety Signal Communication

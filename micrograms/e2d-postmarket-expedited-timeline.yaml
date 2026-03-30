@@ -1,0 +1,206 @@
+name: e2d-postmarket-expedited-timeline
+description: 'ICH E2D Section 4.1: Post-approval expedited reporting timeline for serious unexpected adverse drug reactions — 7-day for fatal/life-threatening, 15-day for other serious unexpected'
+version: 0.1.0
+interface:
+  inputs:
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+    is_fatal:
+      type: bool
+      required: false
+    is_life_threatening:
+      type: bool
+      required: false
+    study_type:
+      type: string
+      required: false
+  outputs:
+    deadline_days:
+      type: int
+    report_type:
+      type: string
+    reporting_category:
+      type: string
+    regulatory_reference:
+      type: string
+    action_required:
+      type: bool
+tree:
+  start: check_serious
+  nodes:
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_unexpected
+      false_next: return_non_serious
+    check_unexpected:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: check_fatal
+      false_next: return_serious_expected
+    check_fatal:
+      type: condition
+      variable: is_fatal
+      operator: eq
+      value: true
+      true_next: return_7_day
+      false_next: check_life_threatening
+    check_life_threatening:
+      type: condition
+      variable: is_life_threatening
+      operator: eq
+      value: true
+      true_next: return_7_day
+      false_next: check_study_postapproval
+    check_study_postapproval:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: postapproval_study
+      true_next: return_15_day_study
+      false_next: return_15_day_spontaneous
+    return_7_day:
+      type: return
+      value:
+        deadline_days: 7
+        report_type: EXPEDITED_7_DAY
+        reporting_category: post_approval_expedited
+        regulatory_reference: ICH E2D Section 4.1 - Expedited Reporting Requirements
+        action_required: true
+    return_15_day_spontaneous:
+      type: return
+      value:
+        deadline_days: 15
+        report_type: EXPEDITED_15_DAY
+        reporting_category: post_approval_expedited
+        regulatory_reference: ICH E2D Section 4.1 - Expedited Reporting Requirements
+        action_required: true
+    return_15_day_study:
+      type: return
+      value:
+        deadline_days: 15
+        report_type: EXPEDITED_15_DAY_STUDY
+        reporting_category: post_approval_study_expedited
+        regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Reporting
+        action_required: true
+    return_serious_expected:
+      type: return
+      value:
+        deadline_days: 90
+        report_type: PERIODIC_PSUR
+        reporting_category: periodic
+        regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+        action_required: false
+    return_non_serious:
+      type: return
+      value:
+        deadline_days: 90
+        report_type: PERIODIC_LINE_LISTING
+        reporting_category: periodic
+        regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+        action_required: false
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — post-approval expedited reporting timeline gate per ICH E2D Section 4.1'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['is_serious', 'is_unexpected', 'is_fatal', 'is_life_threatening', 'study_type']
+tests:
+- input:
+    is_serious: true
+    is_unexpected: true
+    is_fatal: true
+    is_life_threatening: false
+    study_type: spontaneous
+  expect:
+    deadline_days: 7
+    report_type: EXPEDITED_7_DAY
+    reporting_category: post_approval_expedited
+    regulatory_reference: ICH E2D Section 4.1 - Expedited Reporting Requirements
+    action_required: true
+- input:
+    is_serious: true
+    is_unexpected: true
+    is_fatal: false
+    is_life_threatening: true
+    study_type: spontaneous
+  expect:
+    deadline_days: 7
+    report_type: EXPEDITED_7_DAY
+    reporting_category: post_approval_expedited
+    regulatory_reference: ICH E2D Section 4.1 - Expedited Reporting Requirements
+    action_required: true
+- input:
+    is_serious: true
+    is_unexpected: true
+    is_fatal: false
+    is_life_threatening: false
+    study_type: spontaneous
+  expect:
+    deadline_days: 15
+    report_type: EXPEDITED_15_DAY
+    reporting_category: post_approval_expedited
+    regulatory_reference: ICH E2D Section 4.1 - Expedited Reporting Requirements
+    action_required: true
+- input:
+    is_serious: true
+    is_unexpected: true
+    is_fatal: false
+    is_life_threatening: false
+    study_type: postapproval_study
+  expect:
+    deadline_days: 15
+    report_type: EXPEDITED_15_DAY_STUDY
+    reporting_category: post_approval_study_expedited
+    regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Reporting
+    action_required: true
+- input:
+    is_serious: true
+    is_unexpected: false
+    is_fatal: true
+    is_life_threatening: false
+    study_type: spontaneous
+  expect:
+    deadline_days: 90
+    report_type: PERIODIC_PSUR
+    reporting_category: periodic
+    regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+    action_required: false
+- input:
+    is_serious: false
+    is_unexpected: true
+    is_fatal: false
+    is_life_threatening: false
+    study_type: spontaneous
+  expect:
+    deadline_days: 90
+    report_type: PERIODIC_LINE_LISTING
+    reporting_category: periodic
+    regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+    action_required: false
+- input:
+    is_serious: true
+    is_unexpected: false
+    is_fatal: false
+    is_life_threatening: false
+    study_type: spontaneous
+  expect:
+    deadline_days: 90
+    report_type: PERIODIC_PSUR
+    reporting_category: periodic
+    regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+    action_required: false
+- input: {}
+  expect:
+    deadline_days: 90
+    report_type: PERIODIC_LINE_LISTING
+    reporting_category: periodic
+    regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+    action_required: false

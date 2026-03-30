@@ -1,0 +1,140 @@
+name: station-vigiaccess-pipeline
+description: Triage WHO VigiBase/VigiAccess global report data by geographic spread and volume
+version: 0.1.0
+tree:
+  start: check_total
+  nodes:
+    low_vol:
+      type: return
+      value:
+        priority: low
+        route: periodic_review
+        reason: Under 200 global VigiBase reports — insufficient for analysis
+        action: monitor
+    global_signal:
+      type: return
+      value:
+        action: escalate
+        priority: critical
+        reason: 200+ reports across 4+ WHO regions — global safety signal
+        route: signal_detection
+    check_total:
+      type: condition
+      variable: total_reports
+      operator: gte
+      value: 200
+      true_next: check_regions
+      false_next: low_vol
+    check_regions:
+      type: condition
+      variable: region_count
+      operator: gte
+      value: 4
+      true_next: global_signal
+      false_next: regional_signal
+    regional_signal:
+      type: return
+      value:
+        reason: 200+ reports in limited regions — possible reporting bias
+        priority: moderate
+        route: signal_validation
+        action: investigate
+tests:
+- input:
+    region_count: 2
+    total_reports: 80
+  expect:
+    route: periodic_review
+    action: monitor
+    priority: low
+- input:
+    region_count: 5
+    total_reports: 500
+  expect:
+    route: signal_detection
+    action: escalate
+    priority: critical
+- input:
+    region_count: 2
+    total_reports: 300
+  expect:
+    route: signal_validation
+    action: investigate
+    priority: moderate
+- input:
+    total_reports: 0
+  expect:
+    priority: low
+    reason: Under 200 global VigiBase reports — insufficient for analysis
+    route: periodic_review
+    action: monitor
+- input:
+    total_reports: -1
+  expect:
+    priority: low
+    action: monitor
+    reason: Under 200 global VigiBase reports — insufficient for analysis
+    route: periodic_review
+- input:
+    total_reports: 199
+  expect:
+    priority: low
+    route: periodic_review
+    reason: Under 200 global VigiBase reports — insufficient for analysis
+    action: monitor
+- input:
+    total_reports: 201
+  expect:
+    reason: 200+ reports in limited regions — possible reporting bias
+    action: investigate
+    route: signal_validation
+    priority: moderate
+- input:
+    total_reports: 20000
+  expect:
+    reason: 200+ reports in limited regions — possible reporting bias
+    route: signal_validation
+    priority: moderate
+    action: investigate
+- input: {}
+  expect:
+    route: periodic_review
+    priority: low
+    reason: Under 200 global VigiBase reports — insufficient for analysis
+    action: monitor
+- input:
+    region_count: 0
+  expect:
+    route: periodic_review
+    priority: low
+    reason: Under 200 global VigiBase reports — insufficient for analysis
+    action: monitor
+- input:
+    region_count: -1
+  expect:
+    reason: Under 200 global VigiBase reports — insufficient for analysis
+    priority: low
+    route: periodic_review
+    action: monitor
+- input:
+    region_count: 3
+  expect:
+    route: periodic_review
+    priority: low
+    reason: Under 200 global VigiBase reports — insufficient for analysis
+    action: monitor
+- input:
+    region_count: 400
+  expect:
+    priority: low
+    action: monitor
+    reason: Under 200 global VigiBase reports — insufficient for analysis
+    route: periodic_review
+- input: {}
+  expect:
+    action: monitor
+    priority: low
+    reason: Under 200 global VigiBase reports — insufficient for analysis
+    route: periodic_review
+interface: null
+primitive_signature: null

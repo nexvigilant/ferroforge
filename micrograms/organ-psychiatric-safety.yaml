@@ -1,0 +1,66 @@
+name: organ-psychiatric-safety
+description: "Psychiatric safety assessment. Evaluates suicide risk, psychosis, mood destabilization, and behavioral changes."
+version: 0.1.0
+tree:
+  start: check_suicidal_ideation
+  nodes:
+    check_suicidal_ideation:
+      type: condition
+      variable: has_active_suicidal_ideation
+      operator: eq
+      value: true
+      true_next: suicide_alert
+      false_next: check_psychosis_history
+    suicide_alert:
+      type: return
+      value:
+        organ: psychiatric
+        risk_level: critical
+        monitoring: intensive
+        message: "Active suicidal ideation; antidepressants require black box warning monitoring"
+    check_psychosis_history:
+      type: condition
+      variable: has_psychotic_disorder
+      operator: eq
+      value: true
+      true_next: psychosis_alert
+      false_next: check_mood_stability
+    psychosis_alert:
+      type: return
+      value:
+        organ: psychiatric
+        risk_level: high
+        psychosis_monitoring: required
+        message: "History of psychosis; psychotomimetic drugs contraindicated"
+    check_mood_stability:
+      type: condition
+      variable: has_bipolar_disorder
+      operator: eq
+      value: true
+      true_next: bipolar_alert
+      false_next: standard_dosing
+    bipolar_alert:
+      type: return
+      value:
+        organ: psychiatric
+        risk_level: high
+        mood_destabilization_risk: true
+        mood_stabilizer_required: true
+        message: "Bipolar disorder; antidepressants without mood stabilizer risk mood destabilization"
+    standard_dosing:
+      type: return
+      value:
+        organ: psychiatric
+        risk_level: low
+        psychiatric_assessment: recommended
+tests:
+  - input: { has_active_suicidal_ideation: true, has_psychotic_disorder: false, has_bipolar_disorder: false }
+    expect: { organ: psychiatric, risk_level: critical, monitoring: intensive }
+  - input: { has_active_suicidal_ideation: false, has_psychotic_disorder: true, has_bipolar_disorder: false }
+    expect: { organ: psychiatric, risk_level: high, psychosis_monitoring: required }
+  - input: { has_active_suicidal_ideation: false, has_psychotic_disorder: false, has_bipolar_disorder: true }
+    expect: { organ: psychiatric, risk_level: high, mood_destabilization_risk: true }
+  - input: { has_active_suicidal_ideation: false, has_psychotic_disorder: false, has_bipolar_disorder: false }
+    expect: { organ: psychiatric, risk_level: low }
+  - input: {}
+    expect: {}

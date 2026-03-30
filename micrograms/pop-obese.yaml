@@ -1,0 +1,70 @@
+name: pop-obese
+description: Obese — altered drug distribution
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    standard:
+      type: return
+      value:
+        action: standard_care
+        population: obese
+        at_risk: false
+    at_risk:
+      type: return
+      value:
+        population: obese
+        action: special_monitoring
+        at_risk: true
+        reason: Obese — altered drug distribution
+    check:
+      type: condition
+      variable: bmi
+      operator: gte
+      value: 35
+      true_next: at_risk
+      false_next: standard
+tests:
+- input:
+    bmi: 35
+  expect:
+    at_risk: true
+    population: obese
+- input: {}
+  expect:
+    at_risk: false
+    population: obese
+- input:
+    bmi: 0
+  expect:
+    action: standard_care
+    population: obese
+    at_risk: false
+- input:
+    bmi: -1
+  expect:
+    action: standard_care
+    at_risk: false
+    population: obese
+- input:
+    bmi: 34
+  expect:
+    at_risk: false
+    action: standard_care
+    population: obese
+- input:
+    bmi: 36
+  expect:
+    at_risk: true
+    action: special_monitoring
+    reason: Obese — altered drug distribution
+    population: obese
+- input:
+    bmi: 3500
+  expect:
+    population: obese
+    reason: Obese — altered drug distribution
+    at_risk: true
+    action: special_monitoring
+interface: null
+primitive_signature: null

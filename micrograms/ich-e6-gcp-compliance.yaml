@@ -1,0 +1,106 @@
+name: ich-e6-gcp-compliance
+description: "ICH E6: Good Clinical Practice compliance check for trial governance"
+version: 0.1.0
+tree:
+  start: validate_informed_consent
+  nodes:
+    validate_informed_consent:
+      type: condition
+      variable: informed_consent_obtained
+      operator: eq
+      value: true
+      true_next: validate_protocol_approval
+      false_next: non_compliant_consent
+    validate_protocol_approval:
+      type: condition
+      variable: protocol_approved_by_irb
+      operator: eq
+      value: true
+      true_next: validate_safety_monitoring
+      false_next: non_compliant_approval
+    validate_safety_monitoring:
+      type: condition
+      variable: safety_monitoring_board_established
+      operator: eq
+      value: true
+      true_next: validate_data_integrity
+      false_next: non_compliant_monitoring
+    validate_data_integrity:
+      type: condition
+      variable: data_integrity_procedures_in_place
+      operator: eq
+      value: true
+      true_next: compliant
+      false_next: non_compliant_data
+    compliant:
+      type: return
+      value:
+        gcp_compliance_status: "compliant"
+        major_violations: 0
+        action_required: false
+        ich_e6_compliant: true
+        audit_level: "routine"
+    non_compliant_consent:
+      type: return
+      value:
+        gcp_compliance_status: "non_compliant"
+        violation_type: "informed_consent_missing"
+        major_violations: 1
+        action_required: true
+        ich_e6_compliant: false
+        audit_level: "critical"
+    non_compliant_approval:
+      type: return
+      value:
+        gcp_compliance_status: "non_compliant"
+        violation_type: "protocol_approval_missing"
+        major_violations: 1
+        action_required: true
+        ich_e6_compliant: false
+        audit_level: "critical"
+    non_compliant_monitoring:
+      type: return
+      value:
+        gcp_compliance_status: "non_compliant"
+        violation_type: "safety_monitoring_missing"
+        major_violations: 1
+        action_required: true
+        ich_e6_compliant: false
+        audit_level: "major"
+    non_compliant_data:
+      type: return
+      value:
+        gcp_compliance_status: "non_compliant"
+        violation_type: "data_integrity_missing"
+        major_violations: 1
+        action_required: true
+        ich_e6_compliant: false
+        audit_level: "major"
+tests:
+- input:
+    informed_consent_obtained: true
+    protocol_approved_by_irb: true
+    safety_monitoring_board_established: true
+    data_integrity_procedures_in_place: true
+  expect:
+    gcp_compliance_status: "compliant"
+    major_violations: 0
+- input:
+    informed_consent_obtained: false
+    protocol_approved_by_irb: true
+    safety_monitoring_board_established: true
+    data_integrity_procedures_in_place: true
+  expect:
+    gcp_compliance_status: "non_compliant"
+    violation_type: "informed_consent_missing"
+- input:
+    informed_consent_obtained: true
+    protocol_approved_by_irb: true
+    safety_monitoring_board_established: false
+  expect:
+    gcp_compliance_status: "non_compliant"
+    violation_type: "safety_monitoring_missing"
+- input: {}
+  expect:
+    gcp_compliance_status: "non_compliant"
+    ich_e6_compliant: false

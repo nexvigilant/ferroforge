@@ -1,0 +1,100 @@
+name: station-harm-taxonomy-pipeline
+description: Route harm classifications through the A-H taxonomy to appropriate response pathways
+version: 0.1.0
+tree:
+  start: check_type
+  nodes:
+    check_type:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: A
+      true_next: type_a
+      false_next: check_b_d
+    type_b:
+      type: return
+      value:
+        reason: Type B (bizarre/idiosyncratic) — unpredictable, potentially fatal, needs genetic workup
+        priority: high
+        action: investigate
+        route: causality_assessment
+    check_c:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: C
+      true_next: type_c
+      false_next: other_type
+    other_type:
+      type: return
+      value:
+        action: classify
+        reason: Type D-H harm — delayed/end-of-use/failure/genetic/hypersensitivity
+        route: specialist_review
+        priority: moderate
+    check_b_d:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: B
+      true_next: type_b
+      false_next: check_c
+    type_a:
+      type: return
+      value:
+        action: escalate
+        priority: critical
+        reason: Type A (augmented pharmacology) — dose-dependent, predictable, high incidence
+        route: dose_adjustment
+    type_c:
+      type: return
+      value:
+        reason: Type C (chronic/cumulative) — long-term exposure effect, monitor over time
+        route: long_term_monitoring
+        action: monitor
+        priority: moderate
+tests:
+- input:
+    harm_type: A
+  expect:
+    route: dose_adjustment
+    priority: critical
+    action: escalate
+- input:
+    harm_type: B
+  expect:
+    action: investigate
+    priority: high
+    route: causality_assessment
+- input:
+    harm_type: C
+  expect:
+    action: monitor
+    priority: moderate
+    route: long_term_monitoring
+- input:
+    harm_type: D
+  expect:
+    action: classify
+    route: specialist_review
+    priority: moderate
+- input: {}
+  expect:
+    route: specialist_review
+    action: classify
+    reason: Type D-H harm — delayed/end-of-use/failure/genetic/hypersensitivity
+    priority: moderate
+- input: {}
+  expect:
+    priority: moderate
+    action: classify
+    reason: Type D-H harm — delayed/end-of-use/failure/genetic/hypersensitivity
+    route: specialist_review
+- input: {}
+  expect:
+    reason: Type D-H harm — delayed/end-of-use/failure/genetic/hypersensitivity
+    route: specialist_review
+    priority: moderate
+    action: classify
+interface: null
+primitive_signature: null

@@ -1,0 +1,63 @@
+name: drug-class-benzodiazepine-safety
+description: "Benzodiazepine safety assessment. Evaluates respiratory depression, dependence risk, and fall hazard in elderly."
+version: 0.1.0
+tree:
+  start: check_respiratory_impairment
+  nodes:
+    check_respiratory_impairment:
+      type: condition
+      variable: has_sleep_apnea_or_respiratory_disease
+      operator: eq
+      value: true
+      true_next: respiratory_alert
+      false_next: check_age
+    respiratory_alert:
+      type: return
+      value:
+        risk_level: high
+        relative_contraindication: true
+        message: "Respiratory disease present; benzodiazepine carries high overdose/death risk"
+    check_age:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 65
+      true_next: elderly_assessment
+      false_next: check_substance_abuse
+    elderly_assessment:
+      type: return
+      value:
+        risk_level: moderate
+        fall_risk: true
+        cognitive_impairment: true
+        message: "Elderly patient; increased fall risk and cognitive impairment; avoid if possible"
+    check_substance_abuse:
+      type: condition
+      variable: substance_abuse_history
+      operator: eq
+      value: true
+      true_next: abuse_alert
+      false_next: standard_dosing
+    abuse_alert:
+      type: return
+      value:
+        risk_level: high
+        dependence_risk: true
+        monitoring_required: true
+        message: "Substance abuse history; high dependence risk; avoid or closely monitor"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard benzodiazepine dosing appropriate"
+tests:
+  - input: { has_sleep_apnea_or_respiratory_disease: true, age_years: 50, substance_abuse_history: false }
+    expect: { risk_level: high, relative_contraindication: true }
+  - input: { has_sleep_apnea_or_respiratory_disease: false, age_years: 72, substance_abuse_history: false }
+    expect: { risk_level: moderate, fall_risk: true }
+  - input: { has_sleep_apnea_or_respiratory_disease: false, age_years: 45, substance_abuse_history: true }
+    expect: { risk_level: high, dependence_risk: true }
+  - input: { has_sleep_apnea_or_respiratory_disease: false, age_years: 45, substance_abuse_history: false }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

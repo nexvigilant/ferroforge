@@ -1,0 +1,74 @@
+name: class-anticoagulant
+description: 'Anticoagulants class safety: Major bleeding monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: inr
+      operator: gte
+      value: 4
+      true_next: alert
+      false_next: safe
+    alert:
+      type: return
+      value:
+        drug_class: Anticoagulants
+        alert: true
+        concern: Major bleeding
+        action: class_effect_investigation
+    safe:
+      type: return
+      value:
+        drug_class: Anticoagulants
+        concern: Major bleeding
+        alert: false
+        action: continue
+tests:
+- input:
+    inr: 4
+  expect:
+    drug_class: Anticoagulants
+    alert: true
+- input: {}
+  expect:
+    drug_class: Anticoagulants
+    alert: false
+- input:
+    inr: 0
+  expect:
+    concern: Major bleeding
+    drug_class: Anticoagulants
+    alert: false
+    action: continue
+- input:
+    inr: -1
+  expect:
+    concern: Major bleeding
+    drug_class: Anticoagulants
+    alert: false
+    action: continue
+- input:
+    inr: 3
+  expect:
+    drug_class: Anticoagulants
+    concern: Major bleeding
+    action: continue
+    alert: false
+- input:
+    inr: 5
+  expect:
+    concern: Major bleeding
+    alert: true
+    drug_class: Anticoagulants
+    action: class_effect_investigation
+- input:
+    inr: 400
+  expect:
+    action: class_effect_investigation
+    concern: Major bleeding
+    drug_class: Anticoagulants
+    alert: true
+interface: null
+primitive_signature: null

@@ -1,0 +1,83 @@
+name: ich-q2-analytical-gate
+description: 'Regulatory decision: ich-q2-analytical-gate'
+version: 0.1.0
+interface:
+  inputs:
+    input_type:
+      type: string
+      required: false
+    severity:
+      type: string
+      required: false
+    timeline_days:
+      type: int
+      required: false
+  outputs:
+    decision:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_critical
+  nodes:
+    check_critical:
+      type: condition
+      variable: severity
+      operator: eq
+      value: critical
+      true_next: urgent
+      false_next: check_serious
+    check_serious:
+      type: condition
+      variable: severity
+      operator: eq
+      value: serious
+      true_next: check_timeline
+      false_next: check_moderate
+    check_timeline:
+      type: condition
+      variable: timeline_days
+      operator: lte
+      value: 15
+      true_next: expedited
+      false_next: standard
+    check_moderate:
+      type: condition
+      variable: severity
+      operator: eq
+      value: moderate
+      true_next: standard
+      false_next: routine
+    urgent:
+      type: return
+      value:
+        decision: URGENT
+        action: immediate_submission
+    expedited:
+      type: return
+      value:
+        decision: EXPEDITED
+        action: submit_within_15_days
+    standard:
+      type: return
+      value:
+        decision: STANDARD
+        action: include_in_periodic
+    routine:
+      type: return
+      value:
+        decision: ROUTINE
+        action: aggregate_for_review
+tests:
+- input: {severity: critical, timeline_days: 5}
+  expect: {decision: URGENT, action: immediate_submission}
+- input: {severity: serious, timeline_days: 10}
+  expect: {decision: EXPEDITED, action: submit_within_15_days}
+- input: {severity: serious, timeline_days: 30}
+  expect: {decision: STANDARD, action: include_in_periodic}
+- input: {severity: moderate, timeline_days: 60}
+  expect: {decision: STANDARD, action: include_in_periodic}
+- input: {severity: mild, timeline_days: 90}
+  expect: {decision: ROUTINE, action: aggregate_for_review}
+- input: {}
+  expect: {decision: ROUTINE, action: aggregate_for_review}

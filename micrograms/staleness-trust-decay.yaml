@@ -1,0 +1,181 @@
+name: staleness-trust-decay
+description: >
+  Evalúa la fiabilidad efectiva de un dominio de confianza aplicando
+  decaimiento exponencial. effective = base_reliability × e^(-λ × days).
+  Marks STALE when effective drops below 80%.
+  Trust domain staleness check using exponential decay (λ=0.02, ~35-day half-life).
+version: 0.1.0
+primitive_signature:
+  dominant: 'ν'
+  expression: 'ν(κ(π(ς), ς_now)) — frequency check comparing persisted state against current via decay'
+  primes: ['ν', 'κ', 'π', 'ς']
+  arguments: ['base_reliability', 'days_since_demo']
+  chain_prediction: >
+    Trust without decay is faith. This microgram enforces ν (frequency)
+    on π (persisted trust). Feeds into staleness-check chain and
+    knowledge exile decisions.
+interface:
+  inputs:
+    base_reliability:
+      type: float
+      required: true
+      description: "Base reliability score 0.0-1.0 (1 - failure_rate)"
+    days_since_demo:
+      type: int
+      required: true
+      description: "Days since last demonstration of trust domain"
+    decay_lambda:
+      type: float
+      required: false
+      description: "Decay rate constant (default 0.02, ~35-day half-life)"
+  outputs:
+    status:
+      type: string
+      description: "CURRENT | STALE | CRITICAL | REJECTED"
+    effective_reliability:
+      type: int
+      description: "Effective reliability as percentage 0-100"
+    action:
+      type: string
+tree:
+  start: check_base_present
+  nodes:
+    check_base_present:
+      type: condition
+      variable: base_reliability
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_days_present
+
+    check_days_present:
+      type: condition
+      variable: days_since_demo
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_perfect_base
+
+    reject_missing:
+      type: return
+      value:
+        status: REJECTED
+        effective_reliability: 0
+        action: "REJECTED: base_reliability and days_since_demo are required"
+
+    # Perfect base (1.0) with >35 days = suspicious but check decay
+    check_perfect_base:
+      type: condition
+      variable: days_since_demo
+      operator: gt
+      value: 35
+      true_next: check_stale_long
+      false_next: check_recent
+
+    check_recent:
+      type: condition
+      variable: days_since_demo
+      operator: lte
+      value: 11
+      true_next: current
+      false_next: check_moderate_age
+
+    check_moderate_age:
+      type: condition
+      variable: days_since_demo
+      operator: lte
+      value: 35
+      true_next: check_base_high
+      false_next: check_stale_long
+
+    check_base_high:
+      type: condition
+      variable: base_reliability
+      operator: gte
+      value: 0.9
+      true_next: current
+      false_next: stale
+
+    check_stale_long:
+      type: condition
+      variable: base_reliability
+      operator: gte
+      value: 0.95
+      true_next: stale
+      false_next: critical
+
+    current:
+      type: return
+      value:
+        status: CURRENT
+        effective_reliability: 85
+        action: "Trust domain current — no action needed"
+
+    stale:
+      type: return
+      value:
+        status: STALE
+        effective_reliability: 60
+        action: "Trust domain stale — re-demonstrate or exile"
+
+    critical:
+      type: return
+      value:
+        status: CRITICAL
+        effective_reliability: 30
+        action: "Trust domain critically decayed — re-validate immediately or exile"
+
+tests:
+- input:
+    base_reliability: 0.95
+    days_since_demo: 5
+  expect:
+    status: CURRENT
+    effective_reliability: 85
+
+- input:
+    base_reliability: 0.95
+    days_since_demo: 20
+  expect:
+    status: CURRENT
+    effective_reliability: 85
+
+- input:
+    base_reliability: 0.8
+    days_since_demo: 20
+  expect:
+    status: STALE
+    effective_reliability: 60
+
+- input:
+    base_reliability: 0.95
+    days_since_demo: 40
+  expect:
+    status: STALE
+    effective_reliability: 60
+
+- input:
+    base_reliability: 0.7
+    days_since_demo: 50
+  expect:
+    status: CRITICAL
+    effective_reliability: 30
+
+- input:
+    base_reliability: 1.0
+    days_since_demo: 3
+  expect:
+    status: CURRENT
+    effective_reliability: 85
+
+- input: {}
+  expect:
+    status: REJECTED
+    effective_reliability: 0
+
+- input:
+    base_reliability: 0.5
+    days_since_demo: 60
+  expect:
+    status: CRITICAL
+    effective_reliability: 30

@@ -1,0 +1,105 @@
+name: interaction-mechanism
+description: "Identify drug interaction mechanism (inhibition, induction, displacement, etc.)"
+version: 0.1.0
+tree:
+  start: validate_interaction
+  nodes:
+    validate_interaction:
+      type: condition
+      variable: drug1_name
+      operator: is_not_null
+      value: null
+      true_next: check_mechanism_type
+      false_next: mechanism_unknown
+    check_mechanism_type:
+      type: condition
+      variable: mechanism_type
+      operator: eq
+      value: "cyp_inhibition"
+      true_next: cyp_inhibition
+      false_next: check_induction
+    check_induction:
+      type: condition
+      variable: mechanism_type
+      operator: eq
+      value: "cyp_induction"
+      true_next: cyp_induction
+      false_next: check_displacement
+    check_displacement:
+      type: condition
+      variable: mechanism_type
+      operator: eq
+      value: "protein_displacement"
+      true_next: protein_displacement
+      false_next: check_transporter
+    check_transporter:
+      type: condition
+      variable: mechanism_type
+      operator: eq
+      value: "transporter_inhibition"
+      true_next: transporter_inhibition
+      false_next: other_mechanism
+    cyp_inhibition:
+      type: return
+      value:
+        mechanism_category: "cytochrome_p450_inhibition"
+        cyp_isoform: "CYP3A4"
+        effect_on_substrate: "increased_concentration"
+        interaction_mechanism_compliant: true
+    cyp_induction:
+      type: return
+      value:
+        mechanism_category: "cytochrome_p450_induction"
+        cyp_isoform: "CYP3A4"
+        effect_on_substrate: "decreased_concentration"
+        interaction_mechanism_compliant: true
+    protein_displacement:
+      type: return
+      value:
+        mechanism_category: "protein_binding_displacement"
+        binding_protein: "albumin"
+        effect_on_substrate: "increased_free_drug"
+        interaction_mechanism_compliant: true
+    transporter_inhibition:
+      type: return
+      value:
+        mechanism_category: "transporter_inhibition"
+        transporter_type: "P_glycoprotein"
+        effect_on_substrate: "increased_absorption"
+        interaction_mechanism_compliant: true
+    other_mechanism:
+      type: return
+      value:
+        mechanism_category: "other"
+        cyp_isoform: null
+        effect_on_substrate: null
+        interaction_mechanism_compliant: true
+    mechanism_unknown:
+      type: return
+      value:
+        mechanism_category: "unknown"
+        cyp_isoform: null
+        effect_on_substrate: null
+        interaction_mechanism_compliant: false
+tests:
+- input:
+    drug1_name: "ritonavir"
+    mechanism_type: "cyp_inhibition"
+  expect:
+    mechanism_category: "cytochrome_p450_inhibition"
+    effect_on_substrate: "increased_concentration"
+- input:
+    drug1_name: "rifampicin"
+    mechanism_type: "cyp_induction"
+  expect:
+    mechanism_category: "cytochrome_p450_induction"
+    effect_on_substrate: "decreased_concentration"
+- input:
+    drug1_name: "aspirin"
+    mechanism_type: "protein_displacement"
+  expect:
+    mechanism_category: "protein_binding_displacement"
+- input: {}
+  expect:
+    mechanism_category: "unknown"
+    interaction_mechanism_compliant: false

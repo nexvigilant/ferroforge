@@ -1,0 +1,86 @@
+name: ich-q1a-stability
+description: "ICH Q1A: Validate stability testing data and storage condition requirements"
+version: 0.1.0
+tree:
+  start: validate_storage_condition
+  nodes:
+    validate_storage_condition:
+      type: condition
+      variable: storage_condition
+      operator: is_not_null
+      value: null
+      true_next: check_room_temperature
+      false_next: condition_unknown
+    check_room_temperature:
+      type: condition
+      variable: storage_condition
+      operator: eq
+      value: "room_temperature"
+      true_next: room_temp_requirement
+      false_next: check_refrigerated
+    check_refrigerated:
+      type: condition
+      variable: storage_condition
+      operator: eq
+      value: "refrigerated"
+      true_next: refrigerated_requirement
+      false_next: check_frozen
+    check_frozen:
+      type: condition
+      variable: storage_condition
+      operator: eq
+      value: "frozen"
+      true_next: frozen_requirement
+      false_next: condition_unknown
+    room_temp_requirement:
+      type: return
+      value:
+        storage_temp_celsius: "25±2"
+        storage_humidity_percent: "60±5"
+        stability_duration_months: 36
+        ich_q1a_compliant: true
+        testing_intervals: "3,6,9,12,18,24,36"
+    refrigerated_requirement:
+      type: return
+      value:
+        storage_temp_celsius: "5±3"
+        storage_humidity_percent: "not_specified"
+        stability_duration_months: 12
+        ich_q1a_compliant: true
+        testing_intervals: "3,6,9,12"
+    frozen_requirement:
+      type: return
+      value:
+        storage_temp_celsius: "-20±5"
+        storage_humidity_percent: "not_specified"
+        stability_duration_months: 12
+        ich_q1a_compliant: true
+        testing_intervals: "6,12"
+    condition_unknown:
+      type: return
+      value:
+        storage_temp_celsius: null
+        storage_humidity_percent: null
+        stability_duration_months: null
+        ich_q1a_compliant: false
+        testing_intervals: null
+tests:
+- input:
+    storage_condition: "room_temperature"
+  expect:
+    storage_temp_celsius: "25±2"
+    stability_duration_months: 36
+- input:
+    storage_condition: "refrigerated"
+  expect:
+    storage_temp_celsius: "5±3"
+    stability_duration_months: 12
+- input:
+    storage_condition: "frozen"
+  expect:
+    storage_temp_celsius: "-20±5"
+    stability_duration_months: 12
+- input: {}
+  expect:
+    storage_temp_celsius: null
+    ich_q1a_compliant: false

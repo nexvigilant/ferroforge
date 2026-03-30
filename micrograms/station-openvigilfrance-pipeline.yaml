@@ -1,0 +1,126 @@
+name: station-openvigilfrance-pipeline
+description: 'Triage OpenVigil France disproportionality: route by PRR/ROR strength and case volume'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: check_cases
+      false_next: no_signal
+    no_signal:
+      type: return
+      value:
+        action: archive
+        route: no_action
+        priority: low
+        reason: PRR<2.0 in OpenVigil France — no disproportionality
+    check_cases:
+      type: condition
+      variable: case_count
+      operator: gte
+      value: 10
+      true_next: confirmed
+      false_next: sparse
+    sparse:
+      type: return
+      value:
+        action: monitor
+        priority: moderate
+        reason: PRR elevated but <10 cases — sparse data, watch trend
+        route: periodic_review
+    confirmed:
+      type: return
+      value:
+        priority: high
+        reason: PRR≥2.0 with 10+ cases in France — cross-ref with FAERS
+        route: signal_detection
+        action: investigate
+tests:
+- input:
+    prr: 1.1
+    case_count: 5
+  expect:
+    route: no_action
+    action: archive
+    priority: low
+- input:
+    prr: 3.0
+    case_count: 4
+  expect:
+    route: periodic_review
+    priority: moderate
+    action: monitor
+- input:
+    prr: 2.5
+    case_count: 25
+  expect:
+    priority: high
+    route: signal_detection
+    action: investigate
+- input:
+    prr: 1.999
+  expect:
+    priority: low
+    reason: PRR<2.0 in OpenVigil France — no disproportionality
+    route: no_action
+    action: archive
+- input:
+    prr: 2.001
+  expect:
+    route: periodic_review
+    priority: moderate
+    reason: PRR elevated but <10 cases — sparse data, watch trend
+    action: monitor
+- input: {}
+  expect:
+    priority: low
+    route: no_action
+    action: archive
+    reason: PRR<2.0 in OpenVigil France — no disproportionality
+- input:
+    case_count: 0
+  expect:
+    priority: low
+    route: no_action
+    action: archive
+    reason: PRR<2.0 in OpenVigil France — no disproportionality
+- input:
+    case_count: -1
+  expect:
+    action: archive
+    priority: low
+    route: no_action
+    reason: PRR<2.0 in OpenVigil France — no disproportionality
+- input:
+    case_count: 9
+  expect:
+    action: archive
+    route: no_action
+    priority: low
+    reason: PRR<2.0 in OpenVigil France — no disproportionality
+- input:
+    case_count: 11
+  expect:
+    route: no_action
+    reason: PRR<2.0 in OpenVigil France — no disproportionality
+    action: archive
+    priority: low
+- input:
+    case_count: 1000
+  expect:
+    priority: low
+    reason: PRR<2.0 in OpenVigil France — no disproportionality
+    action: archive
+    route: no_action
+- input: {}
+  expect:
+    route: no_action
+    reason: PRR<2.0 in OpenVigil France — no disproportionality
+    action: archive
+    priority: low
+interface: null
+primitive_signature: null

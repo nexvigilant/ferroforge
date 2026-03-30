@@ -1,0 +1,74 @@
+name: drug-class-checkpoint-inhibitor-safety
+description: "Checkpoint inhibitor safety assessment. Evaluates immune-related adverse events (irAE), organ toxicity, and autoimmune activation."
+version: 0.1.0
+tree:
+  start: check_autoimmune_disease
+  nodes:
+    check_autoimmune_disease:
+      type: condition
+      variable: has_active_autoimmune_disease
+      operator: eq
+      value: true
+      true_next: autoimmune_alert
+      false_next: check_prior_iriae
+    autoimmune_alert:
+      type: return
+      value:
+        risk_level: high
+        relative_contraindication: true
+        message: "Active autoimmune disease; checkpoint inhibitor risk-benefit must be carefully assessed"
+    check_prior_iriae:
+      type: condition
+      variable: prior_grade3_iriae
+      operator: eq
+      value: true
+      true_next: irae_alert
+      false_next: check_organ_function
+    irae_alert:
+      type: return
+      value:
+        risk_level: high
+        enhanced_monitoring: required
+        message: "Prior Grade 3+ irAE; enhanced immunological monitoring required"
+    check_organ_function:
+      type: condition
+      variable: baseline_alt_iu_l
+      operator: gte
+      value: 300
+      true_next: liver_risk
+      false_next: check_cardiac
+    liver_risk:
+      type: return
+      value:
+        risk_level: moderate
+        hepatic_monitoring: required
+        message: "Baseline ALT elevated; monitor closely for hepatotoxicity"
+    check_cardiac:
+      type: condition
+      variable: ejection_fraction_percent
+      operator: lt
+      value: 40
+      true_next: cardiac_risk
+      false_next: standard_dosing
+    cardiac_risk:
+      type: return
+      value:
+        risk_level: moderate
+        cardiac_monitoring: required
+        message: "Reduced ejection fraction; monitor for myocarditis risk"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard checkpoint inhibitor dosing appropriate"
+tests:
+  - input: { has_active_autoimmune_disease: true, prior_grade3_iriae: false, baseline_alt_iu_l: 100, ejection_fraction_percent: 50 }
+    expect: { risk_level: high, relative_contraindication: true }
+  - input: { has_active_autoimmune_disease: false, prior_grade3_iriae: true, baseline_alt_iu_l: 100, ejection_fraction_percent: 50 }
+    expect: { risk_level: high, enhanced_monitoring: required }
+  - input: { has_active_autoimmune_disease: false, prior_grade3_iriae: false, baseline_alt_iu_l: 350, ejection_fraction_percent: 50 }
+    expect: { risk_level: moderate, hepatic_monitoring: required }
+  - input: { has_active_autoimmune_disease: false, prior_grade3_iriae: false, baseline_alt_iu_l: 100, ejection_fraction_percent: 35 }
+    expect: { risk_level: moderate, cardiac_monitoring: required }
+  - input: {}
+    expect: {}

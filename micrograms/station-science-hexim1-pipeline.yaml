@@ -1,0 +1,130 @@
+name: station-science-hexim1-pipeline
+description: Route HEXIM1 hypothesis analysis through evidence strength gates
+version: 0.1.0
+tree:
+  start: check_evidence
+  nodes:
+    strong:
+      type: return
+      value:
+        route: publication_pipeline
+        priority: high
+        action: publish
+        reason: HEXIM1 hypothesis evidence score ≥7 — manuscript-ready
+    check_medium:
+      type: condition
+      variable: evidence_score
+      operator: gte
+      value: 4
+      true_next: medium
+      false_next: weak
+    check_evidence:
+      type: condition
+      variable: evidence_score
+      operator: gte
+      value: 7
+      true_next: strong
+      false_next: check_medium
+    weak:
+      type: return
+      value:
+        reason: Evidence <4 — hypothesis needs reformulation
+        action: revise
+        route: hypothesis_revision
+        priority: low
+    medium:
+      type: return
+      value:
+        action: experiment
+        priority: moderate
+        reason: Evidence 4-7 — design confirmatory experiment
+        route: experiment_design
+tests:
+- input:
+    evidence_score: 8
+  expect:
+    priority: high
+    action: publish
+    route: publication_pipeline
+- input:
+    evidence_score: 5
+  expect:
+    action: experiment
+    route: experiment_design
+    priority: moderate
+- input:
+    evidence_score: 2
+  expect:
+    priority: low
+    action: revise
+    route: hypothesis_revision
+- input:
+    evidence_score: 0
+  expect:
+    reason: Evidence <4 — hypothesis needs reformulation
+    action: revise
+    priority: low
+    route: hypothesis_revision
+- input:
+    evidence_score: -1
+  expect:
+    route: hypothesis_revision
+    action: revise
+    priority: low
+    reason: Evidence <4 — hypothesis needs reformulation
+- input:
+    evidence_score: 3
+  expect:
+    action: revise
+    route: hypothesis_revision
+    priority: low
+    reason: Evidence <4 — hypothesis needs reformulation
+- input:
+    evidence_score: 400
+  expect:
+    priority: high
+    route: publication_pipeline
+    action: publish
+    reason: HEXIM1 hypothesis evidence score ≥7 — manuscript-ready
+- input: {}
+  expect:
+    route: hypothesis_revision
+    reason: Evidence <4 — hypothesis needs reformulation
+    priority: low
+    action: revise
+- input:
+    evidence_score: 0
+  expect:
+    reason: Evidence <4 — hypothesis needs reformulation
+    action: revise
+    route: hypothesis_revision
+    priority: low
+- input:
+    evidence_score: -1
+  expect:
+    reason: Evidence <4 — hypothesis needs reformulation
+    priority: low
+    action: revise
+    route: hypothesis_revision
+- input:
+    evidence_score: 6
+  expect:
+    reason: Evidence 4-7 — design confirmatory experiment
+    action: experiment
+    priority: moderate
+    route: experiment_design
+- input:
+    evidence_score: 700
+  expect:
+    route: publication_pipeline
+    priority: high
+    action: publish
+    reason: HEXIM1 hypothesis evidence score ≥7 — manuscript-ready
+- input: {}
+  expect:
+    route: hypothesis_revision
+    action: revise
+    reason: Evidence <4 — hypothesis needs reformulation
+    priority: low
+interface: null
+primitive_signature: null

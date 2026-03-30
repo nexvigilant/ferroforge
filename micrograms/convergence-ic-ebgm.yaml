@@ -1,0 +1,32 @@
+name: convergence-ic-ebgm
+description: "IC+EBGM both positive"
+version: 0.1.0
+
+tree:
+  start: check
+  nodes:
+    check:
+      type: "condition"
+      variable: "ic_ebgm_agree"
+      operator: "eq"
+      value: true
+      true_next: "converged"
+      false_next: "divergent"
+    converged:
+      type: "return"
+      value:
+        convergence: "bayesian"
+        met: true
+        action: "escalate"
+    divergent:
+      type: "return"
+      value:
+        convergence: "bayesian"
+        met: false
+        action: "investigate_discrepancy"
+
+tests:
+  - input: {"ic_ebgm_agree": true}
+    expect: {"convergence": "bayesian", "met": true}
+  - input: {}
+    expect: {"convergence": "bayesian", "met": false}

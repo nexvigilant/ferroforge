@@ -1,0 +1,206 @@
+name: e2a-reporting-timeline
+description: 'ICH E2A Section III.B: Expedited reporting timeline router — 7-day for fatal/life-threatening unexpected, 15-day for all other serious unexpected, no expedited for serious expected'
+version: 1.0.0
+interface:
+  inputs:
+    is_fatal:
+      type: bool
+      required: false
+    is_life_threatening:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+    study_phase:
+      type: string
+      required: false
+  outputs:
+    deadline_days:
+      type: int
+    expedited_required:
+      type: bool
+    regulatory_reference:
+      type: string
+    report_type:
+      type: string
+    timeline_category:
+      type: string
+tree:
+  start: check_serious
+  nodes:
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_unexpected
+      false_next: not_expedited
+    check_unexpected:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: check_fatal_or_lt
+      false_next: serious_expected
+    check_fatal_or_lt:
+      type: condition
+      variable: is_fatal
+      operator: eq
+      value: true
+      true_next: seven_day
+      false_next: check_life_threatening
+    check_life_threatening:
+      type: condition
+      variable: is_life_threatening
+      operator: eq
+      value: true
+      true_next: seven_day
+      false_next: fifteen_day
+    seven_day:
+      type: return
+      value:
+        timeline_category: 7_DAY_EXPEDITED
+        deadline_days: 7
+        expedited_required: true
+        report_type: EXPEDITED_SAFETY_REPORT
+        regulatory_reference: ICH E2A Section III.B.1 - Fatal or life-threatening unexpected SUSAR requires 7-day initial report
+    fifteen_day:
+      type: return
+      value:
+        timeline_category: 15_DAY_EXPEDITED
+        deadline_days: 15
+        expedited_required: true
+        report_type: EXPEDITED_SAFETY_REPORT
+        regulatory_reference: ICH E2A Section III.B.2 - Serious unexpected non-fatal/non-life-threatening requires 15-day expedited report
+    serious_expected:
+      type: return
+      value:
+        timeline_category: PERIODIC
+        deadline_days: 90
+        expedited_required: false
+        report_type: PERIODIC_SAFETY_UPDATE
+        regulatory_reference: ICH E2A Section III.B.3 - Serious expected reactions reported in periodic updates
+    not_expedited:
+      type: return
+      value:
+        timeline_category: PERIODIC
+        deadline_days: 90
+        expedited_required: false
+        report_type: PERIODIC_SAFETY_UPDATE
+        regulatory_reference: ICH E2A Section III.B.3 - Non-serious reactions reported in periodic updates
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — ICH E2A expedited reporting timeline routing by seriousness × unexpectedness × fatality'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['is_serious', 'is_unexpected', 'is_fatal', 'is_life_threatening']
+  chain_prediction: 'Receives output from case-seriousness (is_serious, is_fatal, is_life_threatening) + e2a-expectedness-check (is_unexpected). Feeds to e2a-reporting-obligation gate.'
+tests:
+# Fatal + unexpected = 7-day
+- input:
+    is_serious: true
+    is_fatal: true
+    is_life_threatening: false
+    is_unexpected: true
+    study_phase: phase_3
+  expect:
+    timeline_category: 7_DAY_EXPEDITED
+    deadline_days: 7
+    expedited_required: true
+    report_type: EXPEDITED_SAFETY_REPORT
+    regulatory_reference: ICH E2A Section III.B.1 - Fatal or life-threatening unexpected SUSAR requires 7-day initial report
+# Life-threatening + unexpected = 7-day
+- input:
+    is_serious: true
+    is_fatal: false
+    is_life_threatening: true
+    is_unexpected: true
+    study_phase: phase_2
+  expect:
+    timeline_category: 7_DAY_EXPEDITED
+    deadline_days: 7
+    expedited_required: true
+    report_type: EXPEDITED_SAFETY_REPORT
+    regulatory_reference: ICH E2A Section III.B.1 - Fatal or life-threatening unexpected SUSAR requires 7-day initial report
+# Both fatal and life-threatening + unexpected = 7-day (fatal takes priority)
+- input:
+    is_serious: true
+    is_fatal: true
+    is_life_threatening: true
+    is_unexpected: true
+  expect:
+    timeline_category: 7_DAY_EXPEDITED
+    deadline_days: 7
+    expedited_required: true
+    report_type: EXPEDITED_SAFETY_REPORT
+    regulatory_reference: ICH E2A Section III.B.1 - Fatal or life-threatening unexpected SUSAR requires 7-day initial report
+# Serious + unexpected + not fatal/LT = 15-day
+- input:
+    is_serious: true
+    is_fatal: false
+    is_life_threatening: false
+    is_unexpected: true
+    study_phase: phase_3
+  expect:
+    timeline_category: 15_DAY_EXPEDITED
+    deadline_days: 15
+    expedited_required: true
+    report_type: EXPEDITED_SAFETY_REPORT
+    regulatory_reference: ICH E2A Section III.B.2 - Serious unexpected non-fatal/non-life-threatening requires 15-day expedited report
+# Serious + hospitalization + unexpected = 15-day
+- input:
+    is_serious: true
+    is_fatal: false
+    is_life_threatening: false
+    is_unexpected: true
+  expect:
+    timeline_category: 15_DAY_EXPEDITED
+    deadline_days: 15
+    expedited_required: true
+    report_type: EXPEDITED_SAFETY_REPORT
+    regulatory_reference: ICH E2A Section III.B.2 - Serious unexpected non-fatal/non-life-threatening requires 15-day expedited report
+# Serious + expected = periodic (no expedited)
+- input:
+    is_serious: true
+    is_fatal: true
+    is_life_threatening: false
+    is_unexpected: false
+  expect:
+    timeline_category: PERIODIC
+    deadline_days: 90
+    expedited_required: false
+    report_type: PERIODIC_SAFETY_UPDATE
+    regulatory_reference: ICH E2A Section III.B.3 - Serious expected reactions reported in periodic updates
+# Non-serious = periodic (no expedited)
+- input:
+    is_serious: false
+    is_fatal: false
+    is_life_threatening: false
+    is_unexpected: true
+  expect:
+    timeline_category: PERIODIC
+    deadline_days: 90
+    expedited_required: false
+    report_type: PERIODIC_SAFETY_UPDATE
+    regulatory_reference: ICH E2A Section III.B.3 - Non-serious reactions reported in periodic updates
+# Empty input = periodic (all false defaults)
+- input: {}
+  expect:
+    timeline_category: PERIODIC
+    deadline_days: 90
+    expedited_required: false
+    report_type: PERIODIC_SAFETY_UPDATE
+    regulatory_reference: ICH E2A Section III.B.3 - Non-serious reactions reported in periodic updates
+# Boundary: serious + unexpected but all flags false = 15-day (default serious non-fatal/non-LT path)
+- input:
+    is_serious: true
+    is_unexpected: true
+  expect:
+    timeline_category: 15_DAY_EXPEDITED
+    deadline_days: 15
+    expedited_required: true
+    report_type: EXPEDITED_SAFETY_REPORT
+    regulatory_reference: ICH E2A Section III.B.2 - Serious unexpected non-fatal/non-life-threatening requires 15-day expedited report

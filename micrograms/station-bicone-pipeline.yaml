@@ -1,0 +1,102 @@
+name: station-bicone-pipeline
+description: Route bicone geometry analysis for Hill response curve characterization
+version: 0.1.0
+tree:
+  start: check_hill
+  nodes:
+    ultrasensitive:
+      type: return
+      value:
+        route: therapeutic_window_analysis
+        reason: Hill coefficient ≥4 — ultrasensitive response, narrow therapeutic window likely
+        action: flag
+        priority: high
+    subsensitive:
+      type: return
+      value:
+        priority: moderate
+        route: mechanism_review
+        action: investigate
+        reason: Hill coefficient ≤0.5 — negative cooperativity or subsensitive response
+    normal:
+      type: return
+      value:
+        route: archive
+        priority: low
+        reason: Hill coefficient 0.5-4 — normal dose-response range
+        action: pass
+    check_low:
+      type: condition
+      variable: hill_coefficient
+      operator: lte
+      value: 0.5
+      true_next: subsensitive
+      false_next: normal
+    check_hill:
+      type: condition
+      variable: hill_coefficient
+      operator: gte
+      value: 4.0
+      true_next: ultrasensitive
+      false_next: check_low
+tests:
+- input:
+    hill_coefficient: 6.0
+  expect:
+    priority: high
+    route: therapeutic_window_analysis
+    action: flag
+- input:
+    hill_coefficient: 0.3
+  expect:
+    action: investigate
+    priority: moderate
+    route: mechanism_review
+- input:
+    hill_coefficient: 1.5
+  expect:
+    priority: low
+    route: archive
+    action: pass
+- input:
+    hill_coefficient: 0.499
+  expect:
+    route: mechanism_review
+    priority: moderate
+    action: investigate
+    reason: Hill coefficient ≤0.5 — negative cooperativity or subsensitive response
+- input:
+    hill_coefficient: 0.501
+  expect:
+    reason: Hill coefficient 0.5-4 — normal dose-response range
+    priority: low
+    route: archive
+    action: pass
+- input: {}
+  expect:
+    priority: low
+    route: archive
+    reason: Hill coefficient 0.5-4 — normal dose-response range
+    action: pass
+- input:
+    hill_coefficient: 3.999
+  expect:
+    action: pass
+    reason: Hill coefficient 0.5-4 — normal dose-response range
+    route: archive
+    priority: low
+- input:
+    hill_coefficient: 4.001
+  expect:
+    priority: high
+    action: flag
+    reason: Hill coefficient ≥4 — ultrasensitive response, narrow therapeutic window likely
+    route: therapeutic_window_analysis
+- input: {}
+  expect:
+    priority: low
+    reason: Hill coefficient 0.5-4 — normal dose-response range
+    route: archive
+    action: pass
+interface: null
+primitive_signature: null

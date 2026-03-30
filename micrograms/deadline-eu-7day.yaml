@@ -1,0 +1,85 @@
+name: deadline-eu-7day
+description: "Calculate EU 7-day expedited reporting deadline for serious adverse events"
+version: 0.1.0
+tree:
+  start: validate_event_date
+  nodes:
+    validate_event_date:
+      type: condition
+      variable: event_date
+      operator: is_not_null
+      value: null
+      true_next: check_seriousness
+      false_next: deadline_unknown
+    check_seriousness:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_fatality
+      false_next: non_serious_event
+    check_fatality:
+      type: condition
+      variable: event_type
+      operator: eq
+      value: "fatal"
+      true_next: fatal_deadline
+      false_next: serious_deadline
+    serious_deadline:
+      type: return
+      value:
+        reporting_deadline_days: 7
+        event_category: "serious_non_fatal"
+        regulatory_requirement: "EU_EMA_GCP"
+        deadline_date: "calculated_from_event_date"
+        regulatory_compliant: true
+    fatal_deadline:
+      type: return
+      value:
+        reporting_deadline_days: 7
+        event_category: "fatal"
+        regulatory_requirement: "EU_EMA_GCP"
+        deadline_date: "calculated_from_event_date"
+        regulatory_compliant: true
+    non_serious_event:
+      type: return
+      value:
+        reporting_deadline_days: 30
+        event_category: "non_serious"
+        regulatory_requirement: "EU_EMA_GCP"
+        deadline_date: "calculated_from_event_date"
+        regulatory_compliant: true
+    deadline_unknown:
+      type: return
+      value:
+        reporting_deadline_days: null
+        event_category: null
+        regulatory_requirement: null
+        deadline_date: null
+        regulatory_compliant: false
+tests:
+- input:
+    event_date: "2024-01-15"
+    is_serious: true
+    event_type: "fatal"
+  expect:
+    reporting_deadline_days: 7
+    event_category: "fatal"
+    regulatory_compliant: true
+- input:
+    event_date: "2024-01-15"
+    is_serious: true
+    event_type: "serious_non_fatal"
+  expect:
+    reporting_deadline_days: 7
+    event_category: "serious_non_fatal"
+- input:
+    event_date: "2024-01-15"
+    is_serious: false
+  expect:
+    reporting_deadline_days: 30
+    event_category: "non_serious"
+- input: {}
+  expect:
+    reporting_deadline_days: null
+    regulatory_compliant: false

@@ -1,0 +1,356 @@
+name: fda-drug-interaction-study
+description: 'FDA drug interaction study requirement: routes by mechanism type and exposure change per ICH M12 ''Drug Interaction Studies'' (2024) and FDA DDI Guidance'
+version: 0.1.0
+tree:
+  start: check_mechanism
+  nodes:
+    check_transporter:
+      type: condition
+      variable: mechanism
+      operator: eq
+      value: transporter
+      true_next: transporter_magnitude
+      false_next: check_ph
+    strong_narrow_ti:
+      type: return
+      value:
+        labeling_section: Contraindications + Drug Interactions + Dosage
+        study_requirement: CONTRAINDICATION_OR_DOSE_ADJUSTMENT
+        regulatory_reference: ICH M12 (2024), Section 4.1; FDA DDI Guidance
+        clinical_recommendation: Contraindicate concomitant use with narrow TI CYP substrates or require significant dose reduction with TDM
+    strong_inhibitor:
+      type: condition
+      variable: victim_narrow_ti
+      operator: eq
+      value: true
+      true_next: strong_narrow_ti
+      false_next: strong_standard
+    weak_inhibitor:
+      type: return
+      value:
+        study_requirement: IN_VITRO_SUFFICIENT
+        clinical_recommendation: Weak inhibition (AUC 1.25-2 fold) — note in labeling; no dose adjustment typically needed
+        labeling_section: Clinical Pharmacology
+        regulatory_reference: ICH M12 (2024), Section 4.1
+    transporter_magnitude:
+      type: condition
+      variable: auc_fold_change
+      operator: gte
+      value: 2.0
+      true_next: transporter_significant
+      false_next: transporter_minor
+    transporter_minor:
+      type: return
+      value:
+        study_requirement: IN_VITRO_SUFFICIENT
+        labeling_section: Clinical Pharmacology
+        regulatory_reference: ICH M12 (2024), Section 5
+        clinical_recommendation: Minor transporter interaction — note in Clinical Pharmacology
+    check_induction:
+      type: condition
+      variable: mechanism
+      operator: eq
+      value: cyp_induction
+      true_next: cyp_induction_magnitude
+      false_next: check_transporter
+    weak_inducer:
+      type: return
+      value:
+        study_requirement: IN_VITRO_SUFFICIENT
+        clinical_recommendation: Weak or no induction — no dose adjustment expected
+        labeling_section: Clinical Pharmacology
+        regulatory_reference: ICH M12 (2024), Section 4.2
+    moderate_inducer:
+      type: return
+      value:
+        labeling_section: Drug Interactions
+        study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+        regulatory_reference: ICH M12 (2024), Section 4.2
+        clinical_recommendation: Moderate induction (AUC decrease 50-80%) — dose increase may be needed for CYP substrates
+    cyp_induction_magnitude:
+      type: condition
+      variable: auc_fold_change
+      operator: lte
+      value: 0.2
+      true_next: strong_inducer
+      false_next: cyp_ind_moderate_check
+    cyp_ind_moderate_check:
+      type: condition
+      variable: auc_fold_change
+      operator: lte
+      value: 0.5
+      true_next: moderate_inducer
+      false_next: weak_inducer
+    transporter_significant:
+      type: return
+      value:
+        clinical_recommendation: Clinically significant transporter interaction — evaluate dose adjustment for transporter substrates
+        labeling_section: Drug Interactions
+        study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+        regulatory_reference: ICH M12 (2024), Section 5
+    cyp_inh_weak_check:
+      type: condition
+      variable: auc_fold_change
+      operator: gte
+      value: 1.25
+      true_next: weak_inhibitor
+      false_next: no_inhibition
+    check_ph:
+      type: condition
+      variable: mechanism
+      operator: eq
+      value: ph_dependent
+      true_next: ph_study
+      false_next: protein_binding_path
+    protein_binding_path:
+      type: return
+      value:
+        study_requirement: NO_FURTHER_STUDY
+        clinical_recommendation: Protein binding displacement alone rarely clinically significant
+        labeling_section: Clinical Pharmacology
+        regulatory_reference: ICH M12 (2024), Section 6
+    strong_inducer:
+      type: return
+      value:
+        labeling_section: Drug Interactions + Warnings
+        clinical_recommendation: Strong induction (AUC decrease >= 80%) — avoid with sensitive CYP substrates; efficacy loss expected
+        study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+        regulatory_reference: ICH M12 (2024), Section 4.2
+    cyp_inh_moderate_check:
+      type: condition
+      variable: auc_fold_change
+      operator: gte
+      value: 2.0
+      true_next: moderate_inhibitor
+      false_next: cyp_inh_weak_check
+    check_mechanism:
+      type: condition
+      variable: mechanism
+      operator: eq
+      value: cyp_inhibition
+      true_next: cyp_inhibition_magnitude
+      false_next: check_induction
+    moderate_inhibitor:
+      type: return
+      value:
+        clinical_recommendation: Moderate inhibition (AUC 2-5 fold) — caution with CYP substrates; dose adjustment may be needed
+        regulatory_reference: ICH M12 (2024), Section 4.1
+        study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+        labeling_section: Drug Interactions
+    ph_study:
+      type: return
+      value:
+        clinical_recommendation: pH-dependent absorption — evaluate with acid-reducing agents (PPI, H2RA, antacid)
+        regulatory_reference: 'FDA Guidance: Evaluation of Gastric pH-Dependent Drug Interactions (2023)'
+        labeling_section: Drug Interactions + Dosage
+        study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+    strong_standard:
+      type: return
+      value:
+        labeling_section: Drug Interactions + Dosage and Administration
+        clinical_recommendation: Strong inhibition (AUC >= 5-fold) — dose adjustment or avoidance with sensitive CYP substrates
+        study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+        regulatory_reference: ICH M12 (2024), Section 4.1; FDA DDI Guidance
+    cyp_inhibition_magnitude:
+      type: condition
+      variable: auc_fold_change
+      operator: gte
+      value: 5.0
+      true_next: strong_inhibitor
+      false_next: cyp_inh_moderate_check
+    no_inhibition:
+      type: return
+      value:
+        clinical_recommendation: No clinically meaningful CYP inhibition
+        regulatory_reference: ICH M12 (2024), Section 4.1
+        labeling_section: Clinical Pharmacology (state negative finding)
+        study_requirement: NO_FURTHER_STUDY
+tests:
+- input:
+    mechanism: cyp_inhibition
+    auc_fold_change: 6.0
+    victim_narrow_ti: true
+  expect:
+    study_requirement: CONTRAINDICATION_OR_DOSE_ADJUSTMENT
+- input:
+    mechanism: cyp_inhibition
+    auc_fold_change: 5.5
+    victim_narrow_ti: false
+  expect:
+    study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+- input:
+    auc_fold_change: 3.0
+    mechanism: cyp_inhibition
+  expect:
+    study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+- input:
+    mechanism: cyp_inhibition
+    auc_fold_change: 1.5
+  expect:
+    study_requirement: IN_VITRO_SUFFICIENT
+- input:
+    auc_fold_change: 1.1
+    mechanism: cyp_inhibition
+  expect:
+    study_requirement: NO_FURTHER_STUDY
+- input:
+    mechanism: cyp_induction
+    auc_fold_change: 0.15
+  expect:
+    study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+- input:
+    auc_fold_change: 0.4
+    mechanism: cyp_induction
+  expect:
+    study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+- input:
+    auc_fold_change: 2.5
+    mechanism: transporter
+  expect:
+    study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+- input:
+    auc_fold_change: 0.3
+    mechanism: ph_dependent
+  expect:
+    study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+- input:
+    auc_fold_change: 1.2
+    mechanism: protein_binding
+  expect:
+    study_requirement: NO_FURTHER_STUDY
+- input: {}
+  expect:
+    study_requirement: NO_FURTHER_STUDY
+- input:
+    auc_fold_change: 1.999
+  expect:
+    study_requirement: NO_FURTHER_STUDY
+    labeling_section: Clinical Pharmacology
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+    regulatory_reference: ICH M12 (2024), Section 6
+- input:
+    auc_fold_change: 2.001
+  expect:
+    study_requirement: NO_FURTHER_STUDY
+    labeling_section: Clinical Pharmacology
+    regulatory_reference: ICH M12 (2024), Section 6
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+- input:
+    auc_fold_change: 0.199
+  expect:
+    labeling_section: Clinical Pharmacology
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+    study_requirement: NO_FURTHER_STUDY
+    regulatory_reference: ICH M12 (2024), Section 6
+- input:
+    auc_fold_change: 0.201
+  expect:
+    regulatory_reference: ICH M12 (2024), Section 6
+    labeling_section: Clinical Pharmacology
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+    study_requirement: NO_FURTHER_STUDY
+- input:
+    auc_fold_change: 0.499
+  expect:
+    labeling_section: Clinical Pharmacology
+    study_requirement: NO_FURTHER_STUDY
+    regulatory_reference: ICH M12 (2024), Section 6
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+- input:
+    auc_fold_change: 0.501
+  expect:
+    study_requirement: NO_FURTHER_STUDY
+    regulatory_reference: ICH M12 (2024), Section 6
+    labeling_section: Clinical Pharmacology
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+- input:
+    auc_fold_change: 1.249
+  expect:
+    study_requirement: NO_FURTHER_STUDY
+    labeling_section: Clinical Pharmacology
+    regulatory_reference: ICH M12 (2024), Section 6
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+- input:
+    auc_fold_change: 1.251
+  expect:
+    study_requirement: NO_FURTHER_STUDY
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+    labeling_section: Clinical Pharmacology
+    regulatory_reference: ICH M12 (2024), Section 6
+- input:
+    auc_fold_change: 1.999
+  expect:
+    labeling_section: Clinical Pharmacology
+    study_requirement: NO_FURTHER_STUDY
+    regulatory_reference: ICH M12 (2024), Section 6
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+- input:
+    auc_fold_change: 2.001
+  expect:
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+    labeling_section: Clinical Pharmacology
+    study_requirement: NO_FURTHER_STUDY
+    regulatory_reference: ICH M12 (2024), Section 6
+- input:
+    auc_fold_change: 4.999
+  expect:
+    regulatory_reference: ICH M12 (2024), Section 6
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+    labeling_section: Clinical Pharmacology
+    study_requirement: NO_FURTHER_STUDY
+- input:
+    auc_fold_change: 5.001
+  expect:
+    labeling_section: Clinical Pharmacology
+    study_requirement: NO_FURTHER_STUDY
+    clinical_recommendation: Protein binding displacement alone rarely clinically significant
+    regulatory_reference: ICH M12 (2024), Section 6
+# Weak inducer (AUC > 0.5)
+- input:
+    mechanism: "cyp_induction"
+    auc_fold_change: 0.7
+  expect:
+    study_requirement: IN_VITRO_SUFFICIENT
+# Minor transporter interaction (AUC < 2.0)
+- input:
+    mechanism: "transporter"
+    auc_fold_change: 1.4
+  expect:
+    study_requirement: IN_VITRO_SUFFICIENT
+interface:
+  inputs:
+    victim_narrow_ti:
+      type: bool
+      required: false
+    auc_fold_change:
+      type: float
+      required: true
+    mechanism:
+      type: string
+      required: true
+  outputs:
+    study_requirement:
+      type: string
+      required: false
+    clinical_recommendation:
+      type: string
+      required: false
+    labeling_section:
+      type: string
+      required: false
+    regulatory_reference:
+      type: string
+      required: false
+  aliases: {}
+primitive_signature:
+  dominant: κ
+  expression: κ(ν, ∂) — DDI classification by exposure magnitude and mechanism boundary
+  primes:
+  - κ
+  - ν
+  - ∂
+  arguments:
+  - mechanism
+  - auc_fold_change
+  - victim_narrow_ti
+  chain_prediction: null

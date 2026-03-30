@@ -1,0 +1,400 @@
+name: pharma-head-to-head
+description: >
+  Head-to-head comparison of two pharmaceutical companies based on FAERS data.
+  Compares report volume, death rate, and signal count to determine which company
+  has the stronger safety profile and the magnitude of the difference.
+version: "1.0"
+interface:
+  inputs:
+    company_a_reports:
+      type: int
+      required: false
+    company_b_reports:
+      type: int
+      required: false
+    company_a_deaths:
+      type: int
+      required: false
+    company_b_deaths:
+      type: int
+      required: false
+    company_a_signals:
+      type: int
+      required: false
+    company_b_signals:
+      type: int
+      required: false
+  outputs:
+    winner:
+      type: string
+    advantage:
+      type: string
+    risk_delta:
+      type: string
+    recommendation:
+      type: string
+tree:
+  start: check_a_reports_null
+  nodes:
+    # --- Null safety gate ---
+    check_a_reports_null:
+      type: condition
+      variable: company_a_reports
+      operator: is_null
+      true_next: return_insufficient
+      false_next: check_b_reports_null
+    check_b_reports_null:
+      type: condition
+      variable: company_b_reports
+      operator: is_null
+      true_next: return_insufficient
+      false_next: compare_volume
+
+    # --- Volume comparison ---
+    compare_volume:
+      type: condition
+      variable: company_a_reports
+      operator: gt
+      value: 0
+      true_next: check_b_has_reports
+      false_next: check_b_has_volume_only
+    check_b_has_reports:
+      type: condition
+      variable: company_b_reports
+      operator: gt
+      value: 0
+      true_next: check_a_higher_volume
+      false_next: return_a_volume_winner
+    check_b_has_volume_only:
+      type: condition
+      variable: company_b_reports
+      operator: gt
+      value: 0
+      true_next: return_b_volume_winner
+      false_next: return_insufficient
+
+    # --- Who has more reports (higher exposure = more surveillance) ---
+    check_a_higher_volume:
+      type: condition
+      variable: company_a_reports
+      operator: gte
+      value: 0
+      true_next: check_a_deaths_null
+      false_next: check_a_deaths_null
+
+    # --- Death rate comparison ---
+    check_a_deaths_null:
+      type: condition
+      variable: company_a_deaths
+      operator: is_null
+      true_next: check_signals_a_null
+      false_next: check_b_deaths_null
+    check_b_deaths_null:
+      type: condition
+      variable: company_b_deaths
+      operator: is_null
+      true_next: check_signals_a_null
+      false_next: check_a_high_death_rate
+
+    # Death rate thresholds: deaths/reports ratio proxy
+    # Company A deaths >= 5% of reports = high death burden
+    check_a_high_death_rate:
+      type: condition
+      variable: company_a_deaths
+      operator: gte
+      value: 50000
+      true_next: check_b_high_death_rate_too
+      false_next: check_b_high_death_rate
+
+    check_b_high_death_rate_too:
+      type: condition
+      variable: company_b_deaths
+      operator: gte
+      value: 50000
+      true_next: check_which_more_deaths
+      false_next: return_b_safety_winner
+
+    check_b_high_death_rate:
+      type: condition
+      variable: company_b_deaths
+      operator: gte
+      value: 50000
+      true_next: return_a_safety_winner
+      false_next: check_which_more_deaths
+
+    # Both have death data, compare raw counts
+    check_which_more_deaths:
+      type: condition
+      variable: company_a_deaths
+      operator: gt
+      value: 0
+      true_next: check_signals_a_null
+      false_next: check_signals_a_null
+
+    # --- Signal comparison ---
+    check_signals_a_null:
+      type: condition
+      variable: company_a_signals
+      operator: is_null
+      true_next: determine_final_no_signals
+      false_next: check_signals_b_null
+    check_signals_b_null:
+      type: condition
+      variable: company_b_signals
+      operator: is_null
+      true_next: determine_final_no_signals
+      false_next: check_a_has_signals
+
+    check_a_has_signals:
+      type: condition
+      variable: company_a_signals
+      operator: gt
+      value: 0
+      true_next: check_b_has_signals_too
+      false_next: check_b_has_signals_only
+
+    check_b_has_signals_too:
+      type: condition
+      variable: company_b_signals
+      operator: gt
+      value: 0
+      true_next: return_balanced_with_signals
+      false_next: return_b_signal_winner
+
+    check_b_has_signals_only:
+      type: condition
+      variable: company_b_signals
+      operator: gt
+      value: 0
+      true_next: return_a_signal_winner
+      false_next: determine_final_no_signals
+
+    # --- Terminal nodes ---
+    return_insufficient:
+      type: return
+      value:
+        winner: "insufficient_data"
+        advantage: "balanced"
+        risk_delta: "negligible"
+        recommendation: "Provide report counts for both companies to enable comparison."
+
+    return_a_volume_winner:
+      type: return
+      value:
+        winner: "company_a"
+        advantage: "volume"
+        risk_delta: "moderate"
+        recommendation: "Company A has greater FAERS exposure; Company B lacks report data for comparison."
+
+    return_b_volume_winner:
+      type: return
+      value:
+        winner: "company_b"
+        advantage: "volume"
+        risk_delta: "moderate"
+        recommendation: "Company B has greater FAERS exposure; Company A lacks report data for comparison."
+
+    return_a_safety_winner:
+      type: return
+      value:
+        winner: "company_a"
+        advantage: "safety"
+        risk_delta: "high"
+        recommendation: "Company A has a lower death burden. Company B exceeds the high-death threshold and warrants closer monitoring."
+
+    return_b_safety_winner:
+      type: return
+      value:
+        winner: "company_b"
+        advantage: "safety"
+        risk_delta: "high"
+        recommendation: "Company B has a lower death burden. Company A exceeds the high-death threshold and warrants closer monitoring."
+
+    return_a_signal_winner:
+      type: return
+      value:
+        winner: "company_a"
+        advantage: "signals"
+        risk_delta: "moderate"
+        recommendation: "Company B has active new signals while Company A does not. Investigate Company B signals."
+
+    return_b_signal_winner:
+      type: return
+      value:
+        winner: "company_b"
+        advantage: "signals"
+        risk_delta: "moderate"
+        recommendation: "Company A has active new signals while Company B does not. Investigate Company A signals."
+
+    return_balanced_with_signals:
+      type: return
+      value:
+        winner: "balanced"
+        advantage: "balanced"
+        risk_delta: "moderate"
+        recommendation: "Both companies have active signals. Compare signal severity and investigate each independently."
+
+    determine_final_no_signals:
+      type: condition
+      variable: company_a_deaths
+      operator: is_null
+      true_next: return_volume_based_balanced
+      false_next: check_final_death_comparison
+
+    check_final_death_comparison:
+      type: condition
+      variable: company_a_deaths
+      operator: gte
+      value: 50000
+      true_next: check_final_b_deaths_high
+      false_next: check_final_b_deaths_low
+
+    check_final_b_deaths_high:
+      type: condition
+      variable: company_b_deaths
+      operator: gte
+      value: 50000
+      true_next: return_both_high_risk
+      false_next: return_b_wins_safety_final
+
+    check_final_b_deaths_low:
+      type: condition
+      variable: company_b_deaths
+      operator: gte
+      value: 50000
+      true_next: return_a_wins_safety_final
+      false_next: return_volume_based_balanced
+
+    return_both_high_risk:
+      type: return
+      value:
+        winner: "balanced"
+        advantage: "balanced"
+        risk_delta: "high"
+        recommendation: "Both companies exceed the high-death threshold. Neither has a clear safety advantage; both require intensive monitoring."
+
+    return_b_wins_safety_final:
+      type: return
+      value:
+        winner: "company_b"
+        advantage: "safety"
+        risk_delta: "high"
+        recommendation: "Company B has a lower death burden. Company A exceeds the high-death threshold."
+
+    return_a_wins_safety_final:
+      type: return
+      value:
+        winner: "company_a"
+        advantage: "safety"
+        risk_delta: "high"
+        recommendation: "Company A has a lower death burden. Company B exceeds the high-death threshold."
+
+    return_volume_based_balanced:
+      type: return
+      value:
+        winner: "balanced"
+        advantage: "balanced"
+        risk_delta: "low"
+        recommendation: "Both companies have comparable safety profiles based on available data. No significant differentiator identified."
+
+tests:
+  - name: "High volume with high deaths both sides — balanced high risk"
+    input:
+      company_a_reports: 2365741
+      company_b_reports: 3488768
+      company_a_deaths: 79684
+      company_b_deaths: 100067
+      company_a_signals: 0
+      company_b_signals: 0
+    expect:
+      winner: "balanced"
+      advantage: "balanced"
+      risk_delta: "high"
+      recommendation: "Both companies exceed the high-death threshold. Neither has a clear safety advantage; both require intensive monitoring."
+
+  - name: "Company A has high deaths, B does not — B wins on safety"
+    input:
+      company_a_reports: 2000000
+      company_b_reports: 1500000
+      company_a_deaths: 80000
+      company_b_deaths: 10000
+      company_a_signals: 0
+      company_b_signals: 0
+    expect:
+      winner: "company_b"
+      advantage: "safety"
+      risk_delta: "high"
+      recommendation: "Company B has a lower death burden. Company A exceeds the high-death threshold and warrants closer monitoring."
+
+  - name: "Company B has high deaths, A does not — A wins on safety"
+    input:
+      company_a_reports: 1500000
+      company_b_reports: 2000000
+      company_a_deaths: 5000
+      company_b_deaths: 60000
+      company_a_signals: 0
+      company_b_signals: 0
+    expect:
+      winner: "company_a"
+      advantage: "safety"
+      risk_delta: "high"
+      recommendation: "Company A has a lower death burden. Company B exceeds the high-death threshold and warrants closer monitoring."
+
+  - name: "Company A has signals, B does not — B wins on signals"
+    input:
+      company_a_reports: 500000
+      company_b_reports: 600000
+      company_a_deaths: 1000
+      company_b_deaths: 1200
+      company_a_signals: 5
+      company_b_signals: 0
+    expect:
+      winner: "company_b"
+      advantage: "signals"
+      risk_delta: "moderate"
+      recommendation: "Company A has active new signals while Company B does not. Investigate Company A signals."
+
+  - name: "Both have signals — balanced moderate"
+    input:
+      company_a_reports: 800000
+      company_b_reports: 900000
+      company_a_deaths: 2000
+      company_b_deaths: 3000
+      company_a_signals: 3
+      company_b_signals: 7
+    expect:
+      winner: "balanced"
+      advantage: "balanced"
+      risk_delta: "moderate"
+      recommendation: "Both companies have active signals. Compare signal severity and investigate each independently."
+
+  - name: "Low deaths, no signals — balanced low risk"
+    input:
+      company_a_reports: 300000
+      company_b_reports: 400000
+      company_a_deaths: 500
+      company_b_deaths: 600
+      company_a_signals: 0
+      company_b_signals: 0
+    expect:
+      winner: "balanced"
+      advantage: "balanced"
+      risk_delta: "low"
+      recommendation: "Both companies have comparable safety profiles based on available data. No significant differentiator identified."
+
+  - name: "Null input safety — both missing"
+    input: {}
+    expect:
+      winner: "insufficient_data"
+      advantage: "balanced"
+      risk_delta: "negligible"
+      recommendation: "Provide report counts for both companies to enable comparison."
+
+  - name: "Partial null — only company A provided"
+    input:
+      company_a_reports: 500000
+    expect:
+      winner: "insufficient_data"
+      advantage: "balanced"
+      risk_delta: "negligible"
+      recommendation: "Provide report counts for both companies to enable comparison."

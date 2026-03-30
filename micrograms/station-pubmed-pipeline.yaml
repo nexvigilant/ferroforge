@@ -1,0 +1,270 @@
+name: station-pubmed-pipeline
+description: 'Routes PubMed literature search results through evidence classification: evaluates systematic reviews, RCTs, case reports, and citation volume to determine evidence strength'
+version: 0.1.0
+tree:
+  start: check_systematic_reviews
+  nodes:
+    limited_evidence_many_cases:
+      type: return
+      value:
+        next_step: expanded_search
+        literature_strength: low
+        recommended_action: Case reports exist but limited total literature — expand search to related terms
+        evidence_level: limited
+    strong_evidence_rct:
+      type: return
+      value:
+        recommended_action: RCT data available — extract safety endpoints for signal confirmation
+        next_step: trial_safety_review
+        evidence_level: strong
+        literature_strength: high
+    insufficient_evidence:
+      type: return
+      value:
+        recommended_action: No relevant literature found — consider alternate search terms or spontaneous reporting data
+        evidence_level: insufficient
+        next_step: alternate_data_sources
+        literature_strength: none
+    check_any_case_reports:
+      type: condition
+      variable: case_report_count
+      operator: gte
+      value: 1
+      true_next: limited_evidence
+      false_next: insufficient_evidence
+    check_rcts:
+      type: condition
+      variable: rct_count
+      operator: gte
+      value: 1
+      true_next: strong_evidence_rct
+      false_next: check_case_reports
+    moderate_evidence:
+      type: return
+      value:
+        evidence_level: moderate
+        recommended_action: Substantial case report literature with broad citation base — review for patterns
+        next_step: case_series_analysis
+        literature_strength: moderate
+    check_systematic_reviews:
+      type: condition
+      variable: systematic_review_count
+      operator: gte
+      value: 2
+      true_next: strong_evidence
+      false_next: check_rcts
+    limited_evidence:
+      type: return
+      value:
+        recommended_action: Few case reports found — monitor for new publications
+        literature_strength: low
+        evidence_level: limited
+        next_step: literature_monitoring
+    check_case_reports:
+      type: condition
+      variable: case_report_count
+      operator: gte
+      value: 5
+      true_next: check_total_for_moderate
+      false_next: check_any_case_reports
+    strong_evidence:
+      type: return
+      value:
+        literature_strength: high
+        evidence_level: strong
+        next_step: evidence_synthesis
+        recommended_action: Multiple systematic reviews available — synthesize findings for signal assessment
+    check_total_for_moderate:
+      type: condition
+      variable: total_citations
+      operator: gte
+      value: 20
+      true_next: moderate_evidence
+      false_next: limited_evidence_many_cases
+tests:
+- input:
+    total_citations: 50
+    systematic_review_count: 3
+    case_report_count: 10
+    rct_count: 2
+  expect:
+    evidence_level: strong
+    literature_strength: high
+    next_step: evidence_synthesis
+- input:
+    total_citations: 30
+    systematic_review_count: 0
+    rct_count: 1
+    case_report_count: 8
+  expect:
+    evidence_level: strong
+    next_step: trial_safety_review
+- input:
+    total_citations: 25
+    systematic_review_count: 1
+    case_report_count: 7
+    rct_count: 0
+  expect:
+    evidence_level: moderate
+    next_step: case_series_analysis
+- input:
+    total_citations: 10
+    rct_count: 0
+    systematic_review_count: 0
+    case_report_count: 6
+  expect:
+    next_step: expanded_search
+    evidence_level: limited
+- input:
+    case_report_count: 2
+    rct_count: 0
+    total_citations: 5
+    systematic_review_count: 0
+  expect:
+    evidence_level: limited
+    next_step: literature_monitoring
+- input:
+    total_citations: 15
+    systematic_review_count: 0
+    case_report_count: 0
+    rct_count: 0
+  expect:
+    next_step: alternate_data_sources
+    evidence_level: insufficient
+- input: {}
+  expect:
+    evidence_level: insufficient
+    next_step: alternate_data_sources
+    literature_strength: none
+- input:
+    systematic_review_count: 2
+  expect:
+    evidence_level: strong
+    next_step: evidence_synthesis
+- input:
+    case_report_count: -1
+  expect:
+    next_step: alternate_data_sources
+    recommended_action: No relevant literature found — consider alternate search terms or spontaneous reporting data
+    evidence_level: insufficient
+    literature_strength: none
+- input:
+    case_report_count: 100
+  expect:
+    next_step: expanded_search
+    literature_strength: low
+    recommended_action: Case reports exist but limited total literature — expand search to related terms
+    evidence_level: limited
+- input:
+    rct_count: -1
+  expect:
+    next_step: alternate_data_sources
+    evidence_level: insufficient
+    literature_strength: none
+    recommended_action: No relevant literature found — consider alternate search terms or spontaneous reporting data
+- input:
+    rct_count: 100
+  expect:
+    evidence_level: strong
+    recommended_action: RCT data available — extract safety endpoints for signal confirmation
+    next_step: trial_safety_review
+    literature_strength: high
+- input:
+    systematic_review_count: -1
+  expect:
+    recommended_action: No relevant literature found — consider alternate search terms or spontaneous reporting data
+    next_step: alternate_data_sources
+    evidence_level: insufficient
+    literature_strength: none
+- input:
+    systematic_review_count: 200
+  expect:
+    evidence_level: strong
+    next_step: evidence_synthesis
+    literature_strength: high
+    recommended_action: Multiple systematic reviews available — synthesize findings for signal assessment
+- input:
+    case_report_count: -1
+  expect:
+    literature_strength: none
+    evidence_level: insufficient
+    next_step: alternate_data_sources
+    recommended_action: No relevant literature found — consider alternate search terms or spontaneous reporting data
+- input:
+    case_report_count: 4
+  expect:
+    recommended_action: Few case reports found — monitor for new publications
+    evidence_level: limited
+    next_step: literature_monitoring
+    literature_strength: low
+- input:
+    case_report_count: 500
+  expect:
+    next_step: expanded_search
+    recommended_action: Case reports exist but limited total literature — expand search to related terms
+    evidence_level: limited
+    literature_strength: low
+- input:
+    total_citations: 0
+  expect:
+    next_step: alternate_data_sources
+    evidence_level: insufficient
+    recommended_action: No relevant literature found — consider alternate search terms or spontaneous reporting data
+    literature_strength: none
+- input:
+    total_citations: -1
+  expect:
+    recommended_action: No relevant literature found — consider alternate search terms or spontaneous reporting data
+    next_step: alternate_data_sources
+    literature_strength: none
+    evidence_level: insufficient
+- input:
+    total_citations: 19
+  expect:
+    recommended_action: No relevant literature found — consider alternate search terms or spontaneous reporting data
+    evidence_level: insufficient
+    next_step: alternate_data_sources
+    literature_strength: none
+- input:
+    total_citations: 21
+  expect:
+    evidence_level: insufficient
+    literature_strength: none
+    recommended_action: No relevant literature found — consider alternate search terms or spontaneous reporting data
+    next_step: alternate_data_sources
+- input:
+    total_citations: 2000
+  expect:
+    evidence_level: insufficient
+    next_step: alternate_data_sources
+    recommended_action: No relevant literature found — consider alternate search terms or spontaneous reporting data
+    literature_strength: none
+interface:
+  inputs:
+    rct_count:
+      type: int
+      required: false
+    systematic_review_count:
+      type: int
+      required: false
+    case_report_count:
+      type: int
+      required: false
+    total_citations:
+      type: int
+      required: false
+  outputs:
+    literature_strength:
+      type: string
+      required: false
+    evidence_level:
+      type: string
+      required: false
+    recommended_action:
+      type: string
+      required: false
+    next_step:
+      type: string
+      required: false
+  aliases: {}
+primitive_signature: null

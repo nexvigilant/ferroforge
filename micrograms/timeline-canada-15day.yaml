@@ -1,0 +1,74 @@
+name: timeline-canada-15day
+description: Canada 15-day report
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    due:
+      type: return
+      value:
+        jurisdiction: CA
+        report_type: expedited
+        due: true
+        action: submit
+    check:
+      type: condition
+      variable: days_to_deadline
+      operator: lte
+      value: 15
+      true_next: due
+      false_next: not_due
+    not_due:
+      type: return
+      value:
+        jurisdiction: CA
+        report_type: expedited
+        due: false
+        action: schedule
+tests:
+- input:
+    days_to_deadline: 15
+  expect:
+    due: true
+    jurisdiction: CA
+- input: {}
+  expect:
+    jurisdiction: CA
+    due: false
+- input:
+    days_to_deadline: 0
+  expect:
+    jurisdiction: CA
+    report_type: expedited
+    action: submit
+    due: true
+- input:
+    days_to_deadline: -1
+  expect:
+    due: true
+    action: submit
+    report_type: expedited
+    jurisdiction: CA
+- input:
+    days_to_deadline: 14
+  expect:
+    jurisdiction: CA
+    due: true
+    report_type: expedited
+    action: submit
+- input:
+    days_to_deadline: 16
+  expect:
+    jurisdiction: CA
+    report_type: expedited
+    due: false
+    action: schedule
+- input:
+    days_to_deadline: 1500
+  expect:
+    report_type: expedited
+    due: false
+    action: schedule
+    jurisdiction: CA
+interface: null
+primitive_signature: null

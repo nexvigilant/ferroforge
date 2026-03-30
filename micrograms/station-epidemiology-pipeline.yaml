@@ -1,0 +1,126 @@
+name: station-epidemiology-pipeline
+description: 'Triage epidemiological metrics: classify incidence rates, relative risk, and population exposure'
+version: 0.1.0
+tree:
+  start: check_rr
+  nodes:
+    check_exposure:
+      type: condition
+      variable: exposed_population
+      operator: gte
+      value: 10000
+      true_next: high_impact
+      false_next: limited_impact
+    check_rr:
+      type: condition
+      variable: relative_risk
+      operator: gte
+      value: 2.0
+      true_next: check_exposure
+      false_next: low_risk
+    limited_impact:
+      type: return
+      value:
+        route: signal_investigation
+        action: investigate
+        reason: RR≥2.0 with limited exposure — investigate before broader use
+        priority: moderate
+    low_risk:
+      type: return
+      value:
+        reason: Relative risk <2.0 — no population-level signal
+        action: monitor
+        priority: low
+        route: periodic_review
+    high_impact:
+      type: return
+      value:
+        reason: RR≥2.0 with 10K+ exposed — significant population impact
+        action: escalate
+        route: risk_communication
+        priority: critical
+tests:
+- input:
+    relative_risk: 1.3
+    exposed_population: 50000
+  expect:
+    action: monitor
+    route: periodic_review
+    priority: low
+- input:
+    relative_risk: 3.5
+    exposed_population: 100000
+  expect:
+    route: risk_communication
+    action: escalate
+    priority: critical
+- input:
+    relative_risk: 2.5
+    exposed_population: 500
+  expect:
+    priority: moderate
+    route: signal_investigation
+    action: investigate
+- input:
+    exposed_population: 0
+  expect:
+    route: periodic_review
+    reason: Relative risk <2.0 — no population-level signal
+    action: monitor
+    priority: low
+- input:
+    exposed_population: -1
+  expect:
+    reason: Relative risk <2.0 — no population-level signal
+    action: monitor
+    priority: low
+    route: periodic_review
+- input:
+    exposed_population: 9999
+  expect:
+    priority: low
+    route: periodic_review
+    action: monitor
+    reason: Relative risk <2.0 — no population-level signal
+- input:
+    exposed_population: 10001
+  expect:
+    route: periodic_review
+    priority: low
+    reason: Relative risk <2.0 — no population-level signal
+    action: monitor
+- input:
+    exposed_population: 1000000
+  expect:
+    route: periodic_review
+    priority: low
+    reason: Relative risk <2.0 — no population-level signal
+    action: monitor
+- input: {}
+  expect:
+    reason: Relative risk <2.0 — no population-level signal
+    action: monitor
+    route: periodic_review
+    priority: low
+- input:
+    relative_risk: 1.999
+  expect:
+    action: monitor
+    reason: Relative risk <2.0 — no population-level signal
+    route: periodic_review
+    priority: low
+- input:
+    relative_risk: 2.001
+  expect:
+    reason: RR≥2.0 with limited exposure — investigate before broader use
+    route: signal_investigation
+    priority: moderate
+    action: investigate
+- input: {}
+  expect:
+    action: monitor
+    priority: low
+    route: periodic_review
+    reason: Relative risk <2.0 — no population-level signal
+interface: null
+primitive_signature: null

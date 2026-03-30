@@ -1,0 +1,103 @@
+name: interaction-severity
+description: "Classify drug interaction severity (contraindicated, major, moderate, minor)"
+version: 0.1.0
+tree:
+  start: validate_drugs
+  nodes:
+    validate_drugs:
+      type: condition
+      variable: drug1_name
+      operator: is_not_null
+      value: null
+      true_next: check_contraindication
+      false_next: severity_unknown
+    check_contraindication:
+      type: condition
+      variable: is_contraindicated
+      operator: eq
+      value: true
+      true_next: contraindicated
+      false_next: check_major
+    check_major:
+      type: condition
+      variable: interaction_severity_level
+      operator: eq
+      value: "major"
+      true_next: major_interaction
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: interaction_severity_level
+      operator: eq
+      value: "moderate"
+      true_next: moderate_interaction
+      false_next: minor_interaction
+    contraindicated:
+      type: return
+      value:
+        severity_category: "contraindicated"
+        severity_score: 4
+        clinical_significance: "contraindicated_combination"
+        action_required: true
+        interaction_compliant: true
+    major_interaction:
+      type: return
+      value:
+        severity_category: "major"
+        severity_score: 3
+        clinical_significance: "significant_clinical_effect"
+        action_required: true
+        interaction_compliant: true
+    moderate_interaction:
+      type: return
+      value:
+        severity_category: "moderate"
+        severity_score: 2
+        clinical_significance: "moderate_clinical_effect"
+        action_required: false
+        interaction_compliant: true
+    minor_interaction:
+      type: return
+      value:
+        severity_category: "minor"
+        severity_score: 1
+        clinical_significance: "minimal_clinical_effect"
+        action_required: false
+        interaction_compliant: true
+    severity_unknown:
+      type: return
+      value:
+        severity_category: "unknown"
+        severity_score: null
+        clinical_significance: null
+        action_required: null
+        interaction_compliant: false
+tests:
+- input:
+    drug1_name: "warfarin"
+    is_contraindicated: true
+  expect:
+    severity_category: "contraindicated"
+    severity_score: 4
+    action_required: true
+- input:
+    drug1_name: "simvastatin"
+    interaction_severity_level: "major"
+  expect:
+    severity_category: "major"
+    severity_score: 3
+- input:
+    drug1_name: "metformin"
+    interaction_severity_level: "moderate"
+  expect:
+    severity_category: "moderate"
+    severity_score: 2
+- input:
+    drug1_name: "ibuprofen"
+    interaction_severity_level: "minor"
+  expect:
+    severity_category: "minor"
+- input: {}
+  expect:
+    severity_category: "unknown"
+    interaction_compliant: false

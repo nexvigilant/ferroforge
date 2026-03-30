@@ -1,0 +1,49 @@
+name: age-pediatric-dose
+description: "Pediatric dosing calculator. Adjusts adult dose for children based on age-appropriate dosing rules."
+version: 0.1.0
+tree:
+  start: check_age_years
+  nodes:
+    check_age_years:
+      type: condition
+      variable: age_years
+      operator: lt
+      value: 18
+      true_next: check_weight_based
+      false_next: adult_dosing
+    check_weight_based:
+      type: condition
+      variable: weight_kg
+      operator: gt
+      value: 0
+      true_next: weight_based_calculation
+      false_next: age_based_calculation
+    weight_based_calculation:
+      type: return
+      value:
+        dosing_method: weight_based
+        adjustment_factor: "mg/kg dosing recommended"
+        message: "Pediatric dosing: use weight-based dosing"
+    age_based_calculation:
+      type: return
+      value:
+        dosing_method: age_based
+        adjustment_factor: "Young's rule or Clark's rule"
+        message: "Use age-based adjustment if weight unavailable"
+    adult_dosing:
+      type: return
+      value:
+        dosing_method: adult
+        adjustment_factor: 1.0
+        message: "Age 18+: use standard adult dosing"
+tests:
+  - input: { age_years: 8, weight_kg: 25 }
+    expect: { dosing_method: weight_based, adjustment_factor: "mg/kg dosing recommended" }
+  - input: { age_years: 8, weight_kg: 0 }
+    expect: { dosing_method: age_based }
+  - input: { age_years: 20, weight_kg: 70 }
+    expect: { dosing_method: adult, adjustment_factor: 1.0 }
+  - input: { age_years: 5, weight_kg: 18 }
+    expect: { dosing_method: weight_based }
+  - input: {}
+    expect: {}

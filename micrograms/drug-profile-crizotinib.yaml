@@ -1,0 +1,62 @@
+name: drug-profile-crizotinib
+description: 'Safety triage for crizotinib: PRR-based signal routing (Type B)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    no_signal:
+      type: return
+      value:
+        expected_prr: 6.7
+        harm_type: B
+        drug: crizotinib
+        signal: false
+        action: monitor
+    signal:
+      type: return
+      value:
+        signal: true
+        harm_type: B
+        expected_prr: 6.7
+        action: investigate
+        drug: crizotinib
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5.0
+      true_next: signal
+      false_next: no_signal
+tests:
+- input:
+    prr: 6.7
+  expect:
+    signal: true
+    drug: crizotinib
+- input:
+    prr: 0.5
+  expect:
+    drug: crizotinib
+    signal: false
+- input: {}
+  expect:
+    drug: crizotinib
+    signal: false
+- input:
+    prr: 4.999
+  expect:
+    expected_prr: 6.7
+    harm_type: B
+    signal: false
+    drug: crizotinib
+    action: monitor
+- input:
+    prr: 5.001
+  expect:
+    signal: true
+    harm_type: B
+    action: investigate
+    drug: crizotinib
+    expected_prr: 6.7
+interface: null
+primitive_signature: null

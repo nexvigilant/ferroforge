@@ -1,0 +1,112 @@
+name: tox-cardiac
+description: 'Cardiac toxicity gate: qtc_ms thresholds for heart'
+version: 0.1.0
+tree:
+  start: check_severe
+  nodes:
+    severe:
+      type: return
+      value:
+        action: discontinue
+        organ: cardiac
+        target: heart
+        severity: severe
+    normal:
+      type: return
+      value:
+        action: continue
+        severity: normal
+        target: heart
+        organ: cardiac
+    check_severe:
+      type: condition
+      variable: qtc_ms
+      operator: gte
+      value: 500
+      true_next: severe
+      false_next: check_mild
+    check_mild:
+      type: condition
+      variable: qtc_ms
+      operator: gte
+      value: 450
+      true_next: mild
+      false_next: normal
+    mild:
+      type: return
+      value:
+        action: monitor_closely
+        target: heart
+        severity: mild
+        organ: cardiac
+tests:
+- input:
+    qtc_ms: 501
+  expect:
+    severity: severe
+    organ: cardiac
+- input:
+    qtc_ms: 450
+  expect:
+    severity: mild
+    organ: cardiac
+- input:
+    qtc_ms: 0
+  expect:
+    severity: normal
+    organ: cardiac
+- input: {}
+  expect:
+    organ: cardiac
+    severity: normal
+- input:
+    qtc_ms: -1
+  expect:
+    organ: cardiac
+    severity: normal
+    target: heart
+    action: continue
+- input:
+    qtc_ms: 499
+  expect:
+    organ: cardiac
+    action: monitor_closely
+    target: heart
+    severity: mild
+- input:
+    qtc_ms: 50000
+  expect:
+    target: heart
+    action: discontinue
+    severity: severe
+    organ: cardiac
+- input:
+    qtc_ms: -1
+  expect:
+    action: continue
+    organ: cardiac
+    severity: normal
+    target: heart
+- input:
+    qtc_ms: 449
+  expect:
+    target: heart
+    organ: cardiac
+    action: continue
+    severity: normal
+- input:
+    qtc_ms: 451
+  expect:
+    action: monitor_closely
+    severity: mild
+    target: heart
+    organ: cardiac
+- input:
+    qtc_ms: 45000
+  expect:
+    severity: severe
+    action: discontinue
+    organ: cardiac
+    target: heart
+interface: null
+primitive_signature: null

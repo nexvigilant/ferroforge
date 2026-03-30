@@ -1,0 +1,66 @@
+name: organ-pulmonary-safety
+description: "Pulmonary (lung) safety assessment. Evaluates interstitial lung disease, bronchospasm, and respiratory depression risk."
+version: 0.1.0
+tree:
+  start: check_baseline_ild
+  nodes:
+    check_baseline_ild:
+      type: condition
+      variable: has_interstitial_lung_disease
+      operator: eq
+      value: true
+      true_next: ild_alert
+      false_next: check_copd
+    ild_alert:
+      type: return
+      value:
+        organ: lung
+        risk_level: high
+        pneumonitis_risk: true
+        contraindication: true
+        message: "ILD present; pneumonitis-risk drugs contraindicated"
+    check_copd:
+      type: condition
+      variable: has_severe_copd
+      operator: eq
+      value: true
+      true_next: copd_alert
+      false_next: check_fev1
+    copd_alert:
+      type: return
+      value:
+        organ: lung
+        risk_level: high
+        bronchospasm_risk: true
+        message: "Severe COPD; bronchospasm-risk drugs require caution"
+    check_fev1:
+      type: condition
+      variable: fev1_percent_predicted
+      operator: lt
+      value: 50
+      true_next: reduced_fev1
+      false_next: standard_dosing
+    reduced_fev1:
+      type: return
+      value:
+        organ: lung
+        risk_level: moderate
+        respiratory_monitoring: required
+        message: "Reduced FEV1 <50%; respiratory monitoring required"
+    standard_dosing:
+      type: return
+      value:
+        organ: lung
+        risk_level: low
+        baseline_pulmonary_function: recommended
+tests:
+  - input: { has_interstitial_lung_disease: true, has_severe_copd: false, fev1_percent_predicted: 70 }
+    expect: { organ: lung, risk_level: high, pneumonitis_risk: true }
+  - input: { has_interstitial_lung_disease: false, has_severe_copd: true, fev1_percent_predicted: 70 }
+    expect: { organ: lung, risk_level: high, bronchospasm_risk: true }
+  - input: { has_interstitial_lung_disease: false, has_severe_copd: false, fev1_percent_predicted: 45 }
+    expect: { organ: lung, risk_level: moderate, respiratory_monitoring: required }
+  - input: { has_interstitial_lung_disease: false, has_severe_copd: false, fev1_percent_predicted: 80 }
+    expect: { organ: lung, risk_level: low }
+  - input: {}
+    expect: {}

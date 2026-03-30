@@ -1,0 +1,193 @@
+name: e2e-pv-action-type
+description: 'ICH E2E Section 4: Determines the type of pharmacovigilance action needed for a safety concern based on risk category, seriousness, frequency, and plausibility'
+version: 0.1.0
+interface:
+  inputs:
+    risk_category:
+      type: string
+      required: true
+    serious:
+      type: bool
+      required: false
+    frequency:
+      type: string
+      required: false
+    plausibility:
+      type: string
+      required: false
+  outputs:
+    action_type:
+      type: string
+    additional:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_identified
+  nodes:
+    check_identified:
+      type: condition
+      variable: risk_category
+      operator: eq
+      value: IDENTIFIED_RISK
+      true_next: check_serious
+      false_next: check_potential
+    check_serious:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: check_frequency
+      false_next: result_routine_identified
+    check_frequency:
+      type: condition
+      variable: frequency
+      operator: eq
+      value: common
+      true_next: result_risk_minimization
+      false_next: result_targeted_followup
+    check_potential:
+      type: condition
+      variable: risk_category
+      operator: eq
+      value: POTENTIAL_RISK
+      true_next: check_plausibility
+      false_next: check_missing
+    check_plausibility:
+      type: condition
+      variable: plausibility
+      operator: eq
+      value: high
+      true_next: result_active_surveillance
+      false_next: result_routine_potential
+    check_missing:
+      type: condition
+      variable: risk_category
+      operator: eq
+      value: MISSING_INFORMATION
+      true_next: result_collect_data
+      false_next: result_routine_default
+    result_risk_minimization:
+      type: return
+      value:
+        action_type: ROUTINE_PV_PLUS_ADDITIONAL
+        additional: risk_minimization
+        regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+    result_targeted_followup:
+      type: return
+      value:
+        action_type: ROUTINE_PV_PLUS_ADDITIONAL
+        additional: targeted_followup
+        regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+    result_routine_identified:
+      type: return
+      value:
+        action_type: ROUTINE_PV
+        additional: none
+        regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+    result_active_surveillance:
+      type: return
+      value:
+        action_type: ROUTINE_PV_PLUS_ADDITIONAL
+        additional: active_surveillance
+        regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+    result_routine_potential:
+      type: return
+      value:
+        action_type: ROUTINE_PV
+        additional: none
+        regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+    result_collect_data:
+      type: return
+      value:
+        action_type: ROUTINE_PV_PLUS_ADDITIONAL
+        additional: collect_data
+        regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+    result_routine_default:
+      type: return
+      value:
+        action_type: ROUTINE_PV
+        additional: none
+        regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — measurement, comparison, or classification'
+  primes: ['κ']
+  arguments: []
+tests:
+# Identified, serious, common = risk minimization
+- input:
+    risk_category: IDENTIFIED_RISK
+    serious: true
+    frequency: common
+    plausibility: high
+  expect:
+    action_type: ROUTINE_PV_PLUS_ADDITIONAL
+    additional: risk_minimization
+    regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+# Identified, serious, rare = targeted followup
+- input:
+    risk_category: IDENTIFIED_RISK
+    serious: true
+    frequency: rare
+    plausibility: high
+  expect:
+    action_type: ROUTINE_PV_PLUS_ADDITIONAL
+    additional: targeted_followup
+    regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+# Identified, non-serious = routine PV
+- input:
+    risk_category: IDENTIFIED_RISK
+    serious: false
+    frequency: common
+    plausibility: high
+  expect:
+    action_type: ROUTINE_PV
+    additional: none
+    regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+# Potential, high plausibility = active surveillance
+- input:
+    risk_category: POTENTIAL_RISK
+    serious: false
+    frequency: rare
+    plausibility: high
+  expect:
+    action_type: ROUTINE_PV_PLUS_ADDITIONAL
+    additional: active_surveillance
+    regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+# Potential, low plausibility = routine PV
+- input:
+    risk_category: POTENTIAL_RISK
+    serious: false
+    frequency: rare
+    plausibility: low
+  expect:
+    action_type: ROUTINE_PV
+    additional: none
+    regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+# Missing information = collect data
+- input:
+    risk_category: MISSING_INFORMATION
+    serious: false
+    frequency: rare
+    plausibility: low
+  expect:
+    action_type: ROUTINE_PV_PLUS_ADDITIONAL
+    additional: collect_data
+    regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+# Unknown risk category = routine PV default
+- input:
+    risk_category: NONE
+    serious: false
+    frequency: rare
+    plausibility: low
+  expect:
+    action_type: ROUTINE_PV
+    additional: none
+    regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+# Empty input defaults
+- input: {}
+  expect:
+    action_type: ROUTINE_PV
+    additional: none
+    regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan

@@ -1,0 +1,84 @@
+name: epi-bias-detector
+description: "Detect potential sources of bias in epidemiologic study design and execution"
+version: 0.1.0
+tree:
+  start: validate_bias_assessment
+  nodes:
+    validate_bias_assessment:
+      type: condition
+      variable: bias_assessment_conducted
+      operator: eq
+      value: true
+      true_next: check_selection_bias
+      false_next: bias_unknown
+    check_selection_bias:
+      type: condition
+      variable: has_selection_bias
+      operator: eq
+      value: true
+      true_next: detection_bias
+      false_next: check_information_bias
+    check_information_bias:
+      type: condition
+      variable: has_information_bias
+      operator: eq
+      value: true
+      true_next: information_bias
+      false_next: no_major_bias
+    detection_bias:
+      type: return
+      value:
+        bias_type: "selection_bias"
+        bias_magnitude: "moderate_to_high"
+        impact_on_results: "significant"
+        mitigation_possible: true
+        bias_detection_compliant: true
+    information_bias:
+      type: return
+      value:
+        bias_type: "information_bias"
+        bias_magnitude: "moderate"
+        impact_on_results: "moderate"
+        mitigation_possible: true
+        bias_detection_compliant: true
+    no_major_bias:
+      type: return
+      value:
+        bias_type: "none_detected"
+        bias_magnitude: "minimal"
+        impact_on_results: "minimal"
+        mitigation_possible: false
+        bias_detection_compliant: true
+    bias_unknown:
+      type: return
+      value:
+        bias_type: "bias_assessment_missing"
+        bias_magnitude: null
+        impact_on_results: null
+        mitigation_possible: null
+        bias_detection_compliant: false
+tests:
+- input:
+    bias_assessment_conducted: true
+    has_selection_bias: true
+  expect:
+    bias_type: "selection_bias"
+    bias_magnitude: "moderate_to_high"
+    impact_on_results: "significant"
+- input:
+    bias_assessment_conducted: true
+    has_selection_bias: false
+    has_information_bias: true
+  expect:
+    bias_type: "information_bias"
+    bias_magnitude: "moderate"
+- input:
+    bias_assessment_conducted: true
+    has_selection_bias: false
+    has_information_bias: false
+  expect:
+    bias_type: "none_detected"
+- input: {}
+  expect:
+    bias_type: "bias_assessment_missing"
+    bias_detection_compliant: false

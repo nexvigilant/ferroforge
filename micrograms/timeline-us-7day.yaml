@@ -1,0 +1,74 @@
+name: timeline-us-7day
+description: US 7-day alert report
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: days_to_deadline
+      operator: lte
+      value: 7
+      true_next: due
+      false_next: not_due
+    due:
+      type: return
+      value:
+        report_type: alert
+        due: true
+        action: submit
+        jurisdiction: US
+    not_due:
+      type: return
+      value:
+        jurisdiction: US
+        due: false
+        action: schedule
+        report_type: alert
+tests:
+- input:
+    days_to_deadline: 7
+  expect:
+    jurisdiction: US
+    due: true
+- input: {}
+  expect:
+    jurisdiction: US
+    due: false
+- input:
+    days_to_deadline: 0
+  expect:
+    report_type: alert
+    jurisdiction: US
+    action: submit
+    due: true
+- input:
+    days_to_deadline: -1
+  expect:
+    report_type: alert
+    jurisdiction: US
+    action: submit
+    due: true
+- input:
+    days_to_deadline: 6
+  expect:
+    due: true
+    report_type: alert
+    action: submit
+    jurisdiction: US
+- input:
+    days_to_deadline: 8
+  expect:
+    action: schedule
+    jurisdiction: US
+    report_type: alert
+    due: false
+- input:
+    days_to_deadline: 700
+  expect:
+    jurisdiction: US
+    due: false
+    action: schedule
+    report_type: alert
+interface: null
+primitive_signature: null

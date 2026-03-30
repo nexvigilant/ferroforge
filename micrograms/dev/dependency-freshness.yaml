@@ -1,0 +1,71 @@
+name: dependency-freshness
+description: 'Development gate: dependency-freshness'
+version: 0.1.0
+interface:
+  inputs:
+    metric_value:
+      type: int
+      required: false
+    threshold:
+      type: int
+      required: false
+  outputs:
+    gate:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_pass
+  nodes:
+    check_pass:
+      type: condition
+      variable: metric_value
+      operator: gte
+      value: 80
+      true_next: pass
+      false_next: check_warn
+    check_warn:
+      type: condition
+      variable: metric_value
+      operator: gte
+      value: 50
+      true_next: warn
+      false_next: check_block
+    check_block:
+      type: condition
+      variable: metric_value
+      operator: gte
+      value: 20
+      true_next: block
+      false_next: critical
+    pass:
+      type: return
+      value:
+        gate: PASS
+        action: proceed
+    warn:
+      type: return
+      value:
+        gate: WARN
+        action: review_before_merge
+    block:
+      type: return
+      value:
+        gate: BLOCK
+        action: fix_before_proceed
+    critical:
+      type: return
+      value:
+        gate: CRITICAL
+        action: stop_and_investigate
+tests:
+- input: {metric_value: 90, threshold: 80}
+  expect: {gate: PASS, action: proceed}
+- input: {metric_value: 60, threshold: 80}
+  expect: {gate: WARN, action: review_before_merge}
+- input: {metric_value: 30, threshold: 80}
+  expect: {gate: BLOCK, action: fix_before_proceed}
+- input: {metric_value: 5, threshold: 80}
+  expect: {gate: CRITICAL, action: stop_and_investigate}
+- input: {}
+  expect: {gate: CRITICAL, action: stop_and_investigate}

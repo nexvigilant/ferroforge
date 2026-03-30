@@ -1,0 +1,48 @@
+name: autopilot-pharma-monitor
+description: >
+  Autopilot monitoring chain: classify company tier, then determine sweep action.
+  Input: raw FAERS metrics. Output: alert level + action + monitoring frequency.
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - pharma-safety-signal
+  - autopilot-pharma-sweep
+
+tests:
+  - name: high-volume critical company
+    input:
+      total_faers_reports: 2400000
+      top_reaction_count: 200000
+      total_reports: 2400000
+      death_count: 80000
+      new_signals: 0
+    expect:
+      signal_tier: high_signal_volume
+      monitoring_frequency: continuous
+      alert_level: WATCH
+      action: continuous_monitor
+
+  - name: moderate company routine
+    input:
+      total_faers_reports: 300000
+      top_reaction_count: 20000
+      total_reports: 300000
+      death_count: 100
+      new_signals: 0
+    expect:
+      signal_tier: moderate_signal_volume
+      monitoring_frequency: weekly
+      alert_level: ROUTINE
+      action: periodic_check
+
+  - name: new signals on mid-tier
+    input:
+      total_faers_reports: 700000
+      top_reaction_count: 50000
+      total_reports: 700000
+      death_count: 200
+      new_signals: 5
+    expect:
+      alert_level: HIGH
+      action: signal_investigation

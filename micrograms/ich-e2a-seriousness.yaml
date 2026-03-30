@@ -1,0 +1,130 @@
+name: ich-e2a-seriousness
+description: "ICH E2A: Classify adverse event seriousness criteria (death, life-threatening, hospitalization, disability, congenital anomaly)"
+version: 0.1.0
+tree:
+  start: validate_input
+  nodes:
+    validate_input:
+      type: condition
+      variable: adverse_event
+      operator: is_not_null
+      value: null
+      true_next: check_death
+      false_next: seriousness_unknown
+    check_death:
+      type: condition
+      variable: outcome_type
+      operator: eq
+      value: death
+      true_next: serious_death
+      false_next: check_life_threatening
+    check_life_threatening:
+      type: condition
+      variable: outcome_type
+      operator: eq
+      value: life_threatening
+      true_next: serious_life_threatening
+      false_next: check_hospitalization
+    check_hospitalization:
+      type: condition
+      variable: outcome_type
+      operator: eq
+      value: hospitalization
+      true_next: serious_hospitalization
+      false_next: check_disability
+    check_disability:
+      type: condition
+      variable: outcome_type
+      operator: eq
+      value: disability
+      true_next: serious_disability
+      false_next: check_congenital
+    check_congenital:
+      type: condition
+      variable: outcome_type
+      operator: eq
+      value: congenital_anomaly
+      true_next: serious_congenital
+      false_next: non_serious
+    serious_death:
+      type: return
+      value:
+        seriousness_category: serious
+        seriousness_criterion: death
+        ich_e2a_compliant: true
+        priority: 1
+    serious_life_threatening:
+      type: return
+      value:
+        seriousness_category: serious
+        seriousness_criterion: life_threatening
+        ich_e2a_compliant: true
+        priority: 2
+    serious_hospitalization:
+      type: return
+      value:
+        seriousness_category: serious
+        seriousness_criterion: hospitalization
+        ich_e2a_compliant: true
+        priority: 3
+    serious_disability:
+      type: return
+      value:
+        seriousness_category: serious
+        seriousness_criterion: disability
+        ich_e2a_compliant: true
+        priority: 4
+    serious_congenital:
+      type: return
+      value:
+        seriousness_category: serious
+        seriousness_criterion: congenital_anomaly
+        ich_e2a_compliant: true
+        priority: 5
+    non_serious:
+      type: return
+      value:
+        seriousness_category: non_serious
+        seriousness_criterion: null
+        ich_e2a_compliant: true
+        priority: 6
+    seriousness_unknown:
+      type: return
+      value:
+        seriousness_category: unknown
+        seriousness_criterion: null
+        ich_e2a_compliant: false
+        priority: null
+tests:
+- input:
+    adverse_event: "myocardial infarction"
+    outcome_type: "death"
+  expect:
+    seriousness_category: "serious"
+    seriousness_criterion: "death"
+    priority: 1
+- input:
+    adverse_event: "severe hypotension"
+    outcome_type: "life_threatening"
+  expect:
+    seriousness_category: "serious"
+    seriousness_criterion: "life_threatening"
+    priority: 2
+- input:
+    adverse_event: "pneumonia"
+    outcome_type: "hospitalization"
+  expect:
+    seriousness_category: "serious"
+    seriousness_criterion: "hospitalization"
+    priority: 3
+- input:
+    adverse_event: "mild headache"
+    outcome_type: "non_serious"
+  expect:
+    seriousness_category: "non_serious"
+    seriousness_criterion: null
+    priority: 6
+- input: {}
+  expect:
+    seriousness_category: "unknown"
+    ich_e2a_compliant: false

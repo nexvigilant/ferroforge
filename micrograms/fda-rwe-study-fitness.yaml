@@ -1,0 +1,201 @@
+name: fda-rwe-study-fitness
+description: "FDA real-world evidence study fitness assessment: routes by RWD source and study design to regulatory acceptability per FDA Guidance 'Considerations for the Use of RWD and RWE' (2023)"
+version: 0.1.0
+interface:
+  inputs:
+    rwd_source:
+      type: string
+      required: true
+      description: "Real-world data source: ehr, claims, registry, patient_generated, linked_database"
+    study_design:
+      type: string
+      required: true
+      description: "Study design: randomized_rwe, single_arm_external_control, observational_cohort, case_control, cross_sectional"
+    regulatory_purpose:
+      type: string
+      required: false
+      description: "Intended use: new_indication, label_expansion, postmarket_safety, postmarket_effectiveness"
+    data_quality_verified:
+      type: bool
+      required: false
+      description: "Whether data relevance, reliability, and completeness have been verified"
+  outputs:
+    fitness_level:
+      type: string
+    regulatory_acceptability:
+      type: string
+    additional_requirements:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_data_quality
+  nodes:
+    check_data_quality:
+      type: condition
+      variable: data_quality_verified
+      operator: eq
+      value: true
+      true_next: check_design
+      false_next: quality_not_verified
+
+    quality_not_verified:
+      type: return
+      value:
+        fitness_level: "NOT_FIT"
+        regulatory_acceptability: "Data quality not verified — cannot support regulatory decision"
+        additional_requirements: "Must demonstrate data relevance, reliability, and completeness per FDA RWD/RWE framework before proceeding"
+        regulatory_reference: "FDA Guidance: Considerations for RWD and RWE (2023), Section III — Data Quality Framework"
+
+    check_design:
+      type: condition
+      variable: study_design
+      operator: eq
+      value: "randomized_rwe"
+      true_next: randomized_rwe_purpose
+      false_next: check_external_control
+
+    check_external_control:
+      type: condition
+      variable: study_design
+      operator: eq
+      value: "single_arm_external_control"
+      true_next: external_control_source
+      false_next: check_observational
+
+    check_observational:
+      type: condition
+      variable: study_design
+      operator: eq
+      value: "observational_cohort"
+      true_next: observational_purpose
+      false_next: check_case_control
+
+    check_case_control:
+      type: condition
+      variable: study_design
+      operator: eq
+      value: "case_control"
+      true_next: case_control_path
+      false_next: cross_sectional_path
+
+    # RANDOMIZED RWE
+    randomized_rwe_purpose:
+      type: condition
+      variable: regulatory_purpose
+      operator: eq
+      value: "new_indication"
+      true_next: rwe_new_indication
+      false_next: rwe_other_purpose
+
+    rwe_new_indication:
+      type: return
+      value:
+        fitness_level: "HIGH"
+        regulatory_acceptability: "Randomized RWE trial can support new indication if pre-specified protocol filed with FDA"
+        additional_requirements: "Pre-registration, SAP filed before unblinding, sensitivity analyses for data quality"
+        regulatory_reference: "FDA Guidance: Considerations for RWD and RWE (2023), Section V.A"
+
+    rwe_other_purpose:
+      type: return
+      value:
+        fitness_level: "HIGH"
+        regulatory_acceptability: "Randomized RWE trial acceptable for label expansion, postmarket safety, and effectiveness"
+        additional_requirements: "Pre-specified protocol, data quality plan, sensitivity analyses"
+        regulatory_reference: "FDA Guidance: Considerations for RWD and RWE (2023), Section V.A"
+
+    # EXTERNAL CONTROL
+    external_control_source:
+      type: condition
+      variable: rwd_source
+      operator: eq
+      value: "registry"
+      true_next: external_registry
+      false_next: external_other
+
+    external_registry:
+      type: return
+      value:
+        fitness_level: "MODERATE_HIGH"
+        regulatory_acceptability: "Registry-based external control may support efficacy in rare diseases or oncology with well-defined endpoints"
+        additional_requirements: "Propensity score or other adjustment for confounding. Registry must have validated data elements."
+        regulatory_reference: "FDA Guidance: RWD Assessing Registries (2023); Considerations for RWD and RWE (2023), Section V.B"
+
+    external_other:
+      type: return
+      value:
+        fitness_level: "MODERATE"
+        regulatory_acceptability: "EHR/claims-based external control requires extensive confounding adjustment and sensitivity analyses"
+        additional_requirements: "Pre-specified analysis plan, multiple analytical approaches, quantitative bias analysis"
+        regulatory_reference: "FDA Guidance: RWD Assessing EHR and Claims (2024); Considerations for RWD and RWE (2023), Section V.B"
+
+    # OBSERVATIONAL COHORT
+    observational_purpose:
+      type: condition
+      variable: regulatory_purpose
+      operator: eq
+      value: "postmarket_safety"
+      true_next: observational_safety
+      false_next: observational_effectiveness
+
+    observational_safety:
+      type: return
+      value:
+        fitness_level: "HIGH"
+        regulatory_acceptability: "Observational cohort is well-established for postmarket safety assessment"
+        additional_requirements: "Active comparator preferred. New-user design. Adequate follow-up for outcome ascertainment."
+        regulatory_reference: "FDA Guidance: Considerations for RWD and RWE (2023), Section V.C"
+
+    observational_effectiveness:
+      type: return
+      value:
+        fitness_level: "LOW_MODERATE"
+        regulatory_acceptability: "Observational cohort for effectiveness faces significant confounding challenges"
+        additional_requirements: "Target trial emulation framework recommended. Multiple sensitivity analyses mandatory."
+        regulatory_reference: "FDA Guidance: Considerations for RWD and RWE (2023), Section V.C"
+
+    # CASE-CONTROL
+    case_control_path:
+      type: return
+      value:
+        fitness_level: "MODERATE"
+        regulatory_acceptability: "Case-control design acceptable for rare safety outcomes with proper control selection"
+        additional_requirements: "Incident case definition, appropriate control sampling, exposure window specification"
+        regulatory_reference: "FDA Guidance: Considerations for RWD and RWE (2023), Section V.D"
+
+    # CROSS-SECTIONAL
+    cross_sectional_path:
+      type: return
+      value:
+        fitness_level: "LOW"
+        regulatory_acceptability: "Cross-sectional design generally insufficient for causal regulatory decisions"
+        additional_requirements: "May supplement other evidence; insufficient as standalone for efficacy or safety conclusions"
+        regulatory_reference: "FDA Guidance: Considerations for RWD and RWE (2023), Section V.E"
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(∃, →) — RWE fitness classification by evidence existence and causal design strength'
+  primes: ['κ', '∃', '→', '∂']
+  arguments: ['rwd_source', 'study_design', 'regulatory_purpose', 'data_quality_verified']
+
+tests:
+- input: { study_design: "randomized_rwe", regulatory_purpose: "new_indication", data_quality_verified: true }
+  expect: { fitness_level: "HIGH" }
+- input: { study_design: "randomized_rwe", regulatory_purpose: "postmarket_safety", data_quality_verified: true }
+  expect: { fitness_level: "HIGH" }
+- input: { study_design: "single_arm_external_control", rwd_source: "registry", data_quality_verified: true }
+  expect: { fitness_level: "MODERATE_HIGH" }
+- input: { study_design: "single_arm_external_control", rwd_source: "ehr", data_quality_verified: true }
+  expect: { fitness_level: "MODERATE" }
+- input: { study_design: "observational_cohort", regulatory_purpose: "postmarket_safety", data_quality_verified: true }
+  expect: { fitness_level: "HIGH" }
+- input: { study_design: "observational_cohort", regulatory_purpose: "postmarket_effectiveness", data_quality_verified: true }
+  expect: { fitness_level: "LOW_MODERATE" }
+- input: { study_design: "case_control", rwd_source: "linked_database", data_quality_verified: true }
+  expect: { fitness_level: "MODERATE" }
+- input: { study_design: "cross_sectional", data_quality_verified: true }
+  expect: { fitness_level: "LOW" }
+- input: { study_design: "randomized_rwe", data_quality_verified: false }
+  expect: { fitness_level: "NOT_FIT" }
+- input: {}
+  expect: { fitness_level: "NOT_FIT" }

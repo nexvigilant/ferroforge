@@ -1,0 +1,67 @@
+name: gate-mw-druglike
+description: Lipinski MW cutoff
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    fail:
+      type: return
+      value:
+        met: false
+        threshold: molecular_weight
+        gate: false
+    pass:
+      type: return
+      value:
+        gate: true
+        met: true
+        threshold: molecular_weight
+    check:
+      type: condition
+      variable: molecular_weight
+      operator: lte
+      value: 500
+      true_next: pass
+      false_next: fail
+tests:
+- input:
+    molecular_weight: 500
+  expect:
+    gate: true
+    met: true
+- input: {}
+  expect:
+    met: false
+    gate: false
+- input:
+    molecular_weight: 0
+  expect:
+    gate: true
+    met: true
+    threshold: molecular_weight
+- input:
+    molecular_weight: -1
+  expect:
+    met: true
+    gate: true
+    threshold: molecular_weight
+- input:
+    molecular_weight: 499
+  expect:
+    met: true
+    gate: true
+    threshold: molecular_weight
+- input:
+    molecular_weight: 501
+  expect:
+    met: false
+    gate: false
+    threshold: molecular_weight
+- input:
+    molecular_weight: 50000
+  expect:
+    met: false
+    threshold: molecular_weight
+    gate: false
+interface: null
+primitive_signature: null

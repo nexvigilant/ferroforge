@@ -1,0 +1,376 @@
+name: disney-creative-loop
+description: Walt Disney Creative Strategy — evaluate a concept through Dreamer (vision), Realist (execution), and Critic (failure modes) rooms, producing a readiness verdict
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(∅(vision) + μ(plan) + ∂(risks)) — compares vision against execution feasibility and failure boundaries to produce readiness'
+  primes: ['κ', '∅', 'μ', '∂', '→']
+  arguments: ['dreamer_score', 'realist_score', 'critic_score', 'harm_risk', 'mitigation_level']
+  chain_prediction: 'Dreamer fills ∅ (what does not exist yet). Realist applies μ (mapping vision to buildable steps). Critic applies ∂ (where are the boundaries that could break). κ compares all three to produce verdict.'
+interface:
+  inputs:
+    dreamer_score:
+      type: int
+      required: true
+      description: "Dreamer Room composite (3-15): sum of vision_clarity + user_value + novelty, each 1-5"
+    realist_score:
+      type: int
+      required: true
+      description: "Realist Room composite (4-20): sum of technical_feasibility + resource_available + timeline_realistic + dependencies_clear, each 1-5"
+    critic_score:
+      type: int
+      required: true
+      description: "Critic Room composite (2-10): sum of failure_modes_identified + mitigations_exist, each 1-5"
+    harm_risk:
+      type: int
+      required: true
+      description: "Could failure harm users? (1=no impact, 5=severe harm possible)"
+    mitigation_level:
+      type: int
+      required: true
+      description: "Quality of mitigations for identified failure modes (1=none, 5=comprehensive)"
+  outputs:
+    verdict:
+      type: string
+      description: "BUILD / REFINE / RETHINK / STOP"
+    room_blocking:
+      type: string
+      description: "Which room is the bottleneck: DREAMER / REALIST / CRITIC / NONE"
+    action:
+      type: string
+      description: "Next step recommendation"
+    confidence:
+      type: int
+      description: "Confidence in verdict (0-100)"
+tree:
+  start: check_dreamer_present
+  nodes:
+    # ── Validate ────────────────────────────────────────
+    check_dreamer_present:
+      type: condition
+      variable: dreamer_score
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_realist_present
+
+    check_realist_present:
+      type: condition
+      variable: realist_score
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_critic_present
+
+    check_critic_present:
+      type: condition
+      variable: critic_score
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_harm_present
+
+    check_harm_present:
+      type: condition
+      variable: harm_risk
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_dreamer_range
+
+    reject_missing:
+      type: return
+      value:
+        verdict: REJECTED
+        room_blocking: NONE
+        confidence: 0
+        action: "All 5 inputs required: dreamer_score (3-15), realist_score (4-20), critic_score (2-10), harm_risk (1-5), mitigation_level (1-5)"
+
+    # ── Range checks ────────────────────────────────────
+    check_dreamer_range:
+      type: condition
+      variable: dreamer_score
+      operator: lt
+      value: 3
+      true_next: reject_range
+      false_next: check_dreamer_upper
+
+    check_dreamer_upper:
+      type: condition
+      variable: dreamer_score
+      operator: gt
+      value: 15
+      true_next: reject_range
+      false_next: check_realist_range
+
+    check_realist_range:
+      type: condition
+      variable: realist_score
+      operator: lt
+      value: 4
+      true_next: reject_range
+      false_next: check_realist_upper
+
+    check_realist_upper:
+      type: condition
+      variable: realist_score
+      operator: gt
+      value: 20
+      true_next: reject_range
+      false_next: check_critic_range
+
+    check_critic_range:
+      type: condition
+      variable: critic_score
+      operator: lt
+      value: 2
+      true_next: reject_range
+      false_next: check_critic_upper
+
+    check_critic_upper:
+      type: condition
+      variable: critic_score
+      operator: gt
+      value: 10
+      true_next: reject_range
+      false_next: check_harm_veto
+
+    reject_range:
+      type: return
+      value:
+        verdict: REJECTED
+        room_blocking: NONE
+        confidence: 0
+        action: "Score out of range. dreamer: 3-15, realist: 4-20, critic: 2-10, harm: 1-5, mitigation: 1-5"
+
+    # ── Critic Veto: high harm + low mitigation = STOP ──
+    check_harm_veto:
+      type: condition
+      variable: harm_risk
+      operator: gte
+      value: 4
+      true_next: check_mitigation_for_harm
+      false_next: check_dreamer_weak
+
+    check_mitigation_for_harm:
+      type: condition
+      variable: mitigation_level
+      operator: lte
+      value: 2
+      true_next: verdict_stop
+      false_next: check_dreamer_weak
+
+    verdict_stop:
+      type: return
+      value:
+        verdict: STOP
+        room_blocking: CRITIC
+        confidence: 95
+        action: "High user harm risk with insufficient mitigations. Do not proceed until mitigations are comprehensive."
+
+    # ── Dreamer gate (score <= 6 = too weak) ────────────
+    check_dreamer_weak:
+      type: condition
+      variable: dreamer_score
+      operator: lte
+      value: 6
+      true_next: verdict_rethink
+      false_next: check_realist_weak
+
+    verdict_rethink:
+      type: return
+      value:
+        verdict: RETHINK
+        room_blocking: DREAMER
+        confidence: 85
+        action: "Vision is too vague or low-value. Return to Dreamer room. Clarify the what and why before planning the how."
+
+    # ── Realist gate (score <= 10 = not feasible) ───────
+    check_realist_weak:
+      type: condition
+      variable: realist_score
+      operator: lte
+      value: 10
+      true_next: verdict_refine_realist
+      false_next: check_critic_weak
+
+    verdict_refine_realist:
+      type: return
+      value:
+        verdict: REFINE
+        room_blocking: REALIST
+        confidence: 80
+        action: "Vision is clear but execution plan has gaps. Return to Realist room. Resolve feasibility, resources, or dependencies."
+
+    # ── Critic gate (score <= 4 = unexamined risks) ─────
+    check_critic_weak:
+      type: condition
+      variable: critic_score
+      operator: lte
+      value: 4
+      true_next: verdict_refine_critic
+      false_next: check_all_strong
+
+    verdict_refine_critic:
+      type: return
+      value:
+        verdict: REFINE
+        room_blocking: CRITIC
+        confidence: 80
+        action: "Plan exists but failure analysis is weak. Return to Critic room. Identify failure modes and build mitigations before building."
+
+    # ── All rooms pass — check for high confidence ──────
+    check_all_strong:
+      type: condition
+      variable: dreamer_score
+      operator: gte
+      value: 12
+      true_next: check_realist_strong
+      false_next: verdict_build_normal
+
+    check_realist_strong:
+      type: condition
+      variable: realist_score
+      operator: gte
+      value: 16
+      true_next: check_critic_strong
+      false_next: verdict_build_normal
+
+    check_critic_strong:
+      type: condition
+      variable: critic_score
+      operator: gte
+      value: 8
+      true_next: verdict_build_confident
+      false_next: verdict_build_normal
+
+    verdict_build_confident:
+      type: return
+      value:
+        verdict: BUILD
+        room_blocking: NONE
+        confidence: 95
+        action: "All three rooms green. High confidence. Build it."
+
+    verdict_build_normal:
+      type: return
+      value:
+        verdict: BUILD
+        room_blocking: NONE
+        confidence: 70
+        action: "All rooms pass minimum thresholds. Proceed with awareness of weaker areas."
+
+tests:
+# ── All strong — confident build ────────────────────
+- input:
+    dreamer_score: 14
+    realist_score: 17
+    critic_score: 9
+    harm_risk: 1
+    mitigation_level: 4
+  expect:
+    verdict: BUILD
+    room_blocking: NONE
+    confidence: 95
+
+# ── Weak dreamer — rethink ──────────────────────────
+- input:
+    dreamer_score: 4
+    realist_score: 16
+    critic_score: 8
+    harm_risk: 1
+    mitigation_level: 4
+  expect:
+    verdict: RETHINK
+    room_blocking: DREAMER
+    confidence: 85
+
+# ── Weak realist — refine ───────────────────────────
+- input:
+    dreamer_score: 12
+    realist_score: 8
+    critic_score: 8
+    harm_risk: 1
+    mitigation_level: 4
+  expect:
+    verdict: REFINE
+    room_blocking: REALIST
+    confidence: 80
+
+# ── High harm + low mitigation — stop ───────────────
+- input:
+    dreamer_score: 14
+    realist_score: 17
+    critic_score: 9
+    harm_risk: 5
+    mitigation_level: 1
+  expect:
+    verdict: STOP
+    room_blocking: CRITIC
+    confidence: 95
+
+# ── Weak critic — refine ────────────────────────────
+- input:
+    dreamer_score: 11
+    realist_score: 14
+    critic_score: 3
+    harm_risk: 2
+    mitigation_level: 2
+  expect:
+    verdict: REFINE
+    room_blocking: CRITIC
+    confidence: 80
+
+# ── Missing input — rejected ────────────────────────
+- input: {}
+  expect:
+    verdict: REJECTED
+    room_blocking: NONE
+    confidence: 0
+
+# ── Moderate all — build normal ─────────────────────
+- input:
+    dreamer_score: 10
+    realist_score: 12
+    critic_score: 6
+    harm_risk: 2
+    mitigation_level: 3
+  expect:
+    verdict: BUILD
+    room_blocking: NONE
+    confidence: 70
+
+# ── Out of range — rejected ─────────────────────────
+- input:
+    dreamer_score: 50
+    realist_score: 12
+    critic_score: 6
+    harm_risk: 2
+    mitigation_level: 3
+  expect:
+    verdict: REJECTED
+    confidence: 0
+
+# ── High harm but high mitigation — passes ──────────
+- input:
+    dreamer_score: 13
+    realist_score: 16
+    critic_score: 9
+    harm_risk: 5
+    mitigation_level: 5
+  expect:
+    verdict: BUILD
+    room_blocking: NONE
+    confidence: 95
+
+# ── Edge: dreamer exactly at threshold (7) — passes ─
+- input:
+    dreamer_score: 7
+    realist_score: 12
+    critic_score: 6
+    harm_risk: 1
+    mitigation_level: 3
+  expect:
+    verdict: BUILD
+    room_blocking: NONE
+    confidence: 70

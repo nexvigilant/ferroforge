@@ -1,0 +1,265 @@
+name: fda-boxed-warning-criteria
+description: "FDA boxed warning determination: routes by risk severity and preventability per FDA Guidance 'Warnings and Precautions, Contraindications, and Boxed Warning Sections of Labeling' (2011) and 21 CFR 201.57(c)(1)"
+version: 0.1.0
+interface:
+  inputs:
+    risk_severity:
+      type: string
+      required: true
+      description: "Severity of the adverse reaction: fatal, life_threatening, serious_disability, serious_reversible, moderate"
+    risk_preventable:
+      type: bool
+      required: false
+      description: "Whether the risk is avoidable with appropriate monitoring or dose adjustment"
+    risk_well_known:
+      type: bool
+      required: false
+      description: "Whether the risk is well-established and clinically significant"
+    restricted_distribution:
+      type: bool
+      required: false
+      description: "Whether drug requires restricted distribution program"
+  outputs:
+    warning_level:
+      type: string
+    boxed_warning_justified:
+      type: bool
+    cfr_basis:
+      type: string
+    rationale:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_fatal
+  nodes:
+    check_fatal:
+      type: condition
+      variable: risk_severity
+      operator: eq
+      value: "fatal"
+      true_next: fatal_boxed
+      false_next: check_life_threatening
+
+    check_life_threatening:
+      type: condition
+      variable: risk_severity
+      operator: eq
+      value: "life_threatening"
+      true_next: lt_preventable_check
+      false_next: check_serious_disability
+
+    check_serious_disability:
+      type: condition
+      variable: risk_severity
+      operator: eq
+      value: "serious_disability"
+      true_next: disability_preventable_check
+      false_next: check_serious_reversible
+
+    check_serious_reversible:
+      type: condition
+      variable: risk_severity
+      operator: eq
+      value: "serious_reversible"
+      true_next: reversible_check
+      false_next: moderate_no_box
+
+    # FATAL -> always boxed warning
+    fatal_boxed:
+      type: return
+      value:
+        warning_level: "BOXED_WARNING"
+        boxed_warning_justified: true
+        cfr_basis: "21 CFR 201.57(c)(1)(i)"
+        rationale: "Fatal adverse reaction — boxed warning required to highlight risk that may affect prescribing decision"
+        regulatory_reference: "FDA Guidance: Warnings/Precautions/Boxed Warning (2011), Section II.C; 21 CFR 201.57(c)(1)"
+
+    # LIFE-THREATENING -> check if preventable
+    lt_preventable_check:
+      type: condition
+      variable: risk_preventable
+      operator: eq
+      value: true
+      true_next: lt_preventable_boxed
+      false_next: lt_nonpreventable_boxed
+
+    lt_preventable_boxed:
+      type: return
+      value:
+        warning_level: "BOXED_WARNING"
+        boxed_warning_justified: true
+        cfr_basis: "21 CFR 201.57(c)(1)(ii)"
+        rationale: "Life-threatening risk that is preventable with monitoring — boxed warning with specific monitoring guidance"
+        regulatory_reference: "FDA Guidance: Warnings/Precautions/Boxed Warning (2011), Section II.C"
+
+    lt_nonpreventable_boxed:
+      type: return
+      value:
+        warning_level: "BOXED_WARNING"
+        boxed_warning_justified: true
+        cfr_basis: "21 CFR 201.57(c)(1)(i)"
+        rationale: "Life-threatening risk — boxed warning to inform benefit-risk assessment"
+        regulatory_reference: "FDA Guidance: Warnings/Precautions/Boxed Warning (2011), Section II.C"
+
+    # SERIOUS DISABILITY -> preventable determines level
+    disability_preventable_check:
+      type: condition
+      variable: risk_preventable
+      operator: eq
+      value: true
+      true_next: disability_preventable
+      false_next: disability_restricted_check
+
+    disability_preventable:
+      type: return
+      value:
+        warning_level: "BOXED_WARNING"
+        boxed_warning_justified: true
+        cfr_basis: "21 CFR 201.57(c)(1)(ii)"
+        rationale: "Serious persistent disability that is preventable — boxed warning with risk minimization instructions"
+        regulatory_reference: "FDA Guidance: Warnings/Precautions/Boxed Warning (2011), Section II.C"
+
+    disability_restricted_check:
+      type: condition
+      variable: restricted_distribution
+      operator: eq
+      value: true
+      true_next: disability_restricted
+      false_next: disability_warnings_section
+
+    disability_restricted:
+      type: return
+      value:
+        warning_level: "BOXED_WARNING"
+        boxed_warning_justified: true
+        cfr_basis: "21 CFR 201.57(c)(1)(iii)"
+        rationale: "Serious disability with restricted distribution — boxed warning required for REMS-restricted products"
+        regulatory_reference: "FDA Guidance: Warnings/Precautions/Boxed Warning (2011), Section II.C"
+
+    disability_warnings_section:
+      type: return
+      value:
+        warning_level: "WARNINGS_AND_PRECAUTIONS"
+        boxed_warning_justified: false
+        cfr_basis: "21 CFR 201.57(c)(6)"
+        rationale: "Serious disability but not preventable and not restricted — Warnings and Precautions section appropriate"
+        regulatory_reference: "FDA Guidance: Warnings/Precautions/Boxed Warning (2011), Section II.B"
+
+    # SERIOUS REVERSIBLE -> warnings section unless restricted
+    reversible_check:
+      type: condition
+      variable: restricted_distribution
+      operator: eq
+      value: true
+      true_next: reversible_restricted
+      false_next: reversible_warnings
+
+    reversible_restricted:
+      type: return
+      value:
+        warning_level: "BOXED_WARNING"
+        boxed_warning_justified: true
+        cfr_basis: "21 CFR 201.57(c)(1)(iii)"
+        rationale: "Serious reversible reaction with restricted distribution program — boxed warning required"
+        regulatory_reference: "FDA Guidance: Warnings/Precautions/Boxed Warning (2011), Section II.C"
+
+    reversible_warnings:
+      type: return
+      value:
+        warning_level: "WARNINGS_AND_PRECAUTIONS"
+        boxed_warning_justified: false
+        cfr_basis: "21 CFR 201.57(c)(6)"
+        rationale: "Serious but reversible — Warnings and Precautions section is appropriate"
+        regulatory_reference: "FDA Guidance: Warnings/Precautions/Boxed Warning (2011), Section II.B"
+
+    # MODERATE -> no boxed warning
+    moderate_no_box:
+      type: return
+      value:
+        warning_level: "WARNINGS_AND_PRECAUTIONS"
+        boxed_warning_justified: false
+        cfr_basis: "21 CFR 201.57(c)(6)"
+        rationale: "Moderate severity — Warnings and Precautions section; boxed warning not warranted"
+        regulatory_reference: "FDA Guidance: Warnings/Precautions/Boxed Warning (2011), Section II.B"
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(∂) — warning level classification by severity boundary and preventability'
+  primes: ['κ', '∂', 'σ']
+  arguments: ['risk_severity', 'risk_preventable', 'restricted_distribution']
+
+tests:
+# Fatal -> always boxed
+- input:
+    risk_severity: "fatal"
+  expect:
+    warning_level: "BOXED_WARNING"
+    boxed_warning_justified: true
+
+# Life-threatening, preventable
+- input:
+    risk_severity: "life_threatening"
+    risk_preventable: true
+  expect:
+    warning_level: "BOXED_WARNING"
+    boxed_warning_justified: true
+
+# Life-threatening, not preventable
+- input:
+    risk_severity: "life_threatening"
+    risk_preventable: false
+  expect:
+    warning_level: "BOXED_WARNING"
+    boxed_warning_justified: true
+
+# Serious disability, preventable -> boxed
+- input:
+    risk_severity: "serious_disability"
+    risk_preventable: true
+  expect:
+    boxed_warning_justified: true
+
+# Serious disability, not preventable, restricted -> boxed
+- input:
+    risk_severity: "serious_disability"
+    risk_preventable: false
+    restricted_distribution: true
+  expect:
+    boxed_warning_justified: true
+
+# Serious disability, not preventable, not restricted -> warnings section
+- input:
+    risk_severity: "serious_disability"
+    risk_preventable: false
+    restricted_distribution: false
+  expect:
+    warning_level: "WARNINGS_AND_PRECAUTIONS"
+    boxed_warning_justified: false
+
+# Serious reversible, restricted -> boxed
+- input:
+    risk_severity: "serious_reversible"
+    restricted_distribution: true
+  expect:
+    boxed_warning_justified: true
+
+# Serious reversible, not restricted -> warnings
+- input:
+    risk_severity: "serious_reversible"
+    restricted_distribution: false
+  expect:
+    warning_level: "WARNINGS_AND_PRECAUTIONS"
+    boxed_warning_justified: false
+
+# Moderate -> no box
+- input:
+    risk_severity: "moderate"
+  expect:
+    warning_level: "WARNINGS_AND_PRECAUTIONS"
+    boxed_warning_justified: false
+
+# Empty input -> moderate default
+- input: {}
+  expect:
+    boxed_warning_justified: false

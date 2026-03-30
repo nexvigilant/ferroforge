@@ -1,0 +1,62 @@
+name: drug-class-calcineurin-inhibitor-safety
+description: "Calcineurin inhibitor safety assessment. Evaluates nephrotoxicity, neurotoxicity, hypertension, and infection risk."
+version: 0.1.0
+tree:
+  start: check_baseline_renal
+  nodes:
+    check_baseline_renal:
+      type: condition
+      variable: baseline_creatinine_mg_dl
+      operator: gte
+      value: 2.5
+      true_next: renal_alert
+      false_next: check_hypertension
+    renal_alert:
+      type: return
+      value:
+        risk_level: high
+        relative_contraindication: true
+        message: "Elevated baseline creatinine; high nephrotoxicity risk with calcineurin inhibitor"
+    check_hypertension:
+      type: condition
+      variable: has_uncontrolled_hypertension
+      operator: eq
+      value: true
+      true_next: htn_alert
+      false_next: check_infections
+    htn_alert:
+      type: return
+      value:
+        risk_level: moderate
+        blood_pressure_monitoring: required
+        message: "Uncontrolled hypertension; calcineurin inhibitor may worsen BP control"
+    check_infections:
+      type: condition
+      variable: recent_infection
+      operator: eq
+      value: true
+      true_next: infection_alert
+      false_next: standard_dosing
+    infection_alert:
+      type: return
+      value:
+        risk_level: moderate
+        infection_monitoring: required
+        message: "Recent infection; defer calcineurin inhibitor until resolved"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        monitoring_required: true
+        message: "Standard calcineurin inhibitor dosing; monitor renal function and levels"
+tests:
+  - input: { baseline_creatinine_mg_dl: 2.8, has_uncontrolled_hypertension: false, recent_infection: false }
+    expect: { risk_level: high, relative_contraindication: true }
+  - input: { baseline_creatinine_mg_dl: 1.5, has_uncontrolled_hypertension: true, recent_infection: false }
+    expect: { risk_level: moderate, blood_pressure_monitoring: required }
+  - input: { baseline_creatinine_mg_dl: 1.5, has_uncontrolled_hypertension: false, recent_infection: true }
+    expect: { risk_level: moderate, infection_monitoring: required }
+  - input: { baseline_creatinine_mg_dl: 1.5, has_uncontrolled_hypertension: false, recent_infection: false }
+    expect: { risk_level: low, monitoring_required: true }
+  - input: {}
+    expect: {}

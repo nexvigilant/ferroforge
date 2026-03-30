@@ -1,0 +1,77 @@
+name: station-stoichiometry-pipeline
+description: 'Route stoichiometric analysis: balance verification and isomer detection'
+version: 0.1.0
+tree:
+  start: check_balanced
+  nodes:
+    check_isomer:
+      type: condition
+      variable: has_isomers
+      operator: eq
+      value: true
+      true_next: isomer_alert
+      false_next: clean
+    check_balanced:
+      type: condition
+      variable: is_balanced
+      operator: eq
+      value: true
+      true_next: check_isomer
+      false_next: unbalanced
+    unbalanced:
+      type: return
+      value:
+        route: chemistry_review
+        reason: Unbalanced formula — stoichiometric error in reaction
+        action: reject
+        priority: high
+    clean:
+      type: return
+      value:
+        priority: low
+        route: archive
+        action: pass
+        reason: Balanced, no isomer ambiguity — proceed
+    isomer_alert:
+      type: return
+      value:
+        route: isomer_review
+        priority: moderate
+        action: flag
+        reason: Isomers detected — verify correct stereoisomer for safety profile
+tests:
+- input:
+    has_isomers: false
+    is_balanced: false
+  expect:
+    action: reject
+    priority: high
+    route: chemistry_review
+- input:
+    has_isomers: true
+    is_balanced: true
+  expect:
+    action: flag
+    priority: moderate
+    route: isomer_review
+- input:
+    has_isomers: false
+    is_balanced: true
+  expect:
+    priority: low
+    route: archive
+    action: pass
+- input: {}
+  expect:
+    route: chemistry_review
+    reason: Unbalanced formula — stoichiometric error in reaction
+    action: reject
+    priority: high
+- input: {}
+  expect:
+    priority: high
+    route: chemistry_review
+    reason: Unbalanced formula — stoichiometric error in reaction
+    action: reject
+interface: null
+primitive_signature: null

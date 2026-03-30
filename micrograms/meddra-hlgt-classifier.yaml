@@ -1,0 +1,89 @@
+name: meddra-hlgt-classifier
+description: "Classify adverse event to MedDRA High Level Group Term (HLGT)"
+version: 0.1.0
+tree:
+  start: validate_soc
+  nodes:
+    validate_soc:
+      type: condition
+      variable: soc_code
+      operator: is_not_null
+      value: null
+      true_next: check_infections_hlgt
+      false_next: hlgt_unknown
+    check_infections_hlgt:
+      type: condition
+      variable: soc_code
+      operator: eq
+      value: "10001"
+      true_next: infections_hlgt
+      false_next: check_cardiac_hlgt
+    check_cardiac_hlgt:
+      type: condition
+      variable: soc_code
+      operator: eq
+      value: "10007"
+      true_next: cardiac_hlgt
+      false_next: check_neuro_hlgt
+    check_neuro_hlgt:
+      type: condition
+      variable: soc_code
+      operator: eq
+      value: "10029104"
+      true_next: neuro_hlgt
+      false_next: other_hlgt
+    infections_hlgt:
+      type: return
+      value:
+        hlgt_code: "10016825"
+        hlgt_name: "Bacterial infections and mycoses"
+        soc_code: "10001"
+        meddra_hierarchy_compliant: true
+    cardiac_hlgt:
+      type: return
+      value:
+        hlgt_code: "10007541"
+        hlgt_name: "Arrhythmias"
+        soc_code: "10007"
+        meddra_hierarchy_compliant: true
+    neuro_hlgt:
+      type: return
+      value:
+        hlgt_code: "10029094"
+        hlgt_name: "Seizures, convulsions and related phenomena"
+        soc_code: "10029104"
+        meddra_hierarchy_compliant: true
+    other_hlgt:
+      type: return
+      value:
+        hlgt_code: "10010020"
+        hlgt_name: "General conditions"
+        soc_code: "10010001"
+        meddra_hierarchy_compliant: true
+    hlgt_unknown:
+      type: return
+      value:
+        hlgt_code: null
+        hlgt_name: null
+        soc_code: null
+        meddra_hierarchy_compliant: false
+tests:
+- input:
+    soc_code: "10001"
+  expect:
+    hlgt_code: "10016825"
+    hlgt_name: "Bacterial infections and mycoses"
+- input:
+    soc_code: "10007"
+  expect:
+    hlgt_code: "10007541"
+    hlgt_name: "Arrhythmias"
+- input:
+    soc_code: "10029104"
+  expect:
+    hlgt_code: "10029094"
+    hlgt_name: "Seizures, convulsions and related phenomena"
+- input: {}
+  expect:
+    hlgt_code: null
+    meddra_hierarchy_compliant: false

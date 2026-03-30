@@ -1,0 +1,82 @@
+name: delta-classifier
+description: 'Classify flywheel score delta between sessions: SURGE (>+10), GROWTH (+3..+10), STABLE (-2..+2), DECLINE (-10..-3), CRASH (<-10)'
+version: 0.1.0
+interface:
+  inputs:
+    delta:
+      type: int
+      required: false
+  outputs:
+    classification:
+      type: string
+    urgency:
+      type: string
+tree:
+  start: check_surge
+  nodes:
+    check_surge:
+      type: condition
+      variable: delta
+      operator: gte
+      value: 10
+      true_next: surge
+      false_next: check_growth
+    check_growth:
+      type: condition
+      variable: delta
+      operator: gte
+      value: 3
+      true_next: growth
+      false_next: check_stable
+    check_stable:
+      type: condition
+      variable: delta
+      operator: gte
+      value: -2
+      true_next: stable
+      false_next: check_decline
+    check_decline:
+      type: condition
+      variable: delta
+      operator: gte
+      value: -10
+      true_next: decline
+      false_next: crash
+    surge:
+      type: return
+      value:
+        classification: SURGE
+        urgency: celebrate
+    growth:
+      type: return
+      value:
+        classification: GROWTH
+        urgency: sustain
+    stable:
+      type: return
+      value:
+        classification: STABLE
+        urgency: push
+    decline:
+      type: return
+      value:
+        classification: DECLINE
+        urgency: investigate
+    crash:
+      type: return
+      value:
+        classification: CRASH
+        urgency: emergency
+tests:
+- input: {delta: 15}
+  expect: {classification: SURGE, urgency: celebrate}
+- input: {delta: 5}
+  expect: {classification: GROWTH, urgency: sustain}
+- input: {delta: 0}
+  expect: {classification: STABLE, urgency: push}
+- input: {delta: -5}
+  expect: {classification: DECLINE, urgency: investigate}
+- input: {delta: -15}
+  expect: {classification: CRASH, urgency: emergency}
+- input: {}
+  expect: {classification: CRASH, urgency: emergency}

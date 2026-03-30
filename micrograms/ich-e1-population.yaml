@@ -1,0 +1,107 @@
+name: ich-e1-population
+description: "ICH E1: Determine population subgroup safety requirements for clinical development"
+version: 0.1.0
+tree:
+  start: validate_population
+  nodes:
+    validate_population:
+      type: condition
+      variable: target_population
+      operator: is_not_null
+      value: null
+      true_next: check_age_group
+      false_next: population_unknown
+    check_age_group:
+      type: condition
+      variable: age_group
+      operator: eq
+      value: "pediatric"
+      true_next: pediatric_requirements
+      false_next: check_elderly
+    check_elderly:
+      type: condition
+      variable: age_group
+      operator: eq
+      value: "elderly"
+      true_next: elderly_requirements
+      false_next: check_renal_impairment
+    check_renal_impairment:
+      type: condition
+      variable: has_renal_impairment_data
+      operator: eq
+      value: true
+      true_next: renal_requirements
+      false_next: check_hepatic_impairment
+    check_hepatic_impairment:
+      type: condition
+      variable: has_hepatic_impairment_data
+      operator: eq
+      value: true
+      true_next: hepatic_requirements
+      false_next: standard_population
+    pediatric_requirements:
+      type: return
+      value:
+        population_type: "pediatric"
+        required_data_package: "ICH_E11_pediatric"
+        age_stratification: "neonatal,infant,child,adolescent"
+        ich_e1_compliant: true
+    elderly_requirements:
+      type: return
+      value:
+        population_type: "elderly"
+        required_data_package: "ICH_E7_elderly"
+        age_stratification: "65_75,greater_than_75"
+        ich_e1_compliant: true
+    renal_requirements:
+      type: return
+      value:
+        population_type: "renal_impairment"
+        required_data_package: "renal_pharmacokinetics"
+        stratification: "mild,moderate,severe"
+        ich_e1_compliant: true
+    hepatic_requirements:
+      type: return
+      value:
+        population_type: "hepatic_impairment"
+        required_data_package: "hepatic_pharmacokinetics"
+        stratification: "mild,moderate,severe"
+        ich_e1_compliant: true
+    standard_population:
+      type: return
+      value:
+        population_type: "adult"
+        required_data_package: "standard"
+        age_stratification: null
+        ich_e1_compliant: true
+    population_unknown:
+      type: return
+      value:
+        population_type: null
+        required_data_package: null
+        age_stratification: null
+        ich_e1_compliant: false
+tests:
+- input:
+    target_population: "pediatric_diabetes"
+    age_group: "pediatric"
+  expect:
+    population_type: "pediatric"
+    required_data_package: "ICH_E11_pediatric"
+- input:
+    target_population: "hypertension_elderly"
+    age_group: "elderly"
+  expect:
+    population_type: "elderly"
+    required_data_package: "ICH_E7_elderly"
+- input:
+    target_population: "renal_disease"
+    age_group: "adult"
+    has_renal_impairment_data: true
+  expect:
+    population_type: "renal_impairment"
+    required_data_package: "renal_pharmacokinetics"
+- input: {}
+  expect:
+    population_type: null
+    ich_e1_compliant: false

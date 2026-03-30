@@ -1,0 +1,85 @@
+name: signal-investigation-pipeline
+description: >
+  Cross-config signal investigation pipeline. Wires 4 Station config domains
+  together via adapter micrograms:
+    Step 1: adapt-faers-to-disproportionality (FAERS counts → 2x2 table gate)
+    Step 2: prr-signal (compute PRR classification)
+    Step 3: config-openvigil-triage (multi-measure signal triage)
+    Step 4: adapt-signal-strength (normalize to signal_detected boolean)
+    Step 5: signal-to-causality (bridge signal → Naranjo input)
+    Step 6: naranjo-quick (causality classification)
+    Step 7: adapt-label-to-expectedness (DailyMed label → expectedness)
+    Step 8: causality-to-action (final regulatory action)
+  This is the /station-signal workflow encoded as a testable microgram chain.
+  Between agent tool calls (FAERS, DailyMed, etc), the chain handles all
+  decision logic. The agent only needs to call Station tools and feed results
+  into the chain.
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - adapt-faers-to-disproportionality
+  - prr-signal
+  - naranjo-quick
+  - adapt-label-to-expectedness
+  - causality-to-action
+tests:
+- name: "strong signal + definite causality + unexpected → URGENT regulatory action"
+  input:
+    # From FAERS (openfda config)
+    drug_event_count: 150
+    drug_total: 5000
+    event_total: 300
+    all_total: 1000000
+    # PRR computed externally or passed through
+    prr: 4.5
+    chi_squared: 25.0
+    case_count: 150
+    # Naranjo score from clinical assessment
+    naranjo_score: 9
+    # From DailyMed label check
+    event_in_label: false
+    event_class_in_label: false
+    # Context for causality-to-action
+    is_serious: true
+  expect:
+    sufficient_data: true
+    signal_detected: true
+    causality: DEFINITE
+    expectedness_category: UNEXPECTED_NATURE
+    regulatory_action: expedited_report
+
+- name: "moderate signal + possible causality + expected → MONITOR"
+  input:
+    drug_event_count: 20
+    drug_total: 3000
+    event_total: 200
+    all_total: 800000
+    prr: 1.8
+    chi_squared: 3.5
+    case_count: 20
+    naranjo_score: 3
+    event_in_label: true
+    is_serious: false
+  expect:
+    sufficient_data: true
+    causality: POSSIBLE
+    expectedness_category: EXPECTED
+    regulatory_action: monitor
+
+- name: "insufficient data → ACCUMULATE"
+  input:
+    drug_event_count: 1
+    drug_total: 50
+    event_total: 10
+    all_total: 500000
+    prr: 0.5
+    chi_squared: 0.1
+    case_count: 1
+    naranjo_score: 0
+    event_in_label: true
+    is_serious: false
+  expect:
+    sufficient_data: false
+    causality: DOUBTFUL
+    expectedness_category: EXPECTED

@@ -1,0 +1,256 @@
+name: fda-combo-reporting-route
+description: "FDA combination product postmarketing safety reporting pathway: routes by product type and lead center per FDA Guidance 'Postmarketing Safety Reporting for Combination Products' (2019)"
+version: 0.1.0
+interface:
+  inputs:
+    product_type:
+      type: string
+      required: true
+      description: "Combination product type: drug-device, drug-biologic, device-biologic, drug-device-biologic"
+    lead_center:
+      type: string
+      required: true
+      description: "FDA lead center: CDER, CBER, CDRH"
+    serious:
+      type: bool
+      required: true
+      description: "Whether the adverse event is serious"
+    unexpected:
+      type: bool
+      required: false
+      description: "Whether the event is unexpected/unlabeled"
+  outputs:
+    reporting_pathway:
+      type: string
+    reporting_form:
+      type: string
+    timeline_days:
+      type: int
+    additional_report:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_lead_center
+  nodes:
+    check_lead_center:
+      type: condition
+      variable: lead_center
+      operator: eq
+      value: "CDER"
+      true_next: cder_serious_check
+      false_next: check_cber
+
+    check_cber:
+      type: condition
+      variable: lead_center
+      operator: eq
+      value: "CBER"
+      true_next: cber_serious_check
+      false_next: cdrh_serious_check
+
+    # CDER lead - drug reporting rules apply
+    cder_serious_check:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: cder_unexpected_check
+      false_next: cder_periodic
+
+    cder_unexpected_check:
+      type: condition
+      variable: unexpected
+      operator: eq
+      value: true
+      true_next: cder_expedited_15
+      false_next: cder_serious_periodic
+
+    cder_expedited_15:
+      type: return
+      value:
+        reporting_pathway: NDA_FIELD_ALERT
+        reporting_form: "MedWatch 3500A + Device Problem Report"
+        timeline_days: 15
+        additional_report: "Submit parallel MDR to CDRH for device constituent if device-related"
+        regulatory_reference: "FDA Guidance: Postmarketing Safety Reporting for Combination Products (2019), 21 CFR 314.80"
+
+    cder_serious_periodic:
+      type: return
+      value:
+        reporting_pathway: NDA_PERIODIC
+        reporting_form: "MedWatch 3500A"
+        timeline_days: 90
+        additional_report: "Include in PSUR/PBRER; parallel MDR if device-related failure"
+        regulatory_reference: "FDA Guidance: Postmarketing Safety Reporting for Combination Products (2019), 21 CFR 314.80"
+
+    cder_periodic:
+      type: return
+      value:
+        reporting_pathway: NDA_PERIODIC
+        reporting_form: "MedWatch 3500A"
+        timeline_days: 90
+        additional_report: "None required for non-serious events"
+        regulatory_reference: "FDA Guidance: Postmarketing Safety Reporting for Combination Products (2019), 21 CFR 314.80"
+
+    # CBER lead - biologic reporting rules apply
+    cber_serious_check:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: cber_unexpected_check
+      false_next: cber_periodic
+
+    cber_unexpected_check:
+      type: condition
+      variable: unexpected
+      operator: eq
+      value: true
+      true_next: cber_expedited_15
+      false_next: cber_serious_periodic
+
+    cber_expedited_15:
+      type: return
+      value:
+        reporting_pathway: BLA_15DAY_ALERT
+        reporting_form: "MedWatch 3500A + VAERS (if vaccine)"
+        timeline_days: 15
+        additional_report: "Submit parallel MDR to CDRH for device constituent if device-related"
+        regulatory_reference: "FDA Guidance: Postmarketing Safety Reporting for Combination Products (2019), 21 CFR 600.80"
+
+    cber_serious_periodic:
+      type: return
+      value:
+        reporting_pathway: BLA_PERIODIC
+        reporting_form: "MedWatch 3500A"
+        timeline_days: 90
+        additional_report: "Include in PSUR/PBRER"
+        regulatory_reference: "FDA Guidance: Postmarketing Safety Reporting for Combination Products (2019), 21 CFR 600.80"
+
+    cber_periodic:
+      type: return
+      value:
+        reporting_pathway: BLA_PERIODIC
+        reporting_form: "MedWatch 3500A"
+        timeline_days: 90
+        additional_report: "None required for non-serious events"
+        regulatory_reference: "FDA Guidance: Postmarketing Safety Reporting for Combination Products (2019), 21 CFR 600.80"
+
+    # CDRH lead - device reporting rules apply
+    cdrh_serious_check:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: cdrh_expedited
+      false_next: cdrh_periodic
+
+    cdrh_expedited:
+      type: return
+      value:
+        reporting_pathway: MDR_30DAY
+        reporting_form: "FDA Form 3500A (MDR)"
+        timeline_days: 30
+        additional_report: "Submit parallel NDA/BLA report to CDER/CBER for drug/biologic constituent"
+        regulatory_reference: "FDA Guidance: Postmarketing Safety Reporting for Combination Products (2019), 21 CFR 803"
+
+    cdrh_periodic:
+      type: return
+      value:
+        reporting_pathway: MDR_ANNUAL
+        reporting_form: "FDA Form 3500A (MDR)"
+        timeline_days: 365
+        additional_report: "None required for non-serious events"
+        regulatory_reference: "FDA Guidance: Postmarketing Safety Reporting for Combination Products (2019), 21 CFR 803"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(∂) — regulatory routing by organizational boundary (lead center) and seriousness'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['lead_center', 'product_type', 'serious', 'unexpected']
+
+tests:
+# CDER lead, serious unexpected -> 15-day field alert
+- input:
+    product_type: "drug-device"
+    lead_center: "CDER"
+    serious: true
+    unexpected: true
+  expect:
+    reporting_pathway: NDA_FIELD_ALERT
+    timeline_days: 15
+
+# CDER lead, serious expected -> periodic
+- input:
+    product_type: "drug-device"
+    lead_center: "CDER"
+    serious: true
+    unexpected: false
+  expect:
+    reporting_pathway: NDA_PERIODIC
+    timeline_days: 90
+
+# CDER lead, non-serious -> periodic
+- input:
+    product_type: "drug-device"
+    lead_center: "CDER"
+    serious: false
+    unexpected: false
+  expect:
+    reporting_pathway: NDA_PERIODIC
+    timeline_days: 90
+
+# CBER lead, serious unexpected -> 15-day
+- input:
+    product_type: "drug-biologic"
+    lead_center: "CBER"
+    serious: true
+    unexpected: true
+  expect:
+    reporting_pathway: BLA_15DAY_ALERT
+    timeline_days: 15
+
+# CBER lead, non-serious -> periodic
+- input:
+    product_type: "device-biologic"
+    lead_center: "CBER"
+    serious: false
+  expect:
+    reporting_pathway: BLA_PERIODIC
+    timeline_days: 90
+
+# CDRH lead, serious -> 30-day MDR
+- input:
+    product_type: "drug-device"
+    lead_center: "CDRH"
+    serious: true
+    unexpected: true
+  expect:
+    reporting_pathway: MDR_30DAY
+    timeline_days: 30
+
+# CDRH lead, non-serious -> annual
+- input:
+    product_type: "drug-device"
+    lead_center: "CDRH"
+    serious: false
+  expect:
+    reporting_pathway: MDR_ANNUAL
+    timeline_days: 365
+
+# CBER lead, serious expected -> periodic
+- input:
+    product_type: "drug-biologic"
+    lead_center: "CBER"
+    serious: true
+    unexpected: false
+  expect:
+    reporting_pathway: BLA_PERIODIC
+    timeline_days: 90
+
+# Empty input defaults (CDRH path, non-serious)
+- input: {}
+  expect:
+    reporting_pathway: MDR_ANNUAL
+    timeline_days: 365

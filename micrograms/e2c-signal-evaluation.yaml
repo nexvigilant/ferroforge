@@ -1,0 +1,232 @@
+name: e2c-signal-evaluation
+description: 'ICH E2C(R2) Section 5: Evaluates whether a signal warrants inclusion in PBRER based on source, strength, and validation status'
+version: 0.1.0
+interface:
+  inputs:
+    signal_source:
+      type: string
+      required: true
+    signal_validated:
+      type: bool
+      required: true
+    prr:
+      type: number
+      required: false
+    case_count:
+      type: number
+      required: false
+    temporal_pattern:
+      type: bool
+      required: false
+    peer_reviewed:
+      type: bool
+      required: false
+    signal_already_in_rmp:
+      type: bool
+      required: false
+  outputs:
+    include_in_pbrer:
+      type: bool
+    section:
+      type: string
+    reason:
+      type: string
+tree:
+  start: check_validated
+  nodes:
+    check_validated:
+      type: condition
+      variable: signal_validated
+      operator: eq
+      value: true
+      true_next: check_in_rmp
+      false_next: return_not_validated
+    check_in_rmp:
+      type: condition
+      variable: signal_already_in_rmp
+      operator: eq
+      value: true
+      true_next: return_known_risks
+      false_next: check_source_disprop
+    check_source_disprop:
+      type: condition
+      variable: signal_source
+      operator: eq
+      value: disproportionality
+      true_next: check_prr
+      false_next: check_source_cluster
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: check_case_count
+      false_next: return_below_threshold
+    check_case_count:
+      type: condition
+      variable: case_count
+      operator: gte
+      value: 3
+      true_next: return_include_signal
+      false_next: return_below_threshold
+    check_source_cluster:
+      type: condition
+      variable: signal_source
+      operator: eq
+      value: cluster
+      true_next: check_temporal
+      false_next: check_source_literature
+    check_temporal:
+      type: condition
+      variable: temporal_pattern
+      operator: eq
+      value: true
+      true_next: return_include_signal
+      false_next: return_no_temporal
+    check_source_literature:
+      type: condition
+      variable: signal_source
+      operator: eq
+      value: literature
+      true_next: check_peer_reviewed
+      false_next: return_unknown_source
+    check_peer_reviewed:
+      type: condition
+      variable: peer_reviewed
+      operator: eq
+      value: true
+      true_next: return_include_signal
+      false_next: return_not_peer_reviewed
+    return_not_validated:
+      type: return
+      value:
+        include_in_pbrer: false
+        section: none
+        reason: signal_not_validated
+    return_known_risks:
+      type: return
+      value:
+        include_in_pbrer: true
+        section: known_risks
+        reason: signal_in_rmp
+    return_include_signal:
+      type: return
+      value:
+        include_in_pbrer: true
+        section: signal_evaluation
+        reason: meets_inclusion_criteria
+    return_below_threshold:
+      type: return
+      value:
+        include_in_pbrer: false
+        section: none
+        reason: below_disproportionality_threshold
+    return_no_temporal:
+      type: return
+      value:
+        include_in_pbrer: false
+        section: none
+        reason: no_temporal_pattern
+    return_not_peer_reviewed:
+      type: return
+      value:
+        include_in_pbrer: false
+        section: none
+        reason: not_peer_reviewed
+    return_unknown_source:
+      type: return
+      value:
+        include_in_pbrer: false
+        section: none
+        reason: unknown_signal_source
+tests:
+# Disproportionality signal meets threshold
+- input:
+    signal_source: disproportionality
+    signal_validated: true
+    prr: 3.5
+    case_count: 10
+    signal_already_in_rmp: false
+  expect:
+    include_in_pbrer: true
+    section: signal_evaluation
+    reason: meets_inclusion_criteria
+# Disproportionality below PRR threshold
+- input:
+    signal_source: disproportionality
+    signal_validated: true
+    prr: 1.2
+    case_count: 10
+    signal_already_in_rmp: false
+  expect:
+    include_in_pbrer: false
+    section: none
+    reason: below_disproportionality_threshold
+# Disproportionality PRR met but insufficient cases
+- input:
+    signal_source: disproportionality
+    signal_validated: true
+    prr: 2.5
+    case_count: 1
+    signal_already_in_rmp: false
+  expect:
+    include_in_pbrer: false
+    section: none
+    reason: below_disproportionality_threshold
+# Cluster with temporal pattern
+- input:
+    signal_source: cluster
+    signal_validated: true
+    temporal_pattern: true
+    signal_already_in_rmp: false
+  expect:
+    include_in_pbrer: true
+    section: signal_evaluation
+    reason: meets_inclusion_criteria
+# Literature peer-reviewed
+- input:
+    signal_source: literature
+    signal_validated: true
+    peer_reviewed: true
+    signal_already_in_rmp: false
+  expect:
+    include_in_pbrer: true
+    section: signal_evaluation
+    reason: meets_inclusion_criteria
+# Signal not validated
+- input:
+    signal_source: disproportionality
+    signal_validated: false
+    prr: 5.0
+    case_count: 20
+  expect:
+    include_in_pbrer: false
+    section: none
+    reason: signal_not_validated
+# Signal already in RMP
+- input:
+    signal_source: disproportionality
+    signal_validated: true
+    prr: 3.0
+    case_count: 5
+    signal_already_in_rmp: true
+  expect:
+    include_in_pbrer: true
+    section: known_risks
+    reason: signal_in_rmp
+# Literature not peer-reviewed
+- input:
+    signal_source: literature
+    signal_validated: true
+    peer_reviewed: false
+    signal_already_in_rmp: false
+  expect:
+    include_in_pbrer: false
+    section: none
+    reason: not_peer_reviewed
+# Null safety
+- input: {}
+  expect:
+    include_in_pbrer: false
+    section: none
+    reason: signal_not_validated

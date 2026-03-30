@@ -1,0 +1,67 @@
+name: quality-completeness
+description: Case completeness score
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: completeness_pct
+      operator: gte
+      value: 80
+      true_next: pass
+      false_next: fail
+    fail:
+      type: return
+      value:
+        check: quality-completeness
+        passed: false
+        action: flag_for_review
+    pass:
+      type: return
+      value:
+        action: accept
+        check: quality-completeness
+        passed: true
+tests:
+- input:
+    completeness_pct: 80
+  expect:
+    check: quality-completeness
+    passed: true
+- input: {}
+  expect:
+    check: quality-completeness
+    passed: false
+- input:
+    completeness_pct: 0
+  expect:
+    check: quality-completeness
+    action: flag_for_review
+    passed: false
+- input:
+    completeness_pct: -1
+  expect:
+    passed: false
+    action: flag_for_review
+    check: quality-completeness
+- input:
+    completeness_pct: 79
+  expect:
+    check: quality-completeness
+    passed: false
+    action: flag_for_review
+- input:
+    completeness_pct: 81
+  expect:
+    check: quality-completeness
+    action: accept
+    passed: true
+- input:
+    completeness_pct: 8000
+  expect:
+    check: quality-completeness
+    action: accept
+    passed: true
+interface: null
+primitive_signature: null

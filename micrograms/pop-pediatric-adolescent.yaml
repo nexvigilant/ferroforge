@@ -1,0 +1,71 @@
+name: pop-pediatric-adolescent
+description: Adolescent safety — growth plate risk
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: age_years
+      operator: lte
+      value: 17
+      true_next: at_risk
+      false_next: standard
+    standard:
+      type: return
+      value:
+        action: standard_care
+        at_risk: false
+        population: pediatric-adolescent
+    at_risk:
+      type: return
+      value:
+        action: special_monitoring
+        population: pediatric-adolescent
+        at_risk: true
+        reason: Adolescent safety — growth plate risk
+tests:
+- input:
+    age_years: 17
+  expect:
+    at_risk: true
+    population: pediatric-adolescent
+- input: {}
+  expect:
+    at_risk: false
+    population: pediatric-adolescent
+- input:
+    age_years: 0
+  expect:
+    at_risk: true
+    action: special_monitoring
+    population: pediatric-adolescent
+    reason: Adolescent safety — growth plate risk
+- input:
+    age_years: -1
+  expect:
+    at_risk: true
+    population: pediatric-adolescent
+    action: special_monitoring
+    reason: Adolescent safety — growth plate risk
+- input:
+    age_years: 16
+  expect:
+    action: special_monitoring
+    population: pediatric-adolescent
+    at_risk: true
+    reason: Adolescent safety — growth plate risk
+- input:
+    age_years: 18
+  expect:
+    population: pediatric-adolescent
+    action: standard_care
+    at_risk: false
+- input:
+    age_years: 1700
+  expect:
+    at_risk: false
+    action: standard_care
+    population: pediatric-adolescent
+interface: null
+primitive_signature: null

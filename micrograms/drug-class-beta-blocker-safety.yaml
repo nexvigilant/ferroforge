@@ -1,0 +1,61 @@
+name: drug-class-beta-blocker-safety
+description: "Beta-blocker safety assessment. Evaluates bradycardia, bronchoconstriction in asthma, and hypoglycemia masking."
+version: 0.1.0
+tree:
+  start: check_asthma_copd
+  nodes:
+    check_asthma_copd:
+      type: condition
+      variable: has_asthma_or_copd
+      operator: eq
+      value: true
+      true_next: bronchospasm_alert
+      false_next: check_diabetes
+    bronchospasm_alert:
+      type: return
+      value:
+        risk_level: high
+        relative_contraindication: true
+        message: "Asthma/COPD present; non-selective beta-blockers contraindicated; cardioselective preferred"
+    check_diabetes:
+      type: condition
+      variable: has_diabetes
+      operator: eq
+      value: true
+      true_next: diabetes_assessment
+      false_next: check_heart_rate
+    diabetes_assessment:
+      type: return
+      value:
+        risk_level: moderate
+        hypoglycemia_masking: true
+        monitoring_required: true
+        message: "Diabetic patient; beta-blocker masks hypoglycemia symptoms; monitor glucose closely"
+    check_heart_rate:
+      type: condition
+      variable: resting_heart_rate
+      operator: lt
+      value: 50
+      true_next: bradycardia_alert
+      false_next: standard_dosing
+    bradycardia_alert:
+      type: return
+      value:
+        risk_level: moderate
+        message: "Bradycardia present; reduce beta-blocker dose"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard beta-blocker dosing appropriate"
+tests:
+  - input: { has_asthma_or_copd: true, has_diabetes: false, resting_heart_rate: 65 }
+    expect: { risk_level: high, relative_contraindication: true }
+  - input: { has_asthma_or_copd: false, has_diabetes: true, resting_heart_rate: 70 }
+    expect: { risk_level: moderate, hypoglycemia_masking: true }
+  - input: { has_asthma_or_copd: false, has_diabetes: false, resting_heart_rate: 48 }
+    expect: { risk_level: moderate }
+  - input: { has_asthma_or_copd: false, has_diabetes: false, resting_heart_rate: 65 }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

@@ -1,0 +1,62 @@
+name: drug-profile-acetaminophen
+description: 'Safety triage for acetaminophen: PRR-based signal routing (Type A)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: signal
+      false_next: no_signal
+    no_signal:
+      type: return
+      value:
+        signal: false
+        harm_type: A
+        action: monitor
+        drug: acetaminophen
+        expected_prr: 2.8
+    signal:
+      type: return
+      value:
+        signal: true
+        action: investigate
+        expected_prr: 2.8
+        drug: acetaminophen
+        harm_type: A
+tests:
+- input:
+    prr: 2.8
+  expect:
+    drug: acetaminophen
+    signal: true
+- input:
+    prr: 0.5
+  expect:
+    drug: acetaminophen
+    signal: false
+- input: {}
+  expect:
+    signal: false
+    drug: acetaminophen
+- input:
+    prr: 1.999
+  expect:
+    signal: false
+    harm_type: A
+    action: monitor
+    drug: acetaminophen
+    expected_prr: 2.8
+- input:
+    prr: 2.001
+  expect:
+    expected_prr: 2.8
+    drug: acetaminophen
+    action: investigate
+    signal: true
+    harm_type: A
+interface: null
+primitive_signature: null

@@ -1,0 +1,55 @@
+name: trend-increasing
+description: Signal reports increasing
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    detected:
+      type: return
+      value:
+        action: investigate
+        detected: true
+        pattern: increasing
+    not_detected:
+      type: return
+      value:
+        action: continue_monitoring
+        detected: false
+        pattern: increasing
+    check:
+      type: condition
+      variable: trend_slope
+      operator: gt
+      value: 0
+      true_next: detected
+      false_next: not_detected
+tests:
+- input:
+    trend_slope: 1
+  expect:
+    detected: true
+    pattern: increasing
+- input: {}
+  expect:
+    detected: false
+    pattern: increasing
+- input:
+    trend_slope: 0
+  expect:
+    action: continue_monitoring
+    detected: false
+    pattern: increasing
+- input:
+    trend_slope: -1
+  expect:
+    detected: false
+    action: continue_monitoring
+    pattern: increasing
+- input:
+    trend_slope: -1
+  expect:
+    pattern: increasing
+    detected: false
+    action: continue_monitoring
+interface: null
+primitive_signature: null

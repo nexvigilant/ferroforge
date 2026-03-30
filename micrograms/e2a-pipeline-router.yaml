@@ -1,0 +1,168 @@
+name: e2a-pipeline-router
+description: 'ICH E2A orchestration router: routes an incoming case through the correct E2A assessment pipeline based on case type and available data. Entry point for the full E2A microservice chain.'
+version: 1.0.0
+interface:
+  inputs:
+    case_type:
+      type: string
+      required: false
+    has_minimum_data:
+      type: bool
+      required: false
+    is_clinical_trial:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+  outputs:
+    next_assessment:
+      type: string
+    pipeline_path:
+      type: string
+    rationale:
+      type: string
+    regulatory_reference:
+      type: string
+    start_with:
+      type: string
+tree:
+  start: check_minimum_data
+  nodes:
+    check_minimum_data:
+      type: condition
+      variable: has_minimum_data
+      operator: eq
+      value: true
+      true_next: check_clinical_trial
+      false_next: collect_minimum_first
+    check_clinical_trial:
+      type: condition
+      variable: is_clinical_trial
+      operator: eq
+      value: true
+      true_next: trial_pipeline
+      false_next: postmarket_pipeline
+    trial_pipeline:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: trial_serious_path
+      false_next: trial_nonserious_path
+    postmarket_pipeline:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: postmarket_serious_path
+      false_next: postmarket_nonserious_path
+    collect_minimum_first:
+      type: return
+      value:
+        pipeline_path: DATA_COLLECTION
+        start_with: e2a-minimum-criteria
+        next_assessment: e2a-data-collection-priority
+        rationale: Minimum ICSR criteria not met — collect 4 required data elements before proceeding
+        regulatory_reference: ICH E2A Section III.A - Minimum criteria required before case processing
+    trial_serious_path:
+      type: return
+      value:
+        pipeline_path: TRIAL_SERIOUS_SUSAR
+        start_with: e2a-expectedness-check
+        next_assessment: e2a-reporting-obligation
+        rationale: Clinical trial serious case — assess expectedness then determine SUSAR status and reporting obligation
+        regulatory_reference: ICH E2A Section III.A-B - Clinical trial SUSAR pathway
+    trial_nonserious_path:
+      type: return
+      value:
+        pipeline_path: TRIAL_NONSERIOUS
+        start_with: e2a-outcome-classifier
+        next_assessment: e2a-data-collection-priority
+        rationale: Clinical trial non-serious case — classify outcome and assign to periodic line listing
+        regulatory_reference: ICH E2A Section III.B.3 - Non-serious trial events in annual reports
+    postmarket_serious_path:
+      type: return
+      value:
+        pipeline_path: POSTMARKET_SERIOUS
+        start_with: e2a-expectedness-check
+        next_assessment: e2a-reporting-timeline
+        rationale: Post-marketing serious case — assess expectedness for 15-day vs periodic reporting determination
+        regulatory_reference: ICH E2A Section III.B - Post-marketing serious unexpected = 15-day expedited
+    postmarket_nonserious_path:
+      type: return
+      value:
+        pipeline_path: POSTMARKET_NONSERIOUS
+        start_with: e2a-outcome-classifier
+        next_assessment: e2a-data-collection-priority
+        rationale: Post-marketing non-serious case — classify outcome for aggregate periodic reporting
+        regulatory_reference: ICH E2A Section III.B.3 - Non-serious post-marketing events in PSURs
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — E2A pipeline routing by case context (trial vs postmarket × serious vs non-serious)'
+  primes: ['σ', '→']
+  arguments: ['has_minimum_data', 'is_clinical_trial', 'is_serious']
+  chain_prediction: 'Entry point for the full E2A microservice chain. Routes to e2a-expectedness-check or e2a-minimum-criteria depending on data completeness.'
+tests:
+# No minimum data = collect first
+- input:
+    has_minimum_data: false
+    is_clinical_trial: true
+    is_serious: true
+    case_type: spontaneous
+  expect:
+    pipeline_path: DATA_COLLECTION
+    start_with: e2a-minimum-criteria
+    next_assessment: e2a-data-collection-priority
+    regulatory_reference: ICH E2A Section III.A - Minimum criteria required before case processing
+# Clinical trial + serious = SUSAR pathway
+- input:
+    has_minimum_data: true
+    is_clinical_trial: true
+    is_serious: true
+    case_type: clinical_trial
+  expect:
+    pipeline_path: TRIAL_SERIOUS_SUSAR
+    start_with: e2a-expectedness-check
+    next_assessment: e2a-reporting-obligation
+    regulatory_reference: ICH E2A Section III.A-B - Clinical trial SUSAR pathway
+# Clinical trial + non-serious = periodic
+- input:
+    has_minimum_data: true
+    is_clinical_trial: true
+    is_serious: false
+    case_type: clinical_trial
+  expect:
+    pipeline_path: TRIAL_NONSERIOUS
+    start_with: e2a-outcome-classifier
+    next_assessment: e2a-data-collection-priority
+    regulatory_reference: ICH E2A Section III.B.3 - Non-serious trial events in annual reports
+# Post-marketing + serious = 15-day pathway
+- input:
+    has_minimum_data: true
+    is_clinical_trial: false
+    is_serious: true
+    case_type: spontaneous
+  expect:
+    pipeline_path: POSTMARKET_SERIOUS
+    start_with: e2a-expectedness-check
+    next_assessment: e2a-reporting-timeline
+    regulatory_reference: ICH E2A Section III.B - Post-marketing serious unexpected = 15-day expedited
+# Post-marketing + non-serious = PSUR
+- input:
+    has_minimum_data: true
+    is_clinical_trial: false
+    is_serious: false
+    case_type: spontaneous
+  expect:
+    pipeline_path: POSTMARKET_NONSERIOUS
+    start_with: e2a-outcome-classifier
+    next_assessment: e2a-data-collection-priority
+    regulatory_reference: ICH E2A Section III.B.3 - Non-serious post-marketing events in PSURs
+# Empty input = collect minimum first
+- input: {}
+  expect:
+    pipeline_path: DATA_COLLECTION
+    start_with: e2a-minimum-criteria
+    next_assessment: e2a-data-collection-priority
+    regulatory_reference: ICH E2A Section III.A - Minimum criteria required before case processing

@@ -1,0 +1,142 @@
+name: station-vigilance-pipeline
+description: Triage Guardian-AV risk scores (0-10) into monitoring tiers
+version: 0.1.0
+tree:
+  start: check_score
+  nodes:
+    low:
+      type: return
+      value:
+        reason: Guardian risk score <4 (low/minimal) — routine monitoring
+        priority: low
+        route: archive
+        action: archive
+    check_moderate:
+      type: condition
+      variable: risk_score
+      operator: gte
+      value: 4.0
+      true_next: moderate
+      false_next: low
+    high:
+      type: return
+      value:
+        priority: high
+        reason: Guardian risk score 6-8 (high) — prioritized signal investigation
+        action: investigate
+        route: signal_investigation
+    moderate:
+      type: return
+      value:
+        priority: moderate
+        route: periodic_review
+        reason: Guardian risk score 4-6 (moderate) — enhanced monitoring
+        action: monitor
+    critical:
+      type: return
+      value:
+        reason: Guardian risk score ≥8 (critical) — immediate safety review
+        priority: critical
+        route: causality_assessment
+        action: escalate
+    check_score:
+      type: condition
+      variable: risk_score
+      operator: gte
+      value: 8.0
+      true_next: critical
+      false_next: check_high
+    check_high:
+      type: condition
+      variable: risk_score
+      operator: gte
+      value: 6.0
+      true_next: high
+      false_next: check_moderate
+tests:
+- input:
+    risk_score: 9.2
+  expect:
+    action: escalate
+    priority: critical
+    route: causality_assessment
+- input:
+    risk_score: 7.0
+  expect:
+    route: signal_investigation
+    priority: high
+    action: investigate
+- input:
+    risk_score: 5.0
+  expect:
+    action: monitor
+    priority: moderate
+    route: periodic_review
+- input:
+    risk_score: 2.0
+  expect:
+    action: archive
+    route: archive
+    priority: low
+- input:
+    risk_score: 3.999
+  expect:
+    reason: Guardian risk score <4 (low/minimal) — routine monitoring
+    route: archive
+    priority: low
+    action: archive
+- input:
+    risk_score: 4.001
+  expect:
+    route: periodic_review
+    action: monitor
+    reason: Guardian risk score 4-6 (moderate) — enhanced monitoring
+    priority: moderate
+- input: {}
+  expect:
+    route: archive
+    reason: Guardian risk score <4 (low/minimal) — routine monitoring
+    action: archive
+    priority: low
+- input:
+    risk_score: 7.999
+  expect:
+    route: signal_investigation
+    action: investigate
+    priority: high
+    reason: Guardian risk score 6-8 (high) — prioritized signal investigation
+- input:
+    risk_score: 8.001
+  expect:
+    priority: critical
+    route: causality_assessment
+    action: escalate
+    reason: Guardian risk score ≥8 (critical) — immediate safety review
+- input: {}
+  expect:
+    priority: low
+    reason: Guardian risk score <4 (low/minimal) — routine monitoring
+    route: archive
+    action: archive
+- input:
+    risk_score: 5.999
+  expect:
+    route: periodic_review
+    priority: moderate
+    reason: Guardian risk score 4-6 (moderate) — enhanced monitoring
+    action: monitor
+- input:
+    risk_score: 6.001
+  expect:
+    action: investigate
+    route: signal_investigation
+    priority: high
+    reason: Guardian risk score 6-8 (high) — prioritized signal investigation
+- input: {}
+  expect:
+    route: archive
+    action: archive
+    reason: Guardian risk score <4 (low/minimal) — routine monitoring
+    priority: low
+interface: null
+primitive_signature: null

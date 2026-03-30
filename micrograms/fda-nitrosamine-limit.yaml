@@ -1,0 +1,192 @@
+name: fda-nitrosamine-limit
+description: "FDA nitrosamine impurity acceptable intake limit routing: determines AI limit by compound type per FDA Guidance 'Recommended Acceptable Intake Limits for Nitrosamine Drug Substance-Related Impurities' (2023)"
+version: 0.1.0
+interface:
+  inputs:
+    nitrosamine_type:
+      type: string
+      required: true
+      description: "Nitrosamine compound: ndma, ndea, nmba, nmpa, nipea, ndipa, ndba, mni, generic_ndsri"
+    product_type:
+      type: string
+      required: false
+      description: "Product type: small_molecule, biologic, complex_generic"
+    duration_of_use:
+      type: string
+      required: false
+      description: "Intended treatment duration: short_term, intermittent, chronic_lifetime"
+  outputs:
+    ai_limit_ng_per_day:
+      type: int
+    compound_name:
+      type: string
+    action_if_exceeded:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_compound
+  nodes:
+    check_compound:
+      type: condition
+      variable: nitrosamine_type
+      operator: eq
+      value: "ndma"
+      true_next: ndma_limit
+      false_next: check_ndea
+
+    check_ndea:
+      type: condition
+      variable: nitrosamine_type
+      operator: eq
+      value: "ndea"
+      true_next: ndea_limit
+      false_next: check_nmba
+
+    check_nmba:
+      type: condition
+      variable: nitrosamine_type
+      operator: eq
+      value: "nmba"
+      true_next: nmba_limit
+      false_next: check_nmpa
+
+    check_nmpa:
+      type: condition
+      variable: nitrosamine_type
+      operator: eq
+      value: "nmpa"
+      true_next: nmpa_limit
+      false_next: check_nipea
+
+    check_nipea:
+      type: condition
+      variable: nitrosamine_type
+      operator: eq
+      value: "nipea"
+      true_next: nipea_limit
+      false_next: check_ndipa
+
+    check_ndipa:
+      type: condition
+      variable: nitrosamine_type
+      operator: eq
+      value: "ndipa"
+      true_next: ndipa_limit
+      false_next: check_ndba
+
+    check_ndba:
+      type: condition
+      variable: nitrosamine_type
+      operator: eq
+      value: "ndba"
+      true_next: ndba_limit
+      false_next: check_mni
+
+    check_mni:
+      type: condition
+      variable: nitrosamine_type
+      operator: eq
+      value: "mni"
+      true_next: mni_limit
+      false_next: ndsri_default
+
+    ndma_limit:
+      type: return
+      value:
+        ai_limit_ng_per_day: 96
+        compound_name: "N-Nitrosodimethylamine (NDMA)"
+        action_if_exceeded: "Immediate batch recall. Root cause investigation. Reformulate or implement process controls."
+        regulatory_reference: "FDA Guidance: Nitrosamine AI Limits (2023), Table 1; ICH M7(R2)"
+
+    ndea_limit:
+      type: return
+      value:
+        ai_limit_ng_per_day: 26
+        compound_name: "N-Nitrosodiethylamine (NDEA)"
+        action_if_exceeded: "Immediate batch recall. More potent carcinogen than NDMA — lower limit."
+        regulatory_reference: "FDA Guidance: Nitrosamine AI Limits (2023), Table 1; ICH M7(R2)"
+
+    nmba_limit:
+      type: return
+      value:
+        ai_limit_ng_per_day: 96
+        compound_name: "N-Nitroso-N-methyl-4-aminobutyric acid (NMBA)"
+        action_if_exceeded: "Batch recall if exceeds limit. Investigate synthesis pathway for nitrosation sources."
+        regulatory_reference: "FDA Guidance: Nitrosamine AI Limits (2023), Table 1"
+
+    nmpa_limit:
+      type: return
+      value:
+        ai_limit_ng_per_day: 26
+        compound_name: "N-Nitroso-N-methyl-phenylamine (NMPA)"
+        action_if_exceeded: "Batch recall. Assess manufacturing process for amine + nitrite contact."
+        regulatory_reference: "FDA Guidance: Nitrosamine AI Limits (2023), Table 1"
+
+    nipea_limit:
+      type: return
+      value:
+        ai_limit_ng_per_day: 26
+        compound_name: "N-Nitrosoisopropylethylamine (NIPEA)"
+        action_if_exceeded: "Batch recall. Review synthesis and degradation pathways."
+        regulatory_reference: "FDA Guidance: Nitrosamine AI Limits (2023), Table 1"
+
+    ndipa_limit:
+      type: return
+      value:
+        ai_limit_ng_per_day: 26
+        compound_name: "N-Nitrosodiisopropylamine (NDIPA)"
+        action_if_exceeded: "Batch recall. Investigate solvent and reagent contamination."
+        regulatory_reference: "FDA Guidance: Nitrosamine AI Limits (2023), Table 1"
+
+    ndba_limit:
+      type: return
+      value:
+        ai_limit_ng_per_day: 26
+        compound_name: "N-Nitrosodibutylamine (NDBA)"
+        action_if_exceeded: "Batch recall. Assess rubber stopper and packaging contact."
+        regulatory_reference: "FDA Guidance: Nitrosamine AI Limits (2023), Table 1"
+
+    mni_limit:
+      type: return
+      value:
+        ai_limit_ng_per_day: 26
+        compound_name: "1-Methyl-4-nitrosopiperazine (MNI)"
+        action_if_exceeded: "Batch recall. Evaluate piperazine-containing API synthesis."
+        regulatory_reference: "FDA Guidance: Nitrosamine AI Limits (2023), Table 1"
+
+    ndsri_default:
+      type: return
+      value:
+        ai_limit_ng_per_day: 18
+        compound_name: "Generic NDSRI (drug substance-related nitrosamine)"
+        action_if_exceeded: "Apply default 18 ng/day AI for uncharacterized NDSRIs. Conduct Ames mutagenicity test. Derive compound-specific AI if negative."
+        regulatory_reference: "FDA Guidance: NDSRI AI Limits (2023), Section III — Default AI for NDSRIs; ICH M7(R2) TTC"
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(ν) — nitrosamine classification by compound-specific acceptable intake threshold'
+  primes: ['κ', 'ν', '∂']
+  arguments: ['nitrosamine_type']
+
+tests:
+- input: { nitrosamine_type: "ndma" }
+  expect: { ai_limit_ng_per_day: 96, compound_name: "N-Nitrosodimethylamine (NDMA)" }
+- input: { nitrosamine_type: "ndea" }
+  expect: { ai_limit_ng_per_day: 26 }
+- input: { nitrosamine_type: "nmba" }
+  expect: { ai_limit_ng_per_day: 96 }
+- input: { nitrosamine_type: "nmpa" }
+  expect: { ai_limit_ng_per_day: 26 }
+- input: { nitrosamine_type: "nipea" }
+  expect: { ai_limit_ng_per_day: 26 }
+- input: { nitrosamine_type: "ndipa" }
+  expect: { ai_limit_ng_per_day: 26 }
+- input: { nitrosamine_type: "ndba" }
+  expect: { ai_limit_ng_per_day: 26 }
+- input: { nitrosamine_type: "mni" }
+  expect: { ai_limit_ng_per_day: 26 }
+- input: { nitrosamine_type: "generic_ndsri" }
+  expect: { ai_limit_ng_per_day: 18 }
+- input: {}
+  expect: { ai_limit_ng_per_day: 18 }

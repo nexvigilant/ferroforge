@@ -1,0 +1,64 @@
+name: organ-endocrine-safety
+description: "Endocrine safety assessment. Evaluates hyperglycemia, hyponatremia (SIADH), and thyroid function risks."
+version: 0.1.0
+tree:
+  start: check_baseline_glucose
+  nodes:
+    check_baseline_glucose:
+      type: condition
+      variable: baseline_fasting_glucose_mg_dl
+      operator: gte
+      value: 300
+      true_next: severe_hyperglycemia
+      false_next: check_diabetes
+    severe_hyperglycemia:
+      type: return
+      value:
+        organ: endocrine
+        risk_level: high
+        glucose_monitoring: required
+        message: "Severe hyperglycemia; glucose-elevating drugs contraindicated"
+    check_diabetes:
+      type: condition
+      variable: has_type2_diabetes
+      operator: eq
+      value: true
+      true_next: diabetes_alert
+      false_next: check_thyroid
+    diabetes_alert:
+      type: return
+      value:
+        organ: endocrine
+        risk_level: moderate
+        glucose_monitoring: required
+        message: "Diabetic patient; monitor for hyperglycemia or hypoglycemia"
+    check_thyroid:
+      type: condition
+      variable: abnormal_tsh
+      operator: eq
+      value: true
+      true_next: thyroid_alert
+      false_next: standard_dosing
+    thyroid_alert:
+      type: return
+      value:
+        organ: endocrine
+        risk_level: moderate
+        thyroid_monitoring: required
+        message: "Abnormal baseline TSH; monitor thyroid function"
+    standard_dosing:
+      type: return
+      value:
+        organ: endocrine
+        risk_level: low
+tests:
+  - input: { baseline_fasting_glucose_mg_dl: 350, has_type2_diabetes: false, abnormal_tsh: false }
+    expect: { organ: endocrine, risk_level: high, glucose_monitoring: required }
+  - input: { baseline_fasting_glucose_mg_dl: 150, has_type2_diabetes: true, abnormal_tsh: false }
+    expect: { organ: endocrine, risk_level: moderate, glucose_monitoring: required }
+  - input: { baseline_fasting_glucose_mg_dl: 100, has_type2_diabetes: false, abnormal_tsh: true }
+    expect: { organ: endocrine, risk_level: moderate, thyroid_monitoring: required }
+  - input: { baseline_fasting_glucose_mg_dl: 100, has_type2_diabetes: false, abnormal_tsh: false }
+    expect: { organ: endocrine, risk_level: low }
+  - input: {}
+    expect: {}

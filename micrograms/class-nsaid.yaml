@@ -1,0 +1,74 @@
+name: class-nsaid
+description: 'NSAIDs class safety: GI bleeding monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    safe:
+      type: return
+      value:
+        alert: false
+        action: continue
+        drug_class: NSAIDs
+        concern: GI bleeding
+    alert:
+      type: return
+      value:
+        action: class_effect_investigation
+        concern: GI bleeding
+        alert: true
+        drug_class: NSAIDs
+    check:
+      type: condition
+      variable: gi_risk
+      operator: gte
+      value: 2
+      true_next: alert
+      false_next: safe
+tests:
+- input:
+    gi_risk: 2
+  expect:
+    drug_class: NSAIDs
+    alert: true
+- input: {}
+  expect:
+    alert: false
+    drug_class: NSAIDs
+- input:
+    gi_risk: 0
+  expect:
+    action: continue
+    concern: GI bleeding
+    alert: false
+    drug_class: NSAIDs
+- input:
+    gi_risk: -1
+  expect:
+    action: continue
+    concern: GI bleeding
+    alert: false
+    drug_class: NSAIDs
+- input:
+    gi_risk: 1
+  expect:
+    concern: GI bleeding
+    action: continue
+    alert: false
+    drug_class: NSAIDs
+- input:
+    gi_risk: 3
+  expect:
+    alert: true
+    concern: GI bleeding
+    drug_class: NSAIDs
+    action: class_effect_investigation
+- input:
+    gi_risk: 200
+  expect:
+    action: class_effect_investigation
+    alert: true
+    drug_class: NSAIDs
+    concern: GI bleeding
+interface: null
+primitive_signature: null

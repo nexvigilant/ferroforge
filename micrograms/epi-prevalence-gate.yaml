@@ -1,0 +1,82 @@
+name: epi-prevalence-gate
+description: "Gate adverse event prevalence assessment for epidemiologic study design"
+version: 0.1.0
+tree:
+  start: validate_prevalence_data
+  nodes:
+    validate_prevalence_data:
+      type: condition
+      variable: total_cases
+      operator: is_not_null
+      value: null
+      true_next: check_prevalence_threshold
+      false_next: prevalence_unknown
+    check_prevalence_threshold:
+      type: condition
+      variable: prevalence_percent
+      operator: gte
+      value: 10
+      true_next: high_prevalence
+      false_next: check_moderate_prevalence
+    check_moderate_prevalence:
+      type: condition
+      variable: prevalence_percent
+      operator: gte
+      value: 1
+      true_next: moderate_prevalence
+      false_next: low_prevalence
+    high_prevalence:
+      type: return
+      value:
+        prevalence_category: "high"
+        study_design_recommended: "cross_sectional"
+        sample_size_needed: "less_than_500"
+        statistical_power: "sufficient"
+        epi_compliant: true
+    moderate_prevalence:
+      type: return
+      value:
+        prevalence_category: "moderate"
+        study_design_recommended: "cohort"
+        sample_size_needed: "500_to_1000"
+        statistical_power: "adequate"
+        epi_compliant: true
+    low_prevalence:
+      type: return
+      value:
+        prevalence_category: "low"
+        study_design_recommended: "case_control"
+        sample_size_needed: "greater_than_1000"
+        statistical_power: "limited"
+        epi_compliant: true
+    prevalence_unknown:
+      type: return
+      value:
+        prevalence_category: null
+        study_design_recommended: null
+        sample_size_needed: null
+        statistical_power: null
+        epi_compliant: false
+tests:
+- input:
+    total_cases: 150
+    prevalence_percent: 15
+  expect:
+    prevalence_category: "high"
+    study_design_recommended: "cross_sectional"
+- input:
+    total_cases: 50
+    prevalence_percent: 5
+  expect:
+    prevalence_category: "moderate"
+    study_design_recommended: "cohort"
+- input:
+    total_cases: 10
+    prevalence_percent: 0.5
+  expect:
+    prevalence_category: "low"
+    study_design_recommended: "case_control"
+- input: {}
+  expect:
+    prevalence_category: null
+    epi_compliant: false

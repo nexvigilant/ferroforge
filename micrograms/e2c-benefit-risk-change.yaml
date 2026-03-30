@@ -1,0 +1,186 @@
+name: e2c-benefit-risk-change
+description: 'ICH E2C(R2) Section 7: Determines if the benefit-risk balance has changed since the last PBRER based on new safety signals, efficacy changes, and risk minimization effectiveness'
+version: 0.1.0
+interface:
+  inputs:
+    new_safety_signal:
+      type: bool
+      required: true
+    signal_serious:
+      type: bool
+      required: false
+    efficacy_data_changed:
+      type: bool
+      required: false
+    effect_direction:
+      type: string
+      required: false
+    risk_minimization_effective:
+      type: bool
+      required: false
+    new_indication_approved:
+      type: bool
+      required: false
+  outputs:
+    benefit_risk_changed:
+      type: bool
+    action:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_new_signal
+  nodes:
+    check_new_signal:
+      type: condition
+      variable: new_safety_signal
+      operator: eq
+      value: true
+      true_next: check_signal_serious
+      false_next: check_efficacy_changed
+    check_signal_serious:
+      type: condition
+      variable: signal_serious
+      operator: eq
+      value: true
+      true_next: return_reassess_signal
+      false_next: check_efficacy_changed
+    check_efficacy_changed:
+      type: condition
+      variable: efficacy_data_changed
+      operator: eq
+      value: true
+      true_next: check_effect_direction
+      false_next: check_rmp_effective
+    check_effect_direction:
+      type: condition
+      variable: effect_direction
+      operator: eq
+      value: decreased
+      true_next: return_reassess_efficacy
+      false_next: check_rmp_effective
+    check_rmp_effective:
+      type: condition
+      variable: risk_minimization_effective
+      operator: eq
+      value: false
+      true_next: return_enhance_rmp
+      false_next: check_new_indication
+    check_new_indication:
+      type: condition
+      variable: new_indication_approved
+      operator: eq
+      value: true
+      true_next: return_update_spec
+      false_next: return_maintain
+    return_reassess_signal:
+      type: return
+      value:
+        benefit_risk_changed: true
+        action: reassess
+        regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+    return_reassess_efficacy:
+      type: return
+      value:
+        benefit_risk_changed: true
+        action: reassess
+        regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+    return_enhance_rmp:
+      type: return
+      value:
+        benefit_risk_changed: true
+        action: enhance_rmp
+        regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+    return_update_spec:
+      type: return
+      value:
+        benefit_risk_changed: true
+        action: update_specification
+        regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+    return_maintain:
+      type: return
+      value:
+        benefit_risk_changed: false
+        action: maintain
+        regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+tests:
+# New serious safety signal triggers reassessment
+- input:
+    new_safety_signal: true
+    signal_serious: true
+    efficacy_data_changed: false
+    risk_minimization_effective: true
+    new_indication_approved: false
+  expect:
+    benefit_risk_changed: true
+    action: reassess
+    regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+# Non-serious new signal, no other changes -> maintain
+- input:
+    new_safety_signal: true
+    signal_serious: false
+    efficacy_data_changed: false
+    risk_minimization_effective: true
+    new_indication_approved: false
+  expect:
+    benefit_risk_changed: false
+    action: maintain
+    regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+# Decreased efficacy triggers reassessment
+- input:
+    new_safety_signal: false
+    efficacy_data_changed: true
+    effect_direction: decreased
+    risk_minimization_effective: true
+    new_indication_approved: false
+  expect:
+    benefit_risk_changed: true
+    action: reassess
+    regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+# No changes -> maintain
+- input:
+    new_safety_signal: false
+    efficacy_data_changed: false
+    risk_minimization_effective: true
+    new_indication_approved: false
+  expect:
+    benefit_risk_changed: false
+    action: maintain
+    regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+# RMP not effective -> enhance
+- input:
+    new_safety_signal: false
+    efficacy_data_changed: false
+    risk_minimization_effective: false
+    new_indication_approved: false
+  expect:
+    benefit_risk_changed: true
+    action: enhance_rmp
+    regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+# New indication approved -> update specification
+- input:
+    new_safety_signal: false
+    efficacy_data_changed: false
+    risk_minimization_effective: true
+    new_indication_approved: true
+  expect:
+    benefit_risk_changed: true
+    action: update_specification
+    regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+# Efficacy changed but increased -> check further
+- input:
+    new_safety_signal: false
+    efficacy_data_changed: true
+    effect_direction: increased
+    risk_minimization_effective: true
+    new_indication_approved: false
+  expect:
+    benefit_risk_changed: false
+    action: maintain
+    regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation
+# Null safety
+- input: {}
+  expect:
+    benefit_risk_changed: false
+    action: maintain
+    regulatory_reference: ICH E2C(R2) Section 7 - Benefit-Risk Evaluation

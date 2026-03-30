@@ -1,0 +1,61 @@
+name: drug-class-anticoagulant-safety
+description: "Anticoagulant safety assessment. Evaluates bleeding risk, drug interactions, and renal clearance requirements."
+version: 0.1.0
+tree:
+  start: check_bleeding_risk
+  nodes:
+    check_bleeding_risk:
+      type: condition
+      variable: has_active_bleeding
+      operator: eq
+      value: true
+      true_next: bleeding_alert
+      false_next: check_renal
+    bleeding_alert:
+      type: return
+      value:
+        risk_level: critical
+        contraindication: true
+        message: "Active bleeding; anticoagulation contraindicated"
+    check_renal:
+      type: condition
+      variable: renal_clearance_ml_min
+      operator: lt
+      value: 30
+      true_next: severe_renal_impairment
+      false_next: check_interactions
+    severe_renal_impairment:
+      type: return
+      value:
+        risk_level: high
+        dose_adjustment: required
+        message: "Severe renal impairment; adjust anticoagulant dose per DOAC guidance"
+    check_interactions:
+      type: condition
+      variable: concurrent_strong_inhibitor
+      operator: eq
+      value: true
+      true_next: interaction_alert
+      false_next: standard_dosing
+    interaction_alert:
+      type: return
+      value:
+        risk_level: moderate
+        drug_interaction: true
+        message: "Strong CYP3A4/transporter inhibitor; assess dose adjustment"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard anticoagulation dosing appropriate"
+tests:
+  - input: { has_active_bleeding: true, renal_clearance_ml_min: 60, concurrent_strong_inhibitor: false }
+    expect: { risk_level: critical, contraindication: true }
+  - input: { has_active_bleeding: false, renal_clearance_ml_min: 20, concurrent_strong_inhibitor: false }
+    expect: { risk_level: high, dose_adjustment: required }
+  - input: { has_active_bleeding: false, renal_clearance_ml_min: 50, concurrent_strong_inhibitor: true }
+    expect: { risk_level: moderate, drug_interaction: true }
+  - input: { has_active_bleeding: false, renal_clearance_ml_min: 70, concurrent_strong_inhibitor: false }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

@@ -1,0 +1,32 @@
+name: convergence-dose-signal
+description: "Signal + dose response"
+version: 0.1.0
+
+tree:
+  start: check
+  nodes:
+    check:
+      type: "condition"
+      variable: "dose_response_present"
+      operator: "eq"
+      value: true
+      true_next: "converged"
+      false_next: "divergent"
+    converged:
+      type: "return"
+      value:
+        convergence: "mechanistic"
+        met: true
+        action: "escalate"
+    divergent:
+      type: "return"
+      value:
+        convergence: "mechanistic"
+        met: false
+        action: "investigate_discrepancy"
+
+tests:
+  - input: {"dose_response_present": true}
+    expect: {"convergence": "mechanistic", "met": true}
+  - input: {}
+    expect: {"convergence": "mechanistic", "met": false}

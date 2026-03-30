@@ -1,0 +1,102 @@
+name: station-benefit-risk-pipeline
+description: 'Triage benefit-risk assessment results: classify QBR/QBRI scores into regulatory action paths'
+version: 0.1.0
+tree:
+  start: check_qbri
+  nodes:
+    unfavorable:
+      type: return
+      value:
+        action: escalate
+        reason: QBRI<0.5 — unfavorable benefit-risk, regulatory action required
+        route: regulatory_referral
+        priority: critical
+    marginal:
+      type: return
+      value:
+        priority: moderate
+        reason: QBRI 0.5-1.0 — marginal benefit-risk, additional risk minimization needed
+        route: rmp_update
+        action: review
+    check_qbri:
+      type: condition
+      variable: qbri_score
+      operator: gte
+      value: 1.0
+      true_next: favorable
+      false_next: check_marginal
+    favorable:
+      type: return
+      value:
+        route: archive
+        priority: low
+        action: approve
+        reason: QBRI≥1.0 — benefits outweigh risks, favorable profile
+    check_marginal:
+      type: condition
+      variable: qbri_score
+      operator: gte
+      value: 0.5
+      true_next: marginal
+      false_next: unfavorable
+tests:
+- input:
+    qbri_score: 1.5
+  expect:
+    priority: low
+    action: approve
+    route: archive
+- input:
+    qbri_score: 0.7
+  expect:
+    action: review
+    route: rmp_update
+    priority: moderate
+- input:
+    qbri_score: 0.3
+  expect:
+    action: escalate
+    priority: critical
+    route: regulatory_referral
+- input:
+    qbri_score: 0.999
+  expect:
+    action: review
+    priority: moderate
+    reason: QBRI 0.5-1.0 — marginal benefit-risk, additional risk minimization needed
+    route: rmp_update
+- input:
+    qbri_score: 1.001
+  expect:
+    action: approve
+    priority: low
+    reason: QBRI≥1.0 — benefits outweigh risks, favorable profile
+    route: archive
+- input: {}
+  expect:
+    route: regulatory_referral
+    reason: QBRI<0.5 — unfavorable benefit-risk, regulatory action required
+    action: escalate
+    priority: critical
+- input:
+    qbri_score: 0.499
+  expect:
+    route: regulatory_referral
+    reason: QBRI<0.5 — unfavorable benefit-risk, regulatory action required
+    action: escalate
+    priority: critical
+- input:
+    qbri_score: 0.501
+  expect:
+    priority: moderate
+    reason: QBRI 0.5-1.0 — marginal benefit-risk, additional risk minimization needed
+    route: rmp_update
+    action: review
+- input: {}
+  expect:
+    action: escalate
+    reason: QBRI<0.5 — unfavorable benefit-risk, regulatory action required
+    route: regulatory_referral
+    priority: critical
+interface: null
+primitive_signature: null

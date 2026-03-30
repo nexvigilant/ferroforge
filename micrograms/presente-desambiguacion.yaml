@@ -1,0 +1,317 @@
+name: presente-desambiguacion
+description: >
+  Desambigua "presente" entre indicativo y subjuntivo usando el verbo rector
+  (verbo_contexto) como árbitro. "Creo que presenta" (indicativo) vs
+  "Dudo que presente" (subjuntivo) — el verbo que gobierna la cláusula
+  determina el modo. Resolves the presente/presenta collision where the
+  same surface form maps to different grammatical moods.
+version: 0.1.0
+primitive_signature:
+  dominant: '∂'
+  expression: '∂(κ + ς) — boundary disambiguation: identical surface forms resolved by governing context'
+  primes: ['∂', 'κ', 'ς']
+  arguments: ['forma_verbal', 'verbo_contexto']
+  chain_prediction: >
+    CHIRALITY check on Spanish verb forms. "presente" looks identical in
+    indicativo and subjuntivo but they are mirror images with different
+    epistemic force. The governing verb (verbo_contexto) is the boundary
+    that disambiguates. Feeds into subjuntivo-confianza-epistemica chain.
+interface:
+  inputs:
+    forma_verbal:
+      type: string
+      required: true
+      description: >
+        La forma verbal ambigua a desambiguar (ej. "presente", "cause").
+        The ambiguous verb form to disambiguate.
+    verbo_contexto:
+      type: string
+      required: false
+      description: >
+        El verbo rector que introduce la cláusula subordinada.
+        Verbos de certeza (creer, afirmar, saber) → indicativo.
+        Verbos de duda/deseo/negación (dudar, querer, negar, esperar, temer) → subjuntivo.
+        If absent, uses heuristic based on form endings.
+  outputs:
+    modo_resuelto:
+      type: string
+      description: "INDICATIVO | SUBJUNTIVO | AMBIGUO"
+    resolved_mood:
+      type: string
+      description: "English: INDICATIVE | SUBJUNCTIVE | AMBIGUOUS"
+    confianza_resolucion:
+      type: int
+      description: "0-100. Con verbo_contexto: 95. Sin verbo_contexto: 60 (heuristic)."
+    razon:
+      type: string
+      description: "Justificación de la desambiguación"
+    modo_verbal:
+      type: string
+      description: >
+        Output compatible con subjuntivo-confianza-epistemica: maps to its
+        input field modo_verbal for chain composition.
+tree:
+  start: check_forma_present
+  nodes:
+    check_forma_present:
+      type: condition
+      variable: forma_verbal
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_contexto_present
+
+    reject_missing:
+      type: return
+      value:
+        modo_resuelto: RECHAZADO
+        resolved_mood: REJECTED
+        confianza_resolucion: 0
+        razon: "forma_verbal es obligatorio"
+        modo_verbal: ""
+
+    check_contexto_present:
+      type: condition
+      variable: verbo_contexto
+      operator: is_null
+      value: null
+      true_next: heuristic_by_form
+      false_next: check_certeza_verbs
+
+    # --- With verbo_contexto (high confidence path) ---
+    check_certeza_verbs:
+      type: condition
+      variable: verbo_contexto
+      operator: matches
+      value: "^(creer|creo|cree|creemos|afirmar|afirmo|afirma|saber|sé|sabe|sabemos|confirmar|confirmo|confirma|asegurar|aseguro|asegura|notar|noto|nota|observar|observo|observa|declarar|declaro|declara|reconocer|reconozco|reconoce)$"
+      true_next: resolve_indicativo_high
+      false_next: check_duda_verbs
+
+    check_duda_verbs:
+      type: condition
+      variable: verbo_contexto
+      operator: matches
+      value: "^(dudar|dudo|duda|dudamos|negar|niego|niega|negamos|querer|quiero|quiere|queremos|esperar|espero|espera|esperamos|temer|temo|teme|tememos|desear|deseo|desea|pedir|pido|pide|sugerir|sugiero|sugiere|recomendar|recomiendo|recomienda|prohibir|prohíbo|prohíbe|ordenar|ordeno|ordena|lamentar|lamento|lamenta)$"
+      true_next: resolve_subjuntivo_high
+      false_next: resolve_ambiguo_contexto
+
+    resolve_indicativo_high:
+      type: return
+      value:
+        modo_resuelto: INDICATIVO
+        resolved_mood: INDICATIVE
+        confianza_resolucion: 95
+        razon: >
+          Verbo rector de certeza detectado. Los verbos de afirmación/conocimiento
+          (creer, saber, afirmar) rigen indicativo en la cláusula subordinada.
+          "Creo que PRESENTA hepatotoxicidad" — el hablante afirma.
+        modo_verbal: "indicativo"
+
+    resolve_subjuntivo_high:
+      type: return
+      value:
+        modo_resuelto: SUBJUNTIVO
+        resolved_mood: SUBJUNCTIVE
+        confianza_resolucion: 95
+        razon: >
+          Verbo rector de duda/deseo/negación detectado. Estos verbos rigen
+          subjuntivo obligatoriamente. "Dudo que PRESENTE hepatotoxicidad" —
+          el hablante expresa incertidumbre. Señal epistémica débil.
+        modo_verbal: "subjuntivo"
+
+    resolve_ambiguo_contexto:
+      type: return
+      value:
+        modo_resuelto: AMBIGUO
+        resolved_mood: AMBIGUOUS
+        confianza_resolucion: 40
+        razon: >
+          Verbo rector no clasificado como certeza ni duda. Posibilidades:
+          verbo neutro, condicional, o error de entrada. Se requiere contexto
+          adicional para desambiguar.
+        modo_verbal: "presente"
+
+    # --- Without verbo_contexto (heuristic path) ---
+    heuristic_by_form:
+      type: condition
+      variable: forma_verbal
+      operator: matches
+      value: "^(presenta|presentan|presentaba|presentó|muestra|muestran|causa|causan|produce|producen|sufre|sufren|tiene|tienen|manifiesta|desarrolla)$"
+      true_next: heuristic_indicativo
+      false_next: check_subjuntivo_forms
+
+    check_subjuntivo_forms:
+      type: condition
+      variable: forma_verbal
+      operator: matches
+      value: "^(presente|presenten|muestre|muestren|cause|causen|produzca|produzcan|sufra|sufran|tenga|tengan|manifieste|desarrolle|padezca)$"
+      true_next: heuristic_subjuntivo
+      false_next: heuristic_ambiguo
+
+    heuristic_indicativo:
+      type: return
+      value:
+        modo_resuelto: INDICATIVO
+        resolved_mood: INDICATIVE
+        confianza_resolucion: 75
+        razon: >
+          Sin verbo rector, usando heurística morfológica. La forma verbal
+          termina en patrón indicativo (-a, -an, -aba, -ó para 3ra persona).
+          Confianza reducida: sin contexto, la desambiguación es probabilística.
+        modo_verbal: "indicativo"
+
+    heuristic_subjuntivo:
+      type: return
+      value:
+        modo_resuelto: SUBJUNTIVO
+        resolved_mood: SUBJUNCTIVE
+        confianza_resolucion: 60
+        razon: >
+          Sin verbo rector, usando heurística morfológica. La forma verbal
+          termina en patrón subjuntivo (-e, -en, -a para verbos -er/-ir).
+          Confianza baja: "presente" es la forma más ambigua del español —
+          puede ser indicativo de "presentar" (yo presento) o subjuntivo.
+        modo_verbal: "subjuntivo"
+
+    heuristic_ambiguo:
+      type: return
+      value:
+        modo_resuelto: AMBIGUO
+        resolved_mood: AMBIGUOUS
+        confianza_resolucion: 30
+        razon: >
+          Forma verbal no reconocida por heurística morfológica.
+          Sin verbo rector y sin patrón de terminación conocido.
+          Requiere análisis sintáctico completo.
+        modo_verbal: "presente"
+
+tests:
+# --- With verbo_contexto: certeza → INDICATIVO ---
+- input:
+    forma_verbal: "presente"
+    verbo_contexto: "creo"
+  expect:
+    modo_resuelto: INDICATIVO
+    resolved_mood: INDICATIVE
+    confianza_resolucion: 95
+    modo_verbal: "indicativo"
+
+- input:
+    forma_verbal: "cause"
+    verbo_contexto: "afirma"
+  expect:
+    modo_resuelto: INDICATIVO
+    resolved_mood: INDICATIVE
+    confianza_resolucion: 95
+
+- input:
+    forma_verbal: "muestre"
+    verbo_contexto: "sabe"
+  expect:
+    modo_resuelto: INDICATIVO
+    resolved_mood: INDICATIVE
+    confianza_resolucion: 95
+
+# --- With verbo_contexto: duda → SUBJUNTIVO ---
+- input:
+    forma_verbal: "presente"
+    verbo_contexto: "dudo"
+  expect:
+    modo_resuelto: SUBJUNTIVO
+    resolved_mood: SUBJUNCTIVE
+    confianza_resolucion: 95
+    modo_verbal: "subjuntivo"
+
+- input:
+    forma_verbal: "tenga"
+    verbo_contexto: "niego"
+  expect:
+    modo_resuelto: SUBJUNTIVO
+    resolved_mood: SUBJUNCTIVE
+    confianza_resolucion: 95
+
+- input:
+    forma_verbal: "cause"
+    verbo_contexto: "espera"
+  expect:
+    modo_resuelto: SUBJUNTIVO
+    resolved_mood: SUBJUNCTIVE
+    confianza_resolucion: 95
+
+- input:
+    forma_verbal: "produzca"
+    verbo_contexto: "teme"
+  expect:
+    modo_resuelto: SUBJUNTIVO
+    resolved_mood: SUBJUNCTIVE
+    confianza_resolucion: 95
+
+# --- With unknown verbo_contexto → AMBIGUO ---
+- input:
+    forma_verbal: "presente"
+    verbo_contexto: "resulta"
+  expect:
+    modo_resuelto: AMBIGUO
+    resolved_mood: AMBIGUOUS
+    confianza_resolucion: 40
+
+# --- Without verbo_contexto: heuristic indicativo ---
+- input:
+    forma_verbal: "presenta"
+  expect:
+    modo_resuelto: INDICATIVO
+    resolved_mood: INDICATIVE
+    confianza_resolucion: 75
+    modo_verbal: "indicativo"
+
+- input:
+    forma_verbal: "causa"
+  expect:
+    modo_resuelto: INDICATIVO
+    resolved_mood: INDICATIVE
+    confianza_resolucion: 75
+
+- input:
+    forma_verbal: "sufre"
+  expect:
+    modo_resuelto: INDICATIVO
+    resolved_mood: INDICATIVE
+    confianza_resolucion: 75
+
+# --- Without verbo_contexto: heuristic subjuntivo ---
+- input:
+    forma_verbal: "presente"
+  expect:
+    modo_resuelto: SUBJUNTIVO
+    resolved_mood: SUBJUNCTIVE
+    confianza_resolucion: 60
+    modo_verbal: "subjuntivo"
+
+- input:
+    forma_verbal: "cause"
+  expect:
+    modo_resuelto: SUBJUNTIVO
+    resolved_mood: SUBJUNCTIVE
+    confianza_resolucion: 60
+
+- input:
+    forma_verbal: "tenga"
+  expect:
+    modo_resuelto: SUBJUNTIVO
+    resolved_mood: SUBJUNCTIVE
+    confianza_resolucion: 60
+
+# --- Without verbo_contexto: heuristic ambiguous ---
+- input:
+    forma_verbal: "tomaría"
+  expect:
+    modo_resuelto: AMBIGUO
+    resolved_mood: AMBIGUOUS
+    confianza_resolucion: 30
+
+# --- Missing input ---
+- input: {}
+  expect:
+    modo_resuelto: RECHAZADO
+    resolved_mood: REJECTED
+    confianza_resolucion: 0

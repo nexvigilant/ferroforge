@@ -1,0 +1,62 @@
+name: drug-class-jak-inhibitor-safety
+description: "JAK inhibitor safety assessment. Evaluates thromboembolic events, lipid elevation, infection risk, and herpes zoster."
+version: 0.1.0
+tree:
+  start: check_thrombotic_history
+  nodes:
+    check_thrombotic_history:
+      type: condition
+      variable: prior_thrombotic_event
+      operator: eq
+      value: true
+      true_next: thrombotic_alert
+      false_next: check_infection_risk
+    thrombotic_alert:
+      type: return
+      value:
+        risk_level: high
+        anticoagulation_consideration: true
+        message: "Prior thrombotic event; JAK inhibitor increases thromboembolic risk"
+    check_infection_risk:
+      type: condition
+      variable: has_active_infection
+      operator: eq
+      value: true
+      true_next: infection_alert
+      false_next: check_lipids
+    infection_alert:
+      type: return
+      value:
+        risk_level: critical
+        contraindication: true
+        message: "Active infection; defer JAK inhibitor until infection resolved"
+    check_lipids:
+      type: condition
+      variable: baseline_cholesterol_mg_dl
+      operator: gte
+      value: 240
+      true_next: lipid_monitoring
+      false_next: standard_dosing
+    lipid_monitoring:
+      type: return
+      value:
+        risk_level: moderate
+        lipid_panel_monitoring: required
+        message: "Elevated cholesterol; JAK inhibitor may further elevate lipids"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        infection_monitoring: required
+        message: "Standard JAK inhibitor dosing; monitor for herpes zoster"
+tests:
+  - input: { prior_thrombotic_event: true, has_active_infection: false, baseline_cholesterol_mg_dl: 200 }
+    expect: { risk_level: high, anticoagulation_consideration: true }
+  - input: { prior_thrombotic_event: false, has_active_infection: true, baseline_cholesterol_mg_dl: 200 }
+    expect: { risk_level: critical, contraindication: true }
+  - input: { prior_thrombotic_event: false, has_active_infection: false, baseline_cholesterol_mg_dl: 260 }
+    expect: { risk_level: moderate, lipid_panel_monitoring: required }
+  - input: { prior_thrombotic_event: false, has_active_infection: false, baseline_cholesterol_mg_dl: 200 }
+    expect: { risk_level: low, infection_monitoring: required }
+  - input: {}
+    expect: {}

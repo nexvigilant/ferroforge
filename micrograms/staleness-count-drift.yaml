@@ -1,0 +1,101 @@
+name: staleness-count-drift
+description: >
+  Clasifica la deriva de conteo como OK o DRIFTED.
+  Caller pre-computes: exceeded = (abs(actual - claimed) > threshold).
+  Microgram classifies the boolean result.
+  Simplest possible interface — caller does math, microgram does classification.
+version: 0.3.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(π(N), N_now) — compare persisted count against current measurement'
+  primes: ['κ', 'π', 'N']
+  arguments: ['exceeded']
+  chain_prediction: >
+    Boolean gate: drift exceeded threshold? Caller computes, microgram classifies.
+    Feeds into knowledge exile and MEMORY.md update decisions.
+interface:
+  inputs:
+    exceeded:
+      type: bool
+      required: true
+      description: "true if abs(actual - claimed) > threshold, false otherwise. Caller computes."
+    surface_name:
+      type: string
+      required: false
+      description: "Name of the surface being checked"
+  outputs:
+    status:
+      type: string
+      description: "OK | DRIFTED | REJECTED"
+    action:
+      type: string
+tree:
+  start: check_exceeded_present
+  nodes:
+    check_exceeded_present:
+      type: condition
+      variable: exceeded
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_drifted
+
+    reject_missing:
+      type: return
+      value:
+        status: REJECTED
+        action: "REJECTED: exceeded is required (bool: did drift exceed threshold?)"
+
+    check_drifted:
+      type: condition
+      variable: exceeded
+      operator: eq
+      value: true
+      true_next: drifted
+      false_next: ok
+
+    ok:
+      type: return
+      value:
+        status: OK
+        action: "Count within threshold — no update needed"
+
+    drifted:
+      type: return
+      value:
+        status: DRIFTED
+        action: "Count drift exceeds threshold — update MEMORY.md or investigate"
+
+tests:
+- input:
+    exceeded: false
+    surface_name: "skills"
+  expect:
+    status: OK
+
+- input:
+    exceeded: true
+    surface_name: "skills"
+  expect:
+    status: DRIFTED
+
+- input:
+    exceeded: false
+    surface_name: "station_configs"
+  expect:
+    status: OK
+
+- input:
+    exceeded: true
+    surface_name: "agents"
+  expect:
+    status: DRIFTED
+
+- input: {}
+  expect:
+    status: REJECTED
+
+- input:
+    exceeded: false
+  expect:
+    status: OK

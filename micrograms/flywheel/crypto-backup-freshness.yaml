@@ -1,0 +1,62 @@
+name: crypto-backup-freshness
+description: 'Brain backup freshness for trust flywheel: GREEN (<12h), YELLOW (<24h), RED (>24h or missing)'
+version: 1.0.0
+primitive_signature:
+  dominant: duration
+  expression: "t(now - newest_backup)"
+  primes: [duration, state, persistence]
+interface:
+  inputs:
+    backup_age_hours: { type: int, required: false }
+    backup_count: { type: int, required: false }
+  outputs:
+    freshness: { type: string }
+    level: { type: string }
+    action: { type: string }
+tree:
+  start: check_exists
+  nodes:
+    check_exists:
+      type: condition
+      variable: backup_count
+      operator: gte
+      value: 1
+      true_next: check_fresh
+      false_next: missing
+    check_fresh:
+      type: condition
+      variable: backup_age_hours
+      operator: lte
+      value: 12
+      true_next: fresh
+      false_next: check_aging
+    check_aging:
+      type: condition
+      variable: backup_age_hours
+      operator: lte
+      value: 24
+      true_next: aging
+      false_next: stale
+    fresh:
+      type: return
+      value: { freshness: fresh, level: green, action: none }
+    aging:
+      type: return
+      value: { freshness: aging, level: yellow, action: monitor }
+    stale:
+      type: return
+      value: { freshness: stale, level: red, action: run_nv_vault_backup }
+    missing:
+      type: return
+      value: { freshness: missing, level: red, action: run_nv_vault_backup }
+tests:
+- input: { backup_age_hours: 3, backup_count: 5 }
+  expect: { freshness: fresh, level: green, action: none }
+- input: { backup_age_hours: 18, backup_count: 3 }
+  expect: { freshness: aging, level: yellow, action: monitor }
+- input: { backup_age_hours: 48, backup_count: 2 }
+  expect: { freshness: stale, level: red, action: run_nv_vault_backup }
+- input: { backup_count: 0 }
+  expect: { freshness: missing, level: red, action: run_nv_vault_backup }
+- input: {}
+  expect: { freshness: missing, level: red, action: run_nv_vault_backup }

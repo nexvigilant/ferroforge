@@ -1,0 +1,67 @@
+name: convergence-2of4
+description: 2 of 4 methods agree
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    divergent:
+      type: return
+      value:
+        action: investigate_discrepancy
+        convergence: weak
+        met: false
+    converged:
+      type: return
+      value:
+        convergence: weak
+        met: true
+        action: escalate
+    check:
+      type: condition
+      variable: methods_positive
+      operator: gte
+      value: 2
+      true_next: converged
+      false_next: divergent
+tests:
+- input:
+    methods_positive: 2
+  expect:
+    met: true
+    convergence: weak
+- input: {}
+  expect:
+    met: false
+    convergence: weak
+- input:
+    methods_positive: 0
+  expect:
+    met: false
+    action: investigate_discrepancy
+    convergence: weak
+- input:
+    methods_positive: -1
+  expect:
+    met: false
+    action: investigate_discrepancy
+    convergence: weak
+- input:
+    methods_positive: 1
+  expect:
+    action: investigate_discrepancy
+    met: false
+    convergence: weak
+- input:
+    methods_positive: 3
+  expect:
+    convergence: weak
+    action: escalate
+    met: true
+- input:
+    methods_positive: 200
+  expect:
+    met: true
+    action: escalate
+    convergence: weak
+interface: null
+primitive_signature: null

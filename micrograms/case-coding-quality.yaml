@@ -1,0 +1,85 @@
+name: case-coding-quality
+description: "Assess quality of MedDRA coding for adverse event terms in case report"
+version: 0.1.0
+tree:
+  start: validate_coding
+  nodes:
+    validate_coding:
+      type: condition
+      variable: coded_terms
+      operator: is_not_null
+      value: null
+      true_next: check_meddra_compliance
+      false_next: coding_quality_unknown
+    check_meddra_compliance:
+      type: condition
+      variable: uses_valid_meddra_pt
+      operator: eq
+      value: true
+      true_next: check_specificity
+      false_next: coding_quality_poor
+    check_specificity:
+      type: condition
+      variable: is_specific_pt
+      operator: eq
+      value: true
+      true_next: coding_quality_good
+      false_next: coding_quality_fair
+    coding_quality_good:
+      type: return
+      value:
+        coding_quality: "high"
+        quality_score: 9
+        requires_recoding: false
+        coding_error_risk: "low"
+        coding_compliant: true
+    coding_quality_fair:
+      type: return
+      value:
+        coding_quality: "moderate"
+        quality_score: 6
+        requires_recoding: false
+        coding_error_risk: "moderate"
+        coding_compliant: true
+    coding_quality_poor:
+      type: return
+      value:
+        coding_quality: "low"
+        quality_score: 2
+        requires_recoding: true
+        coding_error_risk: "high"
+        coding_compliant: false
+    coding_quality_unknown:
+      type: return
+      value:
+        coding_quality: null
+        quality_score: null
+        requires_recoding: null
+        coding_error_risk: null
+        coding_compliant: false
+tests:
+- input:
+    coded_terms: ["bacterial_infection"]
+    uses_valid_meddra_pt: true
+    is_specific_pt: true
+  expect:
+    coding_quality: "high"
+    quality_score: 9
+    requires_recoding: false
+- input:
+    coded_terms: ["bacterial_infection"]
+    uses_valid_meddra_pt: true
+    is_specific_pt: false
+  expect:
+    coding_quality: "moderate"
+    quality_score: 6
+- input:
+    coded_terms: ["infection"]
+    uses_valid_meddra_pt: false
+  expect:
+    coding_quality: "low"
+    requires_recoding: true
+- input: {}
+  expect:
+    coding_quality: null
+    coding_compliant: false

@@ -1,0 +1,112 @@
+name: station-linkedin-pipeline
+description: Route professional network content by PV relevance and engagement potential
+version: 0.1.0
+tree:
+  start: check_pv
+  nodes:
+    high_engagement:
+      type: return
+      value:
+        reason: PV-relevant with high engagement potential — amplify reach
+        priority: moderate
+        action: amplify
+        route: content_distribution
+    low_engagement:
+      type: return
+      value:
+        route: content_publication
+        reason: PV-relevant, niche audience — publish for domain authority
+        priority: low
+        action: publish
+    check_pv:
+      type: condition
+      variable: pv_relevant
+      operator: eq
+      value: true
+      true_next: pv_content
+      false_next: non_pv
+    non_pv:
+      type: return
+      value:
+        priority: low
+        route: archive
+        reason: Not PV-relevant content — skip
+        action: skip
+    pv_content:
+      type: condition
+      variable: engagement_score
+      operator: gte
+      value: 50
+      true_next: high_engagement
+      false_next: low_engagement
+tests:
+- input:
+    pv_relevant: false
+    engagement_score: 80
+  expect:
+    action: skip
+    priority: low
+    route: archive
+- input:
+    pv_relevant: true
+    engagement_score: 75
+  expect:
+    route: content_distribution
+    action: amplify
+    priority: moderate
+- input:
+    pv_relevant: true
+    engagement_score: 20
+  expect:
+    priority: low
+    route: content_publication
+    action: publish
+- input: {}
+  expect:
+    priority: low
+    route: archive
+    action: skip
+    reason: Not PV-relevant content — skip
+- input:
+    engagement_score: 0
+  expect:
+    route: archive
+    reason: Not PV-relevant content — skip
+    action: skip
+    priority: low
+- input:
+    engagement_score: -1
+  expect:
+    priority: low
+    route: archive
+    reason: Not PV-relevant content — skip
+    action: skip
+- input:
+    engagement_score: 49
+  expect:
+    priority: low
+    route: archive
+    action: skip
+    reason: Not PV-relevant content — skip
+- input:
+    engagement_score: 51
+  expect:
+    route: archive
+    reason: Not PV-relevant content — skip
+    action: skip
+    priority: low
+- input:
+    engagement_score: 5000
+  expect:
+    reason: Not PV-relevant content — skip
+    action: skip
+    route: archive
+    priority: low
+- input: {}
+  expect:
+    route: archive
+    action: skip
+    priority: low
+    reason: Not PV-relevant content — skip
+interface: null
+primitive_signature: null

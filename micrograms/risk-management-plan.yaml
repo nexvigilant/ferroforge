@@ -1,0 +1,66 @@
+name: risk-management-plan
+description: "Create or update Risk Management Plan (RMP) based on identified risks"
+version: 0.1.0
+tree:
+  start: validate_risks
+  nodes:
+    validate_risks:
+      type: condition
+      variable: safety_concerns_identified
+      operator: eq
+      value: true
+      true_next: check_rmp_exists
+      false_next: rmp_not_required
+    check_rmp_exists:
+      type: condition
+      variable: rmp_previously_submitted
+      operator: eq
+      value: true
+      true_next: rmp_update
+      false_next: rmp_new
+    rmp_new:
+      type: return
+      value:
+        rmp_action: "create_new_rmp"
+        rmp_content: "safety_summary,pharmacovigilance_plan,risk_minimization_plan"
+        submission_timeline_days: 30
+        requires_regulatory_approval: true
+        rmp_compliant: true
+    rmp_update:
+      type: return
+      value:
+        rmp_action: "update_existing_rmp"
+        rmp_content: "add_identified_risks,update_mitigation_strategies"
+        submission_timeline_days: 60
+        requires_regulatory_approval: false
+        rmp_compliant: true
+    rmp_not_required:
+      type: return
+      value:
+        rmp_action: "no_rmp_required"
+        rmp_content: null
+        submission_timeline_days: 0
+        requires_regulatory_approval: false
+        rmp_compliant: true
+tests:
+- input:
+    safety_concerns_identified: true
+    rmp_previously_submitted: false
+  expect:
+    rmp_action: "create_new_rmp"
+    submission_timeline_days: 30
+    requires_regulatory_approval: true
+- input:
+    safety_concerns_identified: true
+    rmp_previously_submitted: true
+  expect:
+    rmp_action: "update_existing_rmp"
+    submission_timeline_days: 60
+- input:
+    safety_concerns_identified: false
+  expect:
+    rmp_action: "no_rmp_required"
+- input: {}
+  expect:
+    rmp_action: "no_rmp_required"
+    rmp_compliant: true

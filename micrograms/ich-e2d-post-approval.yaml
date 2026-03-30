@@ -1,0 +1,89 @@
+name: ich-e2d-post-approval
+description: "ICH E2D: Identify post-approval safety requirements and monitoring plan"
+version: 0.1.0
+tree:
+  start: validate_safety_concern
+  nodes:
+    validate_safety_concern:
+      type: condition
+      variable: safety_concern
+      operator: is_not_null
+      value: null
+      true_next: check_concern_type
+      false_next: no_requirement
+    check_concern_type:
+      type: condition
+      variable: safety_concern
+      operator: eq
+      value: "identified"
+      true_next: check_severity
+      false_next: check_potential_concern
+    check_potential_concern:
+      type: condition
+      variable: safety_concern
+      operator: eq
+      value: "potential"
+      true_next: potential_requirement
+      false_next: no_requirement
+    check_severity:
+      type: condition
+      variable: concern_severity
+      operator: eq
+      value: "serious"
+      true_next: intensive_monitoring
+      false_next: standard_monitoring
+    intensive_monitoring:
+      type: return
+      value:
+        monitoring_category: intensive
+        requires_risk_minimization: true
+        requires_follow_up_studies: true
+        action_level: urgent
+        ich_e2d_compliant: true
+    standard_monitoring:
+      type: return
+      value:
+        monitoring_category: standard
+        requires_risk_minimization: true
+        requires_follow_up_studies: false
+        action_level: routine
+        ich_e2d_compliant: true
+    potential_requirement:
+      type: return
+      value:
+        monitoring_category: preventive
+        requires_risk_minimization: true
+        requires_follow_up_studies: false
+        action_level: precautionary
+        ich_e2d_compliant: true
+    no_requirement:
+      type: return
+      value:
+        monitoring_category: none
+        requires_risk_minimization: false
+        requires_follow_up_studies: false
+        action_level: none
+        ich_e2d_compliant: true
+tests:
+- input:
+    safety_concern: "identified"
+    concern_severity: "serious"
+  expect:
+    monitoring_category: "intensive"
+    requires_risk_minimization: true
+    action_level: "urgent"
+- input:
+    safety_concern: "identified"
+    concern_severity: "mild"
+  expect:
+    monitoring_category: "standard"
+    action_level: "routine"
+- input:
+    safety_concern: "potential"
+  expect:
+    monitoring_category: "preventive"
+    action_level: "precautionary"
+- input: {}
+  expect:
+    monitoring_category: "none"
+    requires_risk_minimization: false

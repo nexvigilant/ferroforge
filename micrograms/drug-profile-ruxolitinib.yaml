@@ -1,0 +1,62 @@
+name: drug-profile-ruxolitinib
+description: 'Safety triage for ruxolitinib: PRR-based signal routing (Type B)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    signal:
+      type: return
+      value:
+        signal: true
+        harm_type: B
+        drug: ruxolitinib
+        action: investigate
+        expected_prr: 5.7
+    no_signal:
+      type: return
+      value:
+        signal: false
+        expected_prr: 5.7
+        drug: ruxolitinib
+        action: monitor
+        harm_type: B
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5.0
+      true_next: signal
+      false_next: no_signal
+tests:
+- input:
+    prr: 5.7
+  expect:
+    drug: ruxolitinib
+    signal: true
+- input:
+    prr: 0.5
+  expect:
+    signal: false
+    drug: ruxolitinib
+- input: {}
+  expect:
+    drug: ruxolitinib
+    signal: false
+- input:
+    prr: 4.999
+  expect:
+    harm_type: B
+    drug: ruxolitinib
+    expected_prr: 5.7
+    action: monitor
+    signal: false
+- input:
+    prr: 5.001
+  expect:
+    signal: true
+    harm_type: B
+    drug: ruxolitinib
+    action: investigate
+    expected_prr: 5.7
+interface: null
+primitive_signature: null

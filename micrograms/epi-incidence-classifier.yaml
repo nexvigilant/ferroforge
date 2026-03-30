@@ -1,0 +1,106 @@
+name: epi-incidence-classifier
+description: "Classify adverse event incidence rate category for epidemiologic assessment"
+version: 0.1.0
+tree:
+  start: validate_incidence_rate
+  nodes:
+    validate_incidence_rate:
+      type: condition
+      variable: events_per_10000_patients
+      operator: is_not_null
+      value: null
+      true_next: check_very_common
+      false_next: incidence_unknown
+    check_very_common:
+      type: condition
+      variable: events_per_10000_patients
+      operator: gte
+      value: 1000
+      true_next: very_common
+      false_next: check_common
+    check_common:
+      type: condition
+      variable: events_per_10000_patients
+      operator: gte
+      value: 100
+      true_next: common
+      false_next: check_uncommon
+    check_uncommon:
+      type: condition
+      variable: events_per_10000_patients
+      operator: gte
+      value: 10
+      true_next: uncommon
+      false_next: check_rare
+    check_rare:
+      type: condition
+      variable: events_per_10000_patients
+      operator: gte
+      value: 1
+      true_next: rare
+      false_next: very_rare
+    very_common:
+      type: return
+      value:
+        incidence_category: "very_common"
+        incidence_definition: "greater_than_10_percent"
+        population_denominator: 10000
+        epi_compliant: true
+    common:
+      type: return
+      value:
+        incidence_category: "common"
+        incidence_definition: "1_percent_to_10_percent"
+        population_denominator: 10000
+        epi_compliant: true
+    uncommon:
+      type: return
+      value:
+        incidence_category: "uncommon"
+        incidence_definition: "0_1_percent_to_1_percent"
+        population_denominator: 10000
+        epi_compliant: true
+    rare:
+      type: return
+      value:
+        incidence_category: "rare"
+        incidence_definition: "0_01_percent_to_0_1_percent"
+        population_denominator: 10000
+        epi_compliant: true
+    very_rare:
+      type: return
+      value:
+        incidence_category: "very_rare"
+        incidence_definition: "less_than_0_01_percent"
+        population_denominator: 10000
+        epi_compliant: true
+    incidence_unknown:
+      type: return
+      value:
+        incidence_category: null
+        incidence_definition: null
+        population_denominator: null
+        epi_compliant: false
+tests:
+- input:
+    events_per_10000_patients: 1500
+  expect:
+    incidence_category: "very_common"
+    incidence_definition: "greater_than_10_percent"
+- input:
+    events_per_10000_patients: 250
+  expect:
+    incidence_category: "common"
+    incidence_definition: "1_percent_to_10_percent"
+- input:
+    events_per_10000_patients: 50
+  expect:
+    incidence_category: "uncommon"
+- input:
+    events_per_10000_patients: 0.5
+  expect:
+    incidence_category: "very_rare"
+- input: {}
+  expect:
+    incidence_category: null
+    epi_compliant: false

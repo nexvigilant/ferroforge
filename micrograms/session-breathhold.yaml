@@ -1,0 +1,386 @@
+name: session-breathhold
+description: Apnea — the productive hold between inhale and exhale. Measures mid-session gas exchange (context absorbed vs artifacts produced) to detect held breath (no output) or hyperventilation (too much output, no absorption)
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(ν(tools) ÷ ν(time) × ∂(reads:writes)) — compares absorption rate against production rate to detect apnea pathology'
+  primes: ['κ', 'ν', '∂', 'ς']
+  arguments: ['tools_so_far', 'minutes_elapsed', 'reads', 'writes', 'files_modified', 'skills_invoked', 'errors_encountered']
+  chain_prediction: 'Runs mid-session. Chains from session-inhale (start) and to session-kpi-score (end) for full breath cycle.'
+interface:
+  inputs:
+    tools_so_far:
+      type: int
+      required: true
+      description: "Tool calls completed so far in this session"
+    minutes_elapsed:
+      type: int
+      required: true
+      description: "Minutes since session start"
+    reads:
+      type: int
+      required: true
+      description: "Read + Grep + Glob calls (O2 — absorbing context)"
+    writes:
+      type: int
+      required: true
+      description: "Edit + Write calls (CO2 — producing artifacts)"
+    files_modified:
+      type: int
+      required: true
+      description: "Unique files changed"
+    skills_invoked:
+      type: int
+      required: true
+      description: "Skills activated this session"
+    errors_encountered:
+      type: int
+      required: true
+      description: "Tool failures / errors this session"
+  outputs:
+    gas_exchange:
+      type: string
+      description: "EFFICIENT / ABSORBING / PRODUCING / APNEA / HYPERVENTILATING"
+    o2_saturation:
+      type: string
+      description: "HIGH / NORMAL / LOW / CRITICAL — context absorption level"
+    co2_output:
+      type: string
+      description: "HIGH / NORMAL / LOW / NONE — artifact production level"
+    respiratory_distress:
+      type: string
+      description: "NONE / MILD / MODERATE / SEVERE"
+    recommendation:
+      type: string
+      description: "What to do about the breathing pattern"
+tree:
+  start: check_inputs
+  nodes:
+    check_inputs:
+      type: condition
+      variable: tools_so_far
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: check_time
+
+    check_time:
+      type: condition
+      variable: minutes_elapsed
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: check_apnea
+
+    reject:
+      type: return
+      value:
+        gas_exchange: UNKNOWN
+        o2_saturation: UNKNOWN
+        co2_output: UNKNOWN
+        respiratory_distress: SEVERE
+        recommendation: "All 7 inputs required."
+
+    # ── Apnea: no tools at all ──────────────────────────
+    check_apnea:
+      type: condition
+      variable: tools_so_far
+      operator: lte
+      value: 2
+      true_next: check_apnea_duration
+      false_next: check_error_rate
+
+    check_apnea_duration:
+      type: condition
+      variable: minutes_elapsed
+      operator: gte
+      value: 5
+      true_next: apnea_severe
+      false_next: apnea_mild
+
+    apnea_severe:
+      type: return
+      value:
+        gas_exchange: APNEA
+        o2_saturation: CRITICAL
+        co2_output: NONE
+        respiratory_distress: SEVERE
+        recommendation: "Session stalled. No tools for 5+ minutes. Either start working or exhale and close."
+
+    apnea_mild:
+      type: return
+      value:
+        gas_exchange: APNEA
+        o2_saturation: LOW
+        co2_output: NONE
+        respiratory_distress: MILD
+        recommendation: "Session just started or paused. Normal if within first 2 minutes."
+
+    # ── Error rate check ────────────────────────────────
+    check_error_rate:
+      type: condition
+      variable: errors_encountered
+      operator: gte
+      value: 3
+      true_next: distress_errors
+      false_next: check_reads
+
+    distress_errors:
+      type: condition
+      variable: writes
+      operator: lte
+      value: 1
+      true_next: severe_distress
+      false_next: moderate_distress
+
+    severe_distress:
+      type: return
+      value:
+        gas_exchange: APNEA
+        o2_saturation: LOW
+        co2_output: NONE
+        respiratory_distress: SEVERE
+        recommendation: "Multiple errors with no production. Invoke /capa for root cause analysis before continuing."
+
+    moderate_distress:
+      type: return
+      value:
+        gas_exchange: ABSORBING
+        o2_saturation: NORMAL
+        co2_output: LOW
+        respiratory_distress: MODERATE
+        recommendation: "Errors but still producing. Check if errors are blocking the main task."
+
+    # ── O2 saturation (reads) ───────────────────────────
+    check_reads:
+      type: condition
+      variable: reads
+      operator: gte
+      value: 10
+      true_next: o2_high
+      false_next: check_reads_low
+
+    check_reads_low:
+      type: condition
+      variable: reads
+      operator: lte
+      value: 2
+      true_next: o2_low
+      false_next: o2_normal
+
+    o2_low:
+      type: condition
+      variable: writes
+      operator: gte
+      value: 5
+      true_next: hyperventilating
+      false_next: low_exchange
+
+    hyperventilating:
+      type: return
+      value:
+        gas_exchange: HYPERVENTILATING
+        o2_saturation: LOW
+        co2_output: HIGH
+        respiratory_distress: MODERATE
+        recommendation: "Writing heavily without reading. Risk of producing without understanding. Pause and read the code you are modifying."
+
+    low_exchange:
+      type: return
+      value:
+        gas_exchange: APNEA
+        o2_saturation: LOW
+        co2_output: LOW
+        respiratory_distress: MILD
+        recommendation: "Low activity across both reads and writes. Session may be idle or in conversation mode."
+
+    # ── O2 normal path ──────────────────────────────────
+    o2_normal:
+      type: condition
+      variable: writes
+      operator: gte
+      value: 3
+      true_next: efficient_normal
+      false_next: absorbing_normal
+
+    efficient_normal:
+      type: return
+      value:
+        gas_exchange: EFFICIENT
+        o2_saturation: NORMAL
+        co2_output: NORMAL
+        respiratory_distress: NONE
+        recommendation: "Balanced breathing. Reading and writing in proportion. Continue."
+
+    absorbing_normal:
+      type: return
+      value:
+        gas_exchange: ABSORBING
+        o2_saturation: NORMAL
+        co2_output: LOW
+        respiratory_distress: NONE
+        recommendation: "Absorbing context. Normal for DREAM phase or investigation."
+
+    # ── O2 high path ────────────────────────────────────
+    o2_high:
+      type: condition
+      variable: writes
+      operator: gte
+      value: 5
+      true_next: efficient_high
+      false_next: check_absorbing_only
+
+    efficient_high:
+      type: return
+      value:
+        gas_exchange: EFFICIENT
+        o2_saturation: HIGH
+        co2_output: HIGH
+        respiratory_distress: NONE
+        recommendation: "High throughput. Both absorbing and producing at scale. Peak session."
+
+    check_absorbing_only:
+      type: condition
+      variable: writes
+      operator: lte
+      value: 1
+      true_next: absorbing_only
+      false_next: absorbing_mostly
+
+    absorbing_only:
+      type: condition
+      variable: minutes_elapsed
+      operator: gte
+      value: 15
+      true_next: breath_held_too_long
+      false_next: absorbing_early
+
+    breath_held_too_long:
+      type: return
+      value:
+        gas_exchange: ABSORBING
+        o2_saturation: HIGH
+        co2_output: NONE
+        respiratory_distress: MODERATE
+        recommendation: "Heavy reading for 15+ minutes with no output. Holding breath too long. Start producing or exhale what you have learned."
+
+    absorbing_early:
+      type: return
+      value:
+        gas_exchange: ABSORBING
+        o2_saturation: HIGH
+        co2_output: NONE
+        respiratory_distress: NONE
+        recommendation: "Early investigation phase. High absorption is expected. Begin producing when ready."
+
+    absorbing_mostly:
+      type: return
+      value:
+        gas_exchange: ABSORBING
+        o2_saturation: HIGH
+        co2_output: LOW
+        respiratory_distress: NONE
+        recommendation: "Mostly reading with some writes. Transitioning from absorption to production."
+
+tests:
+# ── Peak session: high read + high write
+- input:
+    tools_so_far: 50
+    minutes_elapsed: 20
+    reads: 15
+    writes: 8
+    files_modified: 6
+    skills_invoked: 3
+    errors_encountered: 0
+  expect:
+    gas_exchange: EFFICIENT
+    o2_saturation: HIGH
+    co2_output: HIGH
+    respiratory_distress: NONE
+
+# ── Apnea: stalled session
+- input:
+    tools_so_far: 1
+    minutes_elapsed: 10
+    reads: 1
+    writes: 0
+    files_modified: 0
+    skills_invoked: 0
+    errors_encountered: 0
+  expect:
+    gas_exchange: APNEA
+    respiratory_distress: SEVERE
+
+# ── Hyperventilating: writing without reading
+- input:
+    tools_so_far: 20
+    minutes_elapsed: 10
+    reads: 1
+    writes: 12
+    files_modified: 8
+    skills_invoked: 1
+    errors_encountered: 0
+  expect:
+    gas_exchange: HYPERVENTILATING
+    o2_saturation: LOW
+    co2_output: HIGH
+    respiratory_distress: MODERATE
+
+# ── Error distress
+- input:
+    tools_so_far: 15
+    minutes_elapsed: 8
+    reads: 5
+    writes: 0
+    files_modified: 0
+    skills_invoked: 1
+    errors_encountered: 4
+  expect:
+    gas_exchange: APNEA
+    respiratory_distress: SEVERE
+
+# ── Balanced normal
+- input:
+    tools_so_far: 25
+    minutes_elapsed: 15
+    reads: 8
+    writes: 5
+    files_modified: 3
+    skills_invoked: 2
+    errors_encountered: 0
+  expect:
+    gas_exchange: EFFICIENT
+    respiratory_distress: NONE
+
+# ── Held breath too long (reading for 20 min, no output)
+- input:
+    tools_so_far: 30
+    minutes_elapsed: 20
+    reads: 25
+    writes: 0
+    files_modified: 0
+    skills_invoked: 2
+    errors_encountered: 0
+  expect:
+    gas_exchange: ABSORBING
+    o2_saturation: HIGH
+    co2_output: NONE
+    respiratory_distress: MODERATE
+
+# ── Missing input
+- input: {}
+  expect:
+    respiratory_distress: SEVERE
+
+# ── Early session, just started
+- input:
+    tools_so_far: 2
+    minutes_elapsed: 1
+    reads: 2
+    writes: 0
+    files_modified: 0
+    skills_invoked: 0
+    errors_encountered: 0
+  expect:
+    gas_exchange: APNEA
+    respiratory_distress: MILD

@@ -1,0 +1,67 @@
+name: organ-ototoxicity
+description: "Ototoxicity safety assessment. Evaluates hearing loss and vestibular dysfunction risks from ototoxic drugs."
+version: 0.1.0
+tree:
+  start: check_baseline_hearing
+  nodes:
+    check_baseline_hearing:
+      type: condition
+      variable: baseline_hearing_loss
+      operator: eq
+      value: true
+      true_next: hearing_loss_alert
+      false_next: check_renal
+    hearing_loss_alert:
+      type: return
+      value:
+        organ: ear
+        risk_level: high
+        ototoxicity_risk: true
+        monitoring: required
+        message: "Baseline hearing loss; ototoxic drugs contraindicated or require monitoring"
+    check_renal:
+      type: condition
+      variable: renal_clearance_ml_min
+      operator: lt
+      value: 30
+      true_next: renal_ototoxicity_risk
+      false_next: check_concurrent_ototoxics
+    renal_ototoxicity_risk:
+      type: return
+      value:
+        organ: ear
+        risk_level: moderate
+        ototoxicity_accumulation: true
+        monitoring: required
+        message: "Severe renal impairment increases ototoxic drug accumulation"
+    check_concurrent_ototoxics:
+      type: condition
+      variable: concurrent_ototoxic_drugs
+      operator: eq
+      value: true
+      true_next: concurrent_ototoxic_alert
+      false_next: standard_dosing
+    concurrent_ototoxic_alert:
+      type: return
+      value:
+        organ: ear
+        risk_level: high
+        synergistic_risk: true
+        message: "Concurrent ototoxic drugs; synergistic hearing loss risk"
+    standard_dosing:
+      type: return
+      value:
+        organ: ear
+        risk_level: low
+        baseline_audiometry: recommended
+tests:
+  - input: { baseline_hearing_loss: true, renal_clearance_ml_min: 70, concurrent_ototoxic_drugs: false }
+    expect: { organ: ear, risk_level: high, ototoxicity_risk: true }
+  - input: { baseline_hearing_loss: false, renal_clearance_ml_min: 20, concurrent_ototoxic_drugs: false }
+    expect: { organ: ear, risk_level: moderate, ototoxicity_accumulation: true }
+  - input: { baseline_hearing_loss: false, renal_clearance_ml_min: 70, concurrent_ototoxic_drugs: true }
+    expect: { organ: ear, risk_level: high, synergistic_risk: true }
+  - input: { baseline_hearing_loss: false, renal_clearance_ml_min: 70, concurrent_ototoxic_drugs: false }
+    expect: { organ: ear, risk_level: low }
+  - input: {}
+    expect: {}

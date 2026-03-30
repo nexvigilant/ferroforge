@@ -1,0 +1,199 @@
+name: e2a-medically-important-gate
+description: 'ICH E2A Section II.A.4: Medically important event gate — classifies events that may jeopardize patient or require intervention to prevent other seriousness outcomes. Covers the "medically important" catch-all seriousness criterion.'
+version: 1.0.0
+interface:
+  inputs:
+    drug_dependency_event:
+      type: bool
+      required: false
+    intervention_prevented_serious_outcome:
+      type: bool
+      required: false
+    jeopardizes_patient:
+      type: bool
+      required: false
+    meets_other_serious_criteria:
+      type: bool
+      required: false
+    requires_urgent_medical_attention:
+      type: bool
+      required: false
+  outputs:
+    criterion_basis:
+      type: string
+    medically_important:
+      type: bool
+    rationale:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_other_criteria_first
+  nodes:
+    check_other_criteria_first:
+      type: condition
+      variable: meets_other_serious_criteria
+      operator: eq
+      value: true
+      true_next: not_needed_covered_by_other
+      false_next: check_jeopardizes
+    check_jeopardizes:
+      type: condition
+      variable: jeopardizes_patient
+      operator: eq
+      value: true
+      true_next: medically_important_jeopardizes
+      false_next: check_intervention
+    check_intervention:
+      type: condition
+      variable: intervention_prevented_serious_outcome
+      operator: eq
+      value: true
+      true_next: medically_important_intervention
+      false_next: check_urgent_attention
+    check_urgent_attention:
+      type: condition
+      variable: requires_urgent_medical_attention
+      operator: eq
+      value: true
+      true_next: medically_important_urgent
+      false_next: check_drug_dependency
+    check_drug_dependency:
+      type: condition
+      variable: drug_dependency_event
+      operator: eq
+      value: true
+      true_next: medically_important_dependency
+      false_next: not_medically_important
+    not_needed_covered_by_other:
+      type: return
+      value:
+        medically_important: false
+        criterion_basis: OTHER_SERIOUSNESS_CRITERION
+        rationale: Event meets another seriousness criterion — medically important gate not required
+        regulatory_reference: ICH E2A Section II.A.4 - Other seriousness criteria take precedence
+    medically_important_jeopardizes:
+      type: return
+      value:
+        medically_important: true
+        criterion_basis: JEOPARDIZES_PATIENT
+        rationale: Event jeopardizes patient based on appropriate medical judgment — medically important criterion met
+        regulatory_reference: ICH E2A Section II.A.4 - Events that may jeopardize the patient
+    medically_important_intervention:
+      type: return
+      value:
+        medically_important: true
+        criterion_basis: INTERVENTION_PREVENTED_OUTCOME
+        rationale: Medical/surgical intervention was required to prevent a serious outcome — medically important criterion met
+        regulatory_reference: ICH E2A Section II.A.4 - Events requiring intervention to prevent one of the other outcomes
+    medically_important_urgent:
+      type: return
+      value:
+        medically_important: true
+        criterion_basis: REQUIRES_URGENT_ATTENTION
+        rationale: Event requires urgent medical attention that would prevent serious outcome — medically important criterion met
+        regulatory_reference: ICH E2A Section II.A.4 - Events that may jeopardize the patient or require intervention
+    medically_important_dependency:
+      type: return
+      value:
+        medically_important: true
+        criterion_basis: DRUG_DEPENDENCY
+        rationale: Drug dependency or drug abuse event — explicitly listed as medically important per ICH E2A
+        regulatory_reference: ICH E2A Section II.A.4 - Drug dependency or abuse listed as medically important example
+    not_medically_important:
+      type: return
+      value:
+        medically_important: false
+        criterion_basis: NONE
+        rationale: Event does not meet medically important criterion — no jeopardizing, intervention, urgent attention, or dependency indicators
+        regulatory_reference: ICH E2A Section II.A.4 - Medically important criterion not met
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — medically important seriousness sub-classification per ICH E2A II.A.4'
+  primes: ['κ', '∂']
+  arguments: ['jeopardizes_patient', 'intervention_prevented_serious_outcome', 'requires_urgent_medical_attention', 'drug_dependency_event']
+  chain_prediction: 'Feeds medically_important into case-seriousness as sub-gate for the catch-all seriousness criterion. Must check other criteria first to avoid double-counting.'
+tests:
+# Covered by other criterion = not needed
+- input:
+    meets_other_serious_criteria: true
+    jeopardizes_patient: false
+    intervention_prevented_serious_outcome: false
+    requires_urgent_medical_attention: false
+    drug_dependency_event: false
+  expect:
+    medically_important: false
+    criterion_basis: OTHER_SERIOUSNESS_CRITERION
+    regulatory_reference: ICH E2A Section II.A.4 - Other seriousness criteria take precedence
+# Jeopardizes patient = medically important
+- input:
+    meets_other_serious_criteria: false
+    jeopardizes_patient: true
+    intervention_prevented_serious_outcome: false
+    requires_urgent_medical_attention: false
+    drug_dependency_event: false
+  expect:
+    medically_important: true
+    criterion_basis: JEOPARDIZES_PATIENT
+    regulatory_reference: ICH E2A Section II.A.4 - Events that may jeopardize the patient
+# Intervention prevented serious outcome = medically important
+- input:
+    meets_other_serious_criteria: false
+    jeopardizes_patient: false
+    intervention_prevented_serious_outcome: true
+    requires_urgent_medical_attention: false
+    drug_dependency_event: false
+  expect:
+    medically_important: true
+    criterion_basis: INTERVENTION_PREVENTED_OUTCOME
+    regulatory_reference: ICH E2A Section II.A.4 - Events requiring intervention to prevent one of the other outcomes
+# Urgent medical attention needed = medically important
+- input:
+    meets_other_serious_criteria: false
+    jeopardizes_patient: false
+    intervention_prevented_serious_outcome: false
+    requires_urgent_medical_attention: true
+    drug_dependency_event: false
+  expect:
+    medically_important: true
+    criterion_basis: REQUIRES_URGENT_ATTENTION
+    regulatory_reference: ICH E2A Section II.A.4 - Events that may jeopardize the patient or require intervention
+# Drug dependency event = medically important
+- input:
+    meets_other_serious_criteria: false
+    jeopardizes_patient: false
+    intervention_prevented_serious_outcome: false
+    requires_urgent_medical_attention: false
+    drug_dependency_event: true
+  expect:
+    medically_important: true
+    criterion_basis: DRUG_DEPENDENCY
+    regulatory_reference: ICH E2A Section II.A.4 - Drug dependency or abuse listed as medically important example
+# No indicators = not medically important
+- input:
+    meets_other_serious_criteria: false
+    jeopardizes_patient: false
+    intervention_prevented_serious_outcome: false
+    requires_urgent_medical_attention: false
+    drug_dependency_event: false
+  expect:
+    medically_important: false
+    criterion_basis: NONE
+    regulatory_reference: ICH E2A Section II.A.4 - Medically important criterion not met
+# Empty input = not medically important
+- input: {}
+  expect:
+    medically_important: false
+    criterion_basis: NONE
+    regulatory_reference: ICH E2A Section II.A.4 - Medically important criterion not met
+# Jeopardizes + intervention = jeopardizes takes priority (first check)
+- input:
+    meets_other_serious_criteria: false
+    jeopardizes_patient: true
+    intervention_prevented_serious_outcome: true
+    requires_urgent_medical_attention: false
+    drug_dependency_event: false
+  expect:
+    medically_important: true
+    criterion_basis: JEOPARDIZES_PATIENT
+    regulatory_reference: ICH E2A Section II.A.4 - Events that may jeopardize the patient

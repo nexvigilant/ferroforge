@@ -1,0 +1,74 @@
+name: timeline-eu-7day
+description: EU 7-day alert report
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: days_to_deadline
+      operator: lte
+      value: 7
+      true_next: due
+      false_next: not_due
+    due:
+      type: return
+      value:
+        due: true
+        report_type: alert
+        action: submit
+        jurisdiction: EU
+    not_due:
+      type: return
+      value:
+        action: schedule
+        jurisdiction: EU
+        due: false
+        report_type: alert
+tests:
+- input:
+    days_to_deadline: 7
+  expect:
+    jurisdiction: EU
+    due: true
+- input: {}
+  expect:
+    due: false
+    jurisdiction: EU
+- input:
+    days_to_deadline: 0
+  expect:
+    action: submit
+    due: true
+    report_type: alert
+    jurisdiction: EU
+- input:
+    days_to_deadline: -1
+  expect:
+    due: true
+    report_type: alert
+    action: submit
+    jurisdiction: EU
+- input:
+    days_to_deadline: 6
+  expect:
+    report_type: alert
+    action: submit
+    due: true
+    jurisdiction: EU
+- input:
+    days_to_deadline: 8
+  expect:
+    due: false
+    jurisdiction: EU
+    action: schedule
+    report_type: alert
+- input:
+    days_to_deadline: 700
+  expect:
+    report_type: alert
+    due: false
+    action: schedule
+    jurisdiction: EU
+interface: null
+primitive_signature: null

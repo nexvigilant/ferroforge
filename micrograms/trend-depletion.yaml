@@ -1,0 +1,32 @@
+name: trend-depletion
+description: "Depletion of susceptibles"
+version: 0.1.0
+
+tree:
+  start: check
+  nodes:
+    check:
+      type: "condition"
+      variable: "incidence_declining"
+      operator: "eq"
+      value: true
+      true_next: "detected"
+      false_next: "not_detected"
+    detected:
+      type: "return"
+      value:
+        pattern: "depleted"
+        detected: true
+        action: "investigate"
+    not_detected:
+      type: "return"
+      value:
+        pattern: "depleted"
+        detected: false
+        action: "continue_monitoring"
+
+tests:
+  - input: {"incidence_declining": true}
+    expect: {"pattern": "depleted", "detected": true}
+  - input: {}
+    expect: {"pattern": "depleted", "detected": false}

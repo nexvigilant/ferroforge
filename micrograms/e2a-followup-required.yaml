@@ -1,0 +1,216 @@
+name: e2a-followup-required
+description: 'ICH E2A Section 4.3: Determines if follow-up information is required for a safety report based on seriousness, outcome, and expectedness'
+version: 0.1.0
+interface:
+  inputs:
+    serious:
+      type: bool
+      required: false
+    outcome:
+      type: string
+      required: false
+    autopsy_available:
+      type: bool
+      required: false
+    unexpected:
+      type: bool
+      required: false
+  outputs:
+    followup_required:
+      type: bool
+    priority:
+      type: string
+    rationale:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: serious_check
+  nodes:
+    serious_check:
+      type: condition
+      variable: serious
+      operator: eq
+      value: true
+      true_next: outcome_fatal_check
+      false_next: unexpected_check
+    outcome_fatal_check:
+      type: condition
+      variable: outcome
+      operator: eq
+      value: "fatal"
+      true_next: autopsy_check
+      false_next: outcome_unknown_check
+    autopsy_check:
+      type: condition
+      variable: autopsy_available
+      operator: eq
+      value: true
+      true_next: fatal_autopsy_available
+      false_next: fatal_no_autopsy
+    outcome_unknown_check:
+      type: condition
+      variable: outcome
+      operator: eq
+      value: "unknown"
+      true_next: serious_unknown_outcome
+      false_next: outcome_recovered_check
+    outcome_recovered_check:
+      type: condition
+      variable: outcome
+      operator: eq
+      value: "recovered"
+      true_next: serious_recovered
+      false_next: outcome_recovering_check
+    outcome_recovering_check:
+      type: condition
+      variable: outcome
+      operator: eq
+      value: "recovering"
+      true_next: serious_recovering
+      false_next: serious_other_outcome
+    unexpected_check:
+      type: condition
+      variable: unexpected
+      operator: eq
+      value: true
+      true_next: nonserious_unexpected
+      false_next: no_followup
+    fatal_no_autopsy:
+      type: return
+      value:
+        followup_required: true
+        priority: urgent
+        rationale: Fatal outcome without autopsy data requires urgent follow-up
+        regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+    fatal_autopsy_available:
+      type: return
+      value:
+        followup_required: false
+        priority: none
+        rationale: Fatal outcome with autopsy available - no additional follow-up needed
+        regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+    serious_unknown_outcome:
+      type: return
+      value:
+        followup_required: true
+        priority: urgent
+        rationale: Serious event with unknown outcome requires urgent follow-up
+        regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+    serious_recovered:
+      type: return
+      value:
+        followup_required: false
+        priority: none
+        rationale: Serious event with recovery - no additional follow-up needed
+        regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+    serious_recovering:
+      type: return
+      value:
+        followup_required: false
+        priority: none
+        rationale: Serious event with ongoing recovery - no additional follow-up needed
+        regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+    serious_other_outcome:
+      type: return
+      value:
+        followup_required: true
+        priority: urgent
+        rationale: Serious event with unresolved outcome requires follow-up
+        regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+    nonserious_unexpected:
+      type: return
+      value:
+        followup_required: true
+        priority: routine
+        rationale: Non-serious but unexpected event requires routine follow-up
+        regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+    no_followup:
+      type: return
+      value:
+        followup_required: false
+        priority: none
+        rationale: Non-serious expected event - no follow-up required
+        regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — measurement, comparison, or classification'
+  primes: ['κ']
+  arguments: []
+tests:
+# Serious + unknown outcome -> urgent follow-up
+- input:
+    serious: true
+    outcome: "unknown"
+    autopsy_available: false
+    unexpected: false
+  expect:
+    followup_required: true
+    priority: urgent
+    regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+# Serious + fatal + no autopsy -> urgent follow-up
+- input:
+    serious: true
+    outcome: "fatal"
+    autopsy_available: false
+    unexpected: false
+  expect:
+    followup_required: true
+    priority: urgent
+    regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+# Serious + fatal + autopsy available -> no follow-up
+- input:
+    serious: true
+    outcome: "fatal"
+    autopsy_available: true
+    unexpected: false
+  expect:
+    followup_required: false
+    priority: none
+    regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+# Serious + recovered -> no follow-up
+- input:
+    serious: true
+    outcome: "recovered"
+    autopsy_available: false
+    unexpected: false
+  expect:
+    followup_required: false
+    priority: none
+    regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+# Serious + recovering -> no follow-up
+- input:
+    serious: true
+    outcome: "recovering"
+    autopsy_available: false
+    unexpected: false
+  expect:
+    followup_required: false
+    priority: none
+    regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+# Non-serious + unexpected -> routine follow-up
+- input:
+    serious: false
+    outcome: "recovered"
+    autopsy_available: false
+    unexpected: true
+  expect:
+    followup_required: true
+    priority: routine
+    regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+# Non-serious + expected -> no follow-up
+- input:
+    serious: false
+    outcome: "recovered"
+    autopsy_available: false
+    unexpected: false
+  expect:
+    followup_required: false
+    priority: none
+    regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports
+# Empty input - defaults to no follow-up (non-serious, not unexpected)
+- input: {}
+  expect:
+    followup_required: false
+    priority: none
+    regulatory_reference: ICH E2A Section 4.3 - Follow-up Reports

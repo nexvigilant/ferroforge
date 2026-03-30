@@ -1,21 +1,40 @@
 name: risk-score-classifier
-description: 'Classify risk score 0-100 into CRITICAL/HIGH/MODERATE/LOW bands for Guardian risk routing'
+description: Classify risk score 0-100 into CRITICAL/HIGH/MODERATE/LOW bands for Guardian risk routing
 version: 0.1.0
-interface:
-  inputs:
-    risk_score:
-      type: int
-      required: false
-  outputs:
-    action:
-      type: string
-    escalate:
-      type: bool
-    level:
-      type: string
 tree:
   start: check_critical
   nodes:
+    critical:
+      type: return
+      value:
+        level: CRITICAL
+        action: immediate_review
+        escalate: true
+    moderate:
+      type: return
+      value:
+        level: MODERATE
+        escalate: false
+        action: scheduled_review
+    high:
+      type: return
+      value:
+        level: HIGH
+        action: priority_review
+        escalate: true
+    check_moderate:
+      type: condition
+      variable: risk_score
+      operator: gte
+      value: 30
+      true_next: moderate
+      false_next: low
+    low:
+      type: return
+      value:
+        escalate: false
+        level: LOW
+        action: routine_monitoring
     check_critical:
       type: condition
       variable: risk_score
@@ -30,70 +49,152 @@ tree:
       value: 60
       true_next: high
       false_next: check_moderate
-    check_moderate:
-      type: condition
-      variable: risk_score
-      operator: gte
-      value: 30
-      true_next: moderate
-      false_next: low
-    critical:
-      type: return
-      value:
-        level: CRITICAL
-        action: immediate_review
-        escalate: true
-    high:
-      type: return
-      value:
-        level: HIGH
-        action: priority_review
-        escalate: true
-    moderate:
-      type: return
-      value:
-        level: MODERATE
-        action: scheduled_review
-        escalate: false
-    low:
-      type: return
-      value:
-        level: LOW
-        action: routine_monitoring
-        escalate: false
 tests:
 - input:
     risk_score: 95
   expect:
-    level: CRITICAL
     action: immediate_review
     escalate: true
+    level: CRITICAL
 - input:
     risk_score: 80
   expect:
+    escalate: true
     level: CRITICAL
     action: immediate_review
-    escalate: true
 - input:
     risk_score: 65
+  expect:
+    escalate: true
+    level: HIGH
+    action: priority_review
+- input:
+    risk_score: 45
+  expect:
+    action: scheduled_review
+    escalate: false
+    level: MODERATE
+- input:
+    risk_score: 10
+  expect:
+    action: routine_monitoring
+    level: LOW
+    escalate: false
+- input: {}
+  expect:
+    action: routine_monitoring
+    level: LOW
+    escalate: false
+- input:
+    risk_score: 0
+  expect:
+    escalate: false
+    action: routine_monitoring
+    level: LOW
+- input:
+    risk_score: -1
+  expect:
+    escalate: false
+    level: LOW
+    action: routine_monitoring
+- input:
+    risk_score: 29
+  expect:
+    level: LOW
+    escalate: false
+    action: routine_monitoring
+- input:
+    risk_score: 31
+  expect:
+    action: scheduled_review
+    level: MODERATE
+    escalate: false
+- input:
+    risk_score: 3000
+  expect:
+    escalate: true
+    level: CRITICAL
+    action: immediate_review
+- input:
+    risk_score: 0
+  expect:
+    action: routine_monitoring
+    escalate: false
+    level: LOW
+- input:
+    risk_score: -1
+  expect:
+    level: LOW
+    escalate: false
+    action: routine_monitoring
+- input:
+    risk_score: 79
   expect:
     level: HIGH
     action: priority_review
     escalate: true
 - input:
-    risk_score: 45
+    risk_score: 81
   expect:
-    level: MODERATE
-    action: scheduled_review
+    escalate: true
+    level: CRITICAL
+    action: immediate_review
+- input:
+    risk_score: 8000
+  expect:
+    action: immediate_review
+    level: CRITICAL
+    escalate: true
+- input:
+    risk_score: 0
+  expect:
+    action: routine_monitoring
+    level: LOW
     escalate: false
 - input:
-    risk_score: 10
+    risk_score: -1
   expect:
     level: LOW
-    action: routine_monitoring
     escalate: false
-- input: {}
+    action: routine_monitoring
+- input:
+    risk_score: 59
   expect:
-    action: routine_monitoring
     escalate: false
-    level: LOW
+    action: scheduled_review
+    level: MODERATE
+- input:
+    risk_score: 61
+  expect:
+    action: priority_review
+    level: HIGH
+    escalate: true
+- input:
+    risk_score: 6000
+  expect:
+    action: immediate_review
+    escalate: true
+    level: CRITICAL
+interface:
+  inputs:
+    risk_score:
+      type: int
+      required: false
+  outputs:
+    escalate:
+      type: bool
+      required: false
+    action:
+      type: string
+      required: false
+    level:
+      type: string
+      required: false
+  aliases: {}
+primitive_signature:
+  dominant: κ
+  expression: κ — measurement, comparison, or classification
+  primes:
+  - κ
+  arguments: []
+  chain_prediction: null

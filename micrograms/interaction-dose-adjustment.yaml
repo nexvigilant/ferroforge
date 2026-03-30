@@ -1,0 +1,81 @@
+name: interaction-dose-adjustment
+description: "Calculate recommended dose adjustments to manage drug interactions"
+version: 0.1.0
+tree:
+  start: validate_interaction_data
+  nodes:
+    validate_interaction_data:
+      type: condition
+      variable: auc_increase_factor
+      operator: is_not_null
+      value: null
+      true_next: check_adjustment_threshold
+      false_next: adjustment_unknown
+    check_adjustment_threshold:
+      type: condition
+      variable: auc_increase_factor
+      operator: gte
+      value: 3
+      true_next: reduce_50_percent
+      false_next: check_moderate_increase
+    check_moderate_increase:
+      type: condition
+      variable: auc_increase_factor
+      operator: gte
+      value: 1.5
+      true_next: reduce_25_percent
+      false_next: reduce_10_percent
+    reduce_50_percent:
+      type: return
+      value:
+        dose_adjustment_percent: 50
+        new_dose_recommendation: "half_normal_dose"
+        adjustment_rationale: "major_pk_interaction"
+        titration_required: true
+        adjustment_compliant: true
+    reduce_25_percent:
+      type: return
+      value:
+        dose_adjustment_percent: 25
+        new_dose_recommendation: "three_quarter_normal_dose"
+        adjustment_rationale: "moderate_pk_interaction"
+        titration_required: true
+        adjustment_compliant: true
+    reduce_10_percent:
+      type: return
+      value:
+        dose_adjustment_percent: 10
+        new_dose_recommendation: "consider_minor_reduction"
+        adjustment_rationale: "minor_pk_interaction"
+        titration_required: false
+        adjustment_compliant: true
+    adjustment_unknown:
+      type: return
+      value:
+        dose_adjustment_percent: null
+        new_dose_recommendation: null
+        adjustment_rationale: null
+        titration_required: null
+        adjustment_compliant: false
+tests:
+- input:
+    auc_increase_factor: 4.5
+  expect:
+    dose_adjustment_percent: 50
+    new_dose_recommendation: "half_normal_dose"
+    titration_required: true
+- input:
+    auc_increase_factor: 2.0
+  expect:
+    dose_adjustment_percent: 25
+    new_dose_recommendation: "three_quarter_normal_dose"
+    titration_required: true
+- input:
+    auc_increase_factor: 1.2
+  expect:
+    dose_adjustment_percent: 10
+    new_dose_recommendation: "consider_minor_reduction"
+- input: {}
+  expect:
+    dose_adjustment_percent: null
+    adjustment_compliant: false

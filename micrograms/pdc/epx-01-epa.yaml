@@ -1,0 +1,57 @@
+name: epx-01-epa
+description: 'EPA Progression EPX-01 metric PDC-01'
+version: 0.1.0
+interface:
+  inputs:
+    achievement_pct: {type: int, required: false}
+    target_pct: {type: int, required: false}
+  outputs:
+    status: {type: string}
+    gap: {type: string}
+tree:
+  start: check_exceeds
+  nodes:
+    check_exceeds:
+      type: condition
+      variable: achievement_pct
+      operator: gte
+      value: 95
+      true_next: exceeds
+      false_next: check_meets
+    check_meets:
+      type: condition
+      variable: achievement_pct
+      operator: gte
+      value: 80
+      true_next: meets
+      false_next: check_below
+    check_below:
+      type: condition
+      variable: achievement_pct
+      operator: gte
+      value: 50
+      true_next: below
+      false_next: critical
+    exceeds:
+      type: return
+      value: {status: EXCEEDS, gap: none}
+    meets:
+      type: return
+      value: {status: MEETS, gap: minor}
+    below:
+      type: return
+      value: {status: BELOW, gap: significant}
+    critical:
+      type: return
+      value: {status: CRITICAL, gap: urgent}
+tests:
+- input: {achievement_pct: 98, target_pct: 85}
+  expect: {status: EXCEEDS, gap: none}
+- input: {achievement_pct: 85, target_pct: 85}
+  expect: {status: MEETS, gap: minor}
+- input: {achievement_pct: 60, target_pct: 85}
+  expect: {status: BELOW, gap: significant}
+- input: {achievement_pct: 30, target_pct: 85}
+  expect: {status: CRITICAL, gap: urgent}
+- input: {achievement_pct: 0, target_pct: 0}
+  expect: {status: CRITICAL, gap: urgent}

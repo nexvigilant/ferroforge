@@ -1,0 +1,49 @@
+name: gate-risk-moderate
+description: Guardian moderate risk
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: risk_score
+      operator: gte
+      value: 4.0
+      true_next: pass
+      false_next: fail
+    pass:
+      type: return
+      value:
+        met: true
+        threshold: risk_score
+        gate: true
+    fail:
+      type: return
+      value:
+        gate: false
+        met: false
+        threshold: risk_score
+tests:
+- input:
+    risk_score: 4.0
+  expect:
+    met: true
+    gate: true
+- input: {}
+  expect:
+    gate: false
+    met: false
+- input:
+    risk_score: 3.999
+  expect:
+    met: false
+    gate: false
+    threshold: risk_score
+- input:
+    risk_score: 4.001
+  expect:
+    threshold: risk_score
+    met: true
+    gate: true
+interface: null
+primitive_signature: null

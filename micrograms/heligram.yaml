@@ -1,0 +1,203 @@
+name: heligram
+description: >
+  Helix Computing decision tree. Given boundary (∂), state (ς), void (∅),
+  classifies existence strength via ∃ = ∂(×(ς, ∅)), identifies weakest
+  primitive, routes to Crystalbook laws, and gates helix advancement.
+version: 0.1.0
+primitive_signature:
+  dominant: '∂'
+  expression: '∂(×(ς, ∅)) → ∃ — boundary applied to state-in-void yields existence'
+  primes: ['∂', 'ς', '∅', '∃', '→', 'κ']
+  arguments: ['boundary', 'state', 'void']
+  chain_prediction: 'Self-contained meta-pattern encoder. Chains as pre-check before any domain microgram.'
+interface:
+  inputs:
+    boundary:
+      type: float
+      required: true
+    state:
+      type: float
+      required: true
+    void:
+      type: float
+      required: true
+  outputs:
+    existence_class:
+      type: string
+    weakest:
+      type: string
+    can_advance:
+      type: bool
+    vice_risk:
+      type: string
+tree:
+  start: boundary_strong
+  nodes:
+    # ∂ check: is boundary above 0.5?
+    boundary_strong:
+      type: condition
+      variable: boundary
+      operator: gte
+      value: 0.5
+      true_next: state_strong
+      false_next: boundary_weak_state
+
+    # ∂ >= 0.5, check ς
+    state_strong:
+      type: condition
+      variable: state
+      operator: gte
+      value: 0.5
+      true_next: void_strong
+      false_next: state_is_weakest
+
+    # ∂ >= 0.5, ς >= 0.5, check ∅
+    void_strong:
+      type: condition
+      variable: void
+      operator: gte
+      value: 0.5
+      true_next: all_strong
+      false_next: void_is_weakest
+
+    # All three >= 0.5: strong existence, can advance
+    all_strong:
+      type: return
+      value:
+        existence_class: strong
+        weakest: none
+        can_advance: true
+        can_advance_to_1: true
+        vice_risk: "Low — all primitives healthy"
+        helix_verdict: "Strong enough to advance. The truth at higher resolution awaits."
+        binding_laws: "All 8 laws in balance"
+
+    # ∂ and ς strong but ∅ weak
+    void_is_weakest:
+      type: return
+      value:
+        existence_class: moderate
+        weakest: void
+        can_advance: true
+        can_advance_to_1: true
+        vice_risk: "Envy, Wrath — unclear void invites foreign patterns"
+        helix_verdict: "Can advance. Clarify what this system is NOT."
+        binding_laws: "Law 4 (Generous Witness), Law 6 (Measured Response)"
+
+    # ∂ strong but ς weak
+    state_is_weakest:
+      type: condition
+      variable: state
+      operator: gte
+      value: 0.1
+      true_next: state_weak_not_collapsing
+      false_next: state_collapsing
+
+    state_weak_not_collapsing:
+      type: return
+      value:
+        existence_class: weak
+        weakest: state
+        can_advance: true
+        can_advance_to_1: true
+        vice_risk: "Greed, Gluttony, Sloth — thin state means thin measurement"
+        helix_verdict: "Can advance, but enrich state (ς) first."
+        binding_laws: "Law 2 (Sufficient Portion), Law 5 (Measured Intake), Law 7 (Active Maintenance)"
+
+    state_collapsing:
+      type: return
+      value:
+        existence_class: collapsing
+        weakest: state
+        can_advance: false
+        can_advance_to_1: false
+        vice_risk: "Critical ς gap — conservation failing"
+        helix_verdict: "Cannot advance. State is too thin for existence."
+        binding_laws: "Law 7 (Active Maintenance) — urgent"
+
+    # ∂ < 0.5: boundary is weak, check if state saves it
+    boundary_weak_state:
+      type: condition
+      variable: boundary
+      operator: gte
+      value: 0.1
+      true_next: boundary_weak_not_collapsing
+      false_next: boundary_collapsing
+
+    boundary_weak_not_collapsing:
+      type: return
+      value:
+        existence_class: weak
+        weakest: boundary
+        can_advance: true
+        can_advance_to_1: true
+        vice_risk: "Pride, Lust, Corruption — fuzzy boundaries leak existence"
+        helix_verdict: "Can advance, but sharpen boundary (∂) first."
+        binding_laws: "Law 1 (True Measure), Law 3 (Bounded Pursuit), Law 8 (Sovereign Boundary)"
+
+    boundary_collapsing:
+      type: return
+      value:
+        existence_class: collapsing
+        weakest: boundary
+        can_advance: false
+        can_advance_to_1: false
+        vice_risk: "Critical ∂ gap — no boundary means no existence"
+        helix_verdict: "Cannot advance. Without boundary, there is no inside or outside."
+        binding_laws: "Law 8 (Sovereign Boundary) — existential"
+
+tests:
+  - name: strong_existence_advances
+    input:
+      boundary: 0.9
+      state: 0.8
+      void: 0.7
+    expect:
+      existence_class: strong
+      can_advance_to_1: true
+
+  - name: weak_state_blocks
+    input:
+      boundary: 0.95
+      state: 0.05
+      void: 0.6
+    expect:
+      existence_class: collapsing
+      can_advance_to_1: false
+
+  - name: balanced_system
+    input:
+      boundary: 0.8
+      state: 0.8
+      void: 0.8
+    expect:
+      existence_class: strong
+      can_advance_to_1: true
+
+  - name: zero_boundary_kills
+    input:
+      boundary: 0.0
+      state: 1.0
+      void: 1.0
+    expect:
+      existence_class: collapsing
+      can_advance_to_1: false
+
+  - name: moderate_void_weak
+    input:
+      boundary: 0.7
+      state: 0.6
+      void: 0.3
+    expect:
+      existence_class: moderate
+      weakest: void
+
+  - name: boundary_weak_but_alive
+    input:
+      boundary: 0.3
+      state: 0.9
+      void: 0.9
+    expect:
+      existence_class: weak
+      weakest: boundary
+      can_advance_to_1: true

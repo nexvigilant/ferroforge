@@ -1,0 +1,220 @@
+name: e2d-postapproval-study-reporting
+description: 'ICH E2D Section 4.3: Classifies post-approval study safety report type and determines whether IND-equivalent expedited reporting applies or periodic reporting suffices'
+version: 0.1.0
+interface:
+  inputs:
+    study_type:
+      type: string
+      required: false
+    is_interventional:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+    protocol_defined:
+      type: bool
+      required: false
+  outputs:
+    reporting_pathway:
+      type: string
+    deadline_days:
+      type: int
+    expedited_required:
+      type: bool
+    regulatory_reference:
+      type: string
+tree:
+  start: check_interventional
+  nodes:
+    check_interventional:
+      type: condition
+      variable: is_interventional
+      operator: eq
+      value: true
+      true_next: check_serious_interventional
+      false_next: check_study_type_obs
+    check_serious_interventional:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_unexpected_interventional
+      false_next: return_periodic_interventional
+    check_unexpected_interventional:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: return_expedited_interventional
+      false_next: return_periodic_interventional
+    check_study_type_obs:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: observational
+      true_next: check_serious_obs
+      false_next: check_registry
+    check_serious_obs:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_unexpected_obs
+      false_next: return_aggregate_obs
+    check_unexpected_obs:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: return_expedited_obs
+      false_next: return_periodic_obs
+    check_registry:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: registry
+      true_next: check_protocol_registry
+      false_next: return_standard_periodic
+    check_protocol_registry:
+      type: condition
+      variable: protocol_defined
+      operator: eq
+      value: true
+      true_next: return_registry_protocol
+      false_next: return_aggregate_obs
+    return_expedited_interventional:
+      type: return
+      value:
+        reporting_pathway: IND_EQUIVALENT_EXPEDITED
+        deadline_days: 15
+        expedited_required: true
+        regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Safety Reporting
+    return_periodic_interventional:
+      type: return
+      value:
+        reporting_pathway: DSUR_PERIODIC
+        deadline_days: 365
+        expedited_required: false
+        regulatory_reference: ICH E2D Section 4.3 / ICH E2F DSUR
+    return_expedited_obs:
+      type: return
+      value:
+        reporting_pathway: SPONTANEOUS_EQUIVALENT_EXPEDITED
+        deadline_days: 15
+        expedited_required: true
+        regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Safety Reporting
+    return_periodic_obs:
+      type: return
+      value:
+        reporting_pathway: PSUR_AGGREGATE
+        deadline_days: 90
+        expedited_required: false
+        regulatory_reference: ICH E2D Section 6 / ICH E2C(R2)
+    return_aggregate_obs:
+      type: return
+      value:
+        reporting_pathway: AGGREGATE_LINE_LISTING
+        deadline_days: 90
+        expedited_required: false
+        regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+    return_registry_protocol:
+      type: return
+      value:
+        reporting_pathway: REGISTRY_PROTOCOL_DEFINED
+        deadline_days: 15
+        expedited_required: true
+        regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Safety Reporting
+    return_standard_periodic:
+      type: return
+      value:
+        reporting_pathway: STANDARD_PERIODIC
+        deadline_days: 90
+        expedited_required: false
+        regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — post-approval study safety reporting pathway classifier per ICH E2D Section 4.3'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['study_type', 'is_interventional', 'is_serious', 'is_unexpected', 'protocol_defined']
+tests:
+- input:
+    is_interventional: true
+    is_serious: true
+    is_unexpected: true
+    study_type: interventional
+  expect:
+    reporting_pathway: IND_EQUIVALENT_EXPEDITED
+    deadline_days: 15
+    expedited_required: true
+    regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Safety Reporting
+- input:
+    is_interventional: true
+    is_serious: true
+    is_unexpected: false
+    study_type: interventional
+  expect:
+    reporting_pathway: DSUR_PERIODIC
+    deadline_days: 365
+    expedited_required: false
+    regulatory_reference: ICH E2D Section 4.3 / ICH E2F DSUR
+- input:
+    is_interventional: true
+    is_serious: false
+    is_unexpected: true
+    study_type: interventional
+  expect:
+    reporting_pathway: DSUR_PERIODIC
+    deadline_days: 365
+    expedited_required: false
+    regulatory_reference: ICH E2D Section 4.3 / ICH E2F DSUR
+- input:
+    is_interventional: false
+    study_type: observational
+    is_serious: true
+    is_unexpected: true
+  expect:
+    reporting_pathway: SPONTANEOUS_EQUIVALENT_EXPEDITED
+    deadline_days: 15
+    expedited_required: true
+    regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Safety Reporting
+- input:
+    is_interventional: false
+    study_type: observational
+    is_serious: true
+    is_unexpected: false
+  expect:
+    reporting_pathway: PSUR_AGGREGATE
+    deadline_days: 90
+    expedited_required: false
+    regulatory_reference: ICH E2D Section 6 / ICH E2C(R2)
+- input:
+    is_interventional: false
+    study_type: observational
+    is_serious: false
+    is_unexpected: false
+  expect:
+    reporting_pathway: AGGREGATE_LINE_LISTING
+    deadline_days: 90
+    expedited_required: false
+    regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+- input:
+    is_interventional: false
+    study_type: registry
+    protocol_defined: true
+    is_serious: true
+    is_unexpected: true
+  expect:
+    reporting_pathway: REGISTRY_PROTOCOL_DEFINED
+    deadline_days: 15
+    expedited_required: true
+    regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Safety Reporting
+- input: {}
+  expect:
+    reporting_pathway: STANDARD_PERIODIC
+    deadline_days: 90
+    expedited_required: false
+    regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports

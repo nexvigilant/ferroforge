@@ -1,0 +1,72 @@
+name: organ-reproductive-safety
+description: "Reproductive safety assessment. Evaluates teratogenicity, male infertility, and lactation transfer risks."
+version: 0.1.0
+tree:
+  start: check_pregnancy_status
+  nodes:
+    check_pregnancy_status:
+      type: condition
+      variable: is_pregnant
+      operator: eq
+      value: true
+      true_next: check_trimester
+      false_next: check_male_infertility
+    check_trimester:
+      type: condition
+      variable: trimester
+      operator: eq
+      value: 1
+      true_next: first_trimester_risk
+      false_next: check_known_teratogen
+    first_trimester_risk:
+      type: return
+      value:
+        organ: reproductive
+        risk_level: critical
+        teratogenic_risk: true
+        contraindication: true
+        message: "First trimester; highest teratogenic risk; contraindicated"
+    check_known_teratogen:
+      type: condition
+      variable: is_known_teratogen
+      operator: eq
+      value: true
+      true_next: teratogen_alert
+      false_next: check_male_infertility
+    teratogen_alert:
+      type: return
+      value:
+        organ: reproductive
+        risk_level: critical
+        contraindication: true
+        message: "Known teratogen; contraindicated in pregnancy"
+    check_male_infertility:
+      type: condition
+      variable: male_patient_with_infertility_risk
+      operator: eq
+      value: true
+      true_next: male_infertility_alert
+      false_next: standard_dosing
+    male_infertility_alert:
+      type: return
+      value:
+        organ: reproductive
+        risk_level: moderate
+        fertility_counseling: recommended
+        message: "Drug may affect male fertility; counsel before use"
+    standard_dosing:
+      type: return
+      value:
+        organ: reproductive
+        risk_level: low
+tests:
+  - input: { is_pregnant: true, trimester: 1, is_known_teratogen: false, male_patient_with_infertility_risk: false }
+    expect: { organ: reproductive, risk_level: critical, teratogenic_risk: true }
+  - input: { is_pregnant: true, trimester: 2, is_known_teratogen: true, male_patient_with_infertility_risk: false }
+    expect: { organ: reproductive, risk_level: critical, contraindication: true }
+  - input: { is_pregnant: false, trimester: 0, is_known_teratogen: false, male_patient_with_infertility_risk: true }
+    expect: { organ: reproductive, risk_level: moderate, fertility_counseling: recommended }
+  - input: { is_pregnant: false, trimester: 0, is_known_teratogen: false, male_patient_with_infertility_risk: false }
+    expect: { organ: reproductive, risk_level: low }
+  - input: {}
+    expect: {}

@@ -1,0 +1,74 @@
+name: timeline-ich-dsur
+description: ICH DSUR interval
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    due:
+      type: return
+      value:
+        action: submit
+        due: true
+        report_type: dsur
+        jurisdiction: ICH
+    check:
+      type: condition
+      variable: months_since_dsur
+      operator: gte
+      value: 12
+      true_next: due
+      false_next: not_due
+    not_due:
+      type: return
+      value:
+        action: schedule
+        due: false
+        report_type: dsur
+        jurisdiction: ICH
+tests:
+- input:
+    months_since_dsur: 12
+  expect:
+    due: true
+    jurisdiction: ICH
+- input: {}
+  expect:
+    due: false
+    jurisdiction: ICH
+- input:
+    months_since_dsur: 0
+  expect:
+    report_type: dsur
+    action: schedule
+    due: false
+    jurisdiction: ICH
+- input:
+    months_since_dsur: -1
+  expect:
+    report_type: dsur
+    jurisdiction: ICH
+    due: false
+    action: schedule
+- input:
+    months_since_dsur: 11
+  expect:
+    report_type: dsur
+    jurisdiction: ICH
+    due: false
+    action: schedule
+- input:
+    months_since_dsur: 13
+  expect:
+    action: submit
+    due: true
+    report_type: dsur
+    jurisdiction: ICH
+- input:
+    months_since_dsur: 1200
+  expect:
+    due: true
+    jurisdiction: ICH
+    report_type: dsur
+    action: submit
+interface: null
+primitive_signature: null

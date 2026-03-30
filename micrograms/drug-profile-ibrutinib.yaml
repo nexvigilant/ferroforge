@@ -1,0 +1,62 @@
+name: drug-profile-ibrutinib
+description: 'Safety triage for ibrutinib: PRR-based signal routing (Type B)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    no_signal:
+      type: return
+      value:
+        drug: ibrutinib
+        harm_type: B
+        action: monitor
+        expected_prr: 6.5
+        signal: false
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5.0
+      true_next: signal
+      false_next: no_signal
+    signal:
+      type: return
+      value:
+        drug: ibrutinib
+        harm_type: B
+        action: investigate
+        signal: true
+        expected_prr: 6.5
+tests:
+- input:
+    prr: 6.5
+  expect:
+    drug: ibrutinib
+    signal: true
+- input:
+    prr: 0.5
+  expect:
+    drug: ibrutinib
+    signal: false
+- input: {}
+  expect:
+    drug: ibrutinib
+    signal: false
+- input:
+    prr: 4.999
+  expect:
+    action: monitor
+    drug: ibrutinib
+    expected_prr: 6.5
+    signal: false
+    harm_type: B
+- input:
+    prr: 5.001
+  expect:
+    expected_prr: 6.5
+    harm_type: B
+    drug: ibrutinib
+    action: investigate
+    signal: true
+interface: null
+primitive_signature: null

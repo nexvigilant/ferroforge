@@ -1,0 +1,72 @@
+name: bridge-calculation-to-vigilance
+description: 'Bridge: converts calculation pipeline signal verdict into Guardian risk score input'
+version: 0.1.0
+tree:
+  start: check_action
+  nodes:
+    archive_input:
+      type: return
+      value:
+        source_priority: low
+        risk_score: 2.0
+        bridge: calculation-to-vigilance
+    check_action:
+      type: condition
+      variable: action
+      operator: eq
+      value: investigate
+      true_next: check_priority
+      false_next: archive_input
+    check_priority:
+      type: condition
+      variable: priority
+      operator: eq
+      value: critical
+      true_next: critical_score
+      false_next: high_score
+    critical_score:
+      type: return
+      value:
+        risk_score: 9.0
+        bridge: calculation-to-vigilance
+        source_priority: critical
+    high_score:
+      type: return
+      value:
+        source_priority: high
+        risk_score: 7.0
+        bridge: calculation-to-vigilance
+tests:
+- input:
+    priority: critical
+    action: investigate
+  expect:
+    bridge: calculation-to-vigilance
+    source_priority: critical
+    risk_score: 9.0
+- input:
+    action: investigate
+    priority: high
+  expect:
+    risk_score: 7.0
+    bridge: calculation-to-vigilance
+    source_priority: high
+- input:
+    priority: low
+    action: archive
+  expect:
+    bridge: calculation-to-vigilance
+    source_priority: low
+    risk_score: 2.0
+- input: {}
+  expect:
+    source_priority: low
+    risk_score: 2.0
+    bridge: calculation-to-vigilance
+- input: {}
+  expect:
+    bridge: calculation-to-vigilance
+    source_priority: low
+    risk_score: 2.0
+interface: null
+primitive_signature: null

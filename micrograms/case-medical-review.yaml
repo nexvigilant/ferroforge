@@ -1,0 +1,72 @@
+name: case-medical-review
+description: "Determine if case requires medical review by qualified healthcare professional"
+version: 0.1.0
+tree:
+  start: validate_case
+  nodes:
+    validate_case:
+      type: condition
+      variable: case_seriousness
+      operator: is_not_null
+      value: null
+      true_next: check_seriousness
+      false_next: review_status_unknown
+    check_seriousness:
+      type: condition
+      variable: case_seriousness
+      operator: eq
+      value: "serious"
+      true_next: medical_review_required
+      false_next: check_complexity
+    check_complexity:
+      type: condition
+      variable: case_complexity
+      operator: eq
+      value: "high"
+      true_next: medical_review_required
+      false_next: no_medical_review
+    medical_review_required:
+      type: return
+      value:
+        medical_review_needed: true
+        reviewer_qualification: "physician_or_pharmacist"
+        review_timeline_days: 5
+        expertise_required: "medical_assessment"
+        review_compliant: true
+    no_medical_review:
+      type: return
+      value:
+        medical_review_needed: false
+        reviewer_qualification: null
+        review_timeline_days: 0
+        expertise_required: null
+        review_compliant: true
+    review_status_unknown:
+      type: return
+      value:
+        medical_review_needed: null
+        reviewer_qualification: null
+        review_timeline_days: null
+        expertise_required: null
+        review_compliant: false
+tests:
+- input:
+    case_seriousness: "serious"
+  expect:
+    medical_review_needed: true
+    reviewer_qualification: "physician_or_pharmacist"
+    review_timeline_days: 5
+- input:
+    case_seriousness: "non_serious"
+    case_complexity: "high"
+  expect:
+    medical_review_needed: true
+- input:
+    case_seriousness: "non_serious"
+    case_complexity: "low"
+  expect:
+    medical_review_needed: false
+- input: {}
+  expect:
+    medical_review_needed: null
+    review_compliant: false

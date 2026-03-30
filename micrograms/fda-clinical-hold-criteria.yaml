@@ -1,0 +1,214 @@
+name: fda-clinical-hold-criteria
+description: "FDA clinical hold decision criteria: routes by hold basis and study phase per 21 CFR 312.42"
+version: 0.1.0
+interface:
+  inputs:
+    hold_basis:
+      type: string
+      required: true
+      description: "Basis for clinical hold: unreasonable_risk, unqualified_investigators, misleading_brochure, insufficient_toxicology, deficient_protocol, deficient_informed_consent"
+    study_phase:
+      type: string
+      required: false
+      description: "Clinical trial phase: phase1, phase2, phase3, phase4, babe"
+    prior_hold:
+      type: bool
+      required: false
+      description: "Whether the IND has been on hold previously for the same issue"
+  outputs:
+    hold_type:
+      type: string
+    sponsor_response_days:
+      type: int
+    fda_action:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_basis
+  nodes:
+    check_basis:
+      type: condition
+      variable: hold_basis
+      operator: eq
+      value: "unreasonable_risk"
+      true_next: unreasonable_risk_phase
+      false_next: check_investigators
+
+    check_investigators:
+      type: condition
+      variable: hold_basis
+      operator: eq
+      value: "unqualified_investigators"
+      true_next: partial_hold
+      false_next: check_brochure
+
+    check_brochure:
+      type: condition
+      variable: hold_basis
+      operator: eq
+      value: "misleading_brochure"
+      true_next: full_hold_brochure
+      false_next: check_tox
+
+    check_tox:
+      type: condition
+      variable: hold_basis
+      operator: eq
+      value: "insufficient_toxicology"
+      true_next: tox_phase_check
+      false_next: check_protocol
+
+    check_protocol:
+      type: condition
+      variable: hold_basis
+      operator: eq
+      value: "deficient_protocol"
+      true_next: full_hold_protocol
+      false_next: check_consent
+
+    check_consent:
+      type: condition
+      variable: hold_basis
+      operator: eq
+      value: "deficient_informed_consent"
+      true_next: full_hold_consent
+      false_next: no_hold
+
+    # UNREASONABLE RISK — phase determines scope
+    unreasonable_risk_phase:
+      type: condition
+      variable: study_phase
+      operator: eq
+      value: "phase1"
+      true_next: phase1_risk_hold
+      false_next: later_phase_risk_hold
+
+    phase1_risk_hold:
+      type: return
+      value:
+        hold_type: "COMPLETE_CLINICAL_HOLD"
+        sponsor_response_days: 30
+        fda_action: "No subjects may be exposed. Phase 1: subjects would be exposed to unreasonable and significant risk of illness or injury."
+        regulatory_reference: "21 CFR 312.42(b)(1)(i); FDA must notify sponsor within 30 days of IND receipt"
+
+    later_phase_risk_hold:
+      type: condition
+      variable: prior_hold
+      operator: eq
+      value: true
+      true_next: repeat_hold
+      false_next: standard_risk_hold
+
+    standard_risk_hold:
+      type: return
+      value:
+        hold_type: "COMPLETE_CLINICAL_HOLD"
+        sponsor_response_days: 30
+        fda_action: "All clinical work under IND must stop. Sponsor has 30 days to respond to FDA deficiency letter."
+        regulatory_reference: "21 CFR 312.42(b)(2)(i); subjects would be exposed to unreasonable and significant risk"
+
+    repeat_hold:
+      type: return
+      value:
+        hold_type: "COMPLETE_CLINICAL_HOLD"
+        sponsor_response_days: 30
+        fda_action: "Repeat hold for same issue. FDA may consider IND withdrawal proceedings under 21 CFR 312.44 if sponsor fails to respond adequately."
+        regulatory_reference: "21 CFR 312.42(b); 21 CFR 312.44 (IND withdrawal)"
+
+    # PARTIAL HOLD — specific investigators only
+    partial_hold:
+      type: return
+      value:
+        hold_type: "PARTIAL_CLINICAL_HOLD"
+        sponsor_response_days: 30
+        fda_action: "Hold applies only to specific investigators or clinical sites. Qualified sites may continue enrollment."
+        regulatory_reference: "21 CFR 312.42(b)(2)(ii); 21 CFR 312.42(c) — partial hold"
+
+    # MISLEADING BROCHURE
+    full_hold_brochure:
+      type: return
+      value:
+        hold_type: "COMPLETE_CLINICAL_HOLD"
+        sponsor_response_days: 30
+        fda_action: "Investigator Brochure is misleading, erroneous, or materially incomplete. Hold until corrected IB submitted and approved."
+        regulatory_reference: "21 CFR 312.42(b)(2)(iii)"
+
+    # INSUFFICIENT TOXICOLOGY — phase-dependent
+    tox_phase_check:
+      type: condition
+      variable: study_phase
+      operator: eq
+      value: "phase1"
+      true_next: tox_phase1
+      false_next: tox_later
+
+    tox_phase1:
+      type: return
+      value:
+        hold_type: "COMPLETE_CLINICAL_HOLD"
+        sponsor_response_days: 30
+        fda_action: "Preclinical data insufficient to assess risk to Phase 1 subjects. Hold until adequate nonclinical safety package provided."
+        regulatory_reference: "21 CFR 312.42(b)(1)(iv); ICH M3(R2)"
+
+    tox_later:
+      type: return
+      value:
+        hold_type: "COMPLETE_CLINICAL_HOLD"
+        sponsor_response_days: 30
+        fda_action: "Nonclinical safety data insufficient for proposed phase/duration. Hold until adequate toxicology studies completed."
+        regulatory_reference: "21 CFR 312.42(b)(2)(iv); ICH M3(R2)"
+
+    # DEFICIENT PROTOCOL
+    full_hold_protocol:
+      type: return
+      value:
+        hold_type: "COMPLETE_CLINICAL_HOLD"
+        sponsor_response_days: 30
+        fda_action: "Protocol design deficient — does not meet stated objectives or exposes subjects to unnecessary risk. Hold until protocol amended."
+        regulatory_reference: "21 CFR 312.42(b)(2)(ii)"
+
+    # DEFICIENT INFORMED CONSENT
+    full_hold_consent:
+      type: return
+      value:
+        hold_type: "COMPLETE_CLINICAL_HOLD"
+        sponsor_response_days: 30
+        fda_action: "Informed consent form is deficient regarding 21 CFR 50 requirements. Hold until consent documents corrected."
+        regulatory_reference: "21 CFR 312.42(b)(2); 21 CFR 50"
+
+    no_hold:
+      type: return
+      value:
+        hold_type: "NO_HOLD"
+        sponsor_response_days: 0
+        fda_action: "No basis for clinical hold identified."
+        regulatory_reference: "21 CFR 312.42"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(∝, ∂) — clinical hold routing by risk irreversibility and regulatory boundary'
+  primes: ['σ', '∝', '∂']
+  arguments: ['hold_basis', 'study_phase', 'prior_hold']
+
+tests:
+- input: { hold_basis: "unreasonable_risk", study_phase: "phase1" }
+  expect: { hold_type: "COMPLETE_CLINICAL_HOLD", sponsor_response_days: 30 }
+- input: { hold_basis: "unreasonable_risk", study_phase: "phase3", prior_hold: false }
+  expect: { hold_type: "COMPLETE_CLINICAL_HOLD" }
+- input: { hold_basis: "unreasonable_risk", study_phase: "phase2", prior_hold: true }
+  expect: { hold_type: "COMPLETE_CLINICAL_HOLD" }
+- input: { hold_basis: "unqualified_investigators" }
+  expect: { hold_type: "PARTIAL_CLINICAL_HOLD" }
+- input: { hold_basis: "misleading_brochure" }
+  expect: { hold_type: "COMPLETE_CLINICAL_HOLD" }
+- input: { hold_basis: "insufficient_toxicology", study_phase: "phase1" }
+  expect: { hold_type: "COMPLETE_CLINICAL_HOLD" }
+- input: { hold_basis: "insufficient_toxicology", study_phase: "phase3" }
+  expect: { hold_type: "COMPLETE_CLINICAL_HOLD" }
+- input: { hold_basis: "deficient_protocol" }
+  expect: { hold_type: "COMPLETE_CLINICAL_HOLD" }
+- input: { hold_basis: "deficient_informed_consent" }
+  expect: { hold_type: "COMPLETE_CLINICAL_HOLD" }
+- input: {}
+  expect: { hold_type: "NO_HOLD" }

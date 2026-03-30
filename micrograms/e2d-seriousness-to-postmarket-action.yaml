@@ -1,0 +1,167 @@
+name: e2d-seriousness-to-postmarket-action
+description: 'Bridge: E2A seriousness outputs (is_serious, is_fatal, is_life_threatening) to E2D post-marketing action. Chains from seriousness-to-deadline into postmarket reporting workflow.'
+version: 0.1.0
+interface:
+  inputs:
+    deadline_type:
+      type: string
+      required: false
+    deadline_days:
+      type: int
+      required: false
+    report_category:
+      type: string
+      required: false
+    regulatory_basis:
+      type: string
+      required: false
+  outputs:
+    postmarket_action:
+      type: string
+    e2d_pathway:
+      type: string
+    requires_mah_submission:
+      type: bool
+    reporting_window:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_deadline_7_day
+  nodes:
+    check_deadline_7_day:
+      type: condition
+      variable: deadline_type
+      operator: eq
+      value: 7_DAY_EXPEDITED
+      true_next: return_7_day_postmarket
+      false_next: check_deadline_15_day
+    check_deadline_15_day:
+      type: condition
+      variable: deadline_type
+      operator: eq
+      value: 15_DAY_EXPEDITED
+      true_next: return_15_day_postmarket
+      false_next: check_periodic_psur
+    check_periodic_psur:
+      type: condition
+      variable: deadline_type
+      operator: eq
+      value: PERIODIC_PSUR
+      true_next: return_psur_postmarket
+      false_next: check_periodic_standard
+    check_periodic_standard:
+      type: condition
+      variable: deadline_type
+      operator: eq
+      value: PERIODIC_STANDARD
+      true_next: return_standard_postmarket
+      false_next: return_default
+    return_7_day_postmarket:
+      type: return
+      value:
+        postmarket_action: EXPEDITED_7_DAY_ICSR
+        e2d_pathway: SECTION_4_1_FATAL_LT_UNEXPECTED
+        requires_mah_submission: true
+        reporting_window: 7_CALENDAR_DAYS
+        regulatory_reference: ICH E2D Section 4.1 / ICH E2A
+    return_15_day_postmarket:
+      type: return
+      value:
+        postmarket_action: EXPEDITED_15_DAY_ICSR
+        e2d_pathway: SECTION_4_1_SERIOUS_UNEXPECTED
+        requires_mah_submission: true
+        reporting_window: 15_CALENDAR_DAYS
+        regulatory_reference: ICH E2D Section 4.1 / ICH E2A
+    return_psur_postmarket:
+      type: return
+      value:
+        postmarket_action: INCLUDE_IN_PSUR_PBRER
+        e2d_pathway: SECTION_6_PERIODIC
+        requires_mah_submission: false
+        reporting_window: NEXT_PSUR_CYCLE
+        regulatory_reference: ICH E2D Section 6 / ICH E2C(R2)
+    return_standard_postmarket:
+      type: return
+      value:
+        postmarket_action: AGGREGATE_LINE_LISTING
+        e2d_pathway: SECTION_6_PERIODIC_NON_SERIOUS
+        requires_mah_submission: false
+        reporting_window: PERIODIC_180_DAY
+        regulatory_reference: ICH E2D Section 6 / ICH E2C(R2)
+    return_default:
+      type: return
+      value:
+        postmarket_action: ROUTINE_MONITORING
+        e2d_pathway: SECTION_6_DEFAULT
+        requires_mah_submission: false
+        reporting_window: PERIODIC_180_DAY
+        regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+primitive_signature:
+  dominant: '→'
+  expression: '→ — E2A seriousness-to-deadline output bridges to E2D postmarket action. Chain step between E2A classification and E2D submission.'
+  primes: ['→', 'σ', 'μ']
+  arguments: ['deadline_type', 'deadline_days', 'report_category', 'regulatory_basis']
+  chain_prediction: 'seriousness-to-deadline → e2d-seriousness-to-postmarket-action → e2d-mah-reporting-obligation'
+tests:
+- input:
+    deadline_type: 7_DAY_EXPEDITED
+    deadline_days: 7
+    report_category: expedited
+    regulatory_basis: ICH E2B - fatal/life-threatening unexpected reaction requires 7-day expedited report
+  expect:
+    postmarket_action: EXPEDITED_7_DAY_ICSR
+    e2d_pathway: SECTION_4_1_FATAL_LT_UNEXPECTED
+    requires_mah_submission: true
+    reporting_window: 7_CALENDAR_DAYS
+    regulatory_reference: ICH E2D Section 4.1 / ICH E2A
+- input:
+    deadline_type: 15_DAY_EXPEDITED
+    deadline_days: 15
+    report_category: expedited
+    regulatory_basis: ICH E2B - serious unexpected reaction requires 15-day expedited report
+  expect:
+    postmarket_action: EXPEDITED_15_DAY_ICSR
+    e2d_pathway: SECTION_4_1_SERIOUS_UNEXPECTED
+    requires_mah_submission: true
+    reporting_window: 15_CALENDAR_DAYS
+    regulatory_reference: ICH E2D Section 4.1 / ICH E2A
+- input:
+    deadline_type: PERIODIC_PSUR
+    deadline_days: 90
+    report_category: periodic
+    regulatory_basis: ICH E2B - serious expected reaction included in PSUR/PBRER cycle
+  expect:
+    postmarket_action: INCLUDE_IN_PSUR_PBRER
+    e2d_pathway: SECTION_6_PERIODIC
+    requires_mah_submission: false
+    reporting_window: NEXT_PSUR_CYCLE
+    regulatory_reference: ICH E2D Section 6 / ICH E2C(R2)
+- input:
+    deadline_type: PERIODIC_STANDARD
+    deadline_days: 180
+    report_category: periodic
+    regulatory_basis: ICH E2B - non-serious reaction included in standard periodic reporting
+  expect:
+    postmarket_action: AGGREGATE_LINE_LISTING
+    e2d_pathway: SECTION_6_PERIODIC_NON_SERIOUS
+    requires_mah_submission: false
+    reporting_window: PERIODIC_180_DAY
+    regulatory_reference: ICH E2D Section 6 / ICH E2C(R2)
+- input: {}
+  expect:
+    postmarket_action: ROUTINE_MONITORING
+    e2d_pathway: SECTION_6_DEFAULT
+    requires_mah_submission: false
+    reporting_window: PERIODIC_180_DAY
+    regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+- input:
+    deadline_type: UNKNOWN
+    deadline_days: 0
+    report_category: unknown
+  expect:
+    postmarket_action: ROUTINE_MONITORING
+    e2d_pathway: SECTION_6_DEFAULT
+    requires_mah_submission: false
+    reporting_window: PERIODIC_180_DAY
+    regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports

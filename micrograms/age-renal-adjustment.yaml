@@ -1,0 +1,36 @@
+name: age-renal-adjustment
+description: "Age-based renal clearance adjustment. Estimates eGFR adjustment for elderly based on serum creatinine."
+version: 0.1.0
+tree:
+  start: check_age_category
+  nodes:
+    check_age_category:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 65
+      true_next: elderly_eGFR_adjustment
+      false_next: adult_eGFR
+    elderly_eGFR_adjustment:
+      type: return
+      value:
+        age_group: elderly
+        adjustment_needed: true
+        notes: "eGFR may overestimate renal function in elderly; use cystatin C confirmation if eGFR 45-60"
+    adult_eGFR:
+      type: return
+      value:
+        age_group: adult
+        adjustment_needed: false
+        notes: "Standard MDRD or CKD-EPI equation applies"
+tests:
+  - input: { age_years: 72 }
+    expect: { age_group: elderly, adjustment_needed: true }
+  - input: { age_years: 65 }
+    expect: { age_group: elderly, adjustment_needed: true }
+  - input: { age_years: 45 }
+    expect: { age_group: adult, adjustment_needed: false }
+  - input: { age_years: 30 }
+    expect: { age_group: adult, adjustment_needed: false }
+  - input: {}
+    expect: {}

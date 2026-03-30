@@ -1,0 +1,81 @@
+name: signal-track
+description: "Track signal investigation progress and outcome metrics"
+version: 0.1.0
+tree:
+  start: validate_signal_id
+  nodes:
+    validate_signal_id:
+      type: condition
+      variable: signal_id
+      operator: is_not_null
+      value: null
+      true_next: check_investigation_status
+      false_next: tracking_unknown
+    check_investigation_status:
+      type: condition
+      variable: investigation_status
+      operator: eq
+      value: "ongoing"
+      true_next: track_ongoing
+      false_next: check_completed
+    check_completed:
+      type: condition
+      variable: investigation_status
+      operator: eq
+      value: "completed"
+      true_next: track_completed
+      false_next: track_closed
+    track_ongoing:
+      type: return
+      value:
+        tracking_status: "active"
+        next_milestone_due: "30_days"
+        monitoring_frequency: "weekly"
+        escalation_trigger: true
+        tracking_compliant: true
+    track_completed:
+      type: return
+      value:
+        tracking_status: "completed"
+        investigation_outcome: "documented"
+        monitoring_frequency: "monthly"
+        escalation_trigger: false
+        tracking_compliant: true
+    track_closed:
+      type: return
+      value:
+        tracking_status: "closed"
+        investigation_outcome: "archived"
+        monitoring_frequency: "none"
+        escalation_trigger: false
+        tracking_compliant: true
+    tracking_unknown:
+      type: return
+      value:
+        tracking_status: null
+        investigation_outcome: null
+        monitoring_frequency: null
+        escalation_trigger: null
+        tracking_compliant: false
+tests:
+- input:
+    signal_id: "SIGNAL_2024_001"
+    investigation_status: "ongoing"
+  expect:
+    tracking_status: "active"
+    next_milestone_due: "30_days"
+- input:
+    signal_id: "SIGNAL_2024_001"
+    investigation_status: "completed"
+  expect:
+    tracking_status: "completed"
+    investigation_outcome: "documented"
+- input:
+    signal_id: "SIGNAL_2024_001"
+    investigation_status: "closed"
+  expect:
+    tracking_status: "closed"
+- input: {}
+  expect:
+    tracking_status: null
+    tracking_compliant: false

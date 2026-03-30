@@ -1,0 +1,112 @@
+name: station-combinatorics-pipeline
+description: Route combinatorial computations by problem size and tractability
+version: 0.1.0
+tree:
+  start: check_n
+  nodes:
+    check_n:
+      type: condition
+      variable: n
+      operator: gte
+      value: 20
+      true_next: large_n
+      false_next: check_type
+    large_n:
+      type: return
+      value:
+        priority: moderate
+        route: approximation
+        action: approximate
+        reason: n≥20 — exact computation may overflow, use Stirling approximation
+    check_type:
+      type: condition
+      variable: problem_type
+      operator: eq
+      value: derangement
+      true_next: derangement
+      false_next: exact
+    exact:
+      type: return
+      value:
+        action: compute
+        priority: low
+        route: exact_compute
+        reason: Small n combinatorial — exact computation
+    derangement:
+      type: return
+      value:
+        priority: low
+        reason: Derangement computation — subfactorial formula
+        route: exact_compute
+        action: compute
+tests:
+- input:
+    n: 25
+    problem_type: binomial
+  expect:
+    action: approximate
+    route: approximation
+    priority: moderate
+- input:
+    n: 10
+    problem_type: derangement
+  expect:
+    route: exact_compute
+    priority: low
+    action: compute
+- input:
+    n: 8
+    problem_type: binomial
+  expect:
+    route: exact_compute
+    action: compute
+    priority: low
+- input:
+    n: 0
+  expect:
+    reason: Small n combinatorial — exact computation
+    route: exact_compute
+    priority: low
+    action: compute
+- input:
+    n: -1
+  expect:
+    action: compute
+    priority: low
+    route: exact_compute
+    reason: Small n combinatorial — exact computation
+- input:
+    n: 19
+  expect:
+    route: exact_compute
+    action: compute
+    priority: low
+    reason: Small n combinatorial — exact computation
+- input:
+    n: 21
+  expect:
+    priority: moderate
+    reason: n≥20 — exact computation may overflow, use Stirling approximation
+    route: approximation
+    action: approximate
+- input:
+    n: 2000
+  expect:
+    route: approximation
+    action: approximate
+    priority: moderate
+    reason: n≥20 — exact computation may overflow, use Stirling approximation
+- input: {}
+  expect:
+    priority: low
+    route: exact_compute
+    reason: Small n combinatorial — exact computation
+    action: compute
+- input: {}
+  expect:
+    priority: low
+    reason: Small n combinatorial — exact computation
+    route: exact_compute
+    action: compute
+interface: null
+primitive_signature: null

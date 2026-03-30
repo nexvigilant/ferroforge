@@ -1,0 +1,266 @@
+name: e2e-special-population-flag
+description: 'ICH E2E Section 3.5: Flags whether special population safety data gaps exist for pediatric, geriatric, pregnant, renal-impaired, or hepatic-impaired populations'
+version: 0.1.0
+interface:
+  inputs:
+    population:
+      type: string
+      required: true
+    pediatric_data_available:
+      type: bool
+      required: false
+    geriatric_data_available:
+      type: bool
+      required: false
+    pregnancy_data_available:
+      type: bool
+      required: false
+    renal_data_available:
+      type: bool
+      required: false
+    hepatic_data_available:
+      type: bool
+      required: false
+  outputs:
+    flag:
+      type: bool
+    gap_type:
+      type: string
+    population_group:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_pediatric
+  nodes:
+    check_pediatric:
+      type: condition
+      variable: population
+      operator: eq
+      value: pediatric
+      true_next: check_pediatric_data
+      false_next: check_geriatric
+    check_pediatric_data:
+      type: condition
+      variable: pediatric_data_available
+      operator: eq
+      value: true
+      true_next: result_no_gap_pediatric
+      false_next: result_gap_pediatric
+    check_geriatric:
+      type: condition
+      variable: population
+      operator: eq
+      value: geriatric
+      true_next: check_geriatric_data
+      false_next: check_pregnant
+    check_geriatric_data:
+      type: condition
+      variable: geriatric_data_available
+      operator: eq
+      value: true
+      true_next: result_no_gap_geriatric
+      false_next: result_gap_geriatric
+    check_pregnant:
+      type: condition
+      variable: population
+      operator: eq
+      value: pregnant
+      true_next: check_pregnancy_data
+      false_next: check_renal
+    check_pregnancy_data:
+      type: condition
+      variable: pregnancy_data_available
+      operator: eq
+      value: true
+      true_next: result_no_gap_pregnant
+      false_next: result_gap_pregnant
+    check_renal:
+      type: condition
+      variable: population
+      operator: eq
+      value: renal_impaired
+      true_next: check_renal_data
+      false_next: check_hepatic
+    check_renal_data:
+      type: condition
+      variable: renal_data_available
+      operator: eq
+      value: true
+      true_next: result_no_gap_renal
+      false_next: result_gap_renal
+    check_hepatic:
+      type: condition
+      variable: population
+      operator: eq
+      value: hepatic_impaired
+      true_next: check_hepatic_data
+      false_next: result_no_gap_unknown
+    check_hepatic_data:
+      type: condition
+      variable: hepatic_data_available
+      operator: eq
+      value: true
+      true_next: result_no_gap_hepatic
+      false_next: result_gap_hepatic
+    result_gap_pediatric:
+      type: return
+      value:
+        flag: true
+        gap_type: MISSING_INFORMATION
+        population_group: pediatric
+        regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+    result_no_gap_pediatric:
+      type: return
+      value:
+        flag: false
+        gap_type: NONE
+        population_group: pediatric
+        regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+    result_gap_geriatric:
+      type: return
+      value:
+        flag: true
+        gap_type: MISSING_INFORMATION
+        population_group: geriatric
+        regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+    result_no_gap_geriatric:
+      type: return
+      value:
+        flag: false
+        gap_type: NONE
+        population_group: geriatric
+        regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+    result_gap_pregnant:
+      type: return
+      value:
+        flag: true
+        gap_type: MISSING_INFORMATION
+        population_group: pregnant
+        regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+    result_no_gap_pregnant:
+      type: return
+      value:
+        flag: false
+        gap_type: NONE
+        population_group: pregnant
+        regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+    result_gap_renal:
+      type: return
+      value:
+        flag: true
+        gap_type: MISSING_INFORMATION
+        population_group: renal_impaired
+        regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+    result_no_gap_renal:
+      type: return
+      value:
+        flag: false
+        gap_type: NONE
+        population_group: renal_impaired
+        regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+    result_gap_hepatic:
+      type: return
+      value:
+        flag: true
+        gap_type: MISSING_INFORMATION
+        population_group: hepatic_impaired
+        regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+    result_no_gap_hepatic:
+      type: return
+      value:
+        flag: false
+        gap_type: NONE
+        population_group: hepatic_impaired
+        regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+    result_no_gap_unknown:
+      type: return
+      value:
+        flag: false
+        gap_type: NONE
+        population_group: unknown
+        regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — measurement, comparison, or classification'
+  primes: ['κ']
+  arguments: []
+tests:
+# Pediatric with no data = gap
+- input:
+    population: pediatric
+    pediatric_data_available: false
+  expect:
+    flag: true
+    gap_type: MISSING_INFORMATION
+    population_group: pediatric
+    regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+# Pediatric with data = no gap
+- input:
+    population: pediatric
+    pediatric_data_available: true
+  expect:
+    flag: false
+    gap_type: NONE
+    population_group: pediatric
+    regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+# Geriatric with no data = gap
+- input:
+    population: geriatric
+    geriatric_data_available: false
+  expect:
+    flag: true
+    gap_type: MISSING_INFORMATION
+    population_group: geriatric
+    regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+# Pregnant with no data = gap
+- input:
+    population: pregnant
+    pregnancy_data_available: false
+  expect:
+    flag: true
+    gap_type: MISSING_INFORMATION
+    population_group: pregnant
+    regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+# Renal impaired with data = no gap
+- input:
+    population: renal_impaired
+    renal_data_available: true
+  expect:
+    flag: false
+    gap_type: NONE
+    population_group: renal_impaired
+    regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+# Hepatic impaired with no data = gap
+- input:
+    population: hepatic_impaired
+    hepatic_data_available: false
+  expect:
+    flag: true
+    gap_type: MISSING_INFORMATION
+    population_group: hepatic_impaired
+    regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+# Hepatic impaired with data = no gap
+- input:
+    population: hepatic_impaired
+    hepatic_data_available: true
+  expect:
+    flag: false
+    gap_type: NONE
+    population_group: hepatic_impaired
+    regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+# Unknown population = no gap
+- input:
+    population: general
+  expect:
+    flag: false
+    gap_type: NONE
+    population_group: unknown
+    regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied
+# Empty input defaults
+- input: {}
+  expect:
+    flag: false
+    gap_type: NONE
+    population_group: unknown
+    regulatory_reference: ICH E2E Section 3.5 - Populations Not Studied

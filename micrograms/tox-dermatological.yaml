@@ -1,0 +1,112 @@
+name: tox-dermatological
+description: 'Dermatological toxicity gate: bsa_pct thresholds for skin'
+version: 0.1.0
+tree:
+  start: check_severe
+  nodes:
+    mild:
+      type: return
+      value:
+        severity: mild
+        organ: dermatological
+        action: monitor_closely
+        target: skin
+    normal:
+      type: return
+      value:
+        organ: dermatological
+        action: continue
+        target: skin
+        severity: normal
+    check_mild:
+      type: condition
+      variable: bsa_pct
+      operator: gte
+      value: 10
+      true_next: mild
+      false_next: normal
+    check_severe:
+      type: condition
+      variable: bsa_pct
+      operator: gte
+      value: 30
+      true_next: severe
+      false_next: check_mild
+    severe:
+      type: return
+      value:
+        organ: dermatological
+        severity: severe
+        action: discontinue
+        target: skin
+tests:
+- input:
+    bsa_pct: 31
+  expect:
+    severity: severe
+    organ: dermatological
+- input:
+    bsa_pct: 10
+  expect:
+    organ: dermatological
+    severity: mild
+- input:
+    bsa_pct: 0
+  expect:
+    organ: dermatological
+    severity: normal
+- input: {}
+  expect:
+    organ: dermatological
+    severity: normal
+- input:
+    bsa_pct: -1
+  expect:
+    organ: dermatological
+    target: skin
+    severity: normal
+    action: continue
+- input:
+    bsa_pct: 9
+  expect:
+    action: continue
+    target: skin
+    organ: dermatological
+    severity: normal
+- input:
+    bsa_pct: 11
+  expect:
+    target: skin
+    severity: mild
+    organ: dermatological
+    action: monitor_closely
+- input:
+    bsa_pct: 1000
+  expect:
+    action: discontinue
+    organ: dermatological
+    target: skin
+    severity: severe
+- input:
+    bsa_pct: -1
+  expect:
+    organ: dermatological
+    action: continue
+    severity: normal
+    target: skin
+- input:
+    bsa_pct: 29
+  expect:
+    severity: mild
+    action: monitor_closely
+    organ: dermatological
+    target: skin
+- input:
+    bsa_pct: 3000
+  expect:
+    severity: severe
+    organ: dermatological
+    action: discontinue
+    target: skin
+interface: null
+primitive_signature: null

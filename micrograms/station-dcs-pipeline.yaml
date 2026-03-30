@@ -1,0 +1,112 @@
+name: station-dcs-pipeline
+description: Route distributed computing system tasks by load and partition tolerance
+version: 0.1.0
+tree:
+  start: check_load
+  nodes:
+    overloaded:
+      type: return
+      value:
+        reason: CPU ≥80% — horizontal scaling needed
+        action: scale
+        route: autoscale
+        priority: high
+    partitioned:
+      type: return
+      value:
+        action: failover
+        reason: Network partition detected — activate failover
+        route: partition_recovery
+        priority: critical
+    check_partition:
+      type: condition
+      variable: partition_detected
+      operator: eq
+      value: true
+      true_next: partitioned
+      false_next: nominal
+    check_load:
+      type: condition
+      variable: cpu_pct
+      operator: gte
+      value: 80
+      true_next: overloaded
+      false_next: check_partition
+    nominal:
+      type: return
+      value:
+        action: proceed
+        priority: low
+        reason: Load normal, no partitions — nominal operation
+        route: archive
+tests:
+- input:
+    cpu_pct: 90
+    partition_detected: false
+  expect:
+    route: autoscale
+    action: scale
+    priority: high
+- input:
+    partition_detected: true
+    cpu_pct: 50
+  expect:
+    route: partition_recovery
+    priority: critical
+    action: failover
+- input:
+    partition_detected: false
+    cpu_pct: 40
+  expect:
+    route: archive
+    priority: low
+    action: proceed
+- input: {}
+  expect:
+    priority: low
+    action: proceed
+    route: archive
+    reason: Load normal, no partitions — nominal operation
+- input:
+    cpu_pct: 0
+  expect:
+    reason: Load normal, no partitions — nominal operation
+    action: proceed
+    priority: low
+    route: archive
+- input:
+    cpu_pct: -1
+  expect:
+    route: archive
+    priority: low
+    reason: Load normal, no partitions — nominal operation
+    action: proceed
+- input:
+    cpu_pct: 79
+  expect:
+    action: proceed
+    reason: Load normal, no partitions — nominal operation
+    priority: low
+    route: archive
+- input:
+    cpu_pct: 81
+  expect:
+    action: scale
+    route: autoscale
+    priority: high
+    reason: CPU ≥80% — horizontal scaling needed
+- input:
+    cpu_pct: 8000
+  expect:
+    route: autoscale
+    reason: CPU ≥80% — horizontal scaling needed
+    action: scale
+    priority: high
+- input: {}
+  expect:
+    action: proceed
+    reason: Load normal, no partitions — nominal operation
+    priority: low
+    route: archive
+interface: null
+primitive_signature: null

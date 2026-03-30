@@ -1,0 +1,61 @@
+name: drug-class-ace-inhibitor-safety
+description: "ACE inhibitor safety assessment. Evaluates hyperkalemia risk, persistent cough, angioedema, and renal function."
+version: 0.1.0
+tree:
+  start: check_potassium_level
+  nodes:
+    check_potassium_level:
+      type: condition
+      variable: serum_potassium_mmol_l
+      operator: gte
+      value: 5.5
+      true_next: hyperkalemia_alert
+      false_next: check_angioedema_history
+    hyperkalemia_alert:
+      type: return
+      value:
+        risk_level: critical
+        contraindication: true
+        message: "Elevated potassium; ACE inhibitor contraindicated until corrected"
+    check_angioedema_history:
+      type: condition
+      variable: prior_angioedema
+      operator: eq
+      value: true
+      true_next: angioedema_alert
+      false_next: check_renal
+    angioedema_alert:
+      type: return
+      value:
+        risk_level: critical
+        contraindication: true
+        message: "Prior angioedema; absolute contraindication to ACE inhibitor"
+    check_renal:
+      type: condition
+      variable: renal_clearance_ml_min
+      operator: lt
+      value: 30
+      true_next: severe_renal
+      false_next: standard_dosing
+    severe_renal:
+      type: return
+      value:
+        risk_level: moderate
+        dose_adjustment: true
+        message: "Severe renal impairment; monitor creatinine and potassium closely"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard ACE inhibitor dosing appropriate"
+tests:
+  - input: { serum_potassium_mmol_l: 6.2, renal_clearance_ml_min: 70, prior_angioedema: false }
+    expect: { risk_level: critical, contraindication: true }
+  - input: { serum_potassium_mmol_l: 5.0, renal_clearance_ml_min: 70, prior_angioedema: true }
+    expect: { risk_level: critical, contraindication: true }
+  - input: { serum_potassium_mmol_l: 5.0, renal_clearance_ml_min: 25, prior_angioedema: false }
+    expect: { risk_level: moderate, dose_adjustment: true }
+  - input: { serum_potassium_mmol_l: 4.5, renal_clearance_ml_min: 80, prior_angioedema: false }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

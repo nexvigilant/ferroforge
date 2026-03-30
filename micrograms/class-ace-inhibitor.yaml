@@ -1,0 +1,53 @@
+name: class-ace-inhibitor
+description: 'ACE inhibitors class safety: Hyperkalemia monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    alert:
+      type: return
+      value:
+        concern: Hyperkalemia
+        drug_class: ACE inhibitors
+        action: class_effect_investigation
+        alert: true
+    check:
+      type: condition
+      variable: potassium
+      operator: gte
+      value: 5.5
+      true_next: alert
+      false_next: safe
+    safe:
+      type: return
+      value:
+        action: continue
+        drug_class: ACE inhibitors
+        concern: Hyperkalemia
+        alert: false
+tests:
+- input:
+    potassium: 5.5
+  expect:
+    drug_class: ACE inhibitors
+    alert: true
+- input: {}
+  expect:
+    drug_class: ACE inhibitors
+    alert: false
+- input:
+    potassium: 5.499
+  expect:
+    drug_class: ACE inhibitors
+    action: continue
+    concern: Hyperkalemia
+    alert: false
+- input:
+    potassium: 5.501
+  expect:
+    action: class_effect_investigation
+    drug_class: ACE inhibitors
+    concern: Hyperkalemia
+    alert: true
+interface: null
+primitive_signature: null

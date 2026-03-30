@@ -1,0 +1,104 @@
+name: station-ich-pipeline
+description: 'Route ICH guideline queries: classify by topic (E/Q/S/M) and map to PV relevance'
+version: 0.1.0
+tree:
+  start: check_topic
+  nodes:
+    clinical_guideline:
+      type: return
+      value:
+        action: reference
+        route: archive
+        reason: ICH E-series clinical guideline — reference for trial safety context
+        priority: low
+    check_quality:
+      type: condition
+      variable: guideline_prefix
+      operator: eq
+      value: Q
+      true_next: quality_route
+      false_next: safety_route
+    quality_route:
+      type: return
+      value:
+        priority: low
+        reason: ICH Q-series quality guideline — CMC/manufacturing context
+        route: archive
+        action: reference
+    safety_route:
+      type: return
+      value:
+        action: apply
+        reason: ICH S/M-series — nonclinical safety or multidisciplinary, check PV implications
+        route: compliance_check
+        priority: moderate
+    check_topic:
+      type: condition
+      variable: guideline_prefix
+      operator: eq
+      value: E
+      true_next: efficacy_route
+      false_next: check_quality
+    efficacy_route:
+      type: condition
+      variable: pv_relevant
+      operator: eq
+      value: true
+      true_next: pv_guideline
+      false_next: clinical_guideline
+    pv_guideline:
+      type: return
+      value:
+        route: compliance_check
+        priority: high
+        action: apply
+        reason: ICH E-series PV guideline — directly applicable to signal management
+tests:
+- input:
+    pv_relevant: true
+    guideline_prefix: E
+  expect:
+    action: apply
+    priority: high
+    route: compliance_check
+- input:
+    pv_relevant: false
+    guideline_prefix: E
+  expect:
+    route: archive
+    priority: low
+    action: reference
+- input:
+    guideline_prefix: Q
+    pv_relevant: false
+  expect:
+    route: archive
+    action: reference
+    priority: low
+- input:
+    guideline_prefix: S
+    pv_relevant: false
+  expect:
+    action: apply
+    priority: moderate
+    route: compliance_check
+- input: {}
+  expect:
+    route: compliance_check
+    action: apply
+    priority: moderate
+    reason: ICH S/M-series — nonclinical safety or multidisciplinary, check PV implications
+- input: {}
+  expect:
+    route: compliance_check
+    reason: ICH S/M-series — nonclinical safety or multidisciplinary, check PV implications
+    priority: moderate
+    action: apply
+- input: {}
+  expect:
+    route: compliance_check
+    reason: ICH S/M-series — nonclinical safety or multidisciplinary, check PV implications
+    action: apply
+    priority: moderate
+interface: null
+primitive_signature: null

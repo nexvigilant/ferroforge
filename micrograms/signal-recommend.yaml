@@ -1,0 +1,80 @@
+name: signal-recommend
+description: "Generate regulatory recommendations based on signal evaluation"
+version: 0.1.0
+tree:
+  start: validate_evaluation
+  nodes:
+    validate_evaluation:
+      type: condition
+      variable: causality_category
+      operator: is_not_null
+      value: null
+      true_next: check_causality_type
+      false_next: recommendation_unknown
+    check_causality_type:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: "probable"
+      true_next: probable_recommendation
+      false_next: check_possible
+    check_possible:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: "possible"
+      true_next: possible_recommendation
+      false_next: unrelated_recommendation
+    probable_recommendation:
+      type: return
+      value:
+        recommendation: "label_update_required"
+        action_type: "urgent"
+        risk_minimization_needed: true
+        communication_plan: "healthcare_provider_letter"
+        recommendation_compliant: true
+    possible_recommendation:
+      type: return
+      value:
+        recommendation: "consider_label_update"
+        action_type: "routine"
+        risk_minimization_needed: true
+        communication_plan: "product_information_update"
+        recommendation_compliant: true
+    unrelated_recommendation:
+      type: return
+      value:
+        recommendation: "no_regulatory_action"
+        action_type: "none"
+        risk_minimization_needed: false
+        communication_plan: null
+        recommendation_compliant: true
+    recommendation_unknown:
+      type: return
+      value:
+        recommendation: null
+        action_type: null
+        risk_minimization_needed: null
+        communication_plan: null
+        recommendation_compliant: false
+tests:
+- input:
+    causality_category: "probable"
+  expect:
+    recommendation: "label_update_required"
+    action_type: "urgent"
+    risk_minimization_needed: true
+- input:
+    causality_category: "possible"
+  expect:
+    recommendation: "consider_label_update"
+    action_type: "routine"
+- input:
+    causality_category: "unrelated"
+  expect:
+    recommendation: "no_regulatory_action"
+    action_type: "none"
+- input: {}
+  expect:
+    recommendation: null
+    recommendation_compliant: false

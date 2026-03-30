@@ -1,0 +1,74 @@
+name: class-corticosteroid
+description: 'Corticosteroids class safety: Adrenal suppression monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    safe:
+      type: return
+      value:
+        concern: Adrenal suppression
+        action: continue
+        drug_class: Corticosteroids
+        alert: false
+    alert:
+      type: return
+      value:
+        concern: Adrenal suppression
+        alert: true
+        drug_class: Corticosteroids
+        action: class_effect_investigation
+    check:
+      type: condition
+      variable: duration_days
+      operator: gte
+      value: 30
+      true_next: alert
+      false_next: safe
+tests:
+- input:
+    duration_days: 30
+  expect:
+    alert: true
+    drug_class: Corticosteroids
+- input: {}
+  expect:
+    alert: false
+    drug_class: Corticosteroids
+- input:
+    duration_days: 0
+  expect:
+    alert: false
+    action: continue
+    drug_class: Corticosteroids
+    concern: Adrenal suppression
+- input:
+    duration_days: -1
+  expect:
+    action: continue
+    alert: false
+    concern: Adrenal suppression
+    drug_class: Corticosteroids
+- input:
+    duration_days: 29
+  expect:
+    concern: Adrenal suppression
+    alert: false
+    action: continue
+    drug_class: Corticosteroids
+- input:
+    duration_days: 31
+  expect:
+    action: class_effect_investigation
+    concern: Adrenal suppression
+    drug_class: Corticosteroids
+    alert: true
+- input:
+    duration_days: 3000
+  expect:
+    concern: Adrenal suppression
+    drug_class: Corticosteroids
+    alert: true
+    action: class_effect_investigation
+interface: null
+primitive_signature: null

@@ -1,0 +1,37 @@
+name: age-hepatic-adjustment
+description: "Age-based hepatic clearance adjustment. Accounts for reduced hepatic metabolism in elderly."
+version: 0.1.0
+tree:
+  start: check_age_category
+  nodes:
+    check_age_category:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 65
+      true_next: elderly_hepatic_adjustment
+      false_next: adult_hepatic
+    elderly_hepatic_adjustment:
+      type: return
+      value:
+        age_group: elderly
+        adjustment_needed: true
+        dose_reduction_percent: 25
+        notes: "Reduce initial dose by 25-50% for hepatically-metabolized drugs in elderly"
+    adult_hepatic:
+      type: return
+      value:
+        age_group: adult
+        adjustment_needed: false
+        notes: "Standard hepatic clearance assumptions apply"
+tests:
+  - input: { age_years: 75 }
+    expect: { age_group: elderly, adjustment_needed: true, dose_reduction_percent: 25 }
+  - input: { age_years: 65 }
+    expect: { age_group: elderly, adjustment_needed: true }
+  - input: { age_years: 50 }
+    expect: { age_group: adult, adjustment_needed: false }
+  - input: { age_years: 40 }
+    expect: { age_group: adult, adjustment_needed: false }
+  - input: {}
+    expect: {}

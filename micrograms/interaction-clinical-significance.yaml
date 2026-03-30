@@ -1,0 +1,82 @@
+name: interaction-clinical-significance
+description: "Assess clinical significance of drug interaction based on pharmacokinetic impact"
+version: 0.1.0
+tree:
+  start: validate_pk_data
+  nodes:
+    validate_pk_data:
+      type: condition
+      variable: substrate_auc_change_percent
+      operator: is_not_null
+      value: null
+      true_next: check_auc_increase
+      false_next: significance_unknown
+    check_auc_increase:
+      type: condition
+      variable: substrate_auc_change_percent
+      operator: gte
+      value: 50
+      true_next: high_significance
+      false_next: check_moderate_increase
+    check_moderate_increase:
+      type: condition
+      variable: substrate_auc_change_percent
+      operator: gte
+      value: 20
+      true_next: moderate_significance
+      false_next: low_significance
+    high_significance:
+      type: return
+      value:
+        clinical_significance: "high"
+        auc_impact: "major_increase"
+        therapeutic_index_risk: "significant"
+        dose_adjustment_required: true
+        significance_compliant: true
+    moderate_significance:
+      type: return
+      value:
+        clinical_significance: "moderate"
+        auc_impact: "moderate_increase"
+        therapeutic_index_risk: "moderate"
+        dose_adjustment_required: true
+        significance_compliant: true
+    low_significance:
+      type: return
+      value:
+        clinical_significance: "low"
+        auc_impact: "minor_increase"
+        therapeutic_index_risk: "minimal"
+        dose_adjustment_required: false
+        significance_compliant: true
+    significance_unknown:
+      type: return
+      value:
+        clinical_significance: "unknown"
+        auc_impact: null
+        therapeutic_index_risk: null
+        dose_adjustment_required: null
+        significance_compliant: false
+tests:
+- input:
+    substrate_auc_change_percent: 75
+  expect:
+    clinical_significance: "high"
+    auc_impact: "major_increase"
+    dose_adjustment_required: true
+- input:
+    substrate_auc_change_percent: 35
+  expect:
+    clinical_significance: "moderate"
+    auc_impact: "moderate_increase"
+    dose_adjustment_required: true
+- input:
+    substrate_auc_change_percent: 10
+  expect:
+    clinical_significance: "low"
+    auc_impact: "minor_increase"
+    dose_adjustment_required: false
+- input: {}
+  expect:
+    clinical_significance: "unknown"
+    significance_compliant: false

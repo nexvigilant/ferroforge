@@ -1,0 +1,61 @@
+name: drug-class-sulfonylurea-safety
+description: "Sulfonylurea safety assessment. Evaluates hypoglycemia risk, weight gain, and secondary failure."
+version: 0.1.0
+tree:
+  start: check_hypoglycemia_risk
+  nodes:
+    check_hypoglycemia_risk:
+      type: condition
+      variable: prior_severe_hypoglycemia
+      operator: eq
+      value: true
+      true_next: hypoglycemia_alert
+      false_next: check_age
+    hypoglycemia_alert:
+      type: return
+      value:
+        risk_level: high
+        relative_contraindication: true
+        message: "Prior severe hypoglycemia; sulfonylurea carries unacceptable hypoglycemia risk"
+    check_age:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 70
+      true_next: elderly_assessment
+      false_next: check_renal
+    elderly_assessment:
+      type: return
+      value:
+        risk_level: moderate
+        hypoglycemia_monitoring: required
+        message: "Elderly patient; enhanced hypoglycemia monitoring required"
+    check_renal:
+      type: condition
+      variable: renal_clearance_ml_min
+      operator: lt
+      value: 30
+      true_next: renal_impairment
+      false_next: standard_dosing
+    renal_impairment:
+      type: return
+      value:
+        risk_level: moderate
+        dose_adjustment: required
+        message: "Severe renal impairment; sulfonylurea accumulation risk"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard sulfonylurea dosing appropriate"
+tests:
+  - input: { prior_severe_hypoglycemia: true, age_years: 50, renal_clearance_ml_min: 80 }
+    expect: { risk_level: high, relative_contraindication: true }
+  - input: { prior_severe_hypoglycemia: false, age_years: 75, renal_clearance_ml_min: 70 }
+    expect: { risk_level: moderate, hypoglycemia_monitoring: required }
+  - input: { prior_severe_hypoglycemia: false, age_years: 50, renal_clearance_ml_min: 25 }
+    expect: { risk_level: moderate, dose_adjustment: required }
+  - input: { prior_severe_hypoglycemia: false, age_years: 50, renal_clearance_ml_min: 80 }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

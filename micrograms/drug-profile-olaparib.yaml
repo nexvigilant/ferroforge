@@ -1,0 +1,62 @@
+name: drug-profile-olaparib
+description: 'Safety triage for olaparib: PRR-based signal routing (Type B)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5.0
+      true_next: signal
+      false_next: no_signal
+    signal:
+      type: return
+      value:
+        harm_type: B
+        signal: true
+        drug: olaparib
+        action: investigate
+        expected_prr: 6.1
+    no_signal:
+      type: return
+      value:
+        action: monitor
+        drug: olaparib
+        harm_type: B
+        signal: false
+        expected_prr: 6.1
+tests:
+- input:
+    prr: 6.1
+  expect:
+    drug: olaparib
+    signal: true
+- input:
+    prr: 0.5
+  expect:
+    drug: olaparib
+    signal: false
+- input: {}
+  expect:
+    drug: olaparib
+    signal: false
+- input:
+    prr: 4.999
+  expect:
+    expected_prr: 6.1
+    harm_type: B
+    drug: olaparib
+    action: monitor
+    signal: false
+- input:
+    prr: 5.001
+  expect:
+    expected_prr: 6.1
+    action: investigate
+    signal: true
+    harm_type: B
+    drug: olaparib
+interface: null
+primitive_signature: null

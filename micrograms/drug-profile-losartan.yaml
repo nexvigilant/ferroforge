@@ -1,0 +1,62 @@
+name: drug-profile-losartan
+description: 'Safety triage for losartan: PRR-based signal routing (Type A)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    signal:
+      type: return
+      value:
+        drug: losartan
+        expected_prr: 1.5
+        action: investigate
+        signal: true
+        harm_type: A
+    no_signal:
+      type: return
+      value:
+        drug: losartan
+        harm_type: A
+        signal: false
+        expected_prr: 1.5
+        action: monitor
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: signal
+      false_next: no_signal
+tests:
+- input:
+    prr: 1.5
+  expect:
+    drug: losartan
+    signal: false
+- input:
+    prr: 0.5
+  expect:
+    signal: false
+    drug: losartan
+- input: {}
+  expect:
+    signal: false
+    drug: losartan
+- input:
+    prr: 1.999
+  expect:
+    expected_prr: 1.5
+    harm_type: A
+    signal: false
+    action: monitor
+    drug: losartan
+- input:
+    prr: 2.001
+  expect:
+    action: investigate
+    harm_type: A
+    signal: true
+    drug: losartan
+    expected_prr: 1.5
+interface: null
+primitive_signature: null

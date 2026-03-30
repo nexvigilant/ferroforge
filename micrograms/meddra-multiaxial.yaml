@@ -1,0 +1,72 @@
+name: meddra-multiaxial
+description: "Apply MedDRA multiaxial coding structure to determine appropriate classification level"
+version: 0.1.0
+tree:
+  start: validate_pt_code
+  nodes:
+    validate_pt_code:
+      type: condition
+      variable: meddra_pt_code
+      operator: is_not_null
+      value: null
+      true_next: check_anatomical_axis
+      false_next: multiaxial_unknown
+    check_anatomical_axis:
+      type: condition
+      variable: anatomical_system
+      operator: is_not_null
+      value: null
+      true_next: check_aetiological_axis
+      false_next: multiaxial_unknown
+    check_aetiological_axis:
+      type: condition
+      variable: aetiology
+      operator: is_not_null
+      value: null
+      true_next: check_pathophysiological_axis
+      false_next: multiaxial_unknown
+    check_pathophysiological_axis:
+      type: condition
+      variable: pathophysiological_axis
+      operator: is_not_null
+      value: null
+      true_next: multiaxial_complete
+      false_next: multiaxial_unknown
+    multiaxial_complete:
+      type: return
+      value:
+        anatomical_classification: "cardiac"
+        aetiological_classification: "drug_induced"
+        pathophysiological_classification: "arrhythmia"
+        temporal_classification: "acute"
+        severity_classification: "severe"
+        multiaxial_compliant: true
+    multiaxial_unknown:
+      type: return
+      value:
+        anatomical_classification: null
+        aetiological_classification: null
+        pathophysiological_classification: null
+        temporal_classification: null
+        severity_classification: null
+        multiaxial_compliant: false
+tests:
+- input:
+    meddra_pt_code: "10007585"
+    anatomical_system: "cardiac"
+    aetiology: "drug_induced"
+    pathophysiological_axis: "arrhythmia"
+  expect:
+    anatomical_classification: "cardiac"
+    aetiological_classification: "drug_induced"
+    pathophysiological_classification: "arrhythmia"
+    multiaxial_compliant: true
+- input:
+    meddra_pt_code: "10007585"
+    anatomical_system: null
+  expect:
+    anatomical_classification: null
+    multiaxial_compliant: false
+- input: {}
+  expect:
+    multiaxial_compliant: false

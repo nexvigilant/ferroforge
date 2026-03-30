@@ -1,0 +1,391 @@
+name: ich-e1-population-exposure
+description: >
+  ICH E1 Population Exposure to Assess Clinical Safety. Routes minimum
+  safety database size for drugs intended for long-term treatment of
+  non-life-threatening conditions. Covers standard requirements (300-600
+  at 6 months, 100 at 12 months, ~1500 total) and 5 exception categories
+  requiring larger or allowing smaller databases.
+  Source: ICH E1 Step 4, 27 October 1994.
+version: 0.1.0
+primitive_signature:
+  dominant: quantity
+  expression: "ν(∂(ς))"
+  primes: [quantity, boundary, state]
+  arguments:
+    - "quantity: minimum patient counts at exposure duration thresholds"
+    - "boundary: non-life-threatening long-term treatment scope"
+    - "state: exception conditions modify standard requirements"
+tree:
+  start: check_has_input
+  nodes:
+    # ── Null safety ──
+    check_has_input:
+      type: condition
+      variable: treatment_duration
+      operator: is_not_null
+      value: true
+      true_next: check_scope
+      false_next: default_missing
+
+    # ── Scope gate: applies only to long-term, non-life-threatening ──
+    check_scope:
+      type: condition
+      variable: treatment_duration
+      operator: eq
+      value: long_term
+      true_next: check_condition
+      false_next: out_of_scope
+
+    check_condition:
+      type: condition
+      variable: condition_severity
+      operator: eq
+      value: non_life_threatening
+      true_next: check_exceptions
+      false_next: out_of_scope
+
+    out_of_scope:
+      type: return
+      value:
+        guideline: ICH E1
+        in_scope: false
+        action: "Out of scope — E1 applies only to drugs for long-term treatment (>6 months chronic or repeated intermittent) of non-life-threatening conditions. See E1A for life-threatening conditions."
+
+    # ── Exception check ──
+    check_exceptions:
+      type: condition
+      variable: has_exception
+      operator: eq
+      value: true
+      true_next: check_exception_type
+      false_next: check_region
+
+    check_exception_type:
+      type: condition
+      variable: exception_type
+      operator: eq
+      value: small_population
+      true_next: exception_smaller_db
+      false_next: check_exception_late_ade
+
+    check_exception_late_ade:
+      type: condition
+      variable: exception_type
+      operator: eq
+      value: late_developing_ade
+      true_next: exception_larger_late_ade
+      false_next: check_exception_low_freq
+
+    check_exception_low_freq:
+      type: condition
+      variable: exception_type
+      operator: eq
+      value: low_frequency_ade
+      true_next: exception_larger_low_freq
+      false_next: check_exception_small_benefit
+
+    check_exception_small_benefit:
+      type: condition
+      variable: exception_type
+      operator: eq
+      value: small_benefit
+      true_next: exception_larger_small_benefit
+      false_next: check_exception_background
+
+    check_exception_background:
+      type: condition
+      variable: exception_type
+      operator: eq
+      value: background_morbidity
+      true_next: exception_larger_background
+      false_next: check_region
+
+    # ── Exception outcomes ──
+    exception_smaller_db:
+      type: return
+      value:
+        guideline: "ICH E1 §7.e"
+        in_scope: true
+        exception: small_population
+        standard_applies: false
+        min_patients_6_months: "May be smaller than 300-600"
+        min_patients_12_months: "May be smaller than 100"
+        min_patients_total: "May be smaller than 1500"
+        rationale: "Intended treatment population is small"
+        action: "Smaller database acceptable — justify based on treatment population size"
+
+    exception_larger_late_ade:
+      type: return
+      value:
+        guideline: "ICH E1 §7.a"
+        in_scope: true
+        exception: late_developing_ade
+        standard_applies: false
+        min_patients_6_months: ">600 (larger than standard)"
+        min_patients_12_months: ">100 (longer-term data needed)"
+        min_patients_total: ">1500 (larger than standard)"
+        rationale: "Concern about late-developing ADEs or ADEs increasing in severity/frequency over time. Sources: animal studies, related chemical structures/pharmacologic class, PK/PD properties."
+        action: "Larger and/or longer-term safety database required due to late ADE concern"
+
+    exception_larger_low_freq:
+      type: return
+      value:
+        guideline: "ICH E1 §7.b"
+        in_scope: true
+        exception: low_frequency_ade
+        standard_applies: false
+        min_patients_6_months: ">600 (larger than standard)"
+        min_patients_12_months: ">100 (greater long-term data)"
+        min_patients_total: ">1500 (larger than standard)"
+        rationale: "Need to quantify occurrence rate of expected specific low-frequency ADE — serious ADE identified in similar drugs or serious event as alert signal in early trials."
+        action: "Larger long-term database required to quantify specific low-frequency ADE"
+
+    exception_larger_small_benefit:
+      type: return
+      value:
+        guideline: "ICH E1 §7.c"
+        in_scope: true
+        exception: small_benefit
+        standard_applies: false
+        min_patients_6_months: ">600 (larger than standard)"
+        min_patients_12_months: ">100 (larger than standard)"
+        min_patients_total: ">1500 (larger than standard)"
+        rationale: "Benefit is small: (1) symptomatic improvement in less serious conditions, (2) only a fraction of treated patients benefit (e.g. preventive therapies in healthy populations), or (3) efficacy of uncertain magnitude (surrogate endpoint)."
+        action: "Larger safety database required due to small benefit magnitude — risk-benefit threshold is lower"
+
+    exception_larger_background:
+      type: return
+      value:
+        guideline: "ICH E1 §7.d"
+        in_scope: true
+        exception: background_morbidity
+        standard_applies: false
+        min_patients_6_months: ">600 (powered for statistical detection)"
+        min_patients_12_months: ">100 (powered for statistical detection)"
+        min_patients_total: ">1500 (sufficient statistical power)"
+        rationale: "Drug may add to already significant background morbidity/mortality — need statistical power to detect prespecified increases."
+        action: "Larger database required — design trials with sufficient power to detect increases over baseline morbidity/mortality"
+
+    # ── Standard requirements by region ──
+    check_region:
+      type: condition
+      variable: region
+      operator: eq
+      value: japan
+      true_next: standard_japan
+      false_next: check_priority
+
+    standard_japan:
+      type: return
+      value:
+        guideline: "ICH E1 §6"
+        in_scope: true
+        standard_applies: true
+        region: japan
+        min_patients_6_months: 300
+        min_patients_12_months: 100
+        min_patients_total: "500-1500"
+        total_note: "Japan currently accepts 500-1500; smaller number due to post-marketing surveillance requirement"
+        filing_data: "6-month treatment data sufficient for filing; 12-month data prior to approval"
+        ade_detection_note: "300-600 patients at 6 months characterizes events at 0.5-5% frequency. 100 patients at 12 months provides ≤3% true cumulative incidence assurance for serious ADEs."
+        action: "Standard E1 requirements — Japan range (500-1500 total). File on 6-month data, 12-month data required before approval."
+
+    check_priority:
+      type: condition
+      variable: is_priority_drug
+      operator: eq
+      value: true
+      true_next: standard_us_priority
+      false_next: standard_general
+
+    standard_us_priority:
+      type: return
+      value:
+        guideline: "ICH E1 §8"
+        in_scope: true
+        standard_applies: true
+        region: us
+        is_priority_drug: true
+        min_patients_6_months: 300
+        min_patients_12_months: 100
+        min_patients_total: 1500
+        filing_data: "Initial submission MUST include 12-month patient data (priority drug requirement)"
+        ade_detection_note: "300-600 patients at 6 months characterizes events at 0.5-5% frequency. 100 patients at 12 months provides ≤3% true cumulative incidence assurance for serious ADEs."
+        action: "US priority drug — 12-month data required in INITIAL submission (not deferred)"
+
+    standard_general:
+      type: return
+      value:
+        guideline: "ICH E1 §5-6"
+        in_scope: true
+        standard_applies: true
+        min_patients_6_months: 300
+        min_patients_6_months_note: "300-600 adequate to characterize ADE pattern; observe events at 0.5-5% frequency"
+        min_patients_12_months: 100
+        min_patients_12_months_note: "From prospective studies at clinical dosage. If no serious ADE observed in 1-year exposure, true cumulative incidence ≤3%."
+        min_patients_total: 1500
+        min_patients_total_note: "Including short-term exposure"
+        filing_data: "6-month treatment data usually sufficient for filing"
+        twelve_month_timing: "Must be submitted before approval (US, Japan) or may be after approval (EC)"
+        ade_detection_note: "Not expected to characterize rare events (<1 in 1000 patients)"
+        action: "Standard E1 requirements — 1500 total, 300-600 at 6 months, 100 at 12 months"
+
+    # ── Default ──
+    default_missing:
+      type: return
+      value:
+        guideline: ICH E1
+        in_scope: false
+        action: "Insufficient input — provide treatment_duration (long_term/short_term) and condition_severity (non_life_threatening/life_threatening)"
+
+interface:
+  inputs:
+    treatment_duration:
+      type: string
+      required: true
+      description: "long_term (>6 months chronic or repeated intermittent) or short_term"
+    condition_severity:
+      type: string
+      required: true
+      description: "non_life_threatening or life_threatening"
+    has_exception:
+      type: bool
+      required: false
+      description: "Whether an exception condition applies"
+    exception_type:
+      type: string
+      required: false
+      description: "late_developing_ade, low_frequency_ade, small_benefit, background_morbidity, small_population"
+    region:
+      type: string
+      required: false
+      description: "us, eu, japan (default: general/all regions)"
+    is_priority_drug:
+      type: bool
+      required: false
+      description: "US priority drug designation"
+  outputs:
+    guideline:
+      type: string
+    in_scope:
+      type: bool
+    standard_applies:
+      type: bool
+    min_patients_6_months:
+      type: string
+    min_patients_12_months:
+      type: string
+    min_patients_total:
+      type: string
+    action:
+      type: string
+  aliases: {}
+
+tests:
+  # Standard requirements — general
+  - input:
+      treatment_duration: long_term
+      condition_severity: non_life_threatening
+    expect:
+      guideline: "ICH E1 §5-6"
+      in_scope: true
+      standard_applies: true
+      min_patients_6_months: 300
+      min_patients_12_months: 100
+      min_patients_total: 1500
+
+  # Standard — Japan
+  - input:
+      treatment_duration: long_term
+      condition_severity: non_life_threatening
+      region: japan
+    expect:
+      guideline: "ICH E1 §6"
+      in_scope: true
+      region: japan
+      min_patients_12_months: 100
+
+  # Standard — US priority drug
+  - input:
+      treatment_duration: long_term
+      condition_severity: non_life_threatening
+      is_priority_drug: true
+    expect:
+      guideline: "ICH E1 §8"
+      in_scope: true
+      is_priority_drug: true
+
+  # Out of scope — short term
+  - input:
+      treatment_duration: short_term
+      condition_severity: non_life_threatening
+    expect:
+      in_scope: false
+
+  # Out of scope — life threatening
+  - input:
+      treatment_duration: long_term
+      condition_severity: life_threatening
+    expect:
+      in_scope: false
+
+  # Exception: late developing ADE
+  - input:
+      treatment_duration: long_term
+      condition_severity: non_life_threatening
+      has_exception: true
+      exception_type: late_developing_ade
+    expect:
+      guideline: "ICH E1 §7.a"
+      in_scope: true
+      exception: late_developing_ade
+      standard_applies: false
+
+  # Exception: low frequency ADE
+  - input:
+      treatment_duration: long_term
+      condition_severity: non_life_threatening
+      has_exception: true
+      exception_type: low_frequency_ade
+    expect:
+      guideline: "ICH E1 §7.b"
+      in_scope: true
+      standard_applies: false
+
+  # Exception: small benefit
+  - input:
+      treatment_duration: long_term
+      condition_severity: non_life_threatening
+      has_exception: true
+      exception_type: small_benefit
+    expect:
+      guideline: "ICH E1 §7.c"
+      in_scope: true
+      standard_applies: false
+
+  # Exception: background morbidity
+  - input:
+      treatment_duration: long_term
+      condition_severity: non_life_threatening
+      has_exception: true
+      exception_type: background_morbidity
+    expect:
+      guideline: "ICH E1 §7.d"
+      standard_applies: false
+
+  # Exception: small population
+  - input:
+      treatment_duration: long_term
+      condition_severity: non_life_threatening
+      has_exception: true
+      exception_type: small_population
+    expect:
+      guideline: "ICH E1 §7.e"
+      exception: small_population
+      standard_applies: false
+
+  # Null safety
+  - input: {}
+    expect:
+      guideline: ICH E1
+      in_scope: false

@@ -1,0 +1,74 @@
+name: class-statin
+description: 'Statins class safety: Rhabdomyolysis monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    safe:
+      type: return
+      value:
+        concern: Rhabdomyolysis
+        alert: false
+        drug_class: Statins
+        action: continue
+    alert:
+      type: return
+      value:
+        action: class_effect_investigation
+        alert: true
+        drug_class: Statins
+        concern: Rhabdomyolysis
+    check:
+      type: condition
+      variable: cpk_elevation
+      operator: gte
+      value: 5
+      true_next: alert
+      false_next: safe
+tests:
+- input:
+    cpk_elevation: 5
+  expect:
+    drug_class: Statins
+    alert: true
+- input: {}
+  expect:
+    alert: false
+    drug_class: Statins
+- input:
+    cpk_elevation: 0
+  expect:
+    alert: false
+    concern: Rhabdomyolysis
+    action: continue
+    drug_class: Statins
+- input:
+    cpk_elevation: -1
+  expect:
+    concern: Rhabdomyolysis
+    drug_class: Statins
+    action: continue
+    alert: false
+- input:
+    cpk_elevation: 4
+  expect:
+    concern: Rhabdomyolysis
+    action: continue
+    drug_class: Statins
+    alert: false
+- input:
+    cpk_elevation: 6
+  expect:
+    action: class_effect_investigation
+    drug_class: Statins
+    alert: true
+    concern: Rhabdomyolysis
+- input:
+    cpk_elevation: 500
+  expect:
+    concern: Rhabdomyolysis
+    alert: true
+    action: class_effect_investigation
+    drug_class: Statins
+interface: null
+primitive_signature: null

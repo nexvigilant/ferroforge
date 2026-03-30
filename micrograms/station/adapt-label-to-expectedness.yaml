@@ -1,0 +1,112 @@
+name: adapt-label-to-expectedness
+description: >
+  Adapter: transforms DailyMed labeling data (adverse_reactions section) into
+  the input shape needed by expectedness-check microgram. Takes boolean flags
+  indicating whether the event appears in the drug label.
+version: 0.1.0
+primitive_signature:
+  dominant: 'μ'
+  expression: 'μ(∂_label → ∂_expectedness) — maps labeling boundary to expectedness boundary'
+  primes: ['μ', '∂', 'κ']
+  arguments: ['event_in_label', 'event_class_in_label']
+  chain_prediction: >
+    Bridge between dailymed config (get_adverse_reactions output) and
+    expectedness-check microgram. DailyMed tells us what's in the label,
+    this adapter formats it for the expectedness classifier.
+interface:
+  inputs:
+    event_in_label:
+      type: bool
+      required: true
+      description: "Is the specific event listed in the adverse reactions section?"
+    event_class_in_label:
+      type: bool
+      required: false
+      description: "Is the event class (SOC) listed even if specific PT is not?"
+    severity_in_label:
+      type: bool
+      required: false
+      description: "Is the observed severity level described in the label?"
+  outputs:
+    expectedness_category:
+      type: string
+      description: "EXPECTED | UNEXPECTED_NATURE | UNEXPECTED_SEVERITY | UNKNOWN"
+    action:
+      type: string
+tree:
+  start: check_event_present
+  nodes:
+    check_event_present:
+      type: condition
+      variable: event_in_label
+      operator: is_null
+      value: null
+      true_next: unknown
+      false_next: check_listed
+
+    check_listed:
+      type: condition
+      variable: event_in_label
+      operator: eq
+      value: true
+      true_next: expected
+      false_next: check_class
+
+    expected:
+      type: return
+      value:
+        expectedness_category: EXPECTED
+        action: "Event listed in label — expected, routine reporting"
+
+    check_class:
+      type: condition
+      variable: event_class_in_label
+      operator: eq
+      value: true
+      true_next: unexpected_severity
+      false_next: unexpected_nature
+
+    unexpected_severity:
+      type: return
+      value:
+        expectedness_category: UNEXPECTED_SEVERITY
+        action: "Event class listed but specific event not — unexpected by severity, expedited reporting if serious"
+
+    unexpected_nature:
+      type: return
+      value:
+        expectedness_category: UNEXPECTED_NATURE
+        action: "Event not in label at all — unexpected by nature, expedited reporting if serious"
+
+    unknown:
+      type: return
+      value:
+        expectedness_category: UNKNOWN
+        action: "Label data unavailable — assume unexpected for regulatory safety"
+
+tests:
+- input:
+    event_in_label: true
+  expect:
+    expectedness_category: EXPECTED
+
+- input:
+    event_in_label: false
+    event_class_in_label: true
+  expect:
+    expectedness_category: UNEXPECTED_SEVERITY
+
+- input:
+    event_in_label: false
+    event_class_in_label: false
+  expect:
+    expectedness_category: UNEXPECTED_NATURE
+
+- input: {}
+  expect:
+    expectedness_category: UNKNOWN
+
+- input:
+    event_in_label: false
+  expect:
+    expectedness_category: UNEXPECTED_NATURE

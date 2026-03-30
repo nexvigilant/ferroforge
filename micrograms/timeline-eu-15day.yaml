@@ -1,0 +1,74 @@
+name: timeline-eu-15day
+description: EU 15-day expedited
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: days_to_deadline
+      operator: lte
+      value: 15
+      true_next: due
+      false_next: not_due
+    due:
+      type: return
+      value:
+        action: submit
+        jurisdiction: EU
+        report_type: expedited
+        due: true
+    not_due:
+      type: return
+      value:
+        action: schedule
+        due: false
+        jurisdiction: EU
+        report_type: expedited
+tests:
+- input:
+    days_to_deadline: 15
+  expect:
+    due: true
+    jurisdiction: EU
+- input: {}
+  expect:
+    due: false
+    jurisdiction: EU
+- input:
+    days_to_deadline: 0
+  expect:
+    action: submit
+    due: true
+    report_type: expedited
+    jurisdiction: EU
+- input:
+    days_to_deadline: -1
+  expect:
+    report_type: expedited
+    due: true
+    jurisdiction: EU
+    action: submit
+- input:
+    days_to_deadline: 14
+  expect:
+    report_type: expedited
+    jurisdiction: EU
+    due: true
+    action: submit
+- input:
+    days_to_deadline: 16
+  expect:
+    action: schedule
+    jurisdiction: EU
+    report_type: expedited
+    due: false
+- input:
+    days_to_deadline: 1500
+  expect:
+    jurisdiction: EU
+    report_type: expedited
+    action: schedule
+    due: false
+interface: null
+primitive_signature: null

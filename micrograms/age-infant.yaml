@@ -1,0 +1,43 @@
+name: age-infant
+description: "Infant age classifier. Identifies subjects aged 29 days to 12 months."
+version: 0.1.0
+tree:
+  start: check_lower_bound
+  nodes:
+    check_lower_bound:
+      type: condition
+      variable: age_days
+      operator: gt
+      value: 28
+      true_next: check_upper_bound
+      false_next: not_infant
+    check_upper_bound:
+      type: condition
+      variable: age_days
+      operator: lte
+      value: 365
+      true_next: is_infant
+      false_next: not_infant
+    is_infant:
+      type: return
+      value:
+        age_group: infant
+        age_range: "29 days - 12 months"
+        developmental_stage: rapidly_changing
+        monitoring_required: true
+    not_infant:
+      type: return
+      value:
+        age_group: other
+        is_infant: false
+tests:
+  - input: { age_days: 60 }
+    expect: { age_group: infant, developmental_stage: rapidly_changing }
+  - input: { age_days: 365 }
+    expect: { age_group: infant }
+  - input: { age_days: 29 }
+    expect: { age_group: infant }
+  - input: { age_days: 400 }
+    expect: { age_group: other, is_infant: false }
+  - input: {}
+    expect: {}

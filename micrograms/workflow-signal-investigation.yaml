@@ -1,0 +1,47 @@
+name: workflow-signal-investigation
+description: "Select the optimal signal investigation path based on data source and signal strength"
+version: 0.1.0
+
+tree:
+  start: check_source
+  nodes:
+    check_source:
+      type: "condition"
+      variable: "source"
+      operator: "eq"
+      value: "faers"
+      true_next: "faers_path"
+      false_next: "check_eu"
+    faers_path:
+      type: "return"
+      value:
+        chain: "openfda \u2192 calculation \u2192 signal-theory \u2192 vigilance"
+        steps: ["station-openfda-pipeline", "station-calculation-pipeline", "station-signal-theory-pipeline", "station-vigilance-pipeline"]
+        hop_count: 4
+    check_eu:
+      type: "condition"
+      variable: "source"
+      operator: "eq"
+      value: "eudravigilance"
+      true_next: "eu_path"
+      false_next: "global_path"
+    eu_path:
+      type: "return"
+      value:
+        chain: "ema \u2192 eudravigilance \u2192 compliance \u2192 benefit-risk"
+        steps: ["station-ema-pipeline", "station-eudravigilance-pipeline", "station-compliance-pipeline", "station-benefit-risk-pipeline"]
+        hop_count: 4
+    global_path:
+      type: "return"
+      value:
+        chain: "vigiaccess \u2192 who-umc \u2192 harm-taxonomy \u2192 preemptive-pv"
+        steps: ["station-vigiaccess-pipeline", "station-who-umc-pipeline", "station-harm-taxonomy-pipeline", "station-preemptive-pv-pipeline"]
+        hop_count: 4
+
+tests:
+  - input: {"source": "faers"}
+    expect: {"hop_count": 4}
+  - input: {"source": "eudravigilance"}
+    expect: {"hop_count": 4}
+  - input: {"source": "vigibase"}
+    expect: {"hop_count": 4}

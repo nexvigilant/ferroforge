@@ -1,0 +1,62 @@
+name: drug-class-mtor-inhibitor-safety
+description: "mTOR inhibitor safety assessment. Evaluates stomatitis, hyperlipidemia, immune suppression, and delayed wound healing."
+version: 0.1.0
+tree:
+  start: check_baseline_lipids
+  nodes:
+    check_baseline_lipids:
+      type: condition
+      variable: baseline_triglycerides_mg_dl
+      operator: gte
+      value: 300
+      true_next: lipid_alert
+      false_next: check_poor_wound_healing
+    lipid_alert:
+      type: return
+      value:
+        risk_level: moderate
+        lipid_monitoring: required
+        message: "Elevated triglycerides; mTOR inhibitor may further elevate lipids"
+    check_poor_wound_healing:
+      type: condition
+      variable: impaired_wound_healing_history
+      operator: eq
+      value: true
+      true_next: wound_healing_alert
+      false_next: check_oral_health
+    wound_healing_alert:
+      type: return
+      value:
+        risk_level: high
+        surgery_planning: required
+        message: "Impaired wound healing history; mTOR inhibitor worsens healing; plan surgery carefully"
+    check_oral_health:
+      type: condition
+      variable: poor_oral_hygiene
+      operator: eq
+      value: true
+      true_next: oral_alert
+      false_next: standard_dosing
+    oral_alert:
+      type: return
+      value:
+        risk_level: moderate
+        dental_monitoring: required
+        message: "Poor oral hygiene; mTOR inhibitor stomatitis risk; enhance dental care"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        monitoring_required: true
+        message: "Standard mTOR inhibitor dosing appropriate"
+tests:
+  - input: { baseline_triglycerides_mg_dl: 350, impaired_wound_healing_history: false, poor_oral_hygiene: false }
+    expect: { risk_level: moderate, lipid_monitoring: required }
+  - input: { baseline_triglycerides_mg_dl: 200, impaired_wound_healing_history: true, poor_oral_hygiene: false }
+    expect: { risk_level: high, surgery_planning: required }
+  - input: { baseline_triglycerides_mg_dl: 200, impaired_wound_healing_history: false, poor_oral_hygiene: true }
+    expect: { risk_level: moderate, dental_monitoring: required }
+  - input: { baseline_triglycerides_mg_dl: 200, impaired_wound_healing_history: false, poor_oral_hygiene: false }
+    expect: { risk_level: low, monitoring_required: true }
+  - input: {}
+    expect: {}

@@ -1,0 +1,56 @@
+name: correction-freshness
+description: 'Classify correction recency: FRESH (<7d), AGING (7-30d), STALE (>30d)'
+version: 0.1.0
+interface:
+  inputs:
+    days_since_correction:
+      type: int
+      required: false
+  outputs:
+    freshness:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_fresh
+  nodes:
+    check_fresh:
+      type: condition
+      variable: days_since_correction
+      operator: lte
+      value: 7
+      true_next: fresh
+      false_next: check_aging
+    check_aging:
+      type: condition
+      variable: days_since_correction
+      operator: lte
+      value: 30
+      true_next: aging
+      false_next: stale
+    fresh:
+      type: return
+      value:
+        freshness: FRESH
+        action: none
+    aging:
+      type: return
+      value:
+        freshness: AGING
+        action: review
+    stale:
+      type: return
+      value:
+        freshness: STALE
+        action: revalidate
+tests:
+- input: {days_since_correction: 1}
+  expect: {freshness: FRESH, action: none}
+- input: {days_since_correction: 7}
+  expect: {freshness: FRESH, action: none}
+- input: {days_since_correction: 14}
+  expect: {freshness: AGING, action: review}
+- input: {days_since_correction: 60}
+  expect: {freshness: STALE, action: revalidate}
+- input: {}
+  expect: {freshness: STALE, action: revalidate}

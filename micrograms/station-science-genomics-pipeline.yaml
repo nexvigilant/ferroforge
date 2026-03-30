@@ -1,0 +1,105 @@
+name: station-science-genomics-pipeline
+description: Route genomics data through expression analysis and variant classification
+version: 0.1.0
+tree:
+  start: check_significance
+  nodes:
+    strong_de:
+      type: return
+      value:
+        action: investigate
+        route: pathway_analysis
+        reason: Significant DE with fold change ≥2 — strong differential expression
+        priority: high
+    check_fold:
+      type: condition
+      variable: fold_change
+      operator: gte
+      value: 2.0
+      true_next: strong_de
+      false_next: mild_de
+    mild_de:
+      type: return
+      value:
+        action: note
+        reason: Significant but mild DE — may need larger sample
+        priority: moderate
+        route: validation_cohort
+    not_significant:
+      type: return
+      value:
+        priority: low
+        reason: Adjusted p-value >0.05 — not statistically significant
+        action: archive
+        route: archive
+    check_significance:
+      type: condition
+      variable: adj_pvalue
+      operator: lte
+      value: 0.05
+      true_next: check_fold
+      false_next: not_significant
+tests:
+- input:
+    fold_change: 3.0
+    adj_pvalue: 0.1
+  expect:
+    action: archive
+    route: archive
+    priority: low
+- input:
+    adj_pvalue: 0.01
+    fold_change: 4.0
+  expect:
+    route: pathway_analysis
+    action: investigate
+    priority: high
+- input:
+    fold_change: 1.5
+    adj_pvalue: 0.03
+  expect:
+    action: note
+    priority: moderate
+    route: validation_cohort
+- input:
+    fold_change: 1.999
+  expect:
+    priority: low
+    action: archive
+    reason: Adjusted p-value >0.05 — not statistically significant
+    route: archive
+- input:
+    fold_change: 2.001
+  expect:
+    priority: low
+    action: archive
+    reason: Adjusted p-value >0.05 — not statistically significant
+    route: archive
+- input: {}
+  expect:
+    action: archive
+    reason: Adjusted p-value >0.05 — not statistically significant
+    route: archive
+    priority: low
+- input:
+    adj_pvalue: 0.049
+  expect:
+    route: validation_cohort
+    action: note
+    reason: Significant but mild DE — may need larger sample
+    priority: moderate
+- input:
+    adj_pvalue: 0.051000000000000004
+  expect:
+    route: archive
+    reason: Adjusted p-value >0.05 — not statistically significant
+    priority: low
+    action: archive
+- input: {}
+  expect:
+    route: archive
+    priority: low
+    reason: Adjusted p-value >0.05 — not statistically significant
+    action: archive
+interface: null
+primitive_signature: null

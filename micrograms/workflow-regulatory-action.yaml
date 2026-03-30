@@ -1,0 +1,62 @@
+name: workflow-regulatory-action
+description: "Determine regulatory action type from signal severity and jurisdiction"
+version: 0.1.0
+
+tree:
+  start: check_severity
+  nodes:
+    check_severity:
+      type: "condition"
+      variable: "signal_severity"
+      operator: "eq"
+      value: "critical"
+      true_next: "check_jurisdiction_critical"
+      false_next: "check_moderate"
+    check_jurisdiction_critical:
+      type: "condition"
+      variable: "jurisdiction"
+      operator: "eq"
+      value: "US"
+      true_next: "us_critical"
+      false_next: "eu_critical"
+    us_critical:
+      type: "return"
+      value:
+        action: "boxed_warning"
+        chain: "fda-safety \u2192 fda-accessdata \u2192 compliance"
+        timeline_days: 30
+    eu_critical:
+      type: "return"
+      value:
+        action: "referral"
+        chain: "ema \u2192 compliance \u2192 benefit-risk"
+        timeline_days: 60
+    check_moderate:
+      type: "condition"
+      variable: "signal_severity"
+      operator: "eq"
+      value: "high"
+      true_next: "labeling"
+      false_next: "monitor"
+    labeling:
+      type: "return"
+      value:
+        action: "labeling_change"
+        chain: "fda-safety \u2192 dailymed \u2192 compliance"
+        timeline_days: 90
+    monitor:
+      type: "return"
+      value:
+        action: "enhanced_monitoring"
+        chain: "vigilance \u2192 preemptive-pv \u2192 epidemiology"
+        timeline_days: 180
+
+tests:
+  - input: {"signal_severity": "critical", "jurisdiction": "US"}
+    expect: {"action": "boxed_warning", "timeline_days": 30}
+  - input: {"signal_severity": "critical", "jurisdiction": "EU"}
+    expect: {"action": "referral", "timeline_days": 60}
+  - input: {"signal_severity": "high", "jurisdiction": "US"}
+    expect: {"action": "labeling_change", "timeline_days": 90}
+  - input: {"signal_severity": "moderate", "jurisdiction": "US"}
+    expect: {"action": "enhanced_monitoring", "timeline_days": 180}

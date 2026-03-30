@@ -1,0 +1,74 @@
+name: class-bispecific
+description: 'Bispecific antibodies class safety: Neurotoxicity monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: neurotox_grade
+      operator: gte
+      value: 2
+      true_next: alert
+      false_next: safe
+    alert:
+      type: return
+      value:
+        action: class_effect_investigation
+        drug_class: Bispecific antibodies
+        concern: Neurotoxicity
+        alert: true
+    safe:
+      type: return
+      value:
+        action: continue
+        concern: Neurotoxicity
+        drug_class: Bispecific antibodies
+        alert: false
+tests:
+- input:
+    neurotox_grade: 2
+  expect:
+    drug_class: Bispecific antibodies
+    alert: true
+- input: {}
+  expect:
+    drug_class: Bispecific antibodies
+    alert: false
+- input:
+    neurotox_grade: 0
+  expect:
+    action: continue
+    concern: Neurotoxicity
+    alert: false
+    drug_class: Bispecific antibodies
+- input:
+    neurotox_grade: -1
+  expect:
+    drug_class: Bispecific antibodies
+    action: continue
+    concern: Neurotoxicity
+    alert: false
+- input:
+    neurotox_grade: 1
+  expect:
+    drug_class: Bispecific antibodies
+    concern: Neurotoxicity
+    alert: false
+    action: continue
+- input:
+    neurotox_grade: 3
+  expect:
+    action: class_effect_investigation
+    drug_class: Bispecific antibodies
+    concern: Neurotoxicity
+    alert: true
+- input:
+    neurotox_grade: 200
+  expect:
+    concern: Neurotoxicity
+    alert: true
+    drug_class: Bispecific antibodies
+    action: class_effect_investigation
+interface: null
+primitive_signature: null

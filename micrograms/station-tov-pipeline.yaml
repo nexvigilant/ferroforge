@@ -1,0 +1,91 @@
+name: station-tov-pipeline
+description: Route Theory of Vigilance stability shell and epistemic trust checks
+version: 0.1.0
+tree:
+  start: check_stable
+  nodes:
+    shell_broken:
+      type: return
+      value:
+        action: halt
+        reason: ToV stability shell breached — safety manifold compromised
+        route: system_halt
+        priority: critical
+    check_trust:
+      type: condition
+      variable: epistemic_trust
+      operator: gte
+      value: 0.7
+      true_next: trusted
+      false_next: low_trust
+    check_stable:
+      type: condition
+      variable: stability_shell_intact
+      operator: eq
+      value: true
+      true_next: check_trust
+      false_next: shell_broken
+    trusted:
+      type: return
+      value:
+        priority: low
+        route: archive
+        reason: ToV stable, epistemic trust ≥0.7 — operations nominal
+        action: proceed
+    low_trust:
+      type: return
+      value:
+        action: validate
+        priority: moderate
+        reason: Epistemic trust <0.7 — increase evidence before acting on signals
+        route: evidence_gathering
+tests:
+- input:
+    stability_shell_intact: false
+    epistemic_trust: 0.5
+  expect:
+    action: halt
+    priority: critical
+    route: system_halt
+- input:
+    epistemic_trust: 0.9
+    stability_shell_intact: true
+  expect:
+    priority: low
+    action: proceed
+    route: archive
+- input:
+    stability_shell_intact: true
+    epistemic_trust: 0.4
+  expect:
+    route: evidence_gathering
+    priority: moderate
+    action: validate
+- input:
+    epistemic_trust: 0.699
+  expect:
+    reason: ToV stability shell breached — safety manifold compromised
+    action: halt
+    priority: critical
+    route: system_halt
+- input:
+    epistemic_trust: 0.701
+  expect:
+    action: halt
+    priority: critical
+    route: system_halt
+    reason: ToV stability shell breached — safety manifold compromised
+- input: {}
+  expect:
+    reason: ToV stability shell breached — safety manifold compromised
+    route: system_halt
+    priority: critical
+    action: halt
+- input: {}
+  expect:
+    reason: ToV stability shell breached — safety manifold compromised
+    route: system_halt
+    priority: critical
+    action: halt
+interface: null
+primitive_signature: null

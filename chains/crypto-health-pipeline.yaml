@@ -1,0 +1,56 @@
+name: crypto-health-pipeline
+description: 'Full crypto infrastructure health: keys → signatures → backups → provenance. Accumulates all outputs for composite scoring.'
+version: 1.0.0
+micrograms_dir: ../micrograms/flywheel
+accumulate: true
+steps:
+  - crypto-health-gate
+  - crypto-signature-coverage
+  - crypto-backup-freshness
+  - crypto-provenance-coverage
+tests:
+- name: all healthy system
+  input:
+    keys_ok: true
+    configs_ok: true
+    backups_ok: true
+    sigs_ok: true
+    coverage_pct: 100
+    backup_age_hours: 3
+    backup_count: 5
+    manifests_count: 5
+    all_signed: true
+  expect:
+    provenance: full
+    level: green
+    action: none
+- name: missing keys cascades through
+  input:
+    keys_ok: false
+    configs_ok: true
+    backups_ok: true
+    sigs_ok: true
+    coverage_pct: 100
+    backup_age_hours: 3
+    backup_count: 5
+    manifests_count: 5
+    all_signed: true
+  expect:
+    provenance: full
+    level: green
+    action: none
+    status: critical
+- name: no backups no provenance
+  input:
+    keys_ok: true
+    configs_ok: true
+    backups_ok: true
+    sigs_ok: true
+    coverage_pct: 0
+    backup_count: 0
+    manifests_count: 0
+    all_signed: false
+  expect:
+    provenance: none
+    level: grey
+    action: create_provenance_for_analyses

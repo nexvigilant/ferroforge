@@ -1,0 +1,101 @@
+name: interaction-management
+description: "Recommend management strategy for identified drug interaction"
+version: 0.1.0
+tree:
+  start: validate_interaction
+  nodes:
+    validate_interaction:
+      type: condition
+      variable: interaction_severity
+      operator: is_not_null
+      value: null
+      true_next: check_severity_level
+      false_next: management_unknown
+    check_severity_level:
+      type: condition
+      variable: interaction_severity
+      operator: eq
+      value: "contraindicated"
+      true_next: recommend_avoid
+      false_next: check_major_severity
+    check_major_severity:
+      type: condition
+      variable: interaction_severity
+      operator: eq
+      value: "major"
+      true_next: recommend_manage
+      false_next: check_moderate_severity
+    check_moderate_severity:
+      type: condition
+      variable: interaction_severity
+      operator: eq
+      value: "moderate"
+      true_next: recommend_monitor
+      false_next: recommend_observe
+    recommend_avoid:
+      type: return
+      value:
+        management_strategy: "avoid_combination"
+        action_type: "contraindication"
+        monitoring_required: false
+        alternative_drug_suggested: true
+        management_compliant: true
+    recommend_manage:
+      type: return
+      value:
+        management_strategy: "manage_with_caution"
+        action_type: "dose_adjustment"
+        monitoring_required: true
+        alternative_drug_suggested: true
+        management_compliant: true
+    recommend_monitor:
+      type: return
+      value:
+        management_strategy: "monitor"
+        action_type: "clinical_monitoring"
+        monitoring_required: true
+        alternative_drug_suggested: false
+        management_compliant: true
+    recommend_observe:
+      type: return
+      value:
+        management_strategy: "observe"
+        action_type: "patient_counseling"
+        monitoring_required: false
+        alternative_drug_suggested: false
+        management_compliant: true
+    management_unknown:
+      type: return
+      value:
+        management_strategy: "unknown"
+        action_type: null
+        monitoring_required: null
+        alternative_drug_suggested: null
+        management_compliant: false
+tests:
+- input:
+    interaction_severity: "contraindicated"
+  expect:
+    management_strategy: "avoid_combination"
+    action_type: "contraindication"
+    monitoring_required: false
+- input:
+    interaction_severity: "major"
+  expect:
+    management_strategy: "manage_with_caution"
+    action_type: "dose_adjustment"
+    monitoring_required: true
+- input:
+    interaction_severity: "moderate"
+  expect:
+    management_strategy: "monitor"
+    action_type: "clinical_monitoring"
+- input:
+    interaction_severity: "minor"
+  expect:
+    management_strategy: "observe"
+    action_type: "patient_counseling"
+- input: {}
+  expect:
+    management_strategy: "unknown"
+    management_compliant: false

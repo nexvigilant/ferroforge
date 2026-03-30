@@ -1,0 +1,205 @@
+name: fda-qtc-risk-classification
+description: "FDA QTc prolongation risk classification: routes by QTc change magnitude to risk category and labeling action per ICH E14 (2017 R3) and FDA Guidance 'QTc Information in Prescription Drug Labeling' (2025)"
+version: 0.1.0
+interface:
+  inputs:
+    qtc_change_ms:
+      type: int
+      required: true
+      description: "Mean QTc change from baseline in milliseconds"
+    upper_ci_exceeds_10:
+      type: bool
+      required: false
+      description: "Whether the upper bound of 90% CI exceeds 10 ms"
+    torsade_observed:
+      type: bool
+      required: false
+      description: "Whether Torsade de Pointes has been observed"
+    concentration_response:
+      type: bool
+      required: false
+      description: "Whether concentration-response analysis was performed per E14 R3"
+  outputs:
+    risk_category:
+      type: string
+    labeling_action:
+      type: string
+    thorough_qt_required:
+      type: bool
+    regulatory_reference:
+      type: string
+tree:
+  start: check_torsade
+  nodes:
+    check_torsade:
+      type: condition
+      variable: torsade_observed
+      operator: eq
+      value: true
+      true_next: torsade_positive
+      false_next: check_qtc_high
+
+    check_qtc_high:
+      type: condition
+      variable: qtc_change_ms
+      operator: gte
+      value: 20
+      true_next: high_risk
+      false_next: check_qtc_moderate
+
+    check_qtc_moderate:
+      type: condition
+      variable: qtc_change_ms
+      operator: gte
+      value: 10
+      true_next: moderate_risk
+      false_next: check_qtc_borderline
+
+    check_qtc_borderline:
+      type: condition
+      variable: qtc_change_ms
+      operator: gte
+      value: 5
+      true_next: check_ci_borderline
+      false_next: check_negative
+
+    check_ci_borderline:
+      type: condition
+      variable: upper_ci_exceeds_10
+      operator: eq
+      value: true
+      true_next: borderline_positive
+      false_next: borderline_negative
+
+    check_negative:
+      type: condition
+      variable: qtc_change_ms
+      operator: lt
+      value: 5
+      true_next: negative_study
+      false_next: borderline_negative
+
+    # TORSADE OBSERVED
+    torsade_positive:
+      type: return
+      value:
+        risk_category: "HIGH_PROARRHYTHMIC_RISK"
+        labeling_action: "Boxed warning for QTc prolongation and Torsade de Pointes; contraindication with other QT-prolonging drugs; ECG monitoring required"
+        thorough_qt_required: false
+        regulatory_reference: "ICH E14 R3 (2017); FDA QTc Labeling Guidance (2025); 21 CFR 201.57(c)(1)"
+
+    # HIGH RISK (>= 20 ms)
+    high_risk:
+      type: return
+      value:
+        risk_category: "HIGH_QTC_RISK"
+        labeling_action: "Warnings and Precautions: QTc prolongation >20 ms; contraindication with strong QT prolongers; ECG monitoring recommended; avoid in patients with congenital long QT"
+        thorough_qt_required: false
+        regulatory_reference: "ICH E14 R3 (2017), Section 2.2; FDA QTc Labeling Guidance (2025)"
+
+    # MODERATE RISK (10-19 ms)
+    moderate_risk:
+      type: return
+      value:
+        risk_category: "MODERATE_QTC_RISK"
+        labeling_action: "Warnings and Precautions: clinically relevant QTc prolongation; caution with concomitant QT-prolonging drugs; correct electrolytes before use"
+        thorough_qt_required: false
+        regulatory_reference: "ICH E14 R3 (2017), Section 2.2; FDA QTc Labeling Guidance (2025)"
+
+    # BORDERLINE (5-9 ms, CI exceeds 10)
+    borderline_positive:
+      type: return
+      value:
+        risk_category: "BORDERLINE_QTC_RISK"
+        labeling_action: "Clinical Pharmacology section: QTc effect noted; Warnings if other risk factors present; concentration-response analysis recommended"
+        thorough_qt_required: true
+        regulatory_reference: "ICH E14 R3 (2017), Section 3; FDA QTc Labeling Guidance (2025)"
+
+    # BORDERLINE (5-9 ms, CI does not exceed 10)
+    borderline_negative:
+      type: return
+      value:
+        risk_category: "LOW_QTC_RISK"
+        labeling_action: "Clinical Pharmacology section: state QTc effect; no Warnings section language required"
+        thorough_qt_required: false
+        regulatory_reference: "ICH E14 R3 (2017), Section 3; FDA QTc Labeling Guidance (2025)"
+
+    # NEGATIVE (< 5 ms)
+    negative_study:
+      type: return
+      value:
+        risk_category: "NEGATIVE_QTC_STUDY"
+        labeling_action: "Clinical Pharmacology: state negative TQT result; no QTc-related warnings"
+        thorough_qt_required: false
+        regulatory_reference: "ICH E14 R3 (2017), Section 2.1; FDA QTc Labeling Guidance (2025)"
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(ν) — cardiac risk classification by QTc magnitude threshold'
+  primes: ['κ', 'ν', '∂']
+  arguments: ['qtc_change_ms', 'torsade_observed', 'upper_ci_exceeds_10']
+
+tests:
+# Torsade observed -> high proarrhythmic
+- input:
+    qtc_change_ms: 15
+    torsade_observed: true
+  expect:
+    risk_category: "HIGH_PROARRHYTHMIC_RISK"
+
+# QTc >= 20 ms -> high risk
+- input:
+    qtc_change_ms: 25
+    torsade_observed: false
+  expect:
+    risk_category: "HIGH_QTC_RISK"
+
+# QTc 10-19 ms -> moderate
+- input:
+    qtc_change_ms: 12
+    torsade_observed: false
+  expect:
+    risk_category: "MODERATE_QTC_RISK"
+
+# QTc 5-9 ms, CI exceeds 10 -> borderline positive
+- input:
+    qtc_change_ms: 7
+    upper_ci_exceeds_10: true
+    torsade_observed: false
+  expect:
+    risk_category: "BORDERLINE_QTC_RISK"
+    thorough_qt_required: true
+
+# QTc 5-9 ms, CI below 10 -> low risk
+- input:
+    qtc_change_ms: 6
+    upper_ci_exceeds_10: false
+    torsade_observed: false
+  expect:
+    risk_category: "LOW_QTC_RISK"
+
+# QTc < 5 ms -> negative
+- input:
+    qtc_change_ms: 3
+    torsade_observed: false
+  expect:
+    risk_category: "NEGATIVE_QTC_STUDY"
+
+# Exact boundary: 10 ms -> moderate
+- input:
+    qtc_change_ms: 10
+    torsade_observed: false
+  expect:
+    risk_category: "MODERATE_QTC_RISK"
+
+# Exact boundary: 20 ms -> high
+- input:
+    qtc_change_ms: 20
+    torsade_observed: false
+  expect:
+    risk_category: "HIGH_QTC_RISK"
+
+# Empty input -> low risk (no measured QTc data = unknown, not negative study)
+- input: {}
+  expect:
+    risk_category: "LOW_QTC_RISK"

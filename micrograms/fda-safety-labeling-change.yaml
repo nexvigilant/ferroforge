@@ -1,0 +1,215 @@
+name: fda-safety-labeling-change
+description: "FDA safety labeling change decision tree: routes by evidence type and labeling section per FDA Guidance 'Safety Labeling Changes - Implementation of Section 505(o)(4)' (2013)"
+version: 0.1.0
+interface:
+  inputs:
+    evidence_type:
+      type: string
+      required: true
+      description: "Type of safety evidence: new_safety_info, new_study_data, signal_from_faers, literature_report, foreign_regulatory_action"
+    labeling_section:
+      type: string
+      required: true
+      description: "Target labeling section: boxed_warning, contraindications, warnings_precautions, adverse_reactions, drug_interactions"
+    urgency:
+      type: string
+      required: false
+      description: "Urgency level: immediate, standard, routine"
+  outputs:
+    change_type:
+      type: string
+    supplement_type:
+      type: string
+    fda_can_require:
+      type: bool
+    timeline:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_section
+  nodes:
+    check_section:
+      type: condition
+      variable: labeling_section
+      operator: eq
+      value: "boxed_warning"
+      true_next: boxed_warning_path
+      false_next: check_contraindications
+
+    check_contraindications:
+      type: condition
+      variable: labeling_section
+      operator: eq
+      value: "contraindications"
+      true_next: contraindications_path
+      false_next: check_warnings
+
+    check_warnings:
+      type: condition
+      variable: labeling_section
+      operator: eq
+      value: "warnings_precautions"
+      true_next: warnings_urgency_check
+      false_next: check_adverse_reactions
+
+    check_adverse_reactions:
+      type: condition
+      variable: labeling_section
+      operator: eq
+      value: "adverse_reactions"
+      true_next: ar_evidence_check
+      false_next: drug_interactions_path
+
+    # BOXED WARNING — always PAS, FDA can require
+    boxed_warning_path:
+      type: return
+      value:
+        change_type: "MAJOR_LABELING_CHANGE"
+        supplement_type: "Prior Approval Supplement (PAS)"
+        fda_can_require: true
+        timeline: "FDA may order within 30 days under 505(o)(4); sponsor must comply or request hearing"
+        regulatory_reference: "FDA Guidance: Safety Labeling Changes 505(o)(4) (2013), Section III.A; 21 CFR 201.57(c)(1)"
+
+    # CONTRAINDICATIONS — PAS, FDA can require
+    contraindications_path:
+      type: return
+      value:
+        change_type: "MAJOR_LABELING_CHANGE"
+        supplement_type: "Prior Approval Supplement (PAS)"
+        fda_can_require: true
+        timeline: "FDA may order under 505(o)(4); standard PAS review 4-6 months"
+        regulatory_reference: "FDA Guidance: Safety Labeling Changes 505(o)(4) (2013), Section III.B; 21 CFR 201.57(c)(5)"
+
+    # WARNINGS — check urgency
+    warnings_urgency_check:
+      type: condition
+      variable: urgency
+      operator: eq
+      value: "immediate"
+      true_next: warnings_immediate
+      false_next: warnings_standard
+
+    warnings_immediate:
+      type: return
+      value:
+        change_type: "URGENT_LABELING_CHANGE"
+        supplement_type: "Changes Being Effected (CBE-0)"
+        fda_can_require: true
+        timeline: "Implement immediately; submit CBE-0 supplement concurrently"
+        regulatory_reference: "FDA Guidance: Safety Labeling Changes 505(o)(4) (2013), Section IV; 21 CFR 314.70(c)(6)(iii)"
+
+    warnings_standard:
+      type: return
+      value:
+        change_type: "STANDARD_LABELING_CHANGE"
+        supplement_type: "Changes Being Effected (CBE-30)"
+        fda_can_require: true
+        timeline: "Submit CBE-30; implement after 30 days unless FDA objects"
+        regulatory_reference: "FDA Guidance: Safety Labeling Changes 505(o)(4) (2013), Section IV; 21 CFR 314.70(c)(6)(iii)"
+
+    # ADVERSE REACTIONS — check evidence type
+    ar_evidence_check:
+      type: condition
+      variable: evidence_type
+      operator: eq
+      value: "new_study_data"
+      true_next: ar_study_data
+      false_next: ar_other_evidence
+
+    ar_study_data:
+      type: return
+      value:
+        change_type: "STANDARD_LABELING_CHANGE"
+        supplement_type: "Changes Being Effected (CBE-30)"
+        fda_can_require: true
+        timeline: "Submit CBE-30 with updated ADR table and frequency data"
+        regulatory_reference: "FDA Guidance: Safety Labeling Changes 505(o)(4) (2013), Section V; 21 CFR 201.57(c)(7)"
+
+    ar_other_evidence:
+      type: return
+      value:
+        change_type: "MINOR_LABELING_CHANGE"
+        supplement_type: "Annual Report or CBE-30"
+        fda_can_require: true
+        timeline: "Include in next annual report or submit CBE-30 if clinically significant"
+        regulatory_reference: "FDA Guidance: Safety Labeling Changes 505(o)(4) (2013), Section V; 21 CFR 314.70(d)"
+
+    # DRUG INTERACTIONS
+    drug_interactions_path:
+      type: return
+      value:
+        change_type: "STANDARD_LABELING_CHANGE"
+        supplement_type: "Changes Being Effected (CBE-30)"
+        fda_can_require: true
+        timeline: "Submit CBE-30 with updated interaction data and clinical recommendations"
+        regulatory_reference: "FDA Guidance: Safety Labeling Changes 505(o)(4) (2013); 21 CFR 201.57(c)(8)"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(∂, →) — labeling change routing by section boundary and evidence causality'
+  primes: ['σ', '∂', '→', 'κ']
+  arguments: ['labeling_section', 'evidence_type', 'urgency']
+
+tests:
+# Boxed warning -> PAS, major
+- input:
+    labeling_section: "boxed_warning"
+    evidence_type: "new_safety_info"
+  expect:
+    change_type: "MAJOR_LABELING_CHANGE"
+    supplement_type: "Prior Approval Supplement (PAS)"
+    fda_can_require: true
+
+# Contraindications -> PAS
+- input:
+    labeling_section: "contraindications"
+    evidence_type: "new_study_data"
+  expect:
+    change_type: "MAJOR_LABELING_CHANGE"
+    fda_can_require: true
+
+# Warnings, immediate urgency -> CBE-0
+- input:
+    labeling_section: "warnings_precautions"
+    evidence_type: "new_safety_info"
+    urgency: "immediate"
+  expect:
+    change_type: "URGENT_LABELING_CHANGE"
+    supplement_type: "Changes Being Effected (CBE-0)"
+
+# Warnings, standard -> CBE-30
+- input:
+    labeling_section: "warnings_precautions"
+    evidence_type: "signal_from_faers"
+    urgency: "standard"
+  expect:
+    change_type: "STANDARD_LABELING_CHANGE"
+    supplement_type: "Changes Being Effected (CBE-30)"
+
+# Adverse reactions, study data -> CBE-30
+- input:
+    labeling_section: "adverse_reactions"
+    evidence_type: "new_study_data"
+  expect:
+    change_type: "STANDARD_LABELING_CHANGE"
+    supplement_type: "Changes Being Effected (CBE-30)"
+
+# Adverse reactions, literature -> annual report
+- input:
+    labeling_section: "adverse_reactions"
+    evidence_type: "literature_report"
+  expect:
+    change_type: "MINOR_LABELING_CHANGE"
+
+# Drug interactions -> CBE-30
+- input:
+    labeling_section: "drug_interactions"
+    evidence_type: "new_study_data"
+  expect:
+    change_type: "STANDARD_LABELING_CHANGE"
+
+# Empty input -> drug interactions default
+- input: {}
+  expect:
+    change_type: "STANDARD_LABELING_CHANGE"

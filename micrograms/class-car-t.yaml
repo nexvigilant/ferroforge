@@ -1,0 +1,74 @@
+name: class-car-t
+description: 'CAR-T therapy class safety: Cytokine release syndrome monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: crs_grade
+      operator: gte
+      value: 2
+      true_next: alert
+      false_next: safe
+    alert:
+      type: return
+      value:
+        alert: true
+        drug_class: CAR-T therapy
+        action: class_effect_investigation
+        concern: Cytokine release syndrome
+    safe:
+      type: return
+      value:
+        drug_class: CAR-T therapy
+        action: continue
+        concern: Cytokine release syndrome
+        alert: false
+tests:
+- input:
+    crs_grade: 2
+  expect:
+    drug_class: CAR-T therapy
+    alert: true
+- input: {}
+  expect:
+    alert: false
+    drug_class: CAR-T therapy
+- input:
+    crs_grade: 0
+  expect:
+    alert: false
+    drug_class: CAR-T therapy
+    concern: Cytokine release syndrome
+    action: continue
+- input:
+    crs_grade: -1
+  expect:
+    drug_class: CAR-T therapy
+    alert: false
+    concern: Cytokine release syndrome
+    action: continue
+- input:
+    crs_grade: 1
+  expect:
+    drug_class: CAR-T therapy
+    alert: false
+    concern: Cytokine release syndrome
+    action: continue
+- input:
+    crs_grade: 3
+  expect:
+    action: class_effect_investigation
+    concern: Cytokine release syndrome
+    drug_class: CAR-T therapy
+    alert: true
+- input:
+    crs_grade: 200
+  expect:
+    concern: Cytokine release syndrome
+    alert: true
+    drug_class: CAR-T therapy
+    action: class_effect_investigation
+interface: null
+primitive_signature: null

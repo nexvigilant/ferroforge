@@ -1,0 +1,258 @@
+name: ser-estar-temporal-classifier
+description: >
+  Clasifica síntomas clínicos en español por temporalidad usando la distinción
+  gramatical ser/estar. Estar-codificado = estado transitorio (posible RAM).
+  Ser-codificado = condición permanente/identidad (posible preexistente).
+  Classifies Spanish clinical symptoms by temporality using the ser/estar
+  grammatical distinction — a compulsory causality signal English lacks.
+version: 0.1.0
+primitive_signature:
+  dominant: 'ς'
+  expression: 'ς(∂ + →) — distinguishes transient state (estar) from identity (ser), restoring temporal boundary for causality'
+  primes: ['ς', '∂', '→', 'type']
+  arguments: ['verbo', 'sintoma']
+  chain_prediction: >
+    Spanish grammar forces speakers to commit: estar = transient ς (state change,
+    possible drug-induced), ser = identity/type (permanent, likely pre-existing).
+    This is a FREE Naranjo Q3 signal — temporal ordering encoded in morphology.
+    Feeds → causality-to-action via temporal_classification output.
+interface:
+  inputs:
+    verbo:
+      type: string
+      required: true
+      description: >
+        Forma verbal española: "ser" o "estar" (o conjugaciones: es/está/fue/estuvo/era/estaba/siendo/estando).
+        Spanish verb form indicating ser or estar usage.
+    sintoma:
+      type: string
+      required: false
+      description: >
+        Descripción del síntoma clínico en español. Optional clinical symptom description.
+  outputs:
+    clasificacion_temporal:
+      type: string
+      description: "TRANSITORIO (estar) | PERMANENTE (ser) | AMBIGUO | RECHAZADO"
+    temporalidad:
+      type: string
+      description: "English equivalent: TRANSIENT | PERMANENT | AMBIGUOUS | REJECTED"
+    relevancia_causalidad:
+      type: int
+      description: >
+        Peso de relevancia causal 0-100. Estar (transitorio) = alta relevancia
+        para RAM. Ser (permanente) = baja relevancia para RAM.
+    accion:
+      type: string
+      description: "Acción recomendada / Recommended action"
+    razon:
+      type: string
+      description: "Explicación gramatical / Grammatical rationale"
+tree:
+  start: check_verbo_present
+  nodes:
+    check_verbo_present:
+      type: condition
+      variable: verbo
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: normalize_verbo
+
+    reject_missing:
+      type: return
+      value:
+        clasificacion_temporal: RECHAZADO
+        temporalidad: REJECTED
+        relevancia_causalidad: 0
+        accion: "RECHAZADO: verbo es obligatorio / verb is required"
+        razon: "Sin verbo no hay clasificación temporal posible"
+
+    normalize_verbo:
+      type: condition
+      variable: verbo
+      operator: matches
+      value: "^(estar|está|están|estaba|estaban|estuvo|estuvieron|estando|estuve|estás|estábamos|estaría|estarían|esté|estén)$"
+      true_next: classify_estar
+      false_next: check_ser
+
+    check_ser:
+      type: condition
+      variable: verbo
+      operator: matches
+      value: "^(ser|es|son|era|eran|fue|fueron|siendo|soy|eres|somos|sería|serían|sea|sean)$"
+      true_next: classify_ser
+      false_next: classify_ambiguous
+
+    classify_estar:
+      type: return
+      value:
+        clasificacion_temporal: TRANSITORIO
+        temporalidad: TRANSIENT
+        relevancia_causalidad: 80
+        accion: "INVESTIGAR: estado transitorio sugiere posible reacción adversa al medicamento"
+        razon: >
+          Estar codifica estado transitorio en gramática española.
+          "El paciente ESTÁ mareado" implica cambio de estado — el mareo comenzó
+          en algún momento, posiblemente correlacionado con exposición al fármaco.
+          Equivale a señal positiva en Naranjo Q3 (¿apareció la RAM después del fármaco?).
+
+    classify_ser:
+      type: return
+      value:
+        clasificacion_temporal: PERMANENTE
+        temporalidad: PERMANENT
+        relevancia_causalidad: 20
+        accion: "DOCUMENTAR: condición permanente sugiere preexistencia, no reacción adversa"
+        razon: >
+          Ser codifica identidad/esencia en gramática española.
+          "El paciente ES diabético" implica condición permanente — parte de la
+          identidad del paciente, no un cambio de estado inducido por fármaco.
+          Baja probabilidad de ser RAM a menos que el fármaco cause condición crónica nueva.
+
+    classify_ambiguous:
+      type: return
+      value:
+        clasificacion_temporal: AMBIGUO
+        temporalidad: AMBIGUOUS
+        relevancia_causalidad: 50
+        accion: "REVISAR: verbo no reconocido como ser/estar — requiere clasificación manual"
+        razon: >
+          El verbo proporcionado no es forma reconocida de ser ni estar.
+          Posibilidades: otro verbo copulativo (parecer, resultar), error tipográfico,
+          o texto en idioma diferente. Requiere revisión humana.
+
+tests:
+# --- Estar forms (TRANSITORIO) ---
+- input:
+    verbo: "está"
+    sintoma: "mareado"
+  expect:
+    clasificacion_temporal: TRANSITORIO
+    temporalidad: TRANSIENT
+    relevancia_causalidad: 80
+
+- input:
+    verbo: "estar"
+  expect:
+    clasificacion_temporal: TRANSITORIO
+    temporalidad: TRANSIENT
+    relevancia_causalidad: 80
+
+- input:
+    verbo: "estaba"
+    sintoma: "confundido"
+  expect:
+    clasificacion_temporal: TRANSITORIO
+    temporalidad: TRANSIENT
+    relevancia_causalidad: 80
+
+- input:
+    verbo: "estuvo"
+    sintoma: "vomitando"
+  expect:
+    clasificacion_temporal: TRANSITORIO
+    temporalidad: TRANSIENT
+    relevancia_causalidad: 80
+
+- input:
+    verbo: "estando"
+  expect:
+    clasificacion_temporal: TRANSITORIO
+    temporalidad: TRANSIENT
+    relevancia_causalidad: 80
+
+- input:
+    verbo: "estaban"
+    sintoma: "con dolor de cabeza"
+  expect:
+    clasificacion_temporal: TRANSITORIO
+    temporalidad: TRANSIENT
+    relevancia_causalidad: 80
+
+# --- Ser forms (PERMANENTE) ---
+- input:
+    verbo: "es"
+    sintoma: "diabético"
+  expect:
+    clasificacion_temporal: PERMANENTE
+    temporalidad: PERMANENT
+    relevancia_causalidad: 20
+
+- input:
+    verbo: "ser"
+  expect:
+    clasificacion_temporal: PERMANENTE
+    temporalidad: PERMANENT
+    relevancia_causalidad: 20
+
+- input:
+    verbo: "era"
+    sintoma: "hipertenso"
+  expect:
+    clasificacion_temporal: PERMANENTE
+    temporalidad: PERMANENT
+    relevancia_causalidad: 20
+
+- input:
+    verbo: "fue"
+    sintoma: "alérgico a penicilina"
+  expect:
+    clasificacion_temporal: PERMANENTE
+    temporalidad: PERMANENT
+    relevancia_causalidad: 20
+
+- input:
+    verbo: "siendo"
+  expect:
+    clasificacion_temporal: PERMANENTE
+    temporalidad: PERMANENT
+    relevancia_causalidad: 20
+
+- input:
+    verbo: "son"
+    sintoma: "obesos"
+  expect:
+    clasificacion_temporal: PERMANENTE
+    temporalidad: PERMANENT
+    relevancia_causalidad: 20
+
+# --- Ambiguous ---
+- input:
+    verbo: "parece"
+    sintoma: "cansado"
+  expect:
+    clasificacion_temporal: AMBIGUO
+    temporalidad: AMBIGUOUS
+    relevancia_causalidad: 50
+
+- input:
+    verbo: "has"
+  expect:
+    clasificacion_temporal: AMBIGUO
+    temporalidad: AMBIGUOUS
+    relevancia_causalidad: 50
+
+# --- Rejected ---
+- input: {}
+  expect:
+    clasificacion_temporal: RECHAZADO
+    temporalidad: REJECTED
+    relevancia_causalidad: 0
+
+# --- Subjunctive estar (still TRANSITORIO) ---
+- input:
+    verbo: "esté"
+    sintoma: "con náuseas"
+  expect:
+    clasificacion_temporal: TRANSITORIO
+    temporalidad: TRANSIENT
+    relevancia_causalidad: 80
+
+# --- Subjunctive ser (still PERMANENTE) ---
+- input:
+    verbo: "sea"
+    sintoma: "epiléptico"
+  expect:
+    clasificacion_temporal: PERMANENTE
+    temporalidad: PERMANENT
+    relevancia_causalidad: 20

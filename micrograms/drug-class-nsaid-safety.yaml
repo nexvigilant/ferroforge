@@ -1,0 +1,62 @@
+name: drug-class-nsaid-safety
+description: "Non-steroidal anti-inflammatory drug safety gate. Monitors GI ulceration risk, renal dysfunction, and cardiovascular risk in elderly."
+version: 0.1.0
+tree:
+  start: check_gi_ulcer_history
+  nodes:
+    check_gi_ulcer_history:
+      type: condition
+      variable: prior_gi_ulcer
+      operator: eq
+      value: true
+      true_next: gi_risk_assessment
+      false_next: check_age_group
+    gi_risk_assessment:
+      type: return
+      value:
+        risk_level: high
+        gi_protection: required
+        message: "History of GI ulcer; gastroprotection (PPI) strongly recommended"
+    check_age_group:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 65
+      true_next: elderly_assessment
+      false_next: check_renal
+    elderly_assessment:
+      type: return
+      value:
+        risk_level: moderate
+        special_population: elderly
+        monitoring_required: true
+        message: "Increased GI and cardiovascular risk in elderly; frequent monitoring"
+    check_renal:
+      type: condition
+      variable: renal_clearance_ml_min
+      operator: lt
+      value: 60
+      true_next: renal_impairment
+      false_next: standard_dosing
+    renal_impairment:
+      type: return
+      value:
+        risk_level: moderate
+        renal_adjustment: true
+        message: "Impaired renal function; NSAID may worsen renal clearance"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard NSAID dosing appropriate"
+tests:
+  - input: { prior_gi_ulcer: true, age_years: 50, renal_clearance_ml_min: 80 }
+    expect: { risk_level: high, gi_protection: required }
+  - input: { prior_gi_ulcer: false, age_years: 70, renal_clearance_ml_min: 75 }
+    expect: { risk_level: moderate, special_population: elderly }
+  - input: { prior_gi_ulcer: false, age_years: 50, renal_clearance_ml_min: 45 }
+    expect: { risk_level: moderate, renal_adjustment: true }
+  - input: { prior_gi_ulcer: false, age_years: 45, renal_clearance_ml_min: 90 }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

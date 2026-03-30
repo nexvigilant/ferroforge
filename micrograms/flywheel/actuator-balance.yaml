@@ -1,0 +1,73 @@
+name: actuator-balance
+description: 'Classify actuator/sensor ratio: BALANCED (2-5:1), SENSOR_HEAVY (>5:1), ACTUATOR_HEAVY (<2:1)'
+version: 0.1.0
+interface:
+  inputs:
+    sensor_count:
+      type: int
+      required: false
+    actuator_count:
+      type: int
+      required: false
+  outputs:
+    balance:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_actuator_zero
+  nodes:
+    check_actuator_zero:
+      type: condition
+      variable: actuator_count
+      operator: lte
+      value: 0
+      true_next: sensor_heavy
+      false_next: check_sensor_heavy
+    check_sensor_heavy:
+      type: condition
+      variable: sensor_count
+      operator: gte
+      value: 50
+      true_next: check_ratio_high
+      false_next: check_actuator_heavy
+    check_ratio_high:
+      type: condition
+      variable: actuator_count
+      operator: lte
+      value: 10
+      true_next: sensor_heavy
+      false_next: balanced
+    check_actuator_heavy:
+      type: condition
+      variable: actuator_count
+      operator: gte
+      value: 30
+      true_next: actuator_heavy
+      false_next: balanced
+    sensor_heavy:
+      type: return
+      value:
+        balance: SENSOR_HEAVY
+        action: add_actuators
+    actuator_heavy:
+      type: return
+      value:
+        balance: ACTUATOR_HEAVY
+        action: add_sensors
+    balanced:
+      type: return
+      value:
+        balance: BALANCED
+        action: maintain
+tests:
+- input: {sensor_count: 100, actuator_count: 10}
+  expect: {balance: SENSOR_HEAVY, action: add_actuators}
+- input: {sensor_count: 50, actuator_count: 20}
+  expect: {balance: BALANCED, action: maintain}
+- input: {sensor_count: 10, actuator_count: 30}
+  expect: {balance: ACTUATOR_HEAVY, action: add_sensors}
+- input: {sensor_count: 100, actuator_count: 0}
+  expect: {balance: SENSOR_HEAVY, action: add_actuators}
+- input: {sensor_count: 0, actuator_count: 0}
+  expect: {balance: SENSOR_HEAVY, action: add_actuators}

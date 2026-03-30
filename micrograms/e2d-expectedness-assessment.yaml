@@ -1,0 +1,163 @@
+name: e2d-expectedness-assessment
+description: 'ICH E2D Section 2.2: Determines expectedness of a post-approval adverse drug reaction against the reference safety information (SmPC or CCDS)'
+version: 0.1.0
+interface:
+  inputs:
+    in_reference_text:
+      type: bool
+      required: false
+    reference_document:
+      type: string
+      required: false
+    severity_matches:
+      type: bool
+      required: false
+    specificity_matches:
+      type: bool
+      required: false
+    class_effect_only:
+      type: bool
+      required: false
+  outputs:
+    expectedness:
+      type: string
+    expected:
+      type: bool
+    reference_used:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_in_reference
+  nodes:
+    check_in_reference:
+      type: condition
+      variable: in_reference_text
+      operator: eq
+      value: true
+      true_next: check_severity
+      false_next: check_class_effect
+    check_severity:
+      type: condition
+      variable: severity_matches
+      operator: eq
+      value: true
+      true_next: check_specificity
+      false_next: return_unexpected_severity
+    check_specificity:
+      type: condition
+      variable: specificity_matches
+      operator: eq
+      value: true
+      true_next: return_expected
+      false_next: return_unexpected_specificity
+    check_class_effect:
+      type: condition
+      variable: class_effect_only
+      operator: eq
+      value: true
+      true_next: return_unexpected_class
+      false_next: return_unexpected
+    return_expected:
+      type: return
+      value:
+        expectedness: EXPECTED
+        expected: true
+        reference_used: SmPC_CCDS
+        regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions
+    return_unexpected:
+      type: return
+      value:
+        expectedness: UNEXPECTED
+        expected: false
+        reference_used: SmPC_CCDS
+        regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions
+    return_unexpected_severity:
+      type: return
+      value:
+        expectedness: UNEXPECTED_SEVERITY
+        expected: false
+        reference_used: SmPC_CCDS
+        regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions
+    return_unexpected_specificity:
+      type: return
+      value:
+        expectedness: UNEXPECTED_SPECIFICITY
+        expected: false
+        reference_used: SmPC_CCDS
+        regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions
+    return_unexpected_class:
+      type: return
+      value:
+        expectedness: UNEXPECTED_CLASS_EFFECT_ONLY
+        expected: false
+        reference_used: SmPC_CCDS
+        regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — post-approval expectedness gate against reference safety information per ICH E2D Section 2.2'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['in_reference_text', 'severity_matches', 'specificity_matches', 'class_effect_only', 'reference_document']
+tests:
+- input:
+    in_reference_text: true
+    severity_matches: true
+    specificity_matches: true
+    reference_document: SmPC
+  expect:
+    expectedness: EXPECTED
+    expected: true
+    reference_used: SmPC_CCDS
+    regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions
+- input:
+    in_reference_text: true
+    severity_matches: false
+    specificity_matches: true
+    reference_document: CCDS
+  expect:
+    expectedness: UNEXPECTED_SEVERITY
+    expected: false
+    reference_used: SmPC_CCDS
+    regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions
+- input:
+    in_reference_text: true
+    severity_matches: true
+    specificity_matches: false
+    reference_document: SmPC
+  expect:
+    expectedness: UNEXPECTED_SPECIFICITY
+    expected: false
+    reference_used: SmPC_CCDS
+    regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions
+- input:
+    in_reference_text: false
+    class_effect_only: false
+    reference_document: SmPC
+  expect:
+    expectedness: UNEXPECTED
+    expected: false
+    reference_used: SmPC_CCDS
+    regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions
+- input:
+    in_reference_text: false
+    class_effect_only: true
+    reference_document: SmPC
+  expect:
+    expectedness: UNEXPECTED_CLASS_EFFECT_ONLY
+    expected: false
+    reference_used: SmPC_CCDS
+    regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions
+- input: {}
+  expect:
+    expectedness: UNEXPECTED
+    expected: false
+    reference_used: SmPC_CCDS
+    regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions
+- input:
+    in_reference_text: false
+    class_effect_only: false
+  expect:
+    expectedness: UNEXPECTED
+    expected: false
+    reference_used: SmPC_CCDS
+    regulatory_reference: ICH E2D Section 2.2 - Expectedness of Adverse Drug Reactions

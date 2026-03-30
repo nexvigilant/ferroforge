@@ -1,0 +1,81 @@
+name: deadline-fda-15day
+description: "Calculate FDA 15-day IND safety report deadline for serious adverse events"
+version: 0.1.0
+tree:
+  start: validate_event_date
+  nodes:
+    validate_event_date:
+      type: condition
+      variable: event_date
+      operator: is_not_null
+      value: null
+      true_next: check_event_type
+      false_next: deadline_unknown
+    check_event_type:
+      type: condition
+      variable: event_type
+      operator: eq
+      value: "fatal_or_life_threatening"
+      true_next: urgent_deadline
+      false_next: check_hospitalization
+    check_hospitalization:
+      type: condition
+      variable: event_type
+      operator: eq
+      value: "serious_hospitalization"
+      true_next: serious_deadline
+      false_next: routine_deadline
+    urgent_deadline:
+      type: return
+      value:
+        reporting_deadline_days: 7
+        event_category: "fatal_or_life_threatening"
+        regulatory_requirement: "FDA_IND_Safety_Report"
+        expedited_reporting: true
+        regulatory_compliant: true
+    serious_deadline:
+      type: return
+      value:
+        reporting_deadline_days: 15
+        event_category: "serious_hospitalization"
+        regulatory_requirement: "FDA_IND_Safety_Report"
+        expedited_reporting: false
+        regulatory_compliant: true
+    routine_deadline:
+      type: return
+      value:
+        reporting_deadline_days: 30
+        event_category: "non_serious"
+        regulatory_requirement: "FDA_IND_Safety_Report"
+        expedited_reporting: false
+        regulatory_compliant: true
+    deadline_unknown:
+      type: return
+      value:
+        reporting_deadline_days: null
+        event_category: null
+        regulatory_requirement: null
+        expedited_reporting: null
+        regulatory_compliant: false
+tests:
+- input:
+    event_date: "2024-01-15"
+    event_type: "fatal_or_life_threatening"
+  expect:
+    reporting_deadline_days: 7
+    expedited_reporting: true
+- input:
+    event_date: "2024-01-15"
+    event_type: "serious_hospitalization"
+  expect:
+    reporting_deadline_days: 15
+    expedited_reporting: false
+- input:
+    event_date: "2024-01-15"
+    event_type: "non_serious"
+  expect:
+    reporting_deadline_days: 30
+- input: {}
+  expect:
+    reporting_deadline_days: null
+    regulatory_compliant: false

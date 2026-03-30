@@ -1,0 +1,73 @@
+name: epi-nnt-calculator
+description: "Calculate Number Needed to Treat (NNT) or Number Needed to Harm (NNH)"
+version: 0.1.0
+tree:
+  start: validate_outcome_data
+  nodes:
+    validate_outcome_data:
+      type: condition
+      variable: absolute_risk_difference
+      operator: is_not_null
+      value: null
+      true_next: check_outcome_type
+      false_next: nnt_unknown
+    check_outcome_type:
+      type: condition
+      variable: outcome_type
+      operator: eq
+      value: "benefit"
+      true_next: calculate_nnt
+      false_next: check_harm
+    check_harm:
+      type: condition
+      variable: outcome_type
+      operator: eq
+      value: "harm"
+      true_next: calculate_nnh
+      false_next: nnt_unknown
+    calculate_nnt:
+      type: return
+      value:
+        metric_type: "NNT"
+        metric_interpretation: "patients_needed_to_treat_for_one_benefit"
+        calculation_method: "1_divided_by_absolute_risk_reduction"
+        clinical_significance: "lower_is_better"
+        epi_compliant: true
+    calculate_nnh:
+      type: return
+      value:
+        metric_type: "NNH"
+        metric_interpretation: "patients_exposed_for_one_harm"
+        calculation_method: "1_divided_by_absolute_risk_increase"
+        clinical_significance: "higher_is_better"
+        epi_compliant: true
+    nnt_unknown:
+      type: return
+      value:
+        metric_type: null
+        metric_interpretation: null
+        calculation_method: null
+        clinical_significance: null
+        epi_compliant: false
+tests:
+- input:
+    absolute_risk_difference: 0.05
+    outcome_type: "benefit"
+  expect:
+    metric_type: "NNT"
+    metric_interpretation: "patients_needed_to_treat_for_one_benefit"
+- input:
+    absolute_risk_difference: 0.02
+    outcome_type: "harm"
+  expect:
+    metric_type: "NNH"
+    metric_interpretation: "patients_exposed_for_one_harm"
+- input:
+    absolute_risk_difference: null
+  expect:
+    metric_type: null
+    epi_compliant: false
+- input: {}
+  expect:
+    metric_type: null
+    epi_compliant: false

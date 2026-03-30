@@ -1,0 +1,112 @@
+name: station-preemptive-pv-pipeline
+description: Route preemptive PV predictions by trajectory severity and intervention window
+version: 0.1.0
+tree:
+  start: check_trajectory
+  nodes:
+    wide_window:
+      type: return
+      value:
+        route: enhanced_monitoring
+        reason: Intervention window >7 days — time to gather more data
+        priority: moderate
+        action: monitor
+    check_trajectory:
+      type: condition
+      variable: trajectory_severity
+      operator: eq
+      value: critical
+      true_next: critical_trajectory
+      false_next: check_window
+    critical_trajectory:
+      type: return
+      value:
+        route: preemptive_action
+        priority: critical
+        reason: Predicted critical trajectory — preemptive intervention required NOW
+        action: intervene
+    check_window:
+      type: condition
+      variable: intervention_window_days
+      operator: lte
+      value: 7
+      true_next: narrow_window
+      false_next: wide_window
+    narrow_window:
+      type: return
+      value:
+        route: risk_management
+        action: prepare
+        priority: high
+        reason: Intervention window ≤7 days — prepare risk minimization measures
+tests:
+- input:
+    trajectory_severity: critical
+    intervention_window_days: 3
+  expect:
+    action: intervene
+    priority: critical
+    route: preemptive_action
+- input:
+    trajectory_severity: moderate
+    intervention_window_days: 5
+  expect:
+    priority: high
+    route: risk_management
+    action: prepare
+- input:
+    trajectory_severity: low
+    intervention_window_days: 30
+  expect:
+    route: enhanced_monitoring
+    action: monitor
+    priority: moderate
+- input: {}
+  expect:
+    priority: moderate
+    route: enhanced_monitoring
+    reason: Intervention window >7 days — time to gather more data
+    action: monitor
+- input:
+    intervention_window_days: 0
+  expect:
+    reason: Intervention window ≤7 days — prepare risk minimization measures
+    priority: high
+    route: risk_management
+    action: prepare
+- input:
+    intervention_window_days: -1
+  expect:
+    action: prepare
+    priority: high
+    route: risk_management
+    reason: Intervention window ≤7 days — prepare risk minimization measures
+- input:
+    intervention_window_days: 6
+  expect:
+    action: prepare
+    reason: Intervention window ≤7 days — prepare risk minimization measures
+    route: risk_management
+    priority: high
+- input:
+    intervention_window_days: 8
+  expect:
+    reason: Intervention window >7 days — time to gather more data
+    priority: moderate
+    route: enhanced_monitoring
+    action: monitor
+- input:
+    intervention_window_days: 700
+  expect:
+    action: monitor
+    priority: moderate
+    reason: Intervention window >7 days — time to gather more data
+    route: enhanced_monitoring
+- input: {}
+  expect:
+    route: enhanced_monitoring
+    reason: Intervention window >7 days — time to gather more data
+    priority: moderate
+    action: monitor
+interface: null
+primitive_signature: null

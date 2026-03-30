@@ -1,0 +1,213 @@
+name: ecosystem-health-gate
+description: >
+  Master health gate for the NexVigilant ecosystem. Takes metrics from
+  all surfaces and produces a composite health verdict. Used by autopilot
+  and session start hooks to determine system readiness.
+version: "1.0"
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(×(ς_surfaces)) → ∃_health — comparison across all surface states yields health'
+  primes: ['κ', 'ς', '∂', '∃', 'N']
+  arguments: ['mcg_pass_rate', 'hlg_pass_rate', 'station_tools', 'wiring_pct', 'prod_unwraps', 'clippy_clean']
+
+interface:
+  inputs:
+    mcg_pass_rate:
+      type: float
+      required: true
+    hlg_pass_rate:
+      type: float
+      required: false
+    station_tools:
+      type: int
+      required: false
+    wiring_pct:
+      type: int
+      required: false
+    prod_unwraps:
+      type: int
+      required: false
+    clippy_clean:
+      type: bool
+      required: false
+    jest_pass_rate:
+      type: float
+      required: false
+  outputs:
+    health:
+      type: string
+    grade:
+      type: string
+    weakest_surface:
+      type: string
+    action:
+      type: string
+
+tree:
+  start: check_mcg_present
+  nodes:
+    check_mcg_present:
+      type: condition
+      variable: mcg_pass_rate
+      operator: is_null
+      true_next: critical
+      false_next: check_mcg
+
+    check_mcg:
+      type: condition
+      variable: mcg_pass_rate
+      operator: lt
+      value: 0.99
+      true_next: critical
+      false_next: check_hlg
+
+    check_hlg:
+      type: condition
+      variable: hlg_pass_rate
+      operator: lt
+      value: 0.95
+      true_next: degraded_hlg
+      false_next: check_station
+
+    check_station:
+      type: condition
+      variable: station_tools
+      operator: lt
+      value: 1000
+      true_next: degraded_station
+      false_next: check_wiring
+
+    check_wiring:
+      type: condition
+      variable: wiring_pct
+      operator: lt
+      value: 90
+      true_next: degraded_wiring
+      false_next: check_unwraps
+
+    check_unwraps:
+      type: condition
+      variable: prod_unwraps
+      operator: gt
+      value: 10
+      true_next: degraded_safety
+      false_next: check_clippy
+
+    check_clippy:
+      type: condition
+      variable: clippy_clean
+      operator: eq
+      value: false
+      true_next: degraded_lint
+      false_next: healthy
+
+    critical:
+      type: return
+      value:
+        health: CRITICAL
+        grade: F
+        weakest_surface: micrograms
+        action: "Microgram pass rate below 99% — fix failing tests immediately"
+
+    degraded_hlg:
+      type: return
+      value:
+        health: DEGRADED
+        grade: C
+        weakest_surface: heligrams
+        action: "Heligram pass rate below 95% — fix forged test expectations"
+
+    degraded_station:
+      type: return
+      value:
+        health: DEGRADED
+        grade: C
+        weakest_surface: station
+        action: "Station tool count below 1000 — check config loading"
+
+    degraded_wiring:
+      type: return
+      value:
+        health: DEGRADED
+        grade: C
+        weakest_surface: nucleus_wiring
+        action: "Nucleus wiring below 90% — wire remaining void components"
+
+    degraded_safety:
+      type: return
+      value:
+        health: DEGRADED
+        grade: D
+        weakest_surface: production_safety
+        action: "Production unwraps exceed 10 — eliminate unwrap/expect in production code"
+
+    degraded_lint:
+      type: return
+      value:
+        health: DEGRADED
+        grade: C
+        weakest_surface: lint
+        action: "Clippy not clean — fix warnings"
+
+    healthy:
+      type: return
+      value:
+        health: HEALTHY
+        grade: A
+        weakest_surface: none
+        action: "All surfaces green — continue building"
+
+tests:
+  - name: all healthy — current state
+    input:
+      mcg_pass_rate: 1.0
+      hlg_pass_rate: 1.0
+      station_tools: 1820
+      wiring_pct: 100
+      prod_unwraps: 2
+      clippy_clean: true
+    expect:
+      health: HEALTHY
+      grade: A
+
+  - name: critical — mcg failures
+    input:
+      mcg_pass_rate: 0.95
+      hlg_pass_rate: 1.0
+      station_tools: 1820
+      wiring_pct: 100
+      prod_unwraps: 0
+      clippy_clean: true
+    expect:
+      health: CRITICAL
+      grade: F
+      weakest_surface: micrograms
+
+  - name: degraded — too many unwraps
+    input:
+      mcg_pass_rate: 1.0
+      hlg_pass_rate: 1.0
+      station_tools: 1820
+      wiring_pct: 100
+      prod_unwraps: 50
+      clippy_clean: true
+    expect:
+      health: DEGRADED
+      weakest_surface: production_safety
+
+  - name: degraded — low wiring
+    input:
+      mcg_pass_rate: 1.0
+      hlg_pass_rate: 0.99
+      station_tools: 1820
+      wiring_pct: 80
+      prod_unwraps: 2
+      clippy_clean: true
+    expect:
+      health: DEGRADED
+      weakest_surface: nucleus_wiring
+
+  - name: null safety
+    input: {}
+    expect:
+      health: CRITICAL

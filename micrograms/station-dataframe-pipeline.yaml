@@ -1,0 +1,147 @@
+name: station-dataframe-pipeline
+description: Route dataframe operations by size and complexity for resource allocation
+version: 0.1.0
+tree:
+  start: check_rows
+  nodes:
+    check_rows:
+      type: condition
+      variable: row_count
+      operator: gte
+      value: 100000
+      true_next: large
+      false_next: check_cols
+    large:
+      type: return
+      value:
+        action: partition
+        priority: high
+        reason: 100K+ rows — partition before analysis to prevent OOM
+        route: batch_processing
+    wide:
+      type: return
+      value:
+        route: column_pruning
+        action: select
+        reason: 50+ columns — column selection needed before joins
+        priority: moderate
+    normal:
+      type: return
+      value:
+        action: process
+        priority: low
+        reason: Standard dataframe — direct processing
+        route: archive
+    check_cols:
+      type: condition
+      variable: column_count
+      operator: gte
+      value: 50
+      true_next: wide
+      false_next: normal
+tests:
+- input:
+    column_count: 20
+    row_count: 500000
+  expect:
+    route: batch_processing
+    priority: high
+    action: partition
+- input:
+    row_count: 1000
+    column_count: 80
+  expect:
+    priority: moderate
+    route: column_pruning
+    action: select
+- input:
+    row_count: 5000
+    column_count: 10
+  expect:
+    action: process
+    priority: low
+    route: archive
+- input:
+    row_count: 0
+  expect:
+    reason: Standard dataframe — direct processing
+    route: archive
+    action: process
+    priority: low
+- input:
+    row_count: -1
+  expect:
+    priority: low
+    action: process
+    reason: Standard dataframe — direct processing
+    route: archive
+- input:
+    row_count: 99999
+  expect:
+    priority: low
+    route: archive
+    action: process
+    reason: Standard dataframe — direct processing
+- input:
+    row_count: 100001
+  expect:
+    route: batch_processing
+    action: partition
+    reason: 100K+ rows — partition before analysis to prevent OOM
+    priority: high
+- input:
+    row_count: 10000000
+  expect:
+    reason: 100K+ rows — partition before analysis to prevent OOM
+    action: partition
+    priority: high
+    route: batch_processing
+- input: {}
+  expect:
+    reason: Standard dataframe — direct processing
+    action: process
+    priority: low
+    route: archive
+- input:
+    column_count: 0
+  expect:
+    priority: low
+    route: archive
+    action: process
+    reason: Standard dataframe — direct processing
+- input:
+    column_count: -1
+  expect:
+    reason: Standard dataframe — direct processing
+    action: process
+    priority: low
+    route: archive
+- input:
+    column_count: 49
+  expect:
+    route: archive
+    action: process
+    reason: Standard dataframe — direct processing
+    priority: low
+- input:
+    column_count: 51
+  expect:
+    priority: moderate
+    route: column_pruning
+    action: select
+    reason: 50+ columns — column selection needed before joins
+- input:
+    column_count: 5000
+  expect:
+    action: select
+    priority: moderate
+    route: column_pruning
+    reason: 50+ columns — column selection needed before joins
+- input: {}
+  expect:
+    action: process
+    reason: Standard dataframe — direct processing
+    route: archive
+    priority: low
+interface: null
+primitive_signature: null

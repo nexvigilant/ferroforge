@@ -1,0 +1,52 @@
+name: organ-renal-safety
+description: "Renal (kidney) safety assessment. Evaluates nephrotoxic drug risk based on GFR and serum creatinine."
+version: 0.1.0
+tree:
+  start: check_baseline_creatinine
+  nodes:
+    check_baseline_creatinine:
+      type: condition
+      variable: baseline_creatinine_mg_dl
+      operator: gte
+      value: 3.0
+      true_next: severe_renal_impairment
+      false_next: check_egfr
+    severe_renal_impairment:
+      type: return
+      value:
+        organ: kidney
+        risk_level: critical
+        contraindication: true
+        message: "Severe renal failure; nephrotoxic drugs contraindicated"
+    check_egfr:
+      type: condition
+      variable: egfr_ml_min
+      operator: lt
+      value: 30
+      true_next: moderate_renal_impairment
+      false_next: mild_renal_impairment
+    moderate_renal_impairment:
+      type: return
+      value:
+        organ: kidney
+        risk_level: high
+        dose_adjustment: required
+        message: "eGFR 15-29; significant dose reduction required"
+    mild_renal_impairment:
+      type: return
+      value:
+        organ: kidney
+        risk_level: moderate
+        dose_adjustment: may_be_needed
+        message: "eGFR 30-60; monitor and consider dose adjustment"
+tests:
+  - input: { baseline_creatinine_mg_dl: 3.5, egfr_ml_min: 10 }
+    expect: { organ: kidney, risk_level: critical, contraindication: true }
+  - input: { baseline_creatinine_mg_dl: 2.0, egfr_ml_min: 25 }
+    expect: { organ: kidney, risk_level: high, dose_adjustment: required }
+  - input: { baseline_creatinine_mg_dl: 1.2, egfr_ml_min: 50 }
+    expect: { organ: kidney, risk_level: moderate }
+  - input: { baseline_creatinine_mg_dl: 0.9, egfr_ml_min: 100 }
+    expect: { organ: kidney }
+  - input: {}
+    expect: {}

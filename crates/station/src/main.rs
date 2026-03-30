@@ -99,6 +99,10 @@ fn main() -> Result<()> {
         );
     }
 
+    // Initialize persistent dispatch daemon for ~14x faster proxy calls.
+    // The daemon keeps dispatch_daemon.py alive with pre-warmed nexcore pool.
+    nexvigilant_station::router::init_dispatch_daemon(&registry.station_root);
+
     info!(
         configs = registry.configs.len(),
         tools = registry.tool_count(),

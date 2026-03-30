@@ -1,0 +1,259 @@
+name: fda-postmarket-study-type
+description: "FDA postmarketing study obligation router: classifies PMR vs PMC and determines study type per FDA Guidance 'Annual Status Report for PMRs and PMCs' (2023) and 21 CFR 314.81"
+version: 0.1.0
+interface:
+  inputs:
+    obligation_type:
+      type: string
+      required: true
+      description: "Type of obligation: pmr_safety, pmr_efficacy, pmr_clinical_pharmacology, pmc_safety, pmc_other"
+    study_status:
+      type: string
+      required: true
+      description: "Current status: pending, ongoing, submitted, fulfilled, released, delayed"
+    overdue:
+      type: bool
+      required: false
+      description: "Whether the study is past its agreed-upon milestone date"
+  outputs:
+    report_form:
+      type: string
+    enforcement_action:
+      type: string
+    status_code:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_obligation
+  nodes:
+    check_obligation:
+      type: condition
+      variable: obligation_type
+      operator: eq
+      value: "pmr_safety"
+      true_next: pmr_status_check
+      false_next: check_pmr_efficacy
+
+    check_pmr_efficacy:
+      type: condition
+      variable: obligation_type
+      operator: eq
+      value: "pmr_efficacy"
+      true_next: pmr_status_check
+      false_next: check_pmr_cp
+
+    check_pmr_cp:
+      type: condition
+      variable: obligation_type
+      operator: eq
+      value: "pmr_clinical_pharmacology"
+      true_next: pmr_status_check
+      false_next: pmc_status_check
+
+    # PMR STATUS (legally required)
+    pmr_status_check:
+      type: condition
+      variable: study_status
+      operator: eq
+      value: "fulfilled"
+      true_next: pmr_fulfilled
+      false_next: pmr_check_submitted
+
+    pmr_check_submitted:
+      type: condition
+      variable: study_status
+      operator: eq
+      value: "submitted"
+      true_next: pmr_submitted
+      false_next: pmr_check_ongoing
+
+    pmr_check_ongoing:
+      type: condition
+      variable: study_status
+      operator: eq
+      value: "ongoing"
+      true_next: pmr_check_overdue
+      false_next: pmr_check_delayed
+
+    pmr_check_delayed:
+      type: condition
+      variable: study_status
+      operator: eq
+      value: "delayed"
+      true_next: pmr_delayed
+      false_next: pmr_pending
+
+    pmr_check_overdue:
+      type: condition
+      variable: overdue
+      operator: eq
+      value: true
+      true_next: pmr_overdue
+      false_next: pmr_on_track
+
+    pmr_fulfilled:
+      type: return
+      value:
+        report_form: "FDA Form 3988 — Final Status Report"
+        enforcement_action: "NONE — obligation complete"
+        status_code: "F"
+        regulatory_reference: "FDA PMR/PMC Annual Status Report Guidance (2023), Section III.B; 21 CFR 314.81(b)(2)(vii)"
+
+    pmr_submitted:
+      type: return
+      value:
+        report_form: "FDA Form 3988 — Study Report Submitted"
+        enforcement_action: "Awaiting FDA review. No enforcement action."
+        status_code: "S"
+        regulatory_reference: "FDA PMR/PMC Annual Status Report Guidance (2023), Section III.B"
+
+    pmr_on_track:
+      type: return
+      value:
+        report_form: "FDA Form 3988 — Annual Progress Report"
+        enforcement_action: "NONE — PMR on schedule"
+        status_code: "P"
+        regulatory_reference: "FDA PMR/PMC Annual Status Report Guidance (2023), Section III.A"
+
+    pmr_overdue:
+      type: return
+      value:
+        report_form: "FDA Form 3988 — Annual Progress Report with milestone justification"
+        enforcement_action: "FDA may issue untitled letter, require meeting, or deem PMR not met. Potential misbranding under FD&C Act 505(o)(3)(E)."
+        status_code: "P (overdue)"
+        regulatory_reference: "FDA PMR/PMC Annual Status Report Guidance (2023), Section IV; FD&C Act 505(o)(3)"
+
+    pmr_delayed:
+      type: return
+      value:
+        report_form: "FDA Form 3988 — Delay notification with revised schedule"
+        enforcement_action: "FDA reviews justification. May accept revised timeline or escalate to enforcement. Possible civil money penalties under FDAAA."
+        status_code: "D"
+        regulatory_reference: "FDA PMR/PMC Annual Status Report Guidance (2023), Section IV; FDAAA 2007 Section 902"
+
+    pmr_pending:
+      type: return
+      value:
+        report_form: "FDA Form 3988 — Not yet initiated"
+        enforcement_action: "Must provide timeline for initiation. FDA monitors for progress."
+        status_code: "R"
+        regulatory_reference: "FDA PMR/PMC Annual Status Report Guidance (2023), Section III.A"
+
+    # PMC STATUS (agreed upon, not legally required)
+    pmc_status_check:
+      type: condition
+      variable: study_status
+      operator: eq
+      value: "fulfilled"
+      true_next: pmc_fulfilled
+      false_next: pmc_check_released
+
+    pmc_check_released:
+      type: condition
+      variable: study_status
+      operator: eq
+      value: "released"
+      true_next: pmc_released
+      false_next: pmc_ongoing
+
+    pmc_fulfilled:
+      type: return
+      value:
+        report_form: "FDA Form 3989 — Final Status Report"
+        enforcement_action: "NONE — commitment fulfilled"
+        status_code: "F"
+        regulatory_reference: "FDA PMR/PMC Annual Status Report Guidance (2023), Section V"
+
+    pmc_released:
+      type: return
+      value:
+        report_form: "FDA Form 3989 — Released from commitment"
+        enforcement_action: "NONE — FDA has released sponsor from this commitment"
+        status_code: "X"
+        regulatory_reference: "FDA PMR/PMC Annual Status Report Guidance (2023), Section V"
+
+    pmc_ongoing:
+      type: return
+      value:
+        report_form: "FDA Form 3989 — Annual Status Report"
+        enforcement_action: "Voluntary commitment. FDA may reclassify as PMR if safety concern arises."
+        status_code: "P"
+        regulatory_reference: "FDA PMR/PMC Annual Status Report Guidance (2023), Section V"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(∂, ς) — postmarket obligation routing by regulatory boundary (PMR vs PMC) and study state'
+  primes: ['σ', '∂', 'ς']
+  arguments: ['obligation_type', 'study_status', 'overdue']
+
+tests:
+# PMR safety, fulfilled
+- input:
+    obligation_type: "pmr_safety"
+    study_status: "fulfilled"
+  expect:
+    status_code: "F"
+
+# PMR efficacy, ongoing, on track
+- input:
+    obligation_type: "pmr_efficacy"
+    study_status: "ongoing"
+    overdue: false
+  expect:
+    status_code: "P"
+
+# PMR, ongoing, overdue
+- input:
+    obligation_type: "pmr_safety"
+    study_status: "ongoing"
+    overdue: true
+  expect:
+    status_code: "P (overdue)"
+
+# PMR delayed
+- input:
+    obligation_type: "pmr_clinical_pharmacology"
+    study_status: "delayed"
+  expect:
+    status_code: "D"
+
+# PMC fulfilled
+- input:
+    obligation_type: "pmc_safety"
+    study_status: "fulfilled"
+  expect:
+    status_code: "F"
+
+# PMC released
+- input:
+    obligation_type: "pmc_other"
+    study_status: "released"
+  expect:
+    status_code: "X"
+
+# PMC ongoing
+- input:
+    obligation_type: "pmc_safety"
+    study_status: "ongoing"
+  expect:
+    status_code: "P"
+
+# PMR submitted
+- input:
+    obligation_type: "pmr_safety"
+    study_status: "submitted"
+  expect:
+    status_code: "S"
+
+# PMR pending (not started)
+- input:
+    obligation_type: "pmr_efficacy"
+    study_status: "pending"
+  expect:
+    status_code: "R"
+
+# Empty -> PMC ongoing default
+- input: {}
+  expect:
+    status_code: "P"

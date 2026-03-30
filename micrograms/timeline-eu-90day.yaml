@@ -1,0 +1,74 @@
+name: timeline-eu-90day
+description: EU 90-day periodic
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    not_due:
+      type: return
+      value:
+        report_type: periodic
+        jurisdiction: EU
+        due: false
+        action: schedule
+    check:
+      type: condition
+      variable: days_to_deadline
+      operator: lte
+      value: 90
+      true_next: due
+      false_next: not_due
+    due:
+      type: return
+      value:
+        report_type: periodic
+        jurisdiction: EU
+        due: true
+        action: submit
+tests:
+- input:
+    days_to_deadline: 90
+  expect:
+    due: true
+    jurisdiction: EU
+- input: {}
+  expect:
+    due: false
+    jurisdiction: EU
+- input:
+    days_to_deadline: 0
+  expect:
+    jurisdiction: EU
+    due: true
+    report_type: periodic
+    action: submit
+- input:
+    days_to_deadline: -1
+  expect:
+    report_type: periodic
+    due: true
+    action: submit
+    jurisdiction: EU
+- input:
+    days_to_deadline: 89
+  expect:
+    due: true
+    action: submit
+    report_type: periodic
+    jurisdiction: EU
+- input:
+    days_to_deadline: 91
+  expect:
+    due: false
+    jurisdiction: EU
+    action: schedule
+    report_type: periodic
+- input:
+    days_to_deadline: 9000
+  expect:
+    action: schedule
+    jurisdiction: EU
+    report_type: periodic
+    due: false
+interface: null
+primitive_signature: null

@@ -1,0 +1,105 @@
+name: station-primitives-pipeline
+description: Route T1 primitive decomposition results by coverage and conservation
+version: 0.1.0
+tree:
+  start: check_coverage
+  nodes:
+    shallow:
+      type: return
+      value:
+        priority: moderate
+        reason: Fewer than 5 primitives identified — decomposition too shallow
+        action: deepen
+        route: decomposition_retry
+    check_conservation:
+      type: condition
+      variable: conservation_holds
+      operator: eq
+      value: true
+      true_next: conserved
+      false_next: broken
+    conserved:
+      type: return
+      value:
+        route: archive
+        reason: 5+ primitives, conservation holds — valid decomposition
+        action: certify
+        priority: low
+    check_coverage:
+      type: condition
+      variable: primitives_identified
+      operator: gte
+      value: 5
+      true_next: check_conservation
+      false_next: shallow
+    broken:
+      type: return
+      value:
+        reason: Conservation law violated — existence not conserved through boundaries
+        action: repair
+        route: conservation_repair
+        priority: high
+tests:
+- input:
+    primitives_identified: 3
+    conservation_holds: true
+  expect:
+    route: decomposition_retry
+    action: deepen
+    priority: moderate
+- input:
+    primitives_identified: 8
+    conservation_holds: true
+  expect:
+    action: certify
+    route: archive
+    priority: low
+- input:
+    conservation_holds: false
+    primitives_identified: 6
+  expect:
+    route: conservation_repair
+    action: repair
+    priority: high
+- input: {}
+  expect:
+    priority: moderate
+    reason: Fewer than 5 primitives identified — decomposition too shallow
+    route: decomposition_retry
+    action: deepen
+- input:
+    primitives_identified: 0
+  expect:
+    action: deepen
+    route: decomposition_retry
+    reason: Fewer than 5 primitives identified — decomposition too shallow
+    priority: moderate
+- input:
+    primitives_identified: -1
+  expect:
+    reason: Fewer than 5 primitives identified — decomposition too shallow
+    route: decomposition_retry
+    priority: moderate
+    action: deepen
+- input:
+    primitives_identified: 4
+  expect:
+    reason: Fewer than 5 primitives identified — decomposition too shallow
+    priority: moderate
+    route: decomposition_retry
+    action: deepen
+- input:
+    primitives_identified: 500
+  expect:
+    route: conservation_repair
+    reason: Conservation law violated — existence not conserved through boundaries
+    action: repair
+    priority: high
+- input: {}
+  expect:
+    reason: Fewer than 5 primitives identified — decomposition too shallow
+    priority: moderate
+    route: decomposition_retry
+    action: deepen
+interface: null
+primitive_signature: null

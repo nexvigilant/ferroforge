@@ -1,0 +1,74 @@
+name: station-marketing-pipeline
+description: 'Route marketing funnel stages: discover to onboard conversion'
+version: 0.1.0
+tree:
+  start: check_stage
+  nodes:
+    demo:
+      type: return
+      value:
+        action: engage
+        priority: moderate
+        reason: User at demo stage — show value through live signal detection
+        route: demo_pipeline
+    check_stage:
+      type: condition
+      variable: funnel_stage
+      operator: eq
+      value: onboard
+      true_next: onboard
+      false_next: check_demo
+    onboard:
+      type: return
+      value:
+        action: activate
+        reason: User reached onboard stage — convert to active user
+        priority: high
+        route: user_activation
+    discover:
+      type: return
+      value:
+        route: capability_display
+        reason: User at discover stage — surface capabilities and courses
+        action: attract
+        priority: low
+    check_demo:
+      type: condition
+      variable: funnel_stage
+      operator: eq
+      value: demo
+      true_next: demo
+      false_next: discover
+tests:
+- input:
+    funnel_stage: onboard
+  expect:
+    route: user_activation
+    action: activate
+    priority: high
+- input:
+    funnel_stage: demo
+  expect:
+    priority: moderate
+    route: demo_pipeline
+    action: engage
+- input:
+    funnel_stage: discover
+  expect:
+    priority: low
+    route: capability_display
+    action: attract
+- input: {}
+  expect:
+    priority: low
+    reason: User at discover stage — surface capabilities and courses
+    action: attract
+    route: capability_display
+- input: {}
+  expect:
+    priority: low
+    route: capability_display
+    reason: User at discover stage — surface capabilities and courses
+    action: attract
+interface: null
+primitive_signature: null

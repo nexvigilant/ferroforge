@@ -1,0 +1,63 @@
+name: drug-class-opioid-safety
+description: "Opioid analgesic safety assessment. Evaluates respiratory depression risk, overdose potential, and addiction vulnerability."
+version: 0.1.0
+tree:
+  start: check_respiratory_impairment
+  nodes:
+    check_respiratory_impairment:
+      type: condition
+      variable: has_severe_copd_or_osa
+      operator: eq
+      value: true
+      true_next: respiratory_alert
+      false_next: check_opioid_naive
+    respiratory_alert:
+      type: return
+      value:
+        risk_level: critical
+        relative_contraindication: true
+        message: "Severe respiratory disease; opioid carries high overdose/death risk"
+    check_opioid_naive:
+      type: condition
+      variable: is_opioid_naive
+      operator: eq
+      value: true
+      true_next: naive_assessment
+      false_next: check_abuse_risk
+    naive_assessment:
+      type: return
+      value:
+        risk_level: moderate
+        low_starting_dose: required
+        monitoring_required: true
+        message: "Opioid-naive patient; start with lowest dose and titrate slowly"
+    check_abuse_risk:
+      type: condition
+      variable: substance_abuse_history
+      operator: eq
+      value: true
+      true_next: abuse_alert
+      false_next: standard_dosing
+    abuse_alert:
+      type: return
+      value:
+        risk_level: high
+        addiction_risk: true
+        monitoring_required: true
+        message: "Substance abuse history; enhance monitoring and consider alternatives"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard opioid dosing approach appropriate"
+tests:
+  - input: { has_severe_copd_or_osa: true, is_opioid_naive: false, substance_abuse_history: false }
+    expect: { risk_level: critical, relative_contraindication: true }
+  - input: { has_severe_copd_or_osa: false, is_opioid_naive: true, substance_abuse_history: false }
+    expect: { risk_level: moderate, low_starting_dose: required }
+  - input: { has_severe_copd_or_osa: false, is_opioid_naive: false, substance_abuse_history: true }
+    expect: { risk_level: high, addiction_risk: true }
+  - input: { has_severe_copd_or_osa: false, is_opioid_naive: false, substance_abuse_history: false }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

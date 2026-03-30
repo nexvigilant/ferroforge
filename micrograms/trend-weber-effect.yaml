@@ -1,0 +1,67 @@
+name: trend-weber-effect
+description: Weber effect (new drug)
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    not_detected:
+      type: return
+      value:
+        action: continue_monitoring
+        pattern: weber_peak
+        detected: false
+    detected:
+      type: return
+      value:
+        pattern: weber_peak
+        detected: true
+        action: investigate
+    check:
+      type: condition
+      variable: months_since_launch
+      operator: lte
+      value: 24
+      true_next: detected
+      false_next: not_detected
+tests:
+- input:
+    months_since_launch: 24
+  expect:
+    detected: true
+    pattern: weber_peak
+- input: {}
+  expect:
+    pattern: weber_peak
+    detected: false
+- input:
+    months_since_launch: 0
+  expect:
+    pattern: weber_peak
+    detected: true
+    action: investigate
+- input:
+    months_since_launch: -1
+  expect:
+    action: investigate
+    detected: true
+    pattern: weber_peak
+- input:
+    months_since_launch: 23
+  expect:
+    detected: true
+    pattern: weber_peak
+    action: investigate
+- input:
+    months_since_launch: 25
+  expect:
+    detected: false
+    action: continue_monitoring
+    pattern: weber_peak
+- input:
+    months_since_launch: 2400
+  expect:
+    detected: false
+    action: continue_monitoring
+    pattern: weber_peak
+interface: null
+primitive_signature: null

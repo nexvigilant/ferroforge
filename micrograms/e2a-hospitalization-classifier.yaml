@@ -1,0 +1,194 @@
+name: e2a-hospitalization-classifier
+description: 'ICH E2A Section II.B: Hospitalization sub-classification — initial (new), prolonged (extension of existing), or elective/planned (not a seriousness criterion). Determines if hospitalization criterion is met for SUSAR purposes.'
+version: 1.0.0
+interface:
+  inputs:
+    admission_type:
+      type: string
+      required: false
+    caused_by_ae:
+      type: bool
+      required: false
+    hospitalized:
+      type: bool
+      required: false
+    pre_planned:
+      type: bool
+      required: false
+    prolongation_due_to_ae:
+      type: bool
+      required: false
+  outputs:
+    hospitalization_criterion_met:
+      type: bool
+    hospitalization_type:
+      type: string
+    rationale:
+      type: string
+    regulatory_reference:
+      type: string
+    seriousness_basis:
+      type: string
+tree:
+  start: check_hospitalized
+  nodes:
+    check_hospitalized:
+      type: condition
+      variable: hospitalized
+      operator: eq
+      value: true
+      true_next: check_pre_planned
+      false_next: check_prolongation
+    check_pre_planned:
+      type: condition
+      variable: pre_planned
+      operator: eq
+      value: true
+      true_next: planned_not_criterion
+      false_next: check_caused_by_ae
+    check_caused_by_ae:
+      type: condition
+      variable: caused_by_ae
+      operator: eq
+      value: true
+      true_next: initial_hospitalization
+      false_next: check_admission_type
+    check_admission_type:
+      type: condition
+      variable: admission_type
+      operator: eq
+      value: emergency
+      true_next: initial_hospitalization
+      false_next: hospitalization_unclear
+    check_prolongation:
+      type: condition
+      variable: prolongation_due_to_ae
+      operator: eq
+      value: true
+      true_next: prolonged_hospitalization
+      false_next: not_hospitalized
+    initial_hospitalization:
+      type: return
+      value:
+        hospitalization_criterion_met: true
+        hospitalization_type: INITIAL
+        seriousness_basis: HOSPITALIZATION
+        rationale: Unplanned hospitalization caused by or associated with the adverse event — seriousness criterion met
+        regulatory_reference: ICH E2A Section II.B - Inpatient hospitalization or prolongation of existing hospitalization
+    prolonged_hospitalization:
+      type: return
+      value:
+        hospitalization_criterion_met: true
+        hospitalization_type: PROLONGED
+        seriousness_basis: HOSPITALIZATION
+        rationale: Prolongation of existing hospitalization due to the adverse event — seriousness criterion met
+        regulatory_reference: ICH E2A Section II.B - Inpatient hospitalization or prolongation of existing hospitalization
+    planned_not_criterion:
+      type: return
+      value:
+        hospitalization_criterion_met: false
+        hospitalization_type: ELECTIVE_PLANNED
+        seriousness_basis: NONE
+        rationale: Pre-planned elective admission or hospitalization for a procedure unrelated to the adverse event — does not meet seriousness criterion
+        regulatory_reference: "ICH E2A Section II.B - Note: elective/pre-planned admissions do not fulfill hospitalization criterion"
+    hospitalization_unclear:
+      type: return
+      value:
+        hospitalization_criterion_met: false
+        hospitalization_type: UNCLEAR
+        seriousness_basis: NEEDS_REVIEW
+        rationale: Hospitalization occurred but causal relationship to adverse event is unclear — medical review required
+        regulatory_reference: ICH E2A Section II.B - Clinical judgment required for causal attribution
+    not_hospitalized:
+      type: return
+      value:
+        hospitalization_criterion_met: false
+        hospitalization_type: NONE
+        seriousness_basis: NONE
+        rationale: No hospitalization and no prolongation due to adverse event — criterion not met
+        regulatory_reference: ICH E2A Section II.B - Hospitalization criterion not applicable
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — sub-classification of hospitalization criterion per ICH E2A'
+  primes: ['κ', '∂']
+  arguments: ['hospitalized', 'pre_planned', 'caused_by_ae', 'prolongation_due_to_ae']
+  chain_prediction: 'Feeds hospitalization_criterion_met into case-seriousness or e2a-reporting-obligation as seriousness sub-gate.'
+tests:
+# Unplanned hospitalization caused by AE = criterion met (initial)
+- input:
+    hospitalized: true
+    pre_planned: false
+    caused_by_ae: true
+    prolongation_due_to_ae: false
+    admission_type: emergency
+  expect:
+    hospitalization_criterion_met: true
+    hospitalization_type: INITIAL
+    seriousness_basis: HOSPITALIZATION
+    regulatory_reference: ICH E2A Section II.B - Inpatient hospitalization or prolongation of existing hospitalization
+# Emergency admission (admission_type=emergency) = criterion met
+- input:
+    hospitalized: true
+    pre_planned: false
+    caused_by_ae: false
+    prolongation_due_to_ae: false
+    admission_type: emergency
+  expect:
+    hospitalization_criterion_met: true
+    hospitalization_type: INITIAL
+    seriousness_basis: HOSPITALIZATION
+    regulatory_reference: ICH E2A Section II.B - Inpatient hospitalization or prolongation of existing hospitalization
+# Planned/elective admission = criterion NOT met
+- input:
+    hospitalized: true
+    pre_planned: true
+    caused_by_ae: false
+    prolongation_due_to_ae: false
+    admission_type: elective
+  expect:
+    hospitalization_criterion_met: false
+    hospitalization_type: ELECTIVE_PLANNED
+    seriousness_basis: NONE
+    regulatory_reference: "ICH E2A Section II.B - Note: elective/pre-planned admissions do not fulfill hospitalization criterion"
+# Prolongation of existing stay due to AE = criterion met
+- input:
+    hospitalized: false
+    pre_planned: false
+    caused_by_ae: false
+    prolongation_due_to_ae: true
+    admission_type: existing
+  expect:
+    hospitalization_criterion_met: true
+    hospitalization_type: PROLONGED
+    seriousness_basis: HOSPITALIZATION
+    regulatory_reference: ICH E2A Section II.B - Inpatient hospitalization or prolongation of existing hospitalization
+# Not hospitalized, no prolongation = criterion not met
+- input:
+    hospitalized: false
+    pre_planned: false
+    caused_by_ae: false
+    prolongation_due_to_ae: false
+  expect:
+    hospitalization_criterion_met: false
+    hospitalization_type: NONE
+    seriousness_basis: NONE
+    regulatory_reference: ICH E2A Section II.B - Hospitalization criterion not applicable
+# Hospitalized but cause unclear = needs review
+- input:
+    hospitalized: true
+    pre_planned: false
+    caused_by_ae: false
+    prolongation_due_to_ae: false
+    admission_type: unplanned
+  expect:
+    hospitalization_criterion_met: false
+    hospitalization_type: UNCLEAR
+    seriousness_basis: NEEDS_REVIEW
+    regulatory_reference: ICH E2A Section II.B - Clinical judgment required for causal attribution
+# Empty input = not hospitalized
+- input: {}
+  expect:
+    hospitalization_criterion_met: false
+    hospitalization_type: NONE
+    seriousness_basis: NONE
+    regulatory_reference: ICH E2A Section II.B - Hospitalization criterion not applicable

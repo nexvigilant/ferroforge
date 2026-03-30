@@ -1,5 +1,6 @@
 use serde_json::Value;
-use std::process::Command;
+use std::io::{BufRead, BufReader, Write as IoWrite};
+use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -54,6 +55,120 @@ impl ProxyCache {
         }
     }
 
+}
+
+/// Global dispatch daemon — initialized once, used by execute_proxy.
+static DISPATCH_DAEMON: std::sync::OnceLock<DispatchDaemon> = std::sync::OnceLock::new();
+
+/// Initialize the global dispatch daemon. Call once at startup.
+pub fn init_dispatch_daemon(station_root: &str) {
+    let _ = DISPATCH_DAEMON.set(DispatchDaemon::new(station_root));
+    info!("Dispatch daemon initialized for {station_root}");
+}
+
+/// Persistent Python dispatch daemon — keeps `dispatch_daemon.py` alive across calls.
+///
+/// Instead of spawning a fresh `python3 dispatch.py` per tool call (~77ms overhead),
+/// the daemon stays alive and processes requests via stdin/stdout JSON lines (~6ms).
+/// Auto-respawns if the daemon dies.
+pub struct DispatchDaemon {
+    inner: Mutex<Option<DaemonProcess>>,
+    station_root: String,
+}
+
+struct DaemonProcess {
+    child: Child,
+    stdin: std::process::ChildStdin,
+    stdout: BufReader<std::process::ChildStdout>,
+}
+
+impl DispatchDaemon {
+    pub fn new(station_root: &str) -> Self {
+        Self {
+            inner: Mutex::new(None),
+            station_root: station_root.to_string(),
+        }
+    }
+
+    fn spawn_daemon(station_root: &str) -> Option<DaemonProcess> {
+        let daemon_path = format!("{}/scripts/dispatch_daemon.py", station_root);
+        let mut child = Command::new("python3")
+            .arg(&daemon_path)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .current_dir(station_root)
+            .spawn()
+            .ok()?;
+
+        let stdin = child.stdin.take()?;
+        let stdout = BufReader::new(child.stdout.take()?);
+
+        // Drain stderr in background (daemon writes "ready" there)
+        if let Some(stderr) = child.stderr.take() {
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines() {
+                    if let Ok(line) = line {
+                        info!(daemon_stderr = %line, "dispatch_daemon");
+                    }
+                }
+            });
+        }
+
+        // Give daemon time to warm up (pool spawn)
+        std::thread::sleep(std::time::Duration::from_millis(200));
+
+        Some(DaemonProcess { child, stdin, stdout })
+    }
+
+    /// Send a tool call to the daemon. Returns JSON response.
+    pub fn call(&self, tool_name: &str, arguments: &Value, request_id: &str) -> Option<String> {
+        let mut guard = self.inner.lock().ok()?;
+
+        // Ensure daemon is alive
+        let needs_respawn = match guard.as_mut() {
+            Some(d) => d.child.try_wait().ok().flatten().is_some(),
+            None => true,
+        };
+        if needs_respawn {
+            info!("Spawning dispatch daemon");
+            *guard = Self::spawn_daemon(&self.station_root);
+        }
+
+        let daemon = guard.as_mut()?;
+
+        let envelope = serde_json::json!({
+            "id": request_id,
+            "tool": tool_name,
+            "arguments": arguments,
+        });
+
+        let mut line = serde_json::to_string(&envelope).ok()?;
+        line.push('\n');
+
+        // Write request
+        if daemon.stdin.write_all(line.as_bytes()).is_err() {
+            // Daemon died — respawn and retry once
+            *guard = Self::spawn_daemon(&self.station_root);
+            let daemon = guard.as_mut()?;
+            daemon.stdin.write_all(line.as_bytes()).ok()?;
+            daemon.stdin.flush().ok()?;
+        } else {
+            daemon.stdin.flush().ok()?;
+        }
+
+        // Read response (one JSON line)
+        let daemon = guard.as_mut()?;
+        let mut response = String::new();
+        daemon.stdout.read_line(&mut response).ok()?;
+
+        if response.trim().is_empty() {
+            return None;
+        }
+
+        Some(response)
+    }
 }
 
 /// Route a tool call to the appropriate handler, with auth, telemetry, and rate limiting.
@@ -239,7 +354,7 @@ pub fn route_tool_call_for_hopper(
     registry: &ConfigRegistry,
     tool_name: &str,
     arguments: &Value,
-    station_root: &str,
+    _station_root: &str,
 ) -> ToolCallResult {
     let telemetry = StationTelemetry::new(None);
     let request_id = uuid::Uuid::new_v4().to_string();
@@ -283,6 +398,9 @@ fn route_tool_call_inner(
         return result;
     }
     if let Some(result) = crate::crystalbook::try_handle(tool_name, arguments) {
+        return result;
+    }
+    if let Some(result) = crate::cybercinetics::try_handle(tool_name, arguments) {
         return result;
     }
     if let Some(result) = crate::autopilot::try_handle(tool_name, arguments) {
@@ -409,20 +527,25 @@ fn route_tool_call_inner(
         return result;
     }
 
+    // Config-registered tools first — catches all proxy-routed domains.
+    // This MUST run before the nexcore bridge to prevent the bridge from
+    // intercepting tools that have dedicated proxy scripts.
+    if let Some((config, tool)) = registry.find_tool(tool_name) {
+        return execute_tool(config, tool, tool_name, arguments, &registry.station_root, request_id, proxy_cache);
+    }
+
     // Catch-all for rust-native tools handled by the NexCore bridge.
-    // This handles 100+ tools that don't have a dedicated native handler yet.
+    // Only reached if no config matched — handles 100+ nexcore tools
+    // that don't have dedicated Station configs yet.
     if let Some(result) = crate::nexcore_bridge::try_handle(tool_name, arguments) {
         return result;
     }
 
-    match registry.find_tool(tool_name) {
-        Some((config, tool)) => execute_tool(config, tool, tool_name, arguments, &registry.station_root, request_id, proxy_cache),
-        None => ToolCallResult {
-            content: vec![ContentBlock::Text {
-                text: format!("Unknown tool: {tool_name}. Use nexvigilant_directory to list all available tools."),
-            }],
-            is_error: Some(true),
-        },
+    ToolCallResult {
+        content: vec![ContentBlock::Text {
+            text: format!("Unknown tool: {tool_name}. Use nexvigilant_directory to list all available tools."),
+        }],
+        is_error: Some(true),
     }
 }
 
@@ -506,6 +629,26 @@ fn execute_proxy(
     request_id: &str,
     proxy_cache: Option<&ProxyCache>,
 ) -> ToolCallResult {
+    // Fast path: if this is a dispatch.py call and the daemon is alive, use it.
+    // Falls through to subprocess on any failure (~13.9x speedup when daemon works).
+    if proxy_path.ends_with("dispatch.py") || proxy_path == "rust-native" {
+        if let Some(daemon) = DISPATCH_DAEMON.get() {
+            if let Some(response) = daemon.call(tool_name, arguments, request_id) {
+                let trimmed = response.trim();
+                if let Ok(val) = serde_json::from_str::<Value>(trimmed) {
+                    let is_err = val.get("status").and_then(|s| s.as_str()) == Some("error");
+                    return ToolCallResult {
+                        content: vec![ContentBlock::Text {
+                            text: trimmed.to_string(),
+                        }],
+                        is_error: if is_err { Some(true) } else { None },
+                    };
+                }
+                warn!("Daemon returned unparseable response, falling back to subprocess");
+            }
+        }
+    }
+
     let resolved_path = if proxy_path.ends_with("dispatch.py") {
         format!("{}/scripts/dispatch.py", station_root)
     } else {

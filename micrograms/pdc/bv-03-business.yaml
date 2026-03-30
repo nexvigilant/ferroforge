@@ -1,0 +1,44 @@
+name: bv-03-business
+description: 'Business Value metric BV-03 metric CQ-01'
+version: 0.1.0
+interface:
+  inputs:
+    rate_pct: {type: int, required: false}
+  outputs:
+    compliance: {type: string}
+    action: {type: string}
+tree:
+  start: check_compliant
+  nodes:
+    check_compliant:
+      type: condition
+      variable: rate_pct
+      operator: gte
+      value: 95
+      true_next: compliant
+      false_next: check_partial
+    check_partial:
+      type: condition
+      variable: rate_pct
+      operator: gte
+      value: 80
+      true_next: partial
+      false_next: non_compliant
+    compliant:
+      type: return
+      value: {compliance: COMPLIANT, action: maintain}
+    partial:
+      type: return
+      value: {compliance: PARTIAL, action: remediate}
+    non_compliant:
+      type: return
+      value: {compliance: NON_COMPLIANT, action: escalate}
+tests:
+- input: {rate_pct: 98}
+  expect: {compliance: COMPLIANT, action: maintain}
+- input: {rate_pct: 87}
+  expect: {compliance: PARTIAL, action: remediate}
+- input: {rate_pct: 50}
+  expect: {compliance: NON_COMPLIANT, action: escalate}
+- input: {rate_pct: 0}
+  expect: {compliance: NON_COMPLIANT, action: escalate}

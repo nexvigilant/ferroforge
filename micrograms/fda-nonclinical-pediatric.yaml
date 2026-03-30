@@ -1,0 +1,200 @@
+name: fda-nonclinical-pediatric
+description: "ICH S11 nonclinical pediatric safety testing requirements: routes by age group and clinical need per ICH S11 (2021) and FDA implementation"
+version: 0.1.0
+interface:
+  inputs:
+    target_age_group:
+      type: string
+      required: true
+      description: "Target pediatric age group: neonate, infant, child, adolescent"
+    drug_class_novelty:
+      type: string
+      required: true
+      description: "Drug class novelty: first_in_class, established_class, well_characterized"
+    developmental_concern:
+      type: bool
+      required: false
+      description: "Whether there are specific developmental toxicity concerns (CNS, bone, reproductive)"
+    adult_data_available:
+      type: bool
+      required: false
+      description: "Whether adequate adult nonclinical and clinical safety data exists"
+  outputs:
+    juvenile_study_required:
+      type: bool
+    study_type:
+      type: string
+    species_recommendation:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_age_group
+  nodes:
+    check_age_group:
+      type: condition
+      variable: target_age_group
+      operator: eq
+      value: "neonate"
+      true_next: neonate_path
+      false_next: check_infant
+
+    check_infant:
+      type: condition
+      variable: target_age_group
+      operator: eq
+      value: "infant"
+      true_next: infant_path
+      false_next: check_child
+
+    check_child:
+      type: condition
+      variable: target_age_group
+      operator: eq
+      value: "child"
+      true_next: child_novelty_check
+      false_next: adolescent_path
+
+    # NEONATE — always requires juvenile study
+    neonate_path:
+      type: return
+      value:
+        juvenile_study_required: true
+        study_type: "COMPREHENSIVE_JUVENILE_STUDY"
+        species_recommendation: "Neonatal rat (PND 1-21) or neonatal dog depending on pharmacology. Include CNS, skeletal, and organ maturation endpoints."
+        regulatory_reference: "ICH S11 (2021), Section 3.1 — Neonatal Populations; FDA Implementation"
+
+    # INFANT — requires juvenile study unless well-characterized
+    infant_path:
+      type: condition
+      variable: drug_class_novelty
+      operator: eq
+      value: "well_characterized"
+      true_next: infant_characterized
+      false_next: infant_study_needed
+
+    infant_characterized:
+      type: condition
+      variable: developmental_concern
+      operator: eq
+      value: true
+      true_next: infant_study_needed
+      false_next: infant_waiver_possible
+
+    infant_study_needed:
+      type: return
+      value:
+        juvenile_study_required: true
+        study_type: "STANDARD_JUVENILE_STUDY"
+        species_recommendation: "Juvenile rat (PND 7+) covering organ maturation period. Add endpoints for known class-specific concerns."
+        regulatory_reference: "ICH S11 (2021), Section 3.2 — Infant/Toddler Populations"
+
+    infant_waiver_possible:
+      type: return
+      value:
+        juvenile_study_required: false
+        study_type: "WAIVER_POSSIBLE"
+        species_recommendation: "Well-characterized class without developmental concerns — juvenile study waiver may be justified with adequate adult data"
+        regulatory_reference: "ICH S11 (2021), Section 4 — Weight of Evidence Approach"
+
+    # CHILD — depends on novelty
+    child_novelty_check:
+      type: condition
+      variable: drug_class_novelty
+      operator: eq
+      value: "first_in_class"
+      true_next: child_first_in_class
+      false_next: child_established_check
+
+    child_established_check:
+      type: condition
+      variable: developmental_concern
+      operator: eq
+      value: true
+      true_next: child_targeted_study
+      false_next: child_adult_data_check
+
+    child_adult_data_check:
+      type: condition
+      variable: adult_data_available
+      operator: eq
+      value: true
+      true_next: child_waiver
+      false_next: child_targeted_study
+
+    child_first_in_class:
+      type: return
+      value:
+        juvenile_study_required: true
+        study_type: "STANDARD_JUVENILE_STUDY"
+        species_recommendation: "Juvenile rat or dog. Include growth, CNS, skeletal, and reproductive maturation endpoints."
+        regulatory_reference: "ICH S11 (2021), Section 3.3 — First-in-Class Considerations"
+
+    child_targeted_study:
+      type: return
+      value:
+        juvenile_study_required: true
+        study_type: "TARGETED_JUVENILE_STUDY"
+        species_recommendation: "Targeted study focusing on specific developmental concern (CNS, bone, or reproductive). Species selected for relevant organ maturation timing."
+        regulatory_reference: "ICH S11 (2021), Section 3.3 — Targeted Studies"
+
+    child_waiver:
+      type: return
+      value:
+        juvenile_study_required: false
+        study_type: "WAIVER_JUSTIFIED"
+        species_recommendation: "Established class with adequate adult data and no developmental concerns — juvenile study waiver justified"
+        regulatory_reference: "ICH S11 (2021), Section 4 — Weight of Evidence; Pediatric Study Plan"
+
+    # ADOLESCENT — generally covered by adult data
+    adolescent_path:
+      type: condition
+      variable: developmental_concern
+      operator: eq
+      value: true
+      true_next: adolescent_targeted
+      false_next: adolescent_waiver
+
+    adolescent_targeted:
+      type: return
+      value:
+        juvenile_study_required: true
+        study_type: "TARGETED_JUVENILE_STUDY"
+        species_recommendation: "Peripubertal animal model. Focus on reproductive maturation, bone growth plates, CNS myelination."
+        regulatory_reference: "ICH S11 (2021), Section 3.4 — Adolescent Populations"
+
+    adolescent_waiver:
+      type: return
+      value:
+        juvenile_study_required: false
+        study_type: "WAIVER_JUSTIFIED"
+        species_recommendation: "Adolescent physiology largely mirrors adult — standard adult nonclinical package typically sufficient"
+        regulatory_reference: "ICH S11 (2021), Section 3.4; ICH M3(R2)"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(∂, κ) — nonclinical study routing by age group boundary and drug class classification'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['target_age_group', 'drug_class_novelty', 'developmental_concern']
+
+tests:
+- input: { target_age_group: "neonate", drug_class_novelty: "first_in_class" }
+  expect: { juvenile_study_required: true, study_type: "COMPREHENSIVE_JUVENILE_STUDY" }
+- input: { target_age_group: "infant", drug_class_novelty: "first_in_class" }
+  expect: { juvenile_study_required: true, study_type: "STANDARD_JUVENILE_STUDY" }
+- input: { target_age_group: "infant", drug_class_novelty: "well_characterized", developmental_concern: false }
+  expect: { juvenile_study_required: false, study_type: "WAIVER_POSSIBLE" }
+- input: { target_age_group: "infant", drug_class_novelty: "well_characterized", developmental_concern: true }
+  expect: { juvenile_study_required: true, study_type: "STANDARD_JUVENILE_STUDY" }
+- input: { target_age_group: "child", drug_class_novelty: "first_in_class" }
+  expect: { juvenile_study_required: true, study_type: "STANDARD_JUVENILE_STUDY" }
+- input: { target_age_group: "child", drug_class_novelty: "established_class", developmental_concern: true }
+  expect: { juvenile_study_required: true, study_type: "TARGETED_JUVENILE_STUDY" }
+- input: { target_age_group: "child", drug_class_novelty: "established_class", developmental_concern: false, adult_data_available: true }
+  expect: { juvenile_study_required: false, study_type: "WAIVER_JUSTIFIED" }
+- input: { target_age_group: "adolescent", developmental_concern: true }
+  expect: { juvenile_study_required: true, study_type: "TARGETED_JUVENILE_STUDY" }
+- input: { target_age_group: "adolescent", developmental_concern: false }
+  expect: { juvenile_study_required: false, study_type: "WAIVER_JUSTIFIED" }
+- input: {}
+  expect: { juvenile_study_required: false, study_type: "WAIVER_JUSTIFIED" }

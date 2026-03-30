@@ -1,0 +1,47 @@
+name: pharma-competitive-analysis
+description: >
+  Head-to-head pharma competitive analysis chain. First classifies each company's
+  signal tier via pharma-safety-signal (using company A's metrics), then runs the
+  head-to-head comparison to determine which company has the stronger safety profile.
+  Accumulates all outputs for a complete competitive picture.
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - pharma-safety-signal
+  - pharma-head-to-head
+
+tests:
+  - name: high-volume companies head-to-head
+    input:
+      total_faers_reports: 2365741
+      top_reaction_count: 150000
+      company_a_reports: 2365741
+      company_b_reports: 3488768
+      company_a_deaths: 79684
+      company_b_deaths: 100067
+      company_a_signals: 0
+      company_b_signals: 0
+    expect:
+      signal_tier: high_signal_volume
+      monitoring_frequency: continuous
+      winner: "balanced"
+      advantage: "balanced"
+      risk_delta: "high"
+
+  - name: moderate company vs low company
+    input:
+      total_faers_reports: 300000
+      top_reaction_count: 20000
+      company_a_reports: 300000
+      company_b_reports: 50000
+      company_a_deaths: 500
+      company_b_deaths: 100
+      company_a_signals: 0
+      company_b_signals: 0
+    expect:
+      signal_tier: moderate_signal_volume
+      monitoring_frequency: weekly
+      winner: "balanced"
+      advantage: "balanced"
+      risk_delta: "low"

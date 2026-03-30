@@ -1,0 +1,74 @@
+name: class-thiazolidinedione
+description: 'TZDs class safety: Heart failure monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: heart_failure_risk
+      operator: gte
+      value: 2
+      true_next: alert
+      false_next: safe
+    safe:
+      type: return
+      value:
+        concern: Heart failure
+        drug_class: TZDs
+        alert: false
+        action: continue
+    alert:
+      type: return
+      value:
+        concern: Heart failure
+        alert: true
+        action: class_effect_investigation
+        drug_class: TZDs
+tests:
+- input:
+    heart_failure_risk: 2
+  expect:
+    drug_class: TZDs
+    alert: true
+- input: {}
+  expect:
+    drug_class: TZDs
+    alert: false
+- input:
+    heart_failure_risk: 0
+  expect:
+    alert: false
+    drug_class: TZDs
+    concern: Heart failure
+    action: continue
+- input:
+    heart_failure_risk: -1
+  expect:
+    drug_class: TZDs
+    alert: false
+    concern: Heart failure
+    action: continue
+- input:
+    heart_failure_risk: 1
+  expect:
+    concern: Heart failure
+    alert: false
+    drug_class: TZDs
+    action: continue
+- input:
+    heart_failure_risk: 3
+  expect:
+    action: class_effect_investigation
+    drug_class: TZDs
+    concern: Heart failure
+    alert: true
+- input:
+    heart_failure_risk: 200
+  expect:
+    alert: true
+    concern: Heart failure
+    action: class_effect_investigation
+    drug_class: TZDs
+interface: null
+primitive_signature: null

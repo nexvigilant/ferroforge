@@ -1,0 +1,120 @@
+name: ich-e2b-completeness
+description: "ICH E2B(R2): Validate case report completeness against minimum data elements"
+version: 0.1.0
+tree:
+  start: validate_reporter
+  nodes:
+    validate_reporter:
+      type: condition
+      variable: reporter_name
+      operator: is_not_null
+      value: null
+      true_next: validate_patient_age
+      false_next: incomplete_reporter
+    validate_patient_age:
+      type: condition
+      variable: patient_age
+      operator: is_not_null
+      value: null
+      true_next: validate_adverse_event
+      false_next: incomplete_patient
+    validate_adverse_event:
+      type: condition
+      variable: adverse_event_term
+      operator: is_not_null
+      value: null
+      true_next: validate_suspect_drug
+      false_next: incomplete_event
+    validate_suspect_drug:
+      type: condition
+      variable: suspect_drug_name
+      operator: is_not_null
+      value: null
+      true_next: validate_date_received
+      false_next: incomplete_drug
+    validate_date_received:
+      type: condition
+      variable: date_received
+      operator: is_not_null
+      value: null
+      true_next: complete
+      false_next: incomplete_date
+    complete:
+      type: return
+      value:
+        completeness_status: complete
+        data_completeness_level: 100
+        ich_e2b_compliant: true
+        action_required: false
+    incomplete_reporter:
+      type: return
+      value:
+        completeness_status: incomplete
+        missing_element: "reporter_name"
+        data_completeness_level: 20
+        ich_e2b_compliant: false
+        action_required: true
+    incomplete_patient:
+      type: return
+      value:
+        completeness_status: incomplete
+        missing_element: "patient_age"
+        data_completeness_level: 40
+        ich_e2b_compliant: false
+        action_required: true
+    incomplete_event:
+      type: return
+      value:
+        completeness_status: incomplete
+        missing_element: "adverse_event_term"
+        data_completeness_level: 60
+        ich_e2b_compliant: false
+        action_required: true
+    incomplete_drug:
+      type: return
+      value:
+        completeness_status: incomplete
+        missing_element: "suspect_drug_name"
+        data_completeness_level: 75
+        ich_e2b_compliant: false
+        action_required: true
+    incomplete_date:
+      type: return
+      value:
+        completeness_status: incomplete
+        missing_element: "date_received"
+        data_completeness_level: 80
+        ich_e2b_compliant: false
+        action_required: true
+tests:
+- input:
+    reporter_name: "Dr. Smith"
+    patient_age: 45
+    adverse_event_term: "myocardial infarction"
+    suspect_drug_name: "aspirin"
+    date_received: "2024-01-15"
+  expect:
+    completeness_status: "complete"
+    data_completeness_level: 100
+    ich_e2b_compliant: true
+- input:
+    reporter_name: "Dr. Smith"
+    patient_age: 45
+    adverse_event_term: "myocardial infarction"
+    suspect_drug_name: "aspirin"
+  expect:
+    completeness_status: "incomplete"
+    missing_element: "date_received"
+    action_required: true
+- input:
+    patient_age: 45
+    adverse_event_term: "myocardial infarction"
+    suspect_drug_name: "aspirin"
+    date_received: "2024-01-15"
+  expect:
+    completeness_status: "incomplete"
+    missing_element: "reporter_name"
+- input: {}
+  expect:
+    completeness_status: "incomplete"
+    ich_e2b_compliant: false

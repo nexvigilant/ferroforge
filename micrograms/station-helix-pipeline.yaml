@@ -1,0 +1,112 @@
+name: station-helix-pipeline
+description: Route helix knowledge encoding through 5-turn verification
+version: 0.1.0
+tree:
+  start: check_turns
+  nodes:
+    complete:
+      type: return
+      value:
+        route: archive
+        action: certify
+        reason: 5-turn helix complete with mutualism — knowledge encoded
+        priority: low
+    check_turns:
+      type: condition
+      variable: turns_completed
+      operator: gte
+      value: 5
+      true_next: check_mutualism
+      false_next: incomplete
+    check_mutualism:
+      type: condition
+      variable: mutualism_pass
+      operator: eq
+      value: true
+      true_next: complete
+      false_next: mutualism_fail
+    mutualism_fail:
+      type: return
+      value:
+        reason: Helix complete but mutualism test failed — knowledge serves self only
+        route: mutualism_revision
+        action: revise
+        priority: high
+    incomplete:
+      type: return
+      value:
+        route: helix_continuation
+        action: continue
+        priority: moderate
+        reason: Helix encoding incomplete — fewer than 5 turns
+tests:
+- input:
+    mutualism_pass: true
+    turns_completed: 3
+  expect:
+    route: helix_continuation
+    action: continue
+    priority: moderate
+- input:
+    turns_completed: 5
+    mutualism_pass: true
+  expect:
+    action: certify
+    priority: low
+    route: archive
+- input:
+    mutualism_pass: false
+    turns_completed: 5
+  expect:
+    route: mutualism_revision
+    action: revise
+    priority: high
+- input:
+    turns_completed: 0
+  expect:
+    action: continue
+    reason: Helix encoding incomplete — fewer than 5 turns
+    priority: moderate
+    route: helix_continuation
+- input:
+    turns_completed: -1
+  expect:
+    action: continue
+    route: helix_continuation
+    reason: Helix encoding incomplete — fewer than 5 turns
+    priority: moderate
+- input:
+    turns_completed: 4
+  expect:
+    route: helix_continuation
+    action: continue
+    priority: moderate
+    reason: Helix encoding incomplete — fewer than 5 turns
+- input:
+    turns_completed: 6
+  expect:
+    action: revise
+    reason: Helix complete but mutualism test failed — knowledge serves self only
+    priority: high
+    route: mutualism_revision
+- input:
+    turns_completed: 500
+  expect:
+    reason: Helix complete but mutualism test failed — knowledge serves self only
+    route: mutualism_revision
+    action: revise
+    priority: high
+- input: {}
+  expect:
+    route: helix_continuation
+    priority: moderate
+    reason: Helix encoding incomplete — fewer than 5 turns
+    action: continue
+- input: {}
+  expect:
+    action: continue
+    reason: Helix encoding incomplete — fewer than 5 turns
+    route: helix_continuation
+    priority: moderate
+interface: null
+primitive_signature: null

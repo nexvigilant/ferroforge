@@ -1,0 +1,133 @@
+name: station-cccp-pipeline
+description: Route competency assessment results through EPA readiness gates
+version: 0.1.0
+tree:
+  start: check_level
+  nodes:
+    check_progress:
+      type: condition
+      variable: gap_count
+      operator: gte
+      value: 5
+      true_next: major_gaps
+      false_next: on_track
+    on_track:
+      type: return
+      value:
+        action: continue
+        priority: moderate
+        reason: Progressing with minor gaps — continue current pathway
+        route: periodic_review
+    independent:
+      type: return
+      value:
+        action: certify
+        reason: Entrustment L4+ — independent practice level achieved
+        route: certification
+        priority: low
+    check_level:
+      type: condition
+      variable: entrustment_level
+      operator: gte
+      value: 4
+      true_next: independent
+      false_next: check_progress
+    major_gaps:
+      type: return
+      value:
+        reason: 5+ competency gaps — structured development plan needed
+        route: learning_plan
+        priority: high
+        action: remediate
+tests:
+- input:
+    entrustment_level: 4
+    gap_count: 0
+  expect:
+    route: certification
+    priority: low
+    action: certify
+- input:
+    entrustment_level: 2
+    gap_count: 8
+  expect:
+    priority: high
+    action: remediate
+    route: learning_plan
+- input:
+    gap_count: 2
+    entrustment_level: 3
+  expect:
+    priority: moderate
+    action: continue
+    route: periodic_review
+- input:
+    gap_count: -1
+  expect:
+    action: continue
+    priority: moderate
+    reason: Progressing with minor gaps — continue current pathway
+    route: periodic_review
+- input:
+    gap_count: 4
+  expect:
+    route: periodic_review
+    reason: Progressing with minor gaps — continue current pathway
+    action: continue
+    priority: moderate
+- input:
+    gap_count: 6
+  expect:
+    reason: 5+ competency gaps — structured development plan needed
+    route: learning_plan
+    priority: high
+    action: remediate
+- input:
+    gap_count: 500
+  expect:
+    route: learning_plan
+    action: remediate
+    reason: 5+ competency gaps — structured development plan needed
+    priority: high
+- input: {}
+  expect:
+    priority: moderate
+    route: periodic_review
+    reason: Progressing with minor gaps — continue current pathway
+    action: continue
+- input:
+    entrustment_level: 0
+  expect:
+    priority: moderate
+    route: periodic_review
+    action: continue
+    reason: Progressing with minor gaps — continue current pathway
+- input:
+    entrustment_level: -1
+  expect:
+    route: periodic_review
+    action: continue
+    reason: Progressing with minor gaps — continue current pathway
+    priority: moderate
+- input:
+    entrustment_level: 5
+  expect:
+    action: certify
+    route: certification
+    priority: low
+    reason: Entrustment L4+ — independent practice level achieved
+- input:
+    entrustment_level: 400
+  expect:
+    action: certify
+    route: certification
+    priority: low
+    reason: Entrustment L4+ — independent practice level achieved
+- input: {}
+  expect:
+    action: continue
+    priority: moderate
+    route: periodic_review
+    reason: Progressing with minor gaps — continue current pathway
+interface: null
+primitive_signature: null

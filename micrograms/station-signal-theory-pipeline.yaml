@@ -1,0 +1,98 @@
+name: station-signal-theory-pipeline
+description: Route signal theory axiom checks and detection results
+version: 0.1.0
+tree:
+  start: check_detected
+  nodes:
+    check_axiom_pass:
+      type: condition
+      variable: axioms_satisfied
+      operator: gte
+      value: 4
+      true_next: strong_theory
+      false_next: weak_theory
+    check_detected:
+      type: condition
+      variable: signal_detected
+      operator: eq
+      value: true
+      true_next: check_axiom_pass
+      false_next: no_signal
+    strong_theory:
+      type: return
+      value:
+        reason: Signal satisfies 4+ axioms — theoretically grounded, investigate
+        action: investigate
+        route: signal_investigation
+        priority: high
+    no_signal:
+      type: return
+      value:
+        action: archive
+        priority: low
+        route: archive
+        reason: No signal detected by theory axioms — noise
+    weak_theory:
+      type: return
+      value:
+        route: signal_validation
+        priority: moderate
+        reason: Signal detected but <4 axioms satisfied — needs strengthening
+        action: validate
+tests:
+- input:
+    axioms_satisfied: 0
+    signal_detected: false
+  expect:
+    route: archive
+    priority: low
+    action: archive
+- input:
+    signal_detected: true
+    axioms_satisfied: 5
+  expect:
+    action: investigate
+    priority: high
+    route: signal_investigation
+- input:
+    axioms_satisfied: 2
+    signal_detected: true
+  expect:
+    action: validate
+    route: signal_validation
+    priority: moderate
+- input:
+    axioms_satisfied: -1
+  expect:
+    route: archive
+    priority: low
+    action: archive
+    reason: No signal detected by theory axioms — noise
+- input:
+    axioms_satisfied: 3
+  expect:
+    reason: No signal detected by theory axioms — noise
+    action: archive
+    route: archive
+    priority: low
+- input:
+    axioms_satisfied: 400
+  expect:
+    reason: No signal detected by theory axioms — noise
+    action: archive
+    route: archive
+    priority: low
+- input: {}
+  expect:
+    reason: No signal detected by theory axioms — noise
+    priority: low
+    action: archive
+    route: archive
+- input: {}
+  expect:
+    priority: low
+    route: archive
+    action: archive
+    reason: No signal detected by theory axioms — noise
+interface: null
+primitive_signature: null

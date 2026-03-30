@@ -1,0 +1,77 @@
+name: station-wikipedia-pipeline
+description: Route Wikipedia article data for PV knowledge extraction
+version: 0.1.0
+tree:
+  start: check_drug
+  nodes:
+    no_safety:
+      type: return
+      value:
+        route: archive
+        action: flag
+        priority: low
+        reason: Drug article missing safety section — gap in public knowledge
+    check_safety_section:
+      type: condition
+      variable: has_safety_section
+      operator: eq
+      value: true
+      true_next: extract_safety
+      false_next: no_safety
+    check_drug:
+      type: condition
+      variable: is_drug_article
+      operator: eq
+      value: true
+      true_next: check_safety_section
+      false_next: non_drug
+    extract_safety:
+      type: return
+      value:
+        action: extract
+        reason: Drug article with safety section — extract ADRs for cross-reference
+        priority: moderate
+        route: knowledge_extraction
+    non_drug:
+      type: return
+      value:
+        priority: low
+        reason: Non-drug Wikipedia article — reference only
+        action: archive
+        route: archive
+tests:
+- input:
+    has_safety_section: false
+    is_drug_article: false
+  expect:
+    route: archive
+    action: archive
+    priority: low
+- input:
+    is_drug_article: true
+    has_safety_section: true
+  expect:
+    route: knowledge_extraction
+    priority: moderate
+    action: extract
+- input:
+    is_drug_article: true
+    has_safety_section: false
+  expect:
+    route: archive
+    priority: low
+    action: flag
+- input: {}
+  expect:
+    route: archive
+    reason: Non-drug Wikipedia article — reference only
+    action: archive
+    priority: low
+- input: {}
+  expect:
+    reason: Non-drug Wikipedia article — reference only
+    action: archive
+    route: archive
+    priority: low
+interface: null
+primitive_signature: null

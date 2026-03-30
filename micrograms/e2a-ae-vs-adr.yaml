@@ -1,0 +1,160 @@
+name: e2a-ae-vs-adr
+description: 'ICH E2A Section 2: Classify whether an event is an Adverse Event (AE) or Adverse Drug Reaction (ADR) based on causal relationship and temporal association'
+version: 0.1.0
+interface:
+  inputs:
+    reasonable_causal_relationship:
+      type: string
+      required: false
+    occurred_during_study:
+      type: bool
+      required: false
+    temporal_association:
+      type: bool
+      required: false
+  outputs:
+    classification:
+      type: string
+    definition:
+      type: string
+    reportable:
+      type: bool
+    regulatory_reference:
+      type: string
+tree:
+  start: causal_check
+  nodes:
+    causal_check:
+      type: condition
+      variable: reasonable_causal_relationship
+      operator: eq
+      value: "true"
+      true_next: classify_adr
+      false_next: causal_false_check
+    causal_false_check:
+      type: condition
+      variable: reasonable_causal_relationship
+      operator: eq
+      value: "false"
+      true_next: study_check
+      false_next: causal_unknown_check
+    causal_unknown_check:
+      type: condition
+      variable: reasonable_causal_relationship
+      operator: eq
+      value: "unknown"
+      true_next: temporal_check
+      false_next: default_ae
+    study_check:
+      type: condition
+      variable: occurred_during_study
+      operator: eq
+      value: true
+      true_next: classify_ae
+      false_next: classify_not_related
+    temporal_check:
+      type: condition
+      variable: temporal_association
+      operator: eq
+      value: true
+      true_next: classify_ae_suspect
+      false_next: classify_ae_unlikely
+    classify_adr:
+      type: return
+      value:
+        classification: ADR
+        definition: Adverse Drug Reaction - noxious and unintended response at doses normally used
+        reportable: true
+        regulatory_reference: ICH E2A Section 2 - Definitions
+    classify_ae:
+      type: return
+      value:
+        classification: AE
+        definition: Adverse Event - untoward medical occurrence during study without causal relationship
+        reportable: true
+        regulatory_reference: ICH E2A Section 2 - Definitions
+    classify_ae_suspect:
+      type: return
+      value:
+        classification: AE_SUSPECT
+        definition: Adverse Event with unknown causality but temporal association present
+        reportable: true
+        regulatory_reference: ICH E2A Section 2 - Definitions
+    classify_ae_unlikely:
+      type: return
+      value:
+        classification: AE_UNLIKELY
+        definition: Adverse Event with unknown causality and no temporal association
+        reportable: false
+        regulatory_reference: ICH E2A Section 2 - Definitions
+    classify_not_related:
+      type: return
+      value:
+        classification: NOT_RELATED
+        definition: Event occurred outside study context with no causal relationship
+        reportable: false
+        regulatory_reference: ICH E2A Section 2 - Definitions
+    default_ae:
+      type: return
+      value:
+        classification: AE
+        definition: Adverse Event - default classification when causality not assessed
+        reportable: true
+        regulatory_reference: ICH E2A Section 2 - Definitions
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — measurement, comparison, or classification'
+  primes: ['κ']
+  arguments: []
+tests:
+# Reasonable causal relationship = true -> ADR
+- input:
+    reasonable_causal_relationship: "true"
+    occurred_during_study: true
+    temporal_association: true
+  expect:
+    classification: ADR
+    reportable: true
+    regulatory_reference: ICH E2A Section 2 - Definitions
+# Causal = false, occurred during study -> AE
+- input:
+    reasonable_causal_relationship: "false"
+    occurred_during_study: true
+    temporal_association: false
+  expect:
+    classification: AE
+    reportable: true
+    regulatory_reference: ICH E2A Section 2 - Definitions
+# Causal = false, not during study -> NOT_RELATED
+- input:
+    reasonable_causal_relationship: "false"
+    occurred_during_study: false
+    temporal_association: false
+  expect:
+    classification: NOT_RELATED
+    reportable: false
+    regulatory_reference: ICH E2A Section 2 - Definitions
+# Causal = unknown, temporal association present -> AE_SUSPECT
+- input:
+    reasonable_causal_relationship: "unknown"
+    occurred_during_study: true
+    temporal_association: true
+  expect:
+    classification: AE_SUSPECT
+    reportable: true
+    regulatory_reference: ICH E2A Section 2 - Definitions
+# Causal = unknown, no temporal association -> AE_UNLIKELY
+- input:
+    reasonable_causal_relationship: "unknown"
+    occurred_during_study: false
+    temporal_association: false
+  expect:
+    classification: AE_UNLIKELY
+    reportable: false
+    regulatory_reference: ICH E2A Section 2 - Definitions
+# Empty input - defaults to AE
+- input: {}
+  expect:
+    classification: AE
+    reportable: true
+    regulatory_reference: ICH E2A Section 2 - Definitions

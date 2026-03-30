@@ -1,0 +1,62 @@
+name: drug-profile-tramadol
+description: 'Safety triage for tramadol: PRR-based signal routing (Type A)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    signal:
+      type: return
+      value:
+        signal: true
+        drug: tramadol
+        harm_type: A
+        expected_prr: 3.8
+        action: investigate
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: signal
+      false_next: no_signal
+    no_signal:
+      type: return
+      value:
+        signal: false
+        expected_prr: 3.8
+        drug: tramadol
+        action: monitor
+        harm_type: A
+tests:
+- input:
+    prr: 3.8
+  expect:
+    drug: tramadol
+    signal: true
+- input:
+    prr: 0.5
+  expect:
+    signal: false
+    drug: tramadol
+- input: {}
+  expect:
+    signal: false
+    drug: tramadol
+- input:
+    prr: 1.999
+  expect:
+    expected_prr: 3.8
+    drug: tramadol
+    harm_type: A
+    action: monitor
+    signal: false
+- input:
+    prr: 2.001
+  expect:
+    harm_type: A
+    expected_prr: 3.8
+    signal: true
+    drug: tramadol
+    action: investigate
+interface: null
+primitive_signature: null

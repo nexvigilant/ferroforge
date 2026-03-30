@@ -1,0 +1,66 @@
+name: organ-ophthalmological-safety
+description: "Ophthalmological safety assessment. Evaluates retinopathy, cataracts, and vision-threatening adverse events."
+version: 0.1.0
+tree:
+  start: check_baseline_retinopathy
+  nodes:
+    check_baseline_retinopathy:
+      type: condition
+      variable: has_diabetic_retinopathy
+      operator: eq
+      value: true
+      true_next: retinopathy_alert
+      false_next: check_macular_disease
+    retinopathy_alert:
+      type: return
+      value:
+        organ: eye
+        risk_level: moderate
+        ophthalmology_monitoring: required
+        message: "Diabetic retinopathy present; monitor closely for worsening"
+    check_macular_disease:
+      type: condition
+      variable: has_macular_disease
+      operator: eq
+      value: true
+      true_next: macular_alert
+      false_next: check_color_vision
+    macular_alert:
+      type: return
+      value:
+        organ: eye
+        risk_level: high
+        retinal_toxicity_risk: true
+        ophthalmology_consultation: required
+        message: "Macular disease present; retinal-toxic drugs contraindicated"
+    check_color_vision:
+      type: condition
+      variable: baseline_color_vision_abnormality
+      operator: eq
+      value: true
+      true_next: color_vision_alert
+      false_next: standard_dosing
+    color_vision_alert:
+      type: return
+      value:
+        organ: eye
+        risk_level: moderate
+        ophthalmology_monitoring: required
+        message: "Baseline color vision abnormality; monitor for further deterioration"
+    standard_dosing:
+      type: return
+      value:
+        organ: eye
+        risk_level: low
+        baseline_eye_exam: recommended
+tests:
+  - input: { has_diabetic_retinopathy: true, has_macular_disease: false, baseline_color_vision_abnormality: false }
+    expect: { organ: eye, risk_level: moderate, ophthalmology_monitoring: required }
+  - input: { has_diabetic_retinopathy: false, has_macular_disease: true, baseline_color_vision_abnormality: false }
+    expect: { organ: eye, risk_level: high, retinal_toxicity_risk: true }
+  - input: { has_diabetic_retinopathy: false, has_macular_disease: false, baseline_color_vision_abnormality: true }
+    expect: { organ: eye, risk_level: moderate }
+  - input: { has_diabetic_retinopathy: false, has_macular_disease: false, baseline_color_vision_abnormality: false }
+    expect: { organ: eye, risk_level: low }
+  - input: {}
+    expect: {}

@@ -1,0 +1,70 @@
+name: pop-geriatric-80
+description: Very elderly — frailty and fall risk
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    standard:
+      type: return
+      value:
+        at_risk: false
+        action: standard_care
+        population: geriatric-80
+    check:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 80
+      true_next: at_risk
+      false_next: standard
+    at_risk:
+      type: return
+      value:
+        population: geriatric-80
+        at_risk: true
+        action: special_monitoring
+        reason: Very elderly — frailty and fall risk
+tests:
+- input:
+    age_years: 80
+  expect:
+    at_risk: true
+    population: geriatric-80
+- input: {}
+  expect:
+    population: geriatric-80
+    at_risk: false
+- input:
+    age_years: 0
+  expect:
+    at_risk: false
+    action: standard_care
+    population: geriatric-80
+- input:
+    age_years: -1
+  expect:
+    population: geriatric-80
+    at_risk: false
+    action: standard_care
+- input:
+    age_years: 79
+  expect:
+    population: geriatric-80
+    at_risk: false
+    action: standard_care
+- input:
+    age_years: 81
+  expect:
+    population: geriatric-80
+    action: special_monitoring
+    at_risk: true
+    reason: Very elderly — frailty and fall risk
+- input:
+    age_years: 8000
+  expect:
+    at_risk: true
+    reason: Very elderly — frailty and fall risk
+    action: special_monitoring
+    population: geriatric-80
+interface: null
+primitive_signature: null

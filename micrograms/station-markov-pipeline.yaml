@@ -1,0 +1,77 @@
+name: station-markov-pipeline
+description: 'Route Markov chain analysis: classify state transitions by stationarity and absorption'
+version: 0.1.0
+tree:
+  start: check_stationary
+  nodes:
+    non_stationary:
+      type: return
+      value:
+        route: drift_monitoring
+        priority: high
+        action: flag
+        reason: Non-stationary Markov chain — transition probabilities shifting over time
+    check_stationary:
+      type: condition
+      variable: is_stationary
+      operator: eq
+      value: true
+      true_next: check_absorbing
+      false_next: non_stationary
+    absorbing:
+      type: return
+      value:
+        action: analyze
+        priority: moderate
+        route: absorption_analysis
+        reason: Absorbing states present — compute absorption probabilities and expected times
+    ergodic:
+      type: return
+      value:
+        reason: Ergodic chain — compute steady-state distribution
+        action: compute
+        route: steady_state
+        priority: low
+    check_absorbing:
+      type: condition
+      variable: has_absorbing_state
+      operator: eq
+      value: true
+      true_next: absorbing
+      false_next: ergodic
+tests:
+- input:
+    has_absorbing_state: false
+    is_stationary: false
+  expect:
+    action: flag
+    priority: high
+    route: drift_monitoring
+- input:
+    is_stationary: true
+    has_absorbing_state: true
+  expect:
+    action: analyze
+    priority: moderate
+    route: absorption_analysis
+- input:
+    is_stationary: true
+    has_absorbing_state: false
+  expect:
+    route: steady_state
+    action: compute
+    priority: low
+- input: {}
+  expect:
+    priority: high
+    reason: Non-stationary Markov chain — transition probabilities shifting over time
+    action: flag
+    route: drift_monitoring
+- input: {}
+  expect:
+    action: flag
+    reason: Non-stationary Markov chain — transition probabilities shifting over time
+    priority: high
+    route: drift_monitoring
+interface: null
+primitive_signature: null

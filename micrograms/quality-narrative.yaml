@@ -1,0 +1,67 @@
+name: quality-narrative
+description: Narrative adequate
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    fail:
+      type: return
+      value:
+        check: quality-narrative
+        passed: false
+        action: flag_for_review
+    pass:
+      type: return
+      value:
+        check: quality-narrative
+        passed: true
+        action: accept
+    check:
+      type: condition
+      variable: narrative_length
+      operator: gte
+      value: 50
+      true_next: pass
+      false_next: fail
+tests:
+- input:
+    narrative_length: 50
+  expect:
+    passed: true
+    check: quality-narrative
+- input: {}
+  expect:
+    passed: false
+    check: quality-narrative
+- input:
+    narrative_length: 0
+  expect:
+    passed: false
+    action: flag_for_review
+    check: quality-narrative
+- input:
+    narrative_length: -1
+  expect:
+    passed: false
+    action: flag_for_review
+    check: quality-narrative
+- input:
+    narrative_length: 49
+  expect:
+    action: flag_for_review
+    check: quality-narrative
+    passed: false
+- input:
+    narrative_length: 51
+  expect:
+    check: quality-narrative
+    action: accept
+    passed: true
+- input:
+    narrative_length: 5000
+  expect:
+    passed: true
+    action: accept
+    check: quality-narrative
+interface: null
+primitive_signature: null

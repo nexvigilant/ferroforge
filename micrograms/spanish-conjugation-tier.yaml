@@ -1,0 +1,151 @@
+name: spanish-conjugation-tier
+description: Classifies Spanish verb conjugation difficulty into tiers based on ending, regularity, and reflexivity
+version: 0.1.0
+interface:
+  inputs:
+    verb_ending:
+      type: string
+      required: true
+    is_regular:
+      type: bool
+      required: true
+    is_reflexive:
+      type: bool
+      required: false
+  outputs:
+    tier:
+      type: int
+    practice_reps:
+      type: int
+    example_verb:
+      type: string
+tree:
+  start: check_verb_ending_present
+  nodes:
+    check_verb_ending_present:
+      type: condition
+      variable: verb_ending
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_is_regular_present
+    check_is_regular_present:
+      type: condition
+      variable: is_regular
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_regular
+    reject_missing:
+      type: return
+      value:
+        tier: 0
+        practice_reps: 0
+        example_verb: "REJECTED: verb_ending and is_regular are required"
+    check_regular:
+      type: condition
+      variable: is_regular
+      operator: eq
+      value: true
+      true_next: check_ar_regular
+      false_next: check_reflexive_irregular
+    check_ar_regular:
+      type: condition
+      variable: verb_ending
+      operator: eq
+      value: ar
+      true_next: tier1
+      false_next: tier2
+    check_reflexive_irregular:
+      type: condition
+      variable: is_reflexive
+      operator: eq
+      value: true
+      true_next: tier4
+      false_next: tier3
+    tier1:
+      type: return
+      value:
+        tier: 1
+        practice_reps: 10
+        example_verb: hablar
+    tier2:
+      type: return
+      value:
+        tier: 2
+        practice_reps: 20
+        example_verb: comer
+    tier3:
+      type: return
+      value:
+        tier: 3
+        practice_reps: 40
+        example_verb: tener
+    tier4:
+      type: return
+      value:
+        tier: 4
+        practice_reps: 60
+        example_verb: irse
+tests:
+- input:
+    verb_ending: ar
+    is_regular: true
+    is_reflexive: false
+  expect:
+    tier: 1
+    practice_reps: 10
+    example_verb: hablar
+- input:
+    verb_ending: er
+    is_regular: true
+    is_reflexive: false
+  expect:
+    tier: 2
+    practice_reps: 20
+    example_verb: comer
+- input:
+    verb_ending: ir
+    is_regular: true
+    is_reflexive: false
+  expect:
+    tier: 2
+    practice_reps: 20
+    example_verb: comer
+- input:
+    verb_ending: er
+    is_regular: false
+    is_reflexive: false
+  expect:
+    tier: 3
+    practice_reps: 40
+    example_verb: tener
+- input:
+    verb_ending: ir
+    is_regular: false
+    is_reflexive: true
+  expect:
+    tier: 4
+    practice_reps: 60
+    example_verb: irse
+- input: {}
+  expect:
+    tier: 0
+    practice_reps: 0
+    example_verb: "REJECTED: verb_ending and is_regular are required"
+- input:
+    verb_ending: ar
+    is_regular: false
+    is_reflexive: true
+  expect:
+    tier: 4
+    practice_reps: 60
+    example_verb: irse
+- input:
+    verb_ending: ar
+    is_regular: false
+    is_reflexive: false
+  expect:
+    tier: 3
+    practice_reps: 40
+    example_verb: tener

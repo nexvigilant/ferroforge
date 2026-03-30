@@ -1,0 +1,146 @@
+name: fda-companion-dx-pathway
+description: "FDA companion diagnostic codevelopment pathway: routes by therapeutic context and diagnostic status per FDA Guidance 'Developing and Labeling In Vitro Companion Diagnostic Devices' (2020)"
+version: 0.1.0
+interface:
+  inputs:
+    therapeutic_area:
+      type: string
+      required: true
+      description: "Therapeutic area: oncology, rare_disease, other"
+    biomarker_validated:
+      type: bool
+      required: true
+      description: "Whether the biomarker is analytically and clinically validated"
+    dx_approval_status:
+      type: string
+      required: false
+      description: "Companion diagnostic approval status: approved, under_review, not_submitted, class_specific"
+    drug_approval_pathway:
+      type: string
+      required: false
+      description: "Drug approval pathway: standard, accelerated, breakthrough"
+  outputs:
+    codevelopment_pathway:
+      type: string
+    dx_requirement:
+      type: string
+    labeling_action:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_biomarker
+  nodes:
+    check_biomarker:
+      type: condition
+      variable: biomarker_validated
+      operator: eq
+      value: true
+      true_next: check_dx_status
+      false_next: biomarker_not_validated
+
+    biomarker_not_validated:
+      type: return
+      value:
+        codevelopment_pathway: "BIOMARKER_DEVELOPMENT"
+        dx_requirement: "Analytical and clinical validation required before companion diagnostic submission"
+        labeling_action: "Drug labeling cannot reference companion diagnostic until biomarker validated"
+        regulatory_reference: "FDA Guidance: Companion Diagnostics (2020), Section IV.A"
+
+    check_dx_status:
+      type: condition
+      variable: dx_approval_status
+      operator: eq
+      value: "approved"
+      true_next: dx_approved
+      false_next: check_class_specific
+
+    check_class_specific:
+      type: condition
+      variable: dx_approval_status
+      operator: eq
+      value: "class_specific"
+      true_next: check_oncology_class
+      false_next: check_under_review
+
+    check_under_review:
+      type: condition
+      variable: dx_approval_status
+      operator: eq
+      value: "under_review"
+      true_next: concurrent_review
+      false_next: dx_not_submitted
+
+    # DX APPROVED
+    dx_approved:
+      type: return
+      value:
+        codevelopment_pathway: "STANDARD_CODEVELOPMENT"
+        dx_requirement: "Companion diagnostic approved — cross-reference in drug labeling"
+        labeling_action: "Drug Indications: specify approved companion diagnostic by name. Include in Dosage and Clinical Studies sections."
+        regulatory_reference: "FDA Guidance: Companion Diagnostics (2020), Section V; 21 CFR 809.10"
+
+    # CLASS-SPECIFIC (oncology pilot)
+    check_oncology_class:
+      type: condition
+      variable: therapeutic_area
+      operator: eq
+      value: "oncology"
+      true_next: oncology_pilot
+      false_next: standard_codevelopment_needed
+
+    oncology_pilot:
+      type: return
+      value:
+        codevelopment_pathway: "ONCOLOGY_PILOT_PROGRAM"
+        dx_requirement: "Under oncology pilot, FDA may accept class-level IVD rather than drug-specific companion diagnostic"
+        labeling_action: "Drug labeling references biomarker class (e.g., 'tumor mutational burden') rather than specific IVD device"
+        regulatory_reference: "FDA Guidance: Oncology Drug Products Used with Certain IVDs Pilot Program (2023)"
+
+    standard_codevelopment_needed:
+      type: return
+      value:
+        codevelopment_pathway: "STANDARD_CODEVELOPMENT"
+        dx_requirement: "Drug-specific companion diagnostic PMA or 510(k) required for non-oncology class-specific claims"
+        labeling_action: "Drug labeling must reference specific approved companion diagnostic"
+        regulatory_reference: "FDA Guidance: Companion Diagnostics (2020), Section III"
+
+    # CONCURRENT REVIEW
+    concurrent_review:
+      type: return
+      value:
+        codevelopment_pathway: "CONCURRENT_REVIEW"
+        dx_requirement: "Drug and diagnostic under simultaneous FDA review — coordinated review process"
+        labeling_action: "Drug approval may be contingent on diagnostic approval. Conditional cross-labeling."
+        regulatory_reference: "FDA Guidance: Companion Diagnostics (2020), Section V.B"
+
+    # DX NOT SUBMITTED
+    dx_not_submitted:
+      type: return
+      value:
+        codevelopment_pathway: "DX_SUBMISSION_REQUIRED"
+        dx_requirement: "Companion diagnostic must be submitted before or concurrent with drug NDA/BLA"
+        labeling_action: "Drug cannot be approved with biomarker-dependent indication without companion diagnostic pathway"
+        regulatory_reference: "FDA Guidance: Companion Diagnostics (2020), Section III.B"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(∃, ∂) — codevelopment pathway routing by diagnostic existence and regulatory boundary'
+  primes: ['σ', '∃', '∂']
+  arguments: ['biomarker_validated', 'dx_approval_status', 'therapeutic_area']
+
+tests:
+- input: { biomarker_validated: true, dx_approval_status: "approved", therapeutic_area: "oncology" }
+  expect: { codevelopment_pathway: "STANDARD_CODEVELOPMENT" }
+- input: { biomarker_validated: true, dx_approval_status: "class_specific", therapeutic_area: "oncology" }
+  expect: { codevelopment_pathway: "ONCOLOGY_PILOT_PROGRAM" }
+- input: { biomarker_validated: true, dx_approval_status: "class_specific", therapeutic_area: "rare_disease" }
+  expect: { codevelopment_pathway: "STANDARD_CODEVELOPMENT" }
+- input: { biomarker_validated: true, dx_approval_status: "under_review" }
+  expect: { codevelopment_pathway: "CONCURRENT_REVIEW" }
+- input: { biomarker_validated: true, dx_approval_status: "not_submitted" }
+  expect: { codevelopment_pathway: "DX_SUBMISSION_REQUIRED" }
+- input: { biomarker_validated: false, therapeutic_area: "oncology" }
+  expect: { codevelopment_pathway: "BIOMARKER_DEVELOPMENT" }
+- input: {}
+  expect: { codevelopment_pathway: "BIOMARKER_DEVELOPMENT" }

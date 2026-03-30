@@ -1,0 +1,112 @@
+name: station-compliance-pipeline
+description: 'Triage regulatory compliance assessments: classify by framework, gap severity, and remediation urgency'
+version: 0.1.0
+tree:
+  start: check_score
+  nodes:
+    check_critical:
+      type: condition
+      variable: has_critical_gap
+      operator: eq
+      value: true
+      true_next: critical_gap
+      false_next: moderate_gap
+    check_score:
+      type: condition
+      variable: compliance_score
+      operator: gte
+      value: 80
+      true_next: compliant
+      false_next: check_critical
+    moderate_gap:
+      type: return
+      value:
+        priority: moderate
+        route: capa_planned
+        reason: Compliance below 80% without critical gaps — schedule remediation
+        action: plan
+    compliant:
+      type: return
+      value:
+        priority: low
+        route: archive
+        reason: Compliance score ≥80% — within acceptable range
+        action: certify
+    critical_gap:
+      type: return
+      value:
+        reason: Critical compliance gap detected — regulatory risk exposure
+        route: capa_immediate
+        action: remediate
+        priority: critical
+tests:
+- input:
+    compliance_score: 92
+    has_critical_gap: false
+  expect:
+    action: certify
+    priority: low
+    route: archive
+- input:
+    compliance_score: 45
+    has_critical_gap: true
+  expect:
+    route: capa_immediate
+    priority: critical
+    action: remediate
+- input:
+    compliance_score: 65
+    has_critical_gap: false
+  expect:
+    route: capa_planned
+    action: plan
+    priority: moderate
+- input: {}
+  expect:
+    priority: moderate
+    route: capa_planned
+    reason: Compliance below 80% without critical gaps — schedule remediation
+    action: plan
+- input:
+    compliance_score: 0
+  expect:
+    priority: moderate
+    route: capa_planned
+    action: plan
+    reason: Compliance below 80% without critical gaps — schedule remediation
+- input:
+    compliance_score: -1
+  expect:
+    route: capa_planned
+    priority: moderate
+    action: plan
+    reason: Compliance below 80% without critical gaps — schedule remediation
+- input:
+    compliance_score: 79
+  expect:
+    priority: moderate
+    action: plan
+    reason: Compliance below 80% without critical gaps — schedule remediation
+    route: capa_planned
+- input:
+    compliance_score: 81
+  expect:
+    action: certify
+    priority: low
+    route: archive
+    reason: Compliance score ≥80% — within acceptable range
+- input:
+    compliance_score: 8000
+  expect:
+    route: archive
+    action: certify
+    reason: Compliance score ≥80% — within acceptable range
+    priority: low
+- input: {}
+  expect:
+    priority: moderate
+    reason: Compliance below 80% without critical gaps — schedule remediation
+    route: capa_planned
+    action: plan
+interface: null
+primitive_signature: null

@@ -1,0 +1,62 @@
+name: drug-profile-atorvastatin
+description: 'Safety triage for atorvastatin: PRR-based signal routing (Type B)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    signal:
+      type: return
+      value:
+        drug: atorvastatin
+        signal: true
+        expected_prr: 3.2
+        harm_type: B
+        action: investigate
+    no_signal:
+      type: return
+      value:
+        expected_prr: 3.2
+        signal: false
+        action: monitor
+        drug: atorvastatin
+        harm_type: B
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5.0
+      true_next: signal
+      false_next: no_signal
+tests:
+- input:
+    prr: 3.2
+  expect:
+    drug: atorvastatin
+    signal: false
+- input:
+    prr: 0.5
+  expect:
+    signal: false
+    drug: atorvastatin
+- input: {}
+  expect:
+    signal: false
+    drug: atorvastatin
+- input:
+    prr: 4.999
+  expect:
+    expected_prr: 3.2
+    signal: false
+    drug: atorvastatin
+    harm_type: B
+    action: monitor
+- input:
+    prr: 5.001
+  expect:
+    drug: atorvastatin
+    signal: true
+    expected_prr: 3.2
+    harm_type: B
+    action: investigate
+interface: null
+primitive_signature: null

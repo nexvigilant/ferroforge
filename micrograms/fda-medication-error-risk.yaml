@@ -1,0 +1,177 @@
+name: fda-medication-error-risk
+description: "FDA medication error risk assessment: routes by error type and severity to risk mitigation per FDA Guidance 'Safety Considerations for Product Design to Minimize Medication Errors' (2016)"
+version: 0.1.0
+interface:
+  inputs:
+    error_type:
+      type: string
+      required: true
+      description: "Type of medication error: wrong_dose, wrong_drug, wrong_route, wrong_patient, omission, wrong_frequency"
+    severity_outcome:
+      type: string
+      required: true
+      description: "Potential severity of the error: fatal, serious_harm, moderate_harm, mild_harm, no_harm"
+    preventable_by_design:
+      type: bool
+      required: false
+      description: "Whether the error is preventable through product design changes"
+  outputs:
+    risk_level:
+      type: string
+    mitigation_strategy:
+      type: string
+    labeling_action:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_severity
+  nodes:
+    check_severity:
+      type: condition
+      variable: severity_outcome
+      operator: eq
+      value: "fatal"
+      true_next: fatal_error
+      false_next: check_serious
+
+    check_serious:
+      type: condition
+      variable: severity_outcome
+      operator: eq
+      value: "serious_harm"
+      true_next: serious_designable_check
+      false_next: check_moderate
+
+    check_moderate:
+      type: condition
+      variable: severity_outcome
+      operator: eq
+      value: "moderate_harm"
+      true_next: moderate_error
+      false_next: check_mild
+
+    check_mild:
+      type: condition
+      variable: severity_outcome
+      operator: eq
+      value: "mild_harm"
+      true_next: mild_error
+      false_next: no_harm_error
+
+    # FATAL
+    fatal_error:
+      type: return
+      value:
+        risk_level: "CRITICAL"
+        mitigation_strategy: "Mandatory product redesign: unique container shape, tall-man lettering, barcode verification, distinct color coding. Consider restricted distribution."
+        labeling_action: "Boxed warning for medication error risk. REMS with ETASS may be required."
+        regulatory_reference: "FDA Guidance: Safety Considerations for Product Design to Minimize Medication Errors (2016), Section III; Container Labels Guidance (2022)"
+
+    # SERIOUS HARM
+    serious_designable_check:
+      type: condition
+      variable: preventable_by_design
+      operator: eq
+      value: true
+      true_next: serious_designable
+      false_next: serious_not_designable
+
+    serious_designable:
+      type: return
+      value:
+        risk_level: "HIGH"
+        mitigation_strategy: "Implement design controls: differentiated packaging, prominent strength display, auxiliary labels, oral syringe for liquids. Conduct simulated use study."
+        labeling_action: "Update container labels and carton labeling per FDA container labeling guidance. Add prominent warnings."
+        regulatory_reference: "FDA Guidance: Safety Considerations for Product Design (2016), Section IV; Container Labels Guidance (2022), Section III"
+
+    serious_not_designable:
+      type: return
+      value:
+        risk_level: "HIGH"
+        mitigation_strategy: "Implement administrative controls: Medication Guide, Patient Instructions for Use, healthcare provider communication plan."
+        labeling_action: "Mandatory Medication Guide distribution. Consider communication plan to prescribers."
+        regulatory_reference: "FDA Guidance: Safety Considerations for Product Design (2016), Section V"
+
+    # MODERATE
+    moderate_error:
+      type: return
+      value:
+        risk_level: "MODERATE"
+        mitigation_strategy: "Evaluate packaging differentiation, label clarity improvements, and dosing device accuracy. Conduct label comprehension study."
+        labeling_action: "Review and improve label design per FDA readability guidelines."
+        regulatory_reference: "FDA Guidance: Safety Considerations for Product Design (2016), Section IV"
+
+    # MILD
+    mild_error:
+      type: return
+      value:
+        risk_level: "LOW"
+        mitigation_strategy: "Standard label improvements and monitoring of error reports through MedWatch."
+        labeling_action: "Include medication error prevention language in Patient Information."
+        regulatory_reference: "FDA Guidance: Safety Considerations for Product Design (2016), Section VI"
+
+    # NO HARM
+    no_harm_error:
+      type: return
+      value:
+        risk_level: "MINIMAL"
+        mitigation_strategy: "Monitor through routine pharmacovigilance. No design changes required unless frequency increases."
+        labeling_action: "No labeling changes required."
+        regulatory_reference: "FDA Guidance: Safety Considerations for Product Design (2016), Section VI"
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(∝, ∂) — medication error risk classification by severity irreversibility and design boundary'
+  primes: ['κ', '∝', '∂']
+  arguments: ['severity_outcome', 'error_type', 'preventable_by_design']
+
+tests:
+# Fatal error -> critical
+- input:
+    error_type: "wrong_dose"
+    severity_outcome: "fatal"
+  expect:
+    risk_level: "CRITICAL"
+
+# Serious, preventable by design
+- input:
+    error_type: "wrong_drug"
+    severity_outcome: "serious_harm"
+    preventable_by_design: true
+  expect:
+    risk_level: "HIGH"
+
+# Serious, not designable
+- input:
+    error_type: "wrong_route"
+    severity_outcome: "serious_harm"
+    preventable_by_design: false
+  expect:
+    risk_level: "HIGH"
+
+# Moderate harm
+- input:
+    error_type: "wrong_frequency"
+    severity_outcome: "moderate_harm"
+  expect:
+    risk_level: "MODERATE"
+
+# Mild harm
+- input:
+    error_type: "omission"
+    severity_outcome: "mild_harm"
+  expect:
+    risk_level: "LOW"
+
+# No harm
+- input:
+    error_type: "wrong_dose"
+    severity_outcome: "no_harm"
+  expect:
+    risk_level: "MINIMAL"
+
+# Empty -> minimal
+- input: {}
+  expect:
+    risk_level: "MINIMAL"

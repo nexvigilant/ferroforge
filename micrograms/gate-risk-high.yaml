@@ -1,0 +1,49 @@
+name: gate-risk-high
+description: Guardian high risk
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    pass:
+      type: return
+      value:
+        threshold: risk_score
+        met: true
+        gate: true
+    fail:
+      type: return
+      value:
+        met: false
+        gate: false
+        threshold: risk_score
+    check:
+      type: condition
+      variable: risk_score
+      operator: gte
+      value: 6.0
+      true_next: pass
+      false_next: fail
+tests:
+- input:
+    risk_score: 6.0
+  expect:
+    met: true
+    gate: true
+- input: {}
+  expect:
+    met: false
+    gate: false
+- input:
+    risk_score: 5.999
+  expect:
+    threshold: risk_score
+    met: false
+    gate: false
+- input:
+    risk_score: 6.001
+  expect:
+    threshold: risk_score
+    met: true
+    gate: true
+interface: null
+primitive_signature: null

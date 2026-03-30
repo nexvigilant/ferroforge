@@ -1,0 +1,65 @@
+name: gramatica-causalidad-espanola
+description: >
+  Cadena de enriquecimiento de causalidad desde gramática española.
+  Compone ser/estar (temporalidad) + subjuntivo (confianza epistémica).
+  Paso 1: ¿Transitorio (estar) o permanente (ser)?
+  Paso 2: ¿El reportante afirma (indicativo) o duda (subjuntivo)?
+  Spanish grammar causality enrichment chain.
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - ser-estar-temporal-classifier
+  - subjuntivo-confianza-epistemica
+tests:
+- name: estar + indicativo — high causality signal
+  input:
+    verbo: "está"
+    sintoma: "mareado"
+    modo_verbal: "tiene"
+  expect:
+    clasificacion_temporal: TRANSITORIO
+    temporalidad: TRANSIENT
+    relevancia_causalidad: 80
+    confianza_epistemica: ALTA
+    confidence_level: HIGH
+    peso_senal: 85
+
+- name: ser + subjuntivo — low causality signal
+  input:
+    verbo: "es"
+    sintoma: "diabético"
+    modo_verbal: "tenga"
+  expect:
+    clasificacion_temporal: PERMANENTE
+    temporalidad: PERMANENT
+    relevancia_causalidad: 20
+    confianza_epistemica: BAJA
+    confidence_level: LOW
+    peso_senal: 40
+
+- name: estar + subjuntivo — transient but uncertain
+  input:
+    verbo: "estaba"
+    sintoma: "con náuseas"
+    modo_verbal: "padezca"
+  expect:
+    clasificacion_temporal: TRANSITORIO
+    temporalidad: TRANSIENT
+    relevancia_causalidad: 80
+    confianza_epistemica: BAJA
+    confidence_level: LOW
+    peso_senal: 40
+
+- name: ser + indicativo — permanent and certain (preexisting)
+  input:
+    verbo: "son"
+    sintoma: "hipertensos"
+    modo_verbal: "sufre"
+  expect:
+    clasificacion_temporal: PERMANENTE
+    temporalidad: PERMANENT
+    relevancia_causalidad: 20
+    confianza_epistemica: ALTA
+    confidence_level: HIGH
+    peso_senal: 85

@@ -1,0 +1,37 @@
+name: age-geriatric
+description: "Geriatric age classifier. Identifies subjects aged 80+ years (very elderly)."
+version: 0.1.0
+tree:
+  start: check_age_threshold
+  nodes:
+    check_age_threshold:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 80
+      true_next: is_geriatric
+      false_next: not_geriatric
+    is_geriatric:
+      type: return
+      value:
+        age_group: geriatric
+        age_range: "80+ years"
+        frailty_assessment: required
+        polypharmacy_risk: high
+        fall_risk: high
+    not_geriatric:
+      type: return
+      value:
+        age_group: other
+        is_geriatric: false
+tests:
+  - input: { age_years: 85 }
+    expect: { age_group: geriatric, frailty_assessment: required }
+  - input: { age_years: 80 }
+    expect: { age_group: geriatric }
+  - input: { age_years: 100 }
+    expect: { age_group: geriatric }
+  - input: { age_years: 79 }
+    expect: { age_group: other, is_geriatric: false }
+  - input: {}
+    expect: {}

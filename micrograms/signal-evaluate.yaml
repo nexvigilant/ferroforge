@@ -1,0 +1,80 @@
+name: signal-evaluate
+description: "Evaluate signal causality and evidence quality for pharmacovigilance decision"
+version: 0.1.0
+tree:
+  start: validate_signal
+  nodes:
+    validate_signal:
+      type: condition
+      variable: naranjo_score
+      operator: is_not_null
+      value: null
+      true_next: check_causality_strength
+      false_next: evaluation_unknown
+    check_causality_strength:
+      type: condition
+      variable: naranjo_score
+      operator: gte
+      value: 8
+      true_next: probable_probable
+      false_next: check_moderate_causality
+    check_moderate_causality:
+      type: condition
+      variable: naranjo_score
+      operator: gte
+      value: 5
+      true_next: probable_causality
+      false_next: possible_causality
+    probable_probable:
+      type: return
+      value:
+        causality_category: "probable"
+        evidence_quality: "strong"
+        regulatory_action_warranted: true
+        further_evaluation_needed: false
+        evaluation_compliant: true
+    probable_causality:
+      type: return
+      value:
+        causality_category: "probable"
+        evidence_quality: "moderate"
+        regulatory_action_warranted: true
+        further_evaluation_needed: true
+        evaluation_compliant: true
+    possible_causality:
+      type: return
+      value:
+        causality_category: "possible"
+        evidence_quality: "weak"
+        regulatory_action_warranted: false
+        further_evaluation_needed: true
+        evaluation_compliant: true
+    evaluation_unknown:
+      type: return
+      value:
+        causality_category: null
+        evidence_quality: null
+        regulatory_action_warranted: null
+        further_evaluation_needed: null
+        evaluation_compliant: false
+tests:
+- input:
+    naranjo_score: 9
+  expect:
+    causality_category: "probable"
+    evidence_quality: "strong"
+    regulatory_action_warranted: true
+- input:
+    naranjo_score: 6
+  expect:
+    causality_category: "probable"
+    evidence_quality: "moderate"
+- input:
+    naranjo_score: 3
+  expect:
+    causality_category: "possible"
+    evidence_quality: "weak"
+- input: {}
+  expect:
+    causality_category: null
+    evaluation_compliant: false

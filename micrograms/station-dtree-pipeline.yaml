@@ -1,0 +1,146 @@
+name: station-dtree-pipeline
+description: 'Route decision tree results: classify by depth, accuracy, and overfitting risk'
+version: 0.1.0
+tree:
+  start: check_accuracy
+  nodes:
+    check_overfit:
+      type: condition
+      variable: train_test_gap
+      operator: gte
+      value: 0.1
+      true_next: overfit
+      false_next: excellent
+    check_accuracy:
+      type: condition
+      variable: accuracy
+      operator: gte
+      value: 0.95
+      true_next: check_overfit
+      false_next: check_low_acc
+    poor:
+      type: return
+      value:
+        route: model_retrain
+        priority: high
+        action: retrain
+        reason: Accuracy ≤60% — insufficient, needs feature engineering
+    check_low_acc:
+      type: condition
+      variable: accuracy
+      operator: lte
+      value: 0.6
+      true_next: poor
+      false_next: acceptable
+    acceptable:
+      type: return
+      value:
+        route: model_tuning
+        action: tune
+        priority: moderate
+        reason: Accuracy 60-95% — acceptable, hyperparameter tuning may improve
+    overfit:
+      type: return
+      value:
+        action: prune
+        reason: Accuracy 95%+ but train-test gap ≥10% — overfitting, prune tree
+        route: model_pruning
+        priority: high
+    excellent:
+      type: return
+      value:
+        route: archive
+        action: deploy
+        priority: low
+        reason: High accuracy, no overfit — model ready for production
+tests:
+- input:
+    accuracy: 0.98
+    train_test_gap: 0.15
+  expect:
+    priority: high
+    route: model_pruning
+    action: prune
+- input:
+    train_test_gap: 0.03
+    accuracy: 0.97
+  expect:
+    priority: low
+    action: deploy
+    route: archive
+- input:
+    accuracy: 0.45
+    train_test_gap: 0.05
+  expect:
+    priority: high
+    action: retrain
+    route: model_retrain
+- input:
+    accuracy: 0.78
+    train_test_gap: 0.05
+  expect:
+    action: tune
+    route: model_tuning
+    priority: moderate
+- input:
+    train_test_gap: 0.099
+  expect:
+    route: model_tuning
+    reason: Accuracy 60-95% — acceptable, hyperparameter tuning may improve
+    priority: moderate
+    action: tune
+- input:
+    train_test_gap: 0.101
+  expect:
+    route: model_tuning
+    action: tune
+    reason: Accuracy 60-95% — acceptable, hyperparameter tuning may improve
+    priority: moderate
+- input: {}
+  expect:
+    route: model_tuning
+    action: tune
+    priority: moderate
+    reason: Accuracy 60-95% — acceptable, hyperparameter tuning may improve
+- input:
+    accuracy: 0.949
+  expect:
+    action: tune
+    priority: moderate
+    route: model_tuning
+    reason: Accuracy 60-95% — acceptable, hyperparameter tuning may improve
+- input:
+    accuracy: 0.951
+  expect:
+    priority: low
+    route: archive
+    action: deploy
+    reason: High accuracy, no overfit — model ready for production
+- input: {}
+  expect:
+    priority: moderate
+    action: tune
+    reason: Accuracy 60-95% — acceptable, hyperparameter tuning may improve
+    route: model_tuning
+- input:
+    accuracy: 0.599
+  expect:
+    priority: high
+    action: retrain
+    route: model_retrain
+    reason: Accuracy ≤60% — insufficient, needs feature engineering
+- input:
+    accuracy: 0.601
+  expect:
+    action: tune
+    priority: moderate
+    route: model_tuning
+    reason: Accuracy 60-95% — acceptable, hyperparameter tuning may improve
+- input: {}
+  expect:
+    route: model_tuning
+    priority: moderate
+    reason: Accuracy 60-95% — acceptable, hyperparameter tuning may improve
+    action: tune
+interface: null
+primitive_signature: null

@@ -1,0 +1,190 @@
+name: e2e-risk-categorization
+description: 'ICH E2E Section 3: Categorizes safety concerns into the three E2E risk categories — identified risk, potential risk, or missing information'
+version: 0.1.0
+interface:
+  inputs:
+    evidence_level:
+      type: string
+      required: true
+    cases:
+      type: integer
+      required: false
+    population_exposed:
+      type: bool
+      required: false
+  outputs:
+    risk_category:
+      type: string
+    action:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_refuted
+  nodes:
+    check_refuted:
+      type: condition
+      variable: evidence_level
+      operator: eq
+      value: refuted
+      true_next: result_none
+      false_next: check_confirmed
+    check_confirmed:
+      type: condition
+      variable: evidence_level
+      operator: eq
+      value: confirmed
+      true_next: check_cases
+      false_next: check_theoretical
+    check_cases:
+      type: condition
+      variable: cases
+      operator: gt
+      value: 0
+      true_next: result_identified
+      false_next: result_identified_no_cases
+    check_theoretical:
+      type: condition
+      variable: evidence_level
+      operator: eq
+      value: theoretical
+      true_next: result_potential
+      false_next: check_nonclinical
+    check_nonclinical:
+      type: condition
+      variable: evidence_level
+      operator: eq
+      value: nonclinical_signal
+      true_next: result_potential
+      false_next: check_no_data
+    check_no_data:
+      type: condition
+      variable: evidence_level
+      operator: eq
+      value: no_data
+      true_next: check_population_exposed
+      false_next: result_unknown
+    check_population_exposed:
+      type: condition
+      variable: population_exposed
+      operator: eq
+      value: true
+      true_next: result_missing_collect
+      false_next: result_missing_plan
+    result_none:
+      type: return
+      value:
+        risk_category: NONE
+        action: close_signal
+        regulatory_reference: ICH E2E Section 3 - Safety Specification
+    result_identified:
+      type: return
+      value:
+        risk_category: IDENTIFIED_RISK
+        action: characterize_and_minimize
+        regulatory_reference: ICH E2E Section 3 - Safety Specification
+    result_identified_no_cases:
+      type: return
+      value:
+        risk_category: IDENTIFIED_RISK
+        action: characterize_and_minimize
+        regulatory_reference: ICH E2E Section 3 - Safety Specification
+    result_potential:
+      type: return
+      value:
+        risk_category: POTENTIAL_RISK
+        action: investigate_further
+        regulatory_reference: ICH E2E Section 3 - Safety Specification
+    result_missing_collect:
+      type: return
+      value:
+        risk_category: MISSING_INFORMATION
+        action: collect_data
+        regulatory_reference: ICH E2E Section 3 - Safety Specification
+    result_missing_plan:
+      type: return
+      value:
+        risk_category: MISSING_INFORMATION
+        action: plan_study
+        regulatory_reference: ICH E2E Section 3 - Safety Specification
+    result_unknown:
+      type: return
+      value:
+        risk_category: NONE
+        action: close_signal
+        regulatory_reference: ICH E2E Section 3 - Safety Specification
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — measurement, comparison, or classification'
+  primes: ['κ']
+  arguments: []
+tests:
+# Confirmed risk with cases
+- input:
+    evidence_level: confirmed
+    cases: 15
+    population_exposed: true
+  expect:
+    risk_category: IDENTIFIED_RISK
+    action: characterize_and_minimize
+    regulatory_reference: ICH E2E Section 3 - Safety Specification
+# Confirmed risk with zero cases still classified as identified
+- input:
+    evidence_level: confirmed
+    cases: 0
+    population_exposed: true
+  expect:
+    risk_category: IDENTIFIED_RISK
+    action: characterize_and_minimize
+    regulatory_reference: ICH E2E Section 3 - Safety Specification
+# Theoretical evidence = potential risk
+- input:
+    evidence_level: theoretical
+    cases: 0
+    population_exposed: false
+  expect:
+    risk_category: POTENTIAL_RISK
+    action: investigate_further
+    regulatory_reference: ICH E2E Section 3 - Safety Specification
+# Nonclinical signal = potential risk
+- input:
+    evidence_level: nonclinical_signal
+    cases: 0
+    population_exposed: false
+  expect:
+    risk_category: POTENTIAL_RISK
+    action: investigate_further
+    regulatory_reference: ICH E2E Section 3 - Safety Specification
+# No data with exposed population = missing info, collect
+- input:
+    evidence_level: no_data
+    cases: 0
+    population_exposed: true
+  expect:
+    risk_category: MISSING_INFORMATION
+    action: collect_data
+    regulatory_reference: ICH E2E Section 3 - Safety Specification
+# No data without exposed population = missing info, plan
+- input:
+    evidence_level: no_data
+    cases: 0
+    population_exposed: false
+  expect:
+    risk_category: MISSING_INFORMATION
+    action: plan_study
+    regulatory_reference: ICH E2E Section 3 - Safety Specification
+# Refuted evidence = none
+- input:
+    evidence_level: refuted
+    cases: 5
+    population_exposed: true
+  expect:
+    risk_category: NONE
+    action: close_signal
+    regulatory_reference: ICH E2E Section 3 - Safety Specification
+# Empty input defaults
+- input: {}
+  expect:
+    risk_category: NONE
+    action: close_signal
+    regulatory_reference: ICH E2E Section 3 - Safety Specification

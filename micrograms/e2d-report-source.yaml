@@ -1,0 +1,200 @@
+name: e2d-report-source
+description: 'ICH E2D Section 3: Classifies the source type of a post-approval safety report and determines reportability'
+version: 0.1.0
+interface:
+  inputs:
+    source:
+      type: string
+      required: false
+    solicited:
+      type: bool
+      required: false
+    study_type:
+      type: string
+      required: false
+  outputs:
+    source_type:
+      type: string
+    reportable:
+      type: bool
+    regulatory_reference:
+      type: string
+tree:
+  start: check_source_unknown
+  nodes:
+    check_source_unknown:
+      type: condition
+      variable: source
+      operator: eq
+      value: unknown
+      true_next: return_unknown
+      false_next: check_source_null
+    check_source_null:
+      type: condition
+      variable: source
+      operator: is_null
+      value: null
+      true_next: return_unknown
+      false_next: check_source_regulatory
+    check_source_regulatory:
+      type: condition
+      variable: source
+      operator: eq
+      value: regulatory_authority
+      true_next: return_regulatory
+      false_next: check_source_literature
+    check_source_literature:
+      type: condition
+      variable: source
+      operator: eq
+      value: literature
+      true_next: return_literature
+      false_next: check_source_study
+    check_source_study:
+      type: condition
+      variable: source
+      operator: eq
+      value: study
+      true_next: check_study_type
+      false_next: check_source_consumer
+    check_study_type:
+      type: condition
+      variable: study_type
+      operator: eq
+      value: interventional
+      true_next: return_study
+      false_next: return_solicited
+    check_source_consumer:
+      type: condition
+      variable: source
+      operator: eq
+      value: consumer
+      true_next: check_consumer_solicited
+      false_next: check_hcp_solicited
+    check_consumer_solicited:
+      type: condition
+      variable: solicited
+      operator: eq
+      value: false
+      true_next: return_spontaneous_consumer
+      false_next: return_solicited
+    check_hcp_solicited:
+      type: condition
+      variable: source
+      operator: eq
+      value: healthcare_professional
+      true_next: check_hcp_unsolicited
+      false_next: return_unknown
+    check_hcp_unsolicited:
+      type: condition
+      variable: solicited
+      operator: eq
+      value: false
+      true_next: return_spontaneous
+      false_next: return_solicited
+    return_spontaneous:
+      type: return
+      value:
+        source_type: SPONTANEOUS
+        reportable: true
+        regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+    return_spontaneous_consumer:
+      type: return
+      value:
+        source_type: SPONTANEOUS_CONSUMER
+        reportable: true
+        regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+    return_study:
+      type: return
+      value:
+        source_type: STUDY
+        reportable: true
+        regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+    return_solicited:
+      type: return
+      value:
+        source_type: SOLICITED
+        reportable: true
+        regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+    return_literature:
+      type: return
+      value:
+        source_type: LITERATURE
+        reportable: true
+        regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+    return_regulatory:
+      type: return
+      value:
+        source_type: REGULATORY
+        reportable: true
+        regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+    return_unknown:
+      type: return
+      value:
+        source_type: UNKNOWN
+        reportable: false
+        regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — regulatory source classification for post-approval safety reports'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['source', 'solicited', 'study_type']
+tests:
+- input:
+    source: healthcare_professional
+    solicited: false
+  expect:
+    source_type: SPONTANEOUS
+    reportable: true
+    regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+- input:
+    source: consumer
+    solicited: false
+  expect:
+    source_type: SPONTANEOUS_CONSUMER
+    reportable: true
+    regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+- input:
+    source: study
+    study_type: interventional
+  expect:
+    source_type: STUDY
+    reportable: true
+    regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+- input:
+    source: study
+    study_type: observational
+  expect:
+    source_type: SOLICITED
+    reportable: true
+    regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+- input:
+    source: literature
+  expect:
+    source_type: LITERATURE
+    reportable: true
+    regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+- input:
+    source: regulatory_authority
+  expect:
+    source_type: REGULATORY
+    reportable: true
+    regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+- input:
+    source: unknown
+  expect:
+    source_type: UNKNOWN
+    reportable: false
+    regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+- input: {}
+  expect:
+    source_type: UNKNOWN
+    reportable: false
+    regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports
+- input:
+    source: healthcare_professional
+    solicited: true
+  expect:
+    source_type: SOLICITED
+    reportable: true
+    regulatory_reference: ICH E2D Section 3 - Sources of Individual Case Safety Reports

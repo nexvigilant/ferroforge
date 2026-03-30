@@ -1,0 +1,64 @@
+name: age-pregnancy-category
+description: "Pregnancy category and trimester safety classification. Assigns FDA pregnancy category or trimester-specific risk."
+version: 0.1.0
+tree:
+  start: check_pregnancy_status
+  nodes:
+    check_pregnancy_status:
+      type: condition
+      variable: is_pregnant
+      operator: eq
+      value: true
+      true_next: check_trimester
+      false_next: not_pregnant
+    check_trimester:
+      type: condition
+      variable: trimester
+      operator: eq
+      value: 1
+      true_next: first_trimester
+      false_next: check_second_trimester
+    first_trimester:
+      type: return
+      value:
+        pregnancy_status: pregnant
+        trimester: 1
+        risk_level: highest
+        message: "First trimester: highest teratogenic risk; most medications contraindicated"
+    check_second_trimester:
+      type: condition
+      variable: trimester
+      operator: eq
+      value: 2
+      true_next: second_trimester
+      false_next: third_trimester
+    second_trimester:
+      type: return
+      value:
+        pregnancy_status: pregnant
+        trimester: 2
+        risk_level: moderate
+        message: "Second trimester: organ formation complete; some medications safer"
+    third_trimester:
+      type: return
+      value:
+        pregnancy_status: pregnant
+        trimester: 3
+        risk_level: delivery_related
+        message: "Third trimester: fetal/maternal effects possible near delivery"
+    not_pregnant:
+      type: return
+      value:
+        pregnancy_status: not_pregnant
+        risk_level: none
+tests:
+  - input: { is_pregnant: true, trimester: 1 }
+    expect: { pregnancy_status: pregnant, trimester: 1, risk_level: highest }
+  - input: { is_pregnant: true, trimester: 2 }
+    expect: { pregnancy_status: pregnant, trimester: 2, risk_level: moderate }
+  - input: { is_pregnant: true, trimester: 3 }
+    expect: { pregnancy_status: pregnant, trimester: 3 }
+  - input: { is_pregnant: false, trimester: 0 }
+    expect: { pregnancy_status: not_pregnant, risk_level: none }
+  - input: {}
+    expect: {}

@@ -1,0 +1,83 @@
+name: risk-evaluate-effectiveness
+description: "Evaluate effectiveness of implemented risk mitigation measures"
+version: 0.1.0
+tree:
+  start: validate_monitoring_data
+  nodes:
+    validate_monitoring_data:
+      type: condition
+      variable: monitoring_data_collected
+      operator: eq
+      value: true
+      true_next: check_effectiveness_metrics
+      false_next: evaluation_unknown
+    check_effectiveness_metrics:
+      type: condition
+      variable: adverse_event_reduction_percent
+      operator: gte
+      value: 50
+      true_next: highly_effective
+      false_next: check_moderate_effectiveness
+    check_moderate_effectiveness:
+      type: condition
+      variable: adverse_event_reduction_percent
+      operator: gte
+      value: 20
+      true_next: moderately_effective
+      false_next: minimally_effective
+    highly_effective:
+      type: return
+      value:
+        effectiveness_rating: "high"
+        risk_reduction_achieved: true
+        continue_current_plan: true
+        plan_modification_needed: false
+        evaluation_compliant: true
+    moderately_effective:
+      type: return
+      value:
+        effectiveness_rating: "moderate"
+        risk_reduction_achieved: true
+        continue_current_plan: true
+        plan_modification_needed: true
+        evaluation_compliant: true
+    minimally_effective:
+      type: return
+      value:
+        effectiveness_rating: "low"
+        risk_reduction_achieved: false
+        continue_current_plan: false
+        plan_modification_needed: true
+        evaluation_compliant: true
+    evaluation_unknown:
+      type: return
+      value:
+        effectiveness_rating: null
+        risk_reduction_achieved: null
+        continue_current_plan: null
+        plan_modification_needed: null
+        evaluation_compliant: false
+tests:
+- input:
+    monitoring_data_collected: true
+    adverse_event_reduction_percent: 75
+  expect:
+    effectiveness_rating: "high"
+    risk_reduction_achieved: true
+    plan_modification_needed: false
+- input:
+    monitoring_data_collected: true
+    adverse_event_reduction_percent: 35
+  expect:
+    effectiveness_rating: "moderate"
+    plan_modification_needed: true
+- input:
+    monitoring_data_collected: true
+    adverse_event_reduction_percent: 10
+  expect:
+    effectiveness_rating: "low"
+    risk_reduction_achieved: false
+- input: {}
+  expect:
+    effectiveness_rating: null
+    evaluation_compliant: false

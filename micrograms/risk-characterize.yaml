@@ -1,0 +1,113 @@
+name: risk-characterize
+description: "Characterize identified risk based on frequency and severity assessment"
+version: 0.1.0
+tree:
+  start: validate_risk_data
+  nodes:
+    validate_risk_data:
+      type: condition
+      variable: adverse_event_identified
+      operator: is_not_null
+      value: null
+      true_next: check_frequency
+      false_next: characterization_unknown
+    check_frequency:
+      type: condition
+      variable: frequency_category
+      operator: eq
+      value: "common"
+      true_next: check_common_severity
+      false_next: check_uncommon
+    check_common_severity:
+      type: condition
+      variable: severity
+      operator: eq
+      value: "serious"
+      true_next: high_priority_risk
+      false_next: moderate_priority_risk
+    check_uncommon:
+      type: condition
+      variable: frequency_category
+      operator: eq
+      value: "rare"
+      true_next: check_rare_severity
+      false_next: very_rare_risk
+    check_rare_severity:
+      type: condition
+      variable: severity
+      operator: eq
+      value: "serious"
+      true_next: serious_rare_risk
+      false_next: minimal_risk
+    high_priority_risk:
+      type: return
+      value:
+        risk_category: "high"
+        risk_mitigation_required: true
+        monitoring_intensity: "intensive"
+        patient_communication_required: true
+        risk_management_compliant: true
+    moderate_priority_risk:
+      type: return
+      value:
+        risk_category: "moderate"
+        risk_mitigation_required: true
+        monitoring_intensity: "standard"
+        patient_communication_required: true
+        risk_management_compliant: true
+    serious_rare_risk:
+      type: return
+      value:
+        risk_category: "serious_rare"
+        risk_mitigation_required: true
+        monitoring_intensity: "targeted"
+        patient_communication_required: true
+        risk_management_compliant: true
+    minimal_risk:
+      type: return
+      value:
+        risk_category: "minimal"
+        risk_mitigation_required: false
+        monitoring_intensity: "routine"
+        patient_communication_required: false
+        risk_management_compliant: true
+    very_rare_risk:
+      type: return
+      value:
+        risk_category: "very_rare"
+        risk_mitigation_required: false
+        monitoring_intensity: "standard"
+        patient_communication_required: false
+        risk_management_compliant: true
+    characterization_unknown:
+      type: return
+      value:
+        risk_category: null
+        risk_mitigation_required: null
+        monitoring_intensity: null
+        patient_communication_required: null
+        risk_management_compliant: false
+tests:
+- input:
+    adverse_event_identified: "myocardial_infarction"
+    frequency_category: "common"
+    severity: "serious"
+  expect:
+    risk_category: "high"
+    risk_mitigation_required: true
+- input:
+    adverse_event_identified: "rash"
+    frequency_category: "common"
+    severity: "mild"
+  expect:
+    risk_category: "moderate"
+- input:
+    adverse_event_identified: "rare_syndrome"
+    frequency_category: "rare"
+    severity: "serious"
+  expect:
+    risk_category: "serious_rare"
+- input: {}
+  expect:
+    risk_category: null
+    risk_management_compliant: false

@@ -1,0 +1,214 @@
+name: e2a-causality-terms
+description: 'ICH E2A Section 3: Maps causality assessment terminology to standardized categories for regulatory reporting'
+version: 0.1.0
+interface:
+  inputs:
+    assessment:
+      type: string
+      required: false
+  outputs:
+    causality_category:
+      type: string
+    description:
+      type: string
+    reportable_as_adr:
+      type: bool
+    regulatory_reference:
+      type: string
+tree:
+  start: check_certain
+  nodes:
+    check_certain:
+      type: condition
+      variable: assessment
+      operator: eq
+      value: "certain"
+      true_next: category_certain
+      false_next: check_definite
+    check_definite:
+      type: condition
+      variable: assessment
+      operator: eq
+      value: "definite"
+      true_next: category_certain
+      false_next: check_probable
+    check_probable:
+      type: condition
+      variable: assessment
+      operator: eq
+      value: "probable"
+      true_next: category_probable
+      false_next: check_likely
+    check_likely:
+      type: condition
+      variable: assessment
+      operator: eq
+      value: "likely"
+      true_next: category_probable
+      false_next: check_possible
+    check_possible:
+      type: condition
+      variable: assessment
+      operator: eq
+      value: "possible"
+      true_next: category_possible
+      false_next: check_unlikely
+    check_unlikely:
+      type: condition
+      variable: assessment
+      operator: eq
+      value: "unlikely"
+      true_next: category_unlikely
+      false_next: check_doubtful
+    check_doubtful:
+      type: condition
+      variable: assessment
+      operator: eq
+      value: "doubtful"
+      true_next: category_unlikely
+      false_next: check_conditional
+    check_conditional:
+      type: condition
+      variable: assessment
+      operator: eq
+      value: "conditional"
+      true_next: category_unassessable
+      false_next: check_unclassified
+    check_unclassified:
+      type: condition
+      variable: assessment
+      operator: eq
+      value: "unclassified"
+      true_next: category_unassessable
+      false_next: check_unassessable
+    check_unassessable:
+      type: condition
+      variable: assessment
+      operator: eq
+      value: "unassessable"
+      true_next: category_unassessable
+      false_next: category_default
+    category_certain:
+      type: return
+      value:
+        causality_category: CERTAIN
+        description: Causal relationship is beyond reasonable doubt
+        reportable_as_adr: true
+        regulatory_reference: ICH E2A Section 3 - Causality Assessment
+    category_probable:
+      type: return
+      value:
+        causality_category: PROBABLE
+        description: Causal relationship is likely but not certain
+        reportable_as_adr: true
+        regulatory_reference: ICH E2A Section 3 - Causality Assessment
+    category_possible:
+      type: return
+      value:
+        causality_category: POSSIBLE
+        description: Causal relationship cannot be excluded
+        reportable_as_adr: true
+        regulatory_reference: ICH E2A Section 3 - Causality Assessment
+    category_unlikely:
+      type: return
+      value:
+        causality_category: UNLIKELY
+        description: Causal relationship is doubtful or improbable
+        reportable_as_adr: false
+        regulatory_reference: ICH E2A Section 3 - Causality Assessment
+    category_unassessable:
+      type: return
+      value:
+        causality_category: UNASSESSABLE
+        description: Insufficient information to assess causality
+        reportable_as_adr: false
+        regulatory_reference: ICH E2A Section 3 - Causality Assessment
+    category_default:
+      type: return
+      value:
+        causality_category: UNASSESSABLE
+        description: Assessment term not recognized - treated as unassessable
+        reportable_as_adr: false
+        regulatory_reference: ICH E2A Section 3 - Causality Assessment
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — measurement, comparison, or classification'
+  primes: ['κ']
+  arguments: []
+tests:
+# "certain" -> CERTAIN
+- input:
+    assessment: "certain"
+  expect:
+    causality_category: CERTAIN
+    reportable_as_adr: true
+    regulatory_reference: ICH E2A Section 3 - Causality Assessment
+# "definite" -> CERTAIN
+- input:
+    assessment: "definite"
+  expect:
+    causality_category: CERTAIN
+    reportable_as_adr: true
+    regulatory_reference: ICH E2A Section 3 - Causality Assessment
+# "probable" -> PROBABLE
+- input:
+    assessment: "probable"
+  expect:
+    causality_category: PROBABLE
+    reportable_as_adr: true
+    regulatory_reference: ICH E2A Section 3 - Causality Assessment
+# "likely" -> PROBABLE
+- input:
+    assessment: "likely"
+  expect:
+    causality_category: PROBABLE
+    reportable_as_adr: true
+    regulatory_reference: ICH E2A Section 3 - Causality Assessment
+# "possible" -> POSSIBLE
+- input:
+    assessment: "possible"
+  expect:
+    causality_category: POSSIBLE
+    reportable_as_adr: true
+    regulatory_reference: ICH E2A Section 3 - Causality Assessment
+# "unlikely" -> UNLIKELY
+- input:
+    assessment: "unlikely"
+  expect:
+    causality_category: UNLIKELY
+    reportable_as_adr: false
+    regulatory_reference: ICH E2A Section 3 - Causality Assessment
+# "doubtful" -> UNLIKELY
+- input:
+    assessment: "doubtful"
+  expect:
+    causality_category: UNLIKELY
+    reportable_as_adr: false
+    regulatory_reference: ICH E2A Section 3 - Causality Assessment
+# "conditional" -> UNASSESSABLE
+- input:
+    assessment: "conditional"
+  expect:
+    causality_category: UNASSESSABLE
+    reportable_as_adr: false
+    regulatory_reference: ICH E2A Section 3 - Causality Assessment
+# "unclassified" -> UNASSESSABLE
+- input:
+    assessment: "unclassified"
+  expect:
+    causality_category: UNASSESSABLE
+    reportable_as_adr: false
+    regulatory_reference: ICH E2A Section 3 - Causality Assessment
+# "unassessable" -> UNASSESSABLE
+- input:
+    assessment: "unassessable"
+  expect:
+    causality_category: UNASSESSABLE
+    reportable_as_adr: false
+    regulatory_reference: ICH E2A Section 3 - Causality Assessment
+# Empty input -> UNASSESSABLE (default)
+- input: {}
+  expect:
+    causality_category: UNASSESSABLE
+    reportable_as_adr: false
+    regulatory_reference: ICH E2A Section 3 - Causality Assessment

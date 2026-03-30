@@ -1,0 +1,347 @@
+name: station-dailymed-pipeline
+description: 'Routes DailyMed drug label data through safety classification: checks boxed warnings, contraindications, and ADR severity to produce a labeling risk profile'
+version: 0.1.0
+tree:
+  start: check_boxed_warning
+  nodes:
+    check_adr_low:
+      type: condition
+      variable: adr_count
+      operator: gte
+      value: 5
+      true_next: low_risk
+      false_next: minimal_risk
+    high_risk:
+      type: return
+      value:
+        risk_factors: Boxed warning present
+        labeling_risk: high
+        recommended_action: Prioritize signal monitoring and REMS compliance check
+        next_step: rems_review
+    check_boxed_warning:
+      type: condition
+      variable: has_boxed_warning
+      operator: eq
+      value: true
+      true_next: boxed_warning_present
+      false_next: check_contraindications
+    check_adr_with_contra:
+      type: condition
+      variable: adr_count
+      operator: gte
+      value: 20
+      true_next: moderate_risk
+      false_next: check_adr_low
+    critical_risk:
+      type: return
+      value:
+        risk_factors: Boxed warning with 10+ documented ADRs
+        labeling_risk: critical
+        recommended_action: Immediate causality assessment and enhanced pharmacovigilance
+        next_step: signal_investigation
+    moderate_risk:
+      type: return
+      value:
+        risk_factors: 20+ documented ADRs
+        labeling_risk: moderate
+        next_step: routine_monitoring
+        recommended_action: Standard pharmacovigilance monitoring
+    check_contraindications:
+      type: condition
+      variable: contraindication_count
+      operator: is_not_null
+      value: true
+      true_next: check_contra_count
+      false_next: check_adr_only
+    boxed_warning_present:
+      type: condition
+      variable: adr_count
+      operator: gte
+      value: 10
+      true_next: critical_risk
+      false_next: high_risk
+    minimal_risk:
+      type: return
+      value:
+        next_step: routine_monitoring
+        risk_factors: Fewer than 5 documented ADRs
+        labeling_risk: minimal
+        recommended_action: Standard post-market surveillance
+    check_adr_only:
+      type: condition
+      variable: adr_count
+      operator: gte
+      value: 20
+      true_next: moderate_risk
+      false_next: check_adr_low
+    check_contra_count:
+      type: condition
+      variable: contraindication_count
+      operator: gte
+      value: 5
+      true_next: high_risk_no_box
+      false_next: check_adr_with_contra
+    high_risk_no_box:
+      type: return
+      value:
+        recommended_action: Review contraindication scope and monitor for signal emergence
+        labeling_risk: high
+        risk_factors: 5+ contraindications without boxed warning
+        next_step: contraindication_review
+    low_risk:
+      type: return
+      value:
+        next_step: routine_monitoring
+        risk_factors: 5-19 documented ADRs
+        recommended_action: Routine safety monitoring
+        labeling_risk: low
+tests:
+- input:
+    has_boxed_warning: true
+    adr_count: 15
+    drug_name: metformin
+    contraindication_count: 3
+  expect:
+    next_step: signal_investigation
+    labeling_risk: critical
+- input:
+    has_boxed_warning: true
+    drug_name: pioglitazone
+    adr_count: 5
+  expect:
+    labeling_risk: high
+    next_step: rems_review
+- input:
+    contraindication_count: 7
+    adr_count: 12
+    has_boxed_warning: false
+  expect:
+    labeling_risk: high
+    next_step: contraindication_review
+- input:
+    contraindication_count: 2
+    has_boxed_warning: false
+    adr_count: 25
+  expect:
+    next_step: routine_monitoring
+    labeling_risk: moderate
+- input:
+    has_boxed_warning: false
+    adr_count: 8
+  expect:
+    next_step: routine_monitoring
+    labeling_risk: low
+- input:
+    adr_count: 2
+    has_boxed_warning: false
+  expect:
+    labeling_risk: minimal
+    next_step: routine_monitoring
+- input: {}
+  expect:
+    labeling_risk: minimal
+    next_step: routine_monitoring
+- input:
+    adr_count: 0
+  expect:
+    recommended_action: Standard post-market surveillance
+    risk_factors: Fewer than 5 documented ADRs
+    next_step: routine_monitoring
+    labeling_risk: minimal
+- input:
+    adr_count: -1
+  expect:
+    labeling_risk: minimal
+    recommended_action: Standard post-market surveillance
+    risk_factors: Fewer than 5 documented ADRs
+    next_step: routine_monitoring
+- input:
+    adr_count: 4
+  expect:
+    risk_factors: Fewer than 5 documented ADRs
+    next_step: routine_monitoring
+    labeling_risk: minimal
+    recommended_action: Standard post-market surveillance
+- input:
+    adr_count: 6
+  expect:
+    next_step: routine_monitoring
+    recommended_action: Routine safety monitoring
+    risk_factors: 5-19 documented ADRs
+    labeling_risk: low
+- input:
+    adr_count: 500
+  expect:
+    recommended_action: Standard pharmacovigilance monitoring
+    risk_factors: 20+ documented ADRs
+    labeling_risk: moderate
+    next_step: routine_monitoring
+- input:
+    adr_count: 0
+  expect:
+    labeling_risk: minimal
+    next_step: routine_monitoring
+    risk_factors: Fewer than 5 documented ADRs
+    recommended_action: Standard post-market surveillance
+- input:
+    adr_count: -1
+  expect:
+    next_step: routine_monitoring
+    recommended_action: Standard post-market surveillance
+    risk_factors: Fewer than 5 documented ADRs
+    labeling_risk: minimal
+- input:
+    adr_count: 19
+  expect:
+    risk_factors: 5-19 documented ADRs
+    next_step: routine_monitoring
+    labeling_risk: low
+    recommended_action: Routine safety monitoring
+- input:
+    adr_count: 21
+  expect:
+    risk_factors: 20+ documented ADRs
+    labeling_risk: moderate
+    next_step: routine_monitoring
+    recommended_action: Standard pharmacovigilance monitoring
+- input:
+    adr_count: 2000
+  expect:
+    labeling_risk: moderate
+    risk_factors: 20+ documented ADRs
+    next_step: routine_monitoring
+    recommended_action: Standard pharmacovigilance monitoring
+- input:
+    adr_count: 0
+  expect:
+    next_step: routine_monitoring
+    labeling_risk: minimal
+    risk_factors: Fewer than 5 documented ADRs
+    recommended_action: Standard post-market surveillance
+- input:
+    adr_count: -1
+  expect:
+    labeling_risk: minimal
+    next_step: routine_monitoring
+    recommended_action: Standard post-market surveillance
+    risk_factors: Fewer than 5 documented ADRs
+- input:
+    adr_count: 9
+  expect:
+    risk_factors: 5-19 documented ADRs
+    recommended_action: Routine safety monitoring
+    next_step: routine_monitoring
+    labeling_risk: low
+- input:
+    adr_count: 11
+  expect:
+    risk_factors: 5-19 documented ADRs
+    recommended_action: Routine safety monitoring
+    labeling_risk: low
+    next_step: routine_monitoring
+- input:
+    adr_count: 1000
+  expect:
+    labeling_risk: moderate
+    recommended_action: Standard pharmacovigilance monitoring
+    risk_factors: 20+ documented ADRs
+    next_step: routine_monitoring
+- input:
+    adr_count: 0
+  expect:
+    risk_factors: Fewer than 5 documented ADRs
+    next_step: routine_monitoring
+    recommended_action: Standard post-market surveillance
+    labeling_risk: minimal
+- input:
+    adr_count: -1
+  expect:
+    labeling_risk: minimal
+    risk_factors: Fewer than 5 documented ADRs
+    recommended_action: Standard post-market surveillance
+    next_step: routine_monitoring
+- input:
+    adr_count: 19
+  expect:
+    labeling_risk: low
+    next_step: routine_monitoring
+    recommended_action: Routine safety monitoring
+    risk_factors: 5-19 documented ADRs
+- input:
+    adr_count: 21
+  expect:
+    risk_factors: 20+ documented ADRs
+    labeling_risk: moderate
+    next_step: routine_monitoring
+    recommended_action: Standard pharmacovigilance monitoring
+- input:
+    adr_count: 2000
+  expect:
+    risk_factors: 20+ documented ADRs
+    labeling_risk: moderate
+    next_step: routine_monitoring
+    recommended_action: Standard pharmacovigilance monitoring
+- input:
+    contraindication_count: 0
+  expect:
+    risk_factors: Fewer than 5 documented ADRs
+    recommended_action: Standard post-market surveillance
+    next_step: routine_monitoring
+    labeling_risk: minimal
+- input:
+    contraindication_count: -1
+  expect:
+    next_step: routine_monitoring
+    recommended_action: Standard post-market surveillance
+    labeling_risk: minimal
+    risk_factors: Fewer than 5 documented ADRs
+- input:
+    contraindication_count: 4
+  expect:
+    risk_factors: Fewer than 5 documented ADRs
+    recommended_action: Standard post-market surveillance
+    labeling_risk: minimal
+    next_step: routine_monitoring
+- input:
+    contraindication_count: 6
+  expect:
+    labeling_risk: high
+    risk_factors: 5+ contraindications without boxed warning
+    next_step: contraindication_review
+    recommended_action: Review contraindication scope and monitor for signal emergence
+- input:
+    contraindication_count: 500
+  expect:
+    labeling_risk: high
+    recommended_action: Review contraindication scope and monitor for signal emergence
+    next_step: contraindication_review
+    risk_factors: 5+ contraindications without boxed warning
+interface:
+  inputs:
+    adr_count:
+      type: int
+      required: false
+    has_boxed_warning:
+      type: bool
+      required: false
+    drug_name:
+      type: string
+      required: false
+    contraindication_count:
+      type: int
+      required: false
+  outputs:
+    next_step:
+      type: string
+      required: false
+    labeling_risk:
+      type: string
+      required: false
+    risk_factors:
+      type: string
+      required: false
+    recommended_action:
+      type: string
+      required: false
+  aliases: {}
+primitive_signature: null

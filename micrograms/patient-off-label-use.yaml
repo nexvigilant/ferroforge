@@ -1,0 +1,65 @@
+name: patient-off-label-use
+description: "Identify off-label drug use for patient safety and regulatory tracking"
+version: 0.1.0
+tree:
+  start: validate_indication
+  nodes:
+    validate_indication:
+      type: condition
+      variable: indication_used
+      operator: is_not_null
+      value: null
+      true_next: check_approved_indication
+      false_next: off_label_status_unknown
+    check_approved_indication:
+      type: condition
+      variable: is_approved_indication
+      operator: eq
+      value: true
+      true_next: on_label_use
+      false_next: off_label_use
+    off_label_use:
+      type: return
+      value:
+        use_classification: "off_label"
+        approved_indication_match: false
+        prescriber_judgment_documented: true
+        patient_safety_monitoring: "enhanced"
+        regulatory_tracking: "required"
+        off_label_compliant: true
+    on_label_use:
+      type: return
+      value:
+        use_classification: "on_label"
+        approved_indication_match: true
+        prescriber_judgment_documented: false
+        patient_safety_monitoring: "standard"
+        regulatory_tracking: "not_required"
+        off_label_compliant: true
+    off_label_status_unknown:
+      type: return
+      value:
+        use_classification: "unknown"
+        approved_indication_match: null
+        prescriber_judgment_documented: null
+        patient_safety_monitoring: "enhanced"
+        regulatory_tracking: "recommended"
+        off_label_compliant: false
+tests:
+- input:
+    indication_used: "rheumatoid_arthritis"
+    is_approved_indication: false
+  expect:
+    use_classification: "off_label"
+    patient_safety_monitoring: "enhanced"
+    regulatory_tracking: "required"
+- input:
+    indication_used: "hypertension"
+    is_approved_indication: true
+  expect:
+    use_classification: "on_label"
+    regulatory_tracking: "not_required"
+- input: {}
+  expect:
+    use_classification: "unknown"
+    off_label_compliant: false

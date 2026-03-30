@@ -1,0 +1,84 @@
+name: deadline-eu-15day
+description: "Calculate EU 15-day reporting deadline for serious adverse events in clinical trials"
+version: 0.1.0
+tree:
+  start: validate_event_date
+  nodes:
+    validate_event_date:
+      type: condition
+      variable: event_date
+      operator: is_not_null
+      value: null
+      true_next: check_unexpected_status
+      false_next: deadline_unknown
+    check_unexpected_status:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: check_event_severity
+      false_next: expected_event
+    check_event_severity:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: serious_unexpected_deadline
+      false_next: non_serious_unexpected_deadline
+    serious_unexpected_deadline:
+      type: return
+      value:
+        reporting_deadline_days: 15
+        event_category: "serious_unexpected_adverse_reaction"
+        regulatory_requirement: "EU_Clinical_Trial_Directive"
+        deadline_date: "calculated_from_event_date"
+        regulatory_compliant: true
+    non_serious_unexpected_deadline:
+      type: return
+      value:
+        reporting_deadline_days: 15
+        event_category: "non_serious_unexpected_adverse_reaction"
+        regulatory_requirement: "EU_Clinical_Trial_Directive"
+        deadline_date: "calculated_from_event_date"
+        regulatory_compliant: true
+    expected_event:
+      type: return
+      value:
+        reporting_deadline_days: 30
+        event_category: "expected_adverse_reaction"
+        regulatory_requirement: "EU_Clinical_Trial_Directive"
+        deadline_date: "calculated_from_event_date"
+        regulatory_compliant: true
+    deadline_unknown:
+      type: return
+      value:
+        reporting_deadline_days: null
+        event_category: null
+        regulatory_requirement: null
+        deadline_date: null
+        regulatory_compliant: false
+tests:
+- input:
+    event_date: "2024-01-15"
+    is_unexpected: true
+    is_serious: true
+  expect:
+    reporting_deadline_days: 15
+    event_category: "serious_unexpected_adverse_reaction"
+- input:
+    event_date: "2024-01-15"
+    is_unexpected: true
+    is_serious: false
+  expect:
+    reporting_deadline_days: 15
+    event_category: "non_serious_unexpected_adverse_reaction"
+- input:
+    event_date: "2024-01-15"
+    is_unexpected: false
+  expect:
+    reporting_deadline_days: 30
+    event_category: "expected_adverse_reaction"
+- input: {}
+  expect:
+    reporting_deadline_days: null
+    regulatory_compliant: false

@@ -1,0 +1,252 @@
+name: suse-classifier
+description: "Classify drug-event pair as Suspected Unexpected Serious Adverse Reaction. Three gates: Serious (ICH E2A) → Unexpected (not on label) → Signal strength (Evans disproportionality)."
+version: 1.0.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(signal, label) at ∂(serious+unexpected) — comparison of observed vs labeled at safety boundary'
+  primes: ['κ', '∂', 'N', 'ς']
+  arguments: ['prr', 'ror_lower', 'ic025', 'case_count', 'is_serious', 'on_label']
+  chain_prediction: 'κ gate cascade. Seriousness (∂) → Expectedness (κ vs label) → Signal strength (κ vs threshold). SUSE = all three gates pass.'
+interface:
+  inputs:
+    prr:
+      type: float
+      required: true
+    ror_lower:
+      type: float
+      required: true
+    ic025:
+      type: float
+      required: true
+    case_count:
+      type: integer
+      required: true
+    is_serious:
+      type: bool
+      required: true
+    on_label:
+      type: bool
+      required: true
+  outputs:
+    classification:
+      type: string
+    suse:
+      type: bool
+    priority:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_serious
+  nodes:
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: false
+      true_next: not_serious
+      false_next: check_label
+    not_serious:
+      type: return
+      value:
+        classification: NOT_SERIOUS
+        suse: false
+        priority: P5
+        action: "No SUSE — event does not meet ICH E2A seriousness criteria"
+    check_label:
+      type: condition
+      variable: on_label
+      operator: eq
+      value: true
+      true_next: expected
+      false_next: check_cases
+    expected:
+      type: return
+      value:
+        classification: EXPECTED
+        suse: false
+        priority: P4
+        action: "No SUSE — event is listed on current drug labeling"
+    check_cases:
+      type: condition
+      variable: case_count
+      operator: lt
+      value: 3
+      true_next: insufficient
+      false_next: check_critical
+    insufficient:
+      type: return
+      value:
+        classification: INSUFFICIENT_DATA
+        suse: false
+        priority: P4
+        action: "Insufficient cases for signal detection (N < 3)"
+    check_critical:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 10
+      true_next: check_critical_ror
+      false_next: check_high
+    check_critical_ror:
+      type: condition
+      variable: ror_lower
+      operator: gt
+      value: 5
+      true_next: check_critical_ic
+      false_next: check_high
+    check_critical_ic:
+      type: condition
+      variable: ic025
+      operator: gt
+      value: 2
+      true_next: suse_critical
+      false_next: check_high
+    suse_critical:
+      type: return
+      value:
+        classification: SUSE_CRITICAL
+        suse: true
+        priority: P0
+        action: "CRITICAL SUSE — initiate expedited regulatory review within 15 days"
+    check_high:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5
+      true_next: check_high_ror
+      false_next: check_moderate
+    check_high_ror:
+      type: condition
+      variable: ror_lower
+      operator: gt
+      value: 2
+      true_next: check_high_ic
+      false_next: check_moderate
+    check_high_ic:
+      type: condition
+      variable: ic025
+      operator: gt
+      value: 1
+      true_next: suse_high
+      false_next: check_moderate
+    suse_high:
+      type: return
+      value:
+        classification: SUSE_HIGH
+        suse: true
+        priority: P1
+        action: "HIGH SUSE — schedule causality assessment and regulatory notification"
+    check_moderate:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2
+      true_next: check_moderate_ror
+      false_next: check_low
+    check_moderate_ror:
+      type: condition
+      variable: ror_lower
+      operator: gt
+      value: 1
+      true_next: check_moderate_ic
+      false_next: check_low
+    check_moderate_ic:
+      type: condition
+      variable: ic025
+      operator: gt
+      value: 0
+      true_next: suse_moderate
+      false_next: check_low
+    suse_moderate:
+      type: return
+      value:
+        classification: SUSE_MODERATE
+        suse: true
+        priority: P2
+        action: "MODERATE SUSE — signal confirmed, begin investigation and monitoring"
+    check_low:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2
+      true_next: suse_low
+      false_next: no_signal
+    suse_low:
+      type: return
+      value:
+        classification: SUSE_LOW
+        suse: true
+        priority: P3
+        action: "LOW SUSE — partial signal, continue data collection"
+    no_signal:
+      type: return
+      value:
+        classification: NO_SIGNAL
+        suse: false
+        priority: P5
+        action: "No disproportionality signal detected"
+tests:
+  - input:
+      prr: 134.4
+      ror_lower: 216.7
+      ic025: 6.69
+      case_count: 16103
+      is_serious: true
+      on_label: false
+    expect:
+      classification: SUSE_CRITICAL
+      suse: true
+      priority: P0
+  - input:
+      prr: 12.9
+      ror_lower: 11.4
+      ic025: 3.47
+      case_count: 181
+      is_serious: true
+      on_label: false
+    expect:
+      classification: SUSE_CRITICAL
+      suse: true
+      priority: P0
+  - input:
+      prr: 71.4
+      ror_lower: 72.9
+      ic025: 4.80
+      case_count: 18372
+      is_serious: true
+      on_label: true
+    expect:
+      classification: EXPECTED
+      suse: false
+  - input:
+      prr: 0.96
+      ror_lower: 0.84
+      ic025: -0.25
+      case_count: 224
+      is_serious: true
+      on_label: false
+    expect:
+      classification: NO_SIGNAL
+      suse: false
+  - input:
+      prr: 50.0
+      ror_lower: 40.0
+      ic025: 5.0
+      case_count: 1000
+      is_serious: false
+      on_label: false
+    expect:
+      classification: NOT_SERIOUS
+      suse: false
+  - input:
+      prr: 2.5
+      ror_lower: 1.5
+      ic025: 0.3
+      case_count: 20
+      is_serious: true
+      on_label: false
+    expect:
+      classification: SUSE_MODERATE
+      suse: true
+      priority: P2

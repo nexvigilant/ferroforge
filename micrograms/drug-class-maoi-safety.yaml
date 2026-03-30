@@ -1,0 +1,62 @@
+name: drug-class-maoi-safety
+description: "MAOI safety assessment. Evaluates hypertensive crisis risk with sympathomimetics and serotonin syndrome risk."
+version: 0.1.0
+tree:
+  start: check_sympathomimetic
+  nodes:
+    check_sympathomimetic:
+      type: condition
+      variable: concurrent_sympathomimetic
+      operator: eq
+      value: true
+      true_next: hypertensive_crisis_alert
+      false_next: check_serotoninergic
+    hypertensive_crisis_alert:
+      type: return
+      value:
+        risk_level: critical
+        contraindication: true
+        message: "Concurrent sympathomimetic; hypertensive crisis risk; avoid combination"
+    check_serotoninergic:
+      type: condition
+      variable: concurrent_serotoninergic
+      operator: eq
+      value: true
+      true_next: serotonin_syndrome_alert
+      false_next: check_tyramine_diet
+    serotonin_syndrome_alert:
+      type: return
+      value:
+        risk_level: critical
+        contraindication: true
+        message: "Concurrent serotoninergic drug; serotonin syndrome risk; avoid combination"
+    check_tyramine_diet:
+      type: condition
+      variable: patient_compliant_with_diet
+      operator: eq
+      value: false
+      true_next: dietary_alert
+      false_next: standard_dosing
+    dietary_alert:
+      type: return
+      value:
+        risk_level: high
+        dietary_education: required
+        message: "Patient non-compliant with tyramine-restricted diet; hypertensive crisis risk"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        dietary_compliance: required
+        message: "MAOI dosing appropriate with strict dietary compliance"
+tests:
+  - input: { concurrent_sympathomimetic: true, concurrent_serotoninergic: false, patient_compliant_with_diet: true }
+    expect: { risk_level: critical, contraindication: true }
+  - input: { concurrent_sympathomimetic: false, concurrent_serotoninergic: true, patient_compliant_with_diet: true }
+    expect: { risk_level: critical, contraindication: true }
+  - input: { concurrent_sympathomimetic: false, concurrent_serotoninergic: false, patient_compliant_with_diet: false }
+    expect: { risk_level: high, dietary_education: required }
+  - input: { concurrent_sympathomimetic: false, concurrent_serotoninergic: false, patient_compliant_with_diet: true }
+    expect: { risk_level: low, dietary_compliance: required }
+  - input: {}
+    expect: {}

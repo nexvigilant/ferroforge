@@ -1,0 +1,74 @@
+name: class-benzodiazepine
+description: 'Benzodiazepines class safety: Dependence monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: dependence_risk
+      operator: gte
+      value: 3
+      true_next: alert
+      false_next: safe
+    safe:
+      type: return
+      value:
+        concern: Dependence
+        alert: false
+        action: continue
+        drug_class: Benzodiazepines
+    alert:
+      type: return
+      value:
+        drug_class: Benzodiazepines
+        concern: Dependence
+        action: class_effect_investigation
+        alert: true
+tests:
+- input:
+    dependence_risk: 3
+  expect:
+    drug_class: Benzodiazepines
+    alert: true
+- input: {}
+  expect:
+    alert: false
+    drug_class: Benzodiazepines
+- input:
+    dependence_risk: 0
+  expect:
+    action: continue
+    drug_class: Benzodiazepines
+    alert: false
+    concern: Dependence
+- input:
+    dependence_risk: -1
+  expect:
+    alert: false
+    drug_class: Benzodiazepines
+    action: continue
+    concern: Dependence
+- input:
+    dependence_risk: 2
+  expect:
+    drug_class: Benzodiazepines
+    action: continue
+    concern: Dependence
+    alert: false
+- input:
+    dependence_risk: 4
+  expect:
+    action: class_effect_investigation
+    drug_class: Benzodiazepines
+    concern: Dependence
+    alert: true
+- input:
+    dependence_risk: 300
+  expect:
+    action: class_effect_investigation
+    concern: Dependence
+    alert: true
+    drug_class: Benzodiazepines
+interface: null
+primitive_signature: null

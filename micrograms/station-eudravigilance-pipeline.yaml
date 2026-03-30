@@ -1,0 +1,199 @@
+name: station-eudravigilance-pipeline
+description: 'Triage EudraVigilance spontaneous report data: classify by SOC, case volume, and geographic signal'
+version: 0.1.0
+tree:
+  start: check_case_count
+  nodes:
+    multi_region:
+      type: return
+      value:
+        action: investigate
+        route: signal_investigation
+        priority: high
+        reason: Reports across 3+ EU regions — geographically distributed signal
+    single_region:
+      type: return
+      value:
+        route: signal_validation
+        reason: Reports concentrated in 1-2 regions — may be reporting artifact
+        priority: moderate
+        action: validate
+    low_volume:
+      type: return
+      value:
+        route: periodic_review
+        priority: low
+        reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+        action: monitor
+    check_fatal_pct:
+      type: condition
+      variable: fatal_percentage
+      operator: gte
+      value: 5
+      true_next: high_fatality
+      false_next: check_geographic
+    check_case_count:
+      type: condition
+      variable: case_count
+      operator: gte
+      value: 50
+      true_next: check_fatal_pct
+      false_next: low_volume
+    check_geographic:
+      type: condition
+      variable: region_count
+      operator: gte
+      value: 3
+      true_next: multi_region
+      false_next: single_region
+    high_fatality:
+      type: return
+      value:
+        reason: Fatal outcome ≥5% in EudraVigilance — immediate signal investigation
+        route: signal_detection
+        priority: critical
+        action: escalate
+tests:
+- input:
+    region_count: 1
+    case_count: 20
+    fatal_percentage: 0
+  expect:
+    route: periodic_review
+    action: monitor
+    priority: low
+- input:
+    fatal_percentage: 8
+    region_count: 5
+    case_count: 100
+  expect:
+    priority: critical
+    route: signal_detection
+    action: escalate
+- input:
+    fatal_percentage: 2
+    region_count: 4
+    case_count: 200
+  expect:
+    route: signal_investigation
+    action: investigate
+    priority: high
+- input:
+    case_count: 80
+    fatal_percentage: 1
+    region_count: 1
+  expect:
+    route: signal_validation
+    priority: moderate
+    action: validate
+- input:
+    fatal_percentage: -1
+  expect:
+    route: periodic_review
+    action: monitor
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    priority: low
+- input:
+    fatal_percentage: 4
+  expect:
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    priority: low
+    action: monitor
+    route: periodic_review
+- input:
+    fatal_percentage: 6
+  expect:
+    priority: low
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    action: monitor
+    route: periodic_review
+- input:
+    fatal_percentage: 500
+  expect:
+    route: periodic_review
+    priority: low
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    action: monitor
+- input: {}
+  expect:
+    route: periodic_review
+    priority: low
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    action: monitor
+- input:
+    case_count: 0
+  expect:
+    route: periodic_review
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    priority: low
+    action: monitor
+- input:
+    case_count: -1
+  expect:
+    priority: low
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    route: periodic_review
+    action: monitor
+- input:
+    case_count: 49
+  expect:
+    route: periodic_review
+    priority: low
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    action: monitor
+- input:
+    case_count: 51
+  expect:
+    route: signal_validation
+    action: validate
+    priority: moderate
+    reason: Reports concentrated in 1-2 regions — may be reporting artifact
+- input:
+    case_count: 5000
+  expect:
+    action: validate
+    reason: Reports concentrated in 1-2 regions — may be reporting artifact
+    priority: moderate
+    route: signal_validation
+- input: {}
+  expect:
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    action: monitor
+    route: periodic_review
+    priority: low
+- input:
+    region_count: 0
+  expect:
+    route: periodic_review
+    action: monitor
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    priority: low
+- input:
+    region_count: -1
+  expect:
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    action: monitor
+    route: periodic_review
+    priority: low
+- input:
+    region_count: 2
+  expect:
+    action: monitor
+    route: periodic_review
+    priority: low
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+- input:
+    region_count: 300
+  expect:
+    priority: low
+    action: monitor
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    route: periodic_review
+- input: {}
+  expect:
+    route: periodic_review
+    priority: low
+    reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+    action: monitor
+interface: null
+primitive_signature: null

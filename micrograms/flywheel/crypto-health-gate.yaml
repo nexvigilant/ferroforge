@@ -1,0 +1,89 @@
+name: crypto-health-gate
+description: 'Crypto infrastructure health for flywheel homeostasis: GREEN (all ok), YELLOW (degraded), RED (keys missing)'
+version: 1.0.0
+primitive_signature:
+  dominant: boundary
+  expression: "d(key_exists × config_match × backup_fresh × sigs_valid)"
+  primes: [boundary, state, existence]
+interface:
+  inputs:
+    keys_ok: { type: bool, required: false }
+    configs_ok: { type: bool, required: false }
+    backups_ok: { type: bool, required: false }
+    sigs_ok: { type: bool, required: false }
+  outputs:
+    status: { type: string }
+    level: { type: string }
+    action: { type: string }
+tree:
+  start: check_keys
+  nodes:
+    check_keys:
+      type: condition
+      variable: keys_ok
+      operator: eq
+      value: true
+      true_next: check_configs
+      false_next: critical
+    check_configs:
+      type: condition
+      variable: configs_ok
+      operator: eq
+      value: true
+      true_next: check_backups
+      false_next: degraded_config
+    check_backups:
+      type: condition
+      variable: backups_ok
+      operator: eq
+      value: true
+      true_next: check_sigs
+      false_next: degraded_backup
+    check_sigs:
+      type: condition
+      variable: sigs_ok
+      operator: eq
+      value: true
+      true_next: healthy
+      false_next: degraded_sigs
+    healthy:
+      type: return
+      value:
+        status: healthy
+        level: green
+        action: none
+    degraded_config:
+      type: return
+      value:
+        status: degraded
+        level: yellow
+        action: update_checksum_baseline
+    degraded_backup:
+      type: return
+      value:
+        status: degraded
+        level: yellow
+        action: run_nv_vault_backup
+    degraded_sigs:
+      type: return
+      value:
+        status: degraded
+        level: yellow
+        action: run_nv_sign_chain
+    critical:
+      type: return
+      value:
+        status: critical
+        level: red
+        action: run_nv_keygen
+tests:
+- input: { keys_ok: true, configs_ok: true, backups_ok: true, sigs_ok: true }
+  expect: { status: healthy, level: green, action: none }
+- input: { keys_ok: false, configs_ok: true, backups_ok: true, sigs_ok: true }
+  expect: { status: critical, level: red, action: run_nv_keygen }
+- input: { keys_ok: true, configs_ok: true, backups_ok: false, sigs_ok: true }
+  expect: { status: degraded, level: yellow, action: run_nv_vault_backup }
+- input: { keys_ok: true, configs_ok: true, backups_ok: true, sigs_ok: false }
+  expect: { status: degraded, level: yellow, action: run_nv_sign_chain }
+- input: {}
+  expect: { status: critical, level: red, action: run_nv_keygen }

@@ -1,0 +1,103 @@
+name: meddra-soc-router
+description: "Route adverse event terms to appropriate MedDRA System Organ Class (SOC)"
+version: 0.1.0
+tree:
+  start: validate_term
+  nodes:
+    validate_term:
+      type: condition
+      variable: adverse_event_term
+      operator: is_not_null
+      value: null
+      true_next: check_soc_assignment
+      false_next: soc_unknown
+    check_soc_assignment:
+      type: condition
+      variable: soc_code
+      operator: is_not_null
+      value: null
+      true_next: route_by_soc
+      false_next: check_keyword
+    route_by_soc:
+      type: return
+      value:
+        soc_code: "10001"
+        soc_name: "Infections and infestations"
+        meddra_hierarchy_compliant: true
+    check_keyword:
+      type: condition
+      variable: adverse_event_term
+      operator: matches
+      value: "(?i)(infection|bacterial|viral|fungal|pneumonia|sepsis)"
+      true_next: infections_soc
+      false_next: check_cardiac
+    check_cardiac:
+      type: condition
+      variable: adverse_event_term
+      operator: matches
+      value: "(?i)(cardiac|heart|arrhythmia|infarction|myocardial)"
+      true_next: cardiac_soc
+      false_next: check_neuro
+    check_neuro:
+      type: condition
+      variable: adverse_event_term
+      operator: matches
+      value: "(?i)(seizure|stroke|convulsion|headache|migraine)"
+      true_next: neuro_soc
+      false_next: other_soc
+    infections_soc:
+      type: return
+      value:
+        soc_code: "10001"
+        soc_name: "Infections and infestations"
+        meddra_hierarchy_compliant: true
+    cardiac_soc:
+      type: return
+      value:
+        soc_code: "10007"
+        soc_name: "Cardiac disorders"
+        meddra_hierarchy_compliant: true
+    neuro_soc:
+      type: return
+      value:
+        soc_code: "10029104"
+        soc_name: "Nervous system disorders"
+        meddra_hierarchy_compliant: true
+    other_soc:
+      type: return
+      value:
+        soc_code: "10010001"
+        soc_name: "General disorders and administration site conditions"
+        meddra_hierarchy_compliant: true
+    soc_unknown:
+      type: return
+      value:
+        soc_code: null
+        soc_name: null
+        meddra_hierarchy_compliant: false
+tests:
+- input:
+    adverse_event_term: "pneumonia"
+    soc_code: null
+  expect:
+    soc_code: "10001"
+    soc_name: "Infections and infestations"
+- input:
+    adverse_event_term: "myocardial infarction"
+  expect:
+    soc_code: "10007"
+    soc_name: "Cardiac disorders"
+- input:
+    adverse_event_term: "seizure"
+  expect:
+    soc_code: "10029104"
+    soc_name: "Nervous system disorders"
+- input:
+    adverse_event_term: "fatigue"
+  expect:
+    soc_code: "10010001"
+    soc_name: "General disorders and administration site conditions"
+- input: {}
+  expect:
+    soc_code: null
+    meddra_hierarchy_compliant: false

@@ -1,0 +1,144 @@
+name: station-energy-pipeline
+description: 'Route token energy budget: classify consumption regime and recommend strategy'
+version: 0.1.0
+tree:
+  start: check_charge
+  nodes:
+    check_charge:
+      type: condition
+      variable: energy_charge_pct
+      operator: gte
+      value: 70
+      true_next: high_charge
+      false_next: check_low
+    high_charge:
+      type: return
+      value:
+        reason: Energy charge ≥70% — full capacity for complex work
+        priority: low
+        action: proceed
+        route: archive
+    depleted:
+      type: return
+      value:
+        priority: critical
+        action: conserve
+        reason: Energy ≤20% — compress output, skip optional phases
+        route: energy_conservation
+    moderate:
+      type: return
+      value:
+        action: budget
+        route: energy_budgeting
+        reason: Energy 20-70% — allocate tokens deliberately
+        priority: moderate
+    check_low:
+      type: condition
+      variable: energy_charge_pct
+      operator: lte
+      value: 20
+      true_next: depleted
+      false_next: moderate
+tests:
+- input:
+    energy_charge_pct: 85
+  expect:
+    route: archive
+    action: proceed
+    priority: low
+- input:
+    energy_charge_pct: 10
+  expect:
+    route: energy_conservation
+    action: conserve
+    priority: critical
+- input:
+    energy_charge_pct: 45
+  expect:
+    action: budget
+    route: energy_budgeting
+    priority: moderate
+- input:
+    energy_charge_pct: 0
+  expect:
+    priority: critical
+    reason: Energy ≤20% — compress output, skip optional phases
+    action: conserve
+    route: energy_conservation
+- input:
+    energy_charge_pct: -1
+  expect:
+    reason: Energy ≤20% — compress output, skip optional phases
+    priority: critical
+    route: energy_conservation
+    action: conserve
+- input:
+    energy_charge_pct: 69
+  expect:
+    action: budget
+    route: energy_budgeting
+    reason: Energy 20-70% — allocate tokens deliberately
+    priority: moderate
+- input:
+    energy_charge_pct: 71
+  expect:
+    route: archive
+    reason: Energy charge ≥70% — full capacity for complex work
+    priority: low
+    action: proceed
+- input:
+    energy_charge_pct: 7000
+  expect:
+    reason: Energy charge ≥70% — full capacity for complex work
+    priority: low
+    route: archive
+    action: proceed
+- input: {}
+  expect:
+    priority: moderate
+    reason: Energy 20-70% — allocate tokens deliberately
+    action: budget
+    route: energy_budgeting
+- input:
+    energy_charge_pct: 0
+  expect:
+    action: conserve
+    reason: Energy ≤20% — compress output, skip optional phases
+    route: energy_conservation
+    priority: critical
+- input:
+    energy_charge_pct: -1
+  expect:
+    route: energy_conservation
+    reason: Energy ≤20% — compress output, skip optional phases
+    action: conserve
+    priority: critical
+- input:
+    energy_charge_pct: 19
+  expect:
+    reason: Energy ≤20% — compress output, skip optional phases
+    priority: critical
+    route: energy_conservation
+    action: conserve
+- input:
+    energy_charge_pct: 21
+  expect:
+    priority: moderate
+    reason: Energy 20-70% — allocate tokens deliberately
+    action: budget
+    route: energy_budgeting
+- input:
+    energy_charge_pct: 2000
+  expect:
+    priority: low
+    reason: Energy charge ≥70% — full capacity for complex work
+    action: proceed
+    route: archive
+- input: {}
+  expect:
+    route: energy_budgeting
+    action: budget
+    reason: Energy 20-70% — allocate tokens deliberately
+    priority: moderate
+interface: null
+primitive_signature: null

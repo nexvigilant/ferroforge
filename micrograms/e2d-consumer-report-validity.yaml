@@ -1,0 +1,193 @@
+name: e2d-consumer-report-validity
+description: 'ICH E2D Section 3.2: Validates whether a consumer (non-HCP) report meets minimum criteria for processing'
+version: 0.1.0
+interface:
+  inputs:
+    identifiable_reporter:
+      type: bool
+      required: false
+    identifiable_patient:
+      type: bool
+      required: false
+    suspect_drug:
+      type: bool
+      required: false
+    adverse_event:
+      type: bool
+      required: false
+    medically_confirmed:
+      type: bool
+      required: false
+  outputs:
+    valid:
+      type: bool
+    quality_level:
+      type: string
+    reason:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_reporter
+  nodes:
+    check_reporter:
+      type: condition
+      variable: identifiable_reporter
+      operator: eq
+      value: true
+      true_next: check_adverse_event
+      false_next: return_no_reporter
+    check_adverse_event:
+      type: condition
+      variable: adverse_event
+      operator: eq
+      value: true
+      true_next: check_suspect_drug
+      false_next: return_no_ae
+    check_suspect_drug:
+      type: condition
+      variable: suspect_drug
+      operator: eq
+      value: true
+      true_next: check_patient
+      false_next: return_no_drug
+    check_patient:
+      type: condition
+      variable: identifiable_patient
+      operator: eq
+      value: true
+      true_next: check_medically_confirmed
+      false_next: return_no_patient
+    check_medically_confirmed:
+      type: condition
+      variable: medically_confirmed
+      operator: eq
+      value: true
+      true_next: return_confirmed
+      false_next: return_standard
+    return_confirmed:
+      type: return
+      value:
+        valid: true
+        quality_level: confirmed
+        reason: all_criteria_met_with_medical_confirmation
+        regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+    return_standard:
+      type: return
+      value:
+        valid: true
+        quality_level: standard
+        reason: minimum_criteria_met
+        regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+    return_no_reporter:
+      type: return
+      value:
+        valid: false
+        quality_level: insufficient
+        reason: no_identifiable_reporter
+        regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+    return_no_ae:
+      type: return
+      value:
+        valid: false
+        quality_level: insufficient
+        reason: no_adverse_event
+        regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+    return_no_drug:
+      type: return
+      value:
+        valid: false
+        quality_level: insufficient
+        reason: no_suspect_drug
+        regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+    return_no_patient:
+      type: return
+      value:
+        valid: false
+        quality_level: insufficient
+        reason: no_identifiable_patient
+        regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — consumer report validity gate per ICH E2D four minimum criteria'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['identifiable_reporter', 'identifiable_patient', 'suspect_drug', 'adverse_event', 'medically_confirmed']
+tests:
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspect_drug: true
+    adverse_event: true
+  expect:
+    valid: true
+    quality_level: standard
+    reason: minimum_criteria_met
+    regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspect_drug: true
+    adverse_event: true
+    medically_confirmed: true
+  expect:
+    valid: true
+    quality_level: confirmed
+    reason: all_criteria_met_with_medical_confirmation
+    regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+- input:
+    identifiable_reporter: false
+    identifiable_patient: true
+    suspect_drug: true
+    adverse_event: true
+  expect:
+    valid: false
+    quality_level: insufficient
+    reason: no_identifiable_reporter
+    regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspect_drug: true
+    adverse_event: false
+  expect:
+    valid: false
+    quality_level: insufficient
+    reason: no_adverse_event
+    regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspect_drug: false
+    adverse_event: true
+  expect:
+    valid: false
+    quality_level: insufficient
+    reason: no_suspect_drug
+    regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+- input:
+    identifiable_reporter: true
+    identifiable_patient: false
+    suspect_drug: true
+    adverse_event: true
+  expect:
+    valid: false
+    quality_level: insufficient
+    reason: no_identifiable_patient
+    regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+- input: {}
+  expect:
+    valid: false
+    quality_level: insufficient
+    reason: no_identifiable_reporter
+    regulatory_reference: ICH E2D Section 3.2 - Consumer Reports
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspect_drug: true
+    adverse_event: true
+    medically_confirmed: false
+  expect:
+    valid: true
+    quality_level: standard
+    reason: minimum_criteria_met
+    regulatory_reference: ICH E2D Section 3.2 - Consumer Reports

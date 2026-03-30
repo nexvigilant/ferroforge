@@ -1,0 +1,66 @@
+name: organ-immunological-safety
+description: "Immunological safety assessment. Evaluates immunosuppression, infection risk, and hypersensitivity reactions."
+version: 0.1.0
+tree:
+  start: check_immunocompromised
+  nodes:
+    check_immunocompromised:
+      type: condition
+      variable: is_severely_immunocompromised
+      operator: eq
+      value: true
+      true_next: immunocompromised_alert
+      false_next: check_active_infection
+    immunocompromised_alert:
+      type: return
+      value:
+        organ: immune_system
+        risk_level: high
+        infection_risk: true
+        monitoring: required
+        message: "Severely immunocompromised; additional immunosuppression contraindicated"
+    check_active_infection:
+      type: condition
+      variable: has_active_infection
+      operator: eq
+      value: true
+      true_next: infection_alert
+      false_next: check_hypersensitivity
+    infection_alert:
+      type: return
+      value:
+        organ: immune_system
+        risk_level: critical
+        contraindication: true
+        message: "Active infection; defer immunosuppressive drugs"
+    check_hypersensitivity:
+      type: condition
+      variable: prior_hypersensitivity_reaction
+      operator: eq
+      value: true
+      true_next: hypersensitivity_alert
+      false_next: standard_dosing
+    hypersensitivity_alert:
+      type: return
+      value:
+        organ: immune_system
+        risk_level: high
+        anaphylaxis_risk: true
+        message: "Prior hypersensitivity; same-class drugs contraindicated"
+    standard_dosing:
+      type: return
+      value:
+        organ: immune_system
+        risk_level: low
+        baseline_immunity_assessment: recommended
+tests:
+  - input: { is_severely_immunocompromised: true, has_active_infection: false, prior_hypersensitivity_reaction: false }
+    expect: { organ: immune_system, risk_level: high, infection_risk: true }
+  - input: { is_severely_immunocompromised: false, has_active_infection: true, prior_hypersensitivity_reaction: false }
+    expect: { organ: immune_system, risk_level: critical, contraindication: true }
+  - input: { is_severely_immunocompromised: false, has_active_infection: false, prior_hypersensitivity_reaction: true }
+    expect: { organ: immune_system, risk_level: high, anaphylaxis_risk: true }
+  - input: { is_severely_immunocompromised: false, has_active_infection: false, prior_hypersensitivity_reaction: false }
+    expect: { organ: immune_system, risk_level: low }
+  - input: {}
+    expect: {}

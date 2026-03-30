@@ -21,9 +21,13 @@ Usage:
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+# Ensure sibling imports work regardless of cwd
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 SCRIPTS_DIR = Path(__file__).parent.resolve()
 CONFIGS_DIR = SCRIPTS_DIR.parent / "configs"
@@ -324,14 +328,22 @@ def dispatch(envelope: dict) -> dict:
     if proxy_path is None:
         return stub_response(tool_name, arguments)
 
-    # Rust-native fallback: configs with proxy "rust-native" route to the
-    # nexcore bridge proxy which calls the nexcore-mcp binary via stdio.
-    if not Path(proxy_path).exists():
-        if Path(proxy_path).name == "rust-native":
+    # Rust-native fast path: use persistent nexcore-mcp connection pool
+    # instead of spawning a subprocess per call (~5ms vs ~200ms).
+    if not Path(proxy_path).exists() or Path(proxy_path).name in ("rust-native", "nexcore_proxy.py"):
+        try:
+            from nexcore_pool import get_pool, strip_station_prefix
+            pool = get_pool()
+            nexcore_tool = strip_station_prefix(tool_name)
+            return pool.call(nexcore_tool, arguments)
+        except Exception as exc:
+            # Pool failed — fall back to subprocess
             nexcore_bridge = str(SCRIPTS_DIR / "nexcore_proxy.py")
             if Path(nexcore_bridge).exists():
-                # Pass the FULL tool name — nexcore_proxy strips the prefix itself
                 return call_proxy(nexcore_bridge, tool_name, arguments, request_id)
+            return {"status": "error", "error": f"Nexcore pool failed: {exc}", "tool": tool_name}
+
+    if not Path(proxy_path).exists():
         # Proxy is registered but the file has not been created yet.
         return {
             "status": "stub",

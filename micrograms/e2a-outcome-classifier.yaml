@@ -1,0 +1,224 @@
+name: e2a-outcome-classifier
+description: 'ICH E2A Section IV.B: Classifies the outcome of an adverse event into 5 standardized ICH categories: recovered, recovering, not_recovered, fatal, unknown — with follow-up implications'
+version: 1.0.0
+interface:
+  inputs:
+    ae_ongoing:
+      type: bool
+      required: false
+    death_confirmed:
+      type: bool
+      required: false
+    outcome_known:
+      type: bool
+      required: false
+    recovered_with_sequelae:
+      type: bool
+      required: false
+    signs_improving:
+      type: bool
+      required: false
+    symptoms_resolved:
+      type: bool
+      required: false
+  outputs:
+    followup_needed:
+      type: bool
+    ich_outcome_code:
+      type: string
+    outcome_category:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_death
+  nodes:
+    check_death:
+      type: condition
+      variable: death_confirmed
+      operator: eq
+      value: true
+      true_next: fatal
+      false_next: check_outcome_known
+    check_outcome_known:
+      type: condition
+      variable: outcome_known
+      operator: eq
+      value: true
+      true_next: check_symptoms_resolved
+      false_next: unknown_outcome
+    check_symptoms_resolved:
+      type: condition
+      variable: symptoms_resolved
+      operator: eq
+      value: true
+      true_next: check_sequelae
+      false_next: check_ongoing
+    check_sequelae:
+      type: condition
+      variable: recovered_with_sequelae
+      operator: eq
+      value: true
+      true_next: recovered_sequelae
+      false_next: recovered_complete
+    check_ongoing:
+      type: condition
+      variable: ae_ongoing
+      operator: eq
+      value: true
+      true_next: check_improving
+      false_next: not_recovered
+    check_improving:
+      type: condition
+      variable: signs_improving
+      operator: eq
+      value: true
+      true_next: recovering
+      false_next: not_recovered
+    fatal:
+      type: return
+      value:
+        outcome_category: FATAL
+        ich_outcome_code: "5"
+        followup_needed: true
+        regulatory_reference: "ICH E2A Section IV.B - Outcome code 5: fatal"
+    recovered_complete:
+      type: return
+      value:
+        outcome_category: RECOVERED
+        ich_outcome_code: "1"
+        followup_needed: false
+        regulatory_reference: "ICH E2A Section IV.B - Outcome code 1: recovered/resolved"
+    recovered_sequelae:
+      type: return
+      value:
+        outcome_category: RECOVERED_WITH_SEQUELAE
+        ich_outcome_code: "2"
+        followup_needed: false
+        regulatory_reference: "ICH E2A Section IV.B - Outcome code 2: recovered/resolved with sequelae"
+    recovering:
+      type: return
+      value:
+        outcome_category: RECOVERING
+        ich_outcome_code: "3"
+        followup_needed: true
+        regulatory_reference: "ICH E2A Section IV.B - Outcome code 3: recovering/resolving"
+    not_recovered:
+      type: return
+      value:
+        outcome_category: NOT_RECOVERED
+        ich_outcome_code: "4"
+        followup_needed: true
+        regulatory_reference: "ICH E2A Section IV.B - Outcome code 4: not recovered/not resolved"
+    unknown_outcome:
+      type: return
+      value:
+        outcome_category: UNKNOWN
+        ich_outcome_code: "0"
+        followup_needed: true
+        regulatory_reference: "ICH E2A Section IV.B - Outcome code 0: unknown"
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — ICH E2A outcome classification to 5 standardized codes'
+  primes: ['κ', 'σ']
+  arguments: ['death_confirmed', 'symptoms_resolved', 'recovered_with_sequelae', 'ae_ongoing', 'signs_improving', 'outcome_known']
+  chain_prediction: 'Feeds outcome_category and followup_needed into e2a-followup-required and case-seriousness. ICH outcome codes map to E2B(R3) field C.1.7.'
+tests:
+# Death = fatal (code 5)
+- input:
+    death_confirmed: true
+    symptoms_resolved: false
+    recovered_with_sequelae: false
+    ae_ongoing: false
+    signs_improving: false
+    outcome_known: true
+  expect:
+    outcome_category: FATAL
+    ich_outcome_code: "5"
+    followup_needed: true
+    regulatory_reference: "ICH E2A Section IV.B - Outcome code 5: fatal"
+# Symptoms resolved, no sequelae = recovered (code 1)
+- input:
+    death_confirmed: false
+    symptoms_resolved: true
+    recovered_with_sequelae: false
+    ae_ongoing: false
+    signs_improving: false
+    outcome_known: true
+  expect:
+    outcome_category: RECOVERED
+    ich_outcome_code: "1"
+    followup_needed: false
+    regulatory_reference: "ICH E2A Section IV.B - Outcome code 1: recovered/resolved"
+# Symptoms resolved with sequelae = recovered with sequelae (code 2)
+- input:
+    death_confirmed: false
+    symptoms_resolved: true
+    recovered_with_sequelae: true
+    ae_ongoing: false
+    signs_improving: false
+    outcome_known: true
+  expect:
+    outcome_category: RECOVERED_WITH_SEQUELAE
+    ich_outcome_code: "2"
+    followup_needed: false
+    regulatory_reference: "ICH E2A Section IV.B - Outcome code 2: recovered/resolved with sequelae"
+# AE ongoing + improving = recovering (code 3)
+- input:
+    death_confirmed: false
+    symptoms_resolved: false
+    recovered_with_sequelae: false
+    ae_ongoing: true
+    signs_improving: true
+    outcome_known: true
+  expect:
+    outcome_category: RECOVERING
+    ich_outcome_code: "3"
+    followup_needed: true
+    regulatory_reference: "ICH E2A Section IV.B - Outcome code 3: recovering/resolving"
+# AE ongoing + not improving = not recovered (code 4)
+- input:
+    death_confirmed: false
+    symptoms_resolved: false
+    recovered_with_sequelae: false
+    ae_ongoing: true
+    signs_improving: false
+    outcome_known: true
+  expect:
+    outcome_category: NOT_RECOVERED
+    ich_outcome_code: "4"
+    followup_needed: true
+    regulatory_reference: "ICH E2A Section IV.B - Outcome code 4: not recovered/not resolved"
+# Outcome not known = unknown (code 0)
+- input:
+    death_confirmed: false
+    symptoms_resolved: false
+    recovered_with_sequelae: false
+    ae_ongoing: false
+    signs_improving: false
+    outcome_known: false
+  expect:
+    outcome_category: UNKNOWN
+    ich_outcome_code: "0"
+    followup_needed: true
+    regulatory_reference: "ICH E2A Section IV.B - Outcome code 0: unknown"
+# Empty input = unknown
+- input: {}
+  expect:
+    outcome_category: UNKNOWN
+    ich_outcome_code: "0"
+    followup_needed: true
+    regulatory_reference: "ICH E2A Section IV.B - Outcome code 0: unknown"
+# AE not ongoing but outcome known + not resolved = not recovered
+- input:
+    death_confirmed: false
+    symptoms_resolved: false
+    recovered_with_sequelae: false
+    ae_ongoing: false
+    signs_improving: false
+    outcome_known: true
+  expect:
+    outcome_category: NOT_RECOVERED
+    ich_outcome_code: "4"
+    followup_needed: true
+    regulatory_reference: "ICH E2A Section IV.B - Outcome code 4: not recovered/not resolved"

@@ -1,0 +1,62 @@
+name: drug-profile-durvalumab
+description: 'Safety triage for durvalumab: PRR-based signal routing (Type B)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    signal:
+      type: return
+      value:
+        action: investigate
+        expected_prr: 5.4
+        drug: durvalumab
+        harm_type: B
+        signal: true
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5.0
+      true_next: signal
+      false_next: no_signal
+    no_signal:
+      type: return
+      value:
+        action: monitor
+        expected_prr: 5.4
+        signal: false
+        drug: durvalumab
+        harm_type: B
+tests:
+- input:
+    prr: 5.4
+  expect:
+    signal: true
+    drug: durvalumab
+- input:
+    prr: 0.5
+  expect:
+    signal: false
+    drug: durvalumab
+- input: {}
+  expect:
+    drug: durvalumab
+    signal: false
+- input:
+    prr: 4.999
+  expect:
+    expected_prr: 5.4
+    signal: false
+    drug: durvalumab
+    action: monitor
+    harm_type: B
+- input:
+    prr: 5.001
+  expect:
+    drug: durvalumab
+    action: investigate
+    signal: true
+    expected_prr: 5.4
+    harm_type: B
+interface: null
+primitive_signature: null

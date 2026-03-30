@@ -1,0 +1,165 @@
+name: forge-quality-floor-classify
+description: >
+  Classifies the Ferro Forge quality_floor parameter from session success rate.
+  quality_floor = fully_demonstrated / total_recent_sessions.
+  Below 0.20 = degraded. 0.20-0.50 = cautious. Above 0.50 = confident.
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(N(ς_success) / N(ς_total)) — compare success rate against Forge thresholds'
+  primes: ['κ', 'N', 'ς']
+  arguments: ['demonstrated', 'total']
+  chain_prediction: >
+    Computes quality_floor from real session data. Forge evolved value is 0.313.
+    If computed value diverges significantly from evolved baseline, flag for review.
+interface:
+  inputs:
+    demonstrated:
+      type: int
+      required: true
+      description: "Count of fully_demonstrated sessions in recent window"
+    total:
+      type: int
+      required: true
+      description: "Total sessions in recent window"
+  outputs:
+    quality_floor:
+      type: float
+    regime:
+      type: string
+      description: "DEGRADED | CAUTIOUS | CONFIDENT | REJECTED"
+    action:
+      type: string
+tree:
+  start: check_total_present
+  nodes:
+    check_total_present:
+      type: condition
+      variable: total
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: check_total_nonzero
+
+    check_total_nonzero:
+      type: condition
+      variable: total
+      operator: gt
+      value: 0
+      true_next: check_demonstrated_present
+      false_next: use_default
+
+    check_demonstrated_present:
+      type: condition
+      variable: demonstrated
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: check_high
+
+    reject:
+      type: return
+      value:
+        quality_floor: 0.313
+        regime: REJECTED
+        action: "Missing inputs — using evolved default 0.313"
+
+    use_default:
+      type: return
+      value:
+        quality_floor: 0.313
+        regime: CAUTIOUS
+        action: "No session data — using evolved default 0.313"
+
+    check_high:
+      type: condition
+      variable: demonstrated
+      operator: gte
+      value: 5
+      true_next: confident
+      false_next: check_moderate
+
+    check_moderate:
+      type: condition
+      variable: demonstrated
+      operator: gte
+      value: 2
+      true_next: cautious
+      false_next: check_any
+
+    check_any:
+      type: condition
+      variable: demonstrated
+      operator: gte
+      value: 1
+      true_next: cautious_low
+      false_next: degraded
+
+    confident:
+      type: return
+      value:
+        quality_floor: 0.5
+        regime: CONFIDENT
+        action: "High success rate — ship with confidence"
+
+    cautious:
+      type: return
+      value:
+        quality_floor: 0.313
+        regime: CAUTIOUS
+        action: "Moderate success rate — standard Forge thresholds"
+
+    cautious_low:
+      type: return
+      value:
+        quality_floor: 0.25
+        regime: CAUTIOUS
+        action: "Low success rate — lower quality bar to encourage shipping"
+
+    degraded:
+      type: return
+      value:
+        quality_floor: 0.15
+        regime: DEGRADED
+        action: "Zero successes — learning mode, accept any working output"
+
+tests:
+- input:
+    demonstrated: 7
+    total: 10
+  expect:
+    regime: CONFIDENT
+    quality_floor: 0.5
+
+- input:
+    demonstrated: 3
+    total: 10
+  expect:
+    regime: CAUTIOUS
+    quality_floor: 0.313
+
+- input:
+    demonstrated: 1
+    total: 10
+  expect:
+    regime: CAUTIOUS
+    quality_floor: 0.25
+
+- input:
+    demonstrated: 0
+    total: 10
+  expect:
+    regime: DEGRADED
+    quality_floor: 0.15
+
+- input:
+    demonstrated: 0
+    total: 0
+  expect:
+    regime: CAUTIOUS
+    quality_floor: 0.313
+
+- input: {}
+  expect:
+    regime: REJECTED
+    quality_floor: 0.313

@@ -1,0 +1,67 @@
+name: convergence-multi-db
+description: Multiple databases signal
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: databases_positive
+      operator: gte
+      value: 2
+      true_next: converged
+      false_next: divergent
+    converged:
+      type: return
+      value:
+        action: escalate
+        convergence: multi_source
+        met: true
+    divergent:
+      type: return
+      value:
+        convergence: multi_source
+        met: false
+        action: investigate_discrepancy
+tests:
+- input:
+    databases_positive: 2
+  expect:
+    convergence: multi_source
+    met: true
+- input: {}
+  expect:
+    met: false
+    convergence: multi_source
+- input:
+    databases_positive: 0
+  expect:
+    met: false
+    action: investigate_discrepancy
+    convergence: multi_source
+- input:
+    databases_positive: -1
+  expect:
+    action: investigate_discrepancy
+    met: false
+    convergence: multi_source
+- input:
+    databases_positive: 1
+  expect:
+    action: investigate_discrepancy
+    convergence: multi_source
+    met: false
+- input:
+    databases_positive: 3
+  expect:
+    met: true
+    action: escalate
+    convergence: multi_source
+- input:
+    databases_positive: 200
+  expect:
+    met: true
+    convergence: multi_source
+    action: escalate
+interface: null
+primitive_signature: null

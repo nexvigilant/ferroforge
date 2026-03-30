@@ -1,0 +1,74 @@
+name: class-tkis
+description: 'Tyrosine kinase inhibitors class safety: Hepatotoxicity monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: liver_tox_grade
+      operator: gte
+      value: 2
+      true_next: alert
+      false_next: safe
+    safe:
+      type: return
+      value:
+        drug_class: Tyrosine kinase inhibitors
+        concern: Hepatotoxicity
+        alert: false
+        action: continue
+    alert:
+      type: return
+      value:
+        action: class_effect_investigation
+        concern: Hepatotoxicity
+        drug_class: Tyrosine kinase inhibitors
+        alert: true
+tests:
+- input:
+    liver_tox_grade: 2
+  expect:
+    alert: true
+    drug_class: Tyrosine kinase inhibitors
+- input: {}
+  expect:
+    alert: false
+    drug_class: Tyrosine kinase inhibitors
+- input:
+    liver_tox_grade: 0
+  expect:
+    drug_class: Tyrosine kinase inhibitors
+    concern: Hepatotoxicity
+    alert: false
+    action: continue
+- input:
+    liver_tox_grade: -1
+  expect:
+    action: continue
+    concern: Hepatotoxicity
+    alert: false
+    drug_class: Tyrosine kinase inhibitors
+- input:
+    liver_tox_grade: 1
+  expect:
+    alert: false
+    drug_class: Tyrosine kinase inhibitors
+    action: continue
+    concern: Hepatotoxicity
+- input:
+    liver_tox_grade: 3
+  expect:
+    concern: Hepatotoxicity
+    drug_class: Tyrosine kinase inhibitors
+    action: class_effect_investigation
+    alert: true
+- input:
+    liver_tox_grade: 200
+  expect:
+    alert: true
+    action: class_effect_investigation
+    concern: Hepatotoxicity
+    drug_class: Tyrosine kinase inhibitors
+interface: null
+primitive_signature: null

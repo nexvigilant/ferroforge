@@ -1,0 +1,74 @@
+name: pbrer-vs-psur
+description: "Determine appropriate periodic safety reporting format (PBRER vs PSUR)"
+version: 0.1.0
+tree:
+  start: validate_region
+  nodes:
+    validate_region:
+      type: condition
+      variable: regulatory_region
+      operator: is_not_null
+      value: null
+      true_next: check_region_type
+      false_next: format_unknown
+    check_region_type:
+      type: condition
+      variable: regulatory_region
+      operator: eq
+      value: "eu"
+      true_next: pbrer_format
+      false_next: check_other_regions
+    check_other_regions:
+      type: condition
+      variable: regulatory_region
+      operator: matches
+      value: "(?i)(japan|us|canada|australia)"
+      true_next: psur_format
+      false_next: regional_variant
+    pbrer_format:
+      type: return
+      value:
+        reporting_format: "PBRER"
+        format_name: "Periodic Benefit-Risk Evaluation Report"
+        applicable_regions: "EU"
+        regulatory_compliant: true
+    psur_format:
+      type: return
+      value:
+        reporting_format: "PSUR"
+        format_name: "Periodic Safety Update Report"
+        applicable_regions: "US,Japan,Canada,Australia"
+        regulatory_compliant: true
+    regional_variant:
+      type: return
+      value:
+        reporting_format: "regional_variant"
+        format_name: "region_specific_periodic_reporting"
+        applicable_regions: "other_regions"
+        regulatory_compliant: true
+    format_unknown:
+      type: return
+      value:
+        reporting_format: null
+        format_name: null
+        applicable_regions: null
+        regulatory_compliant: false
+tests:
+- input:
+    regulatory_region: "eu"
+  expect:
+    reporting_format: "PBRER"
+    format_name: "Periodic Benefit-Risk Evaluation Report"
+- input:
+    regulatory_region: "japan"
+  expect:
+    reporting_format: "PSUR"
+    format_name: "Periodic Safety Update Report"
+- input:
+    regulatory_region: "us"
+  expect:
+    reporting_format: "PSUR"
+- input: {}
+  expect:
+    reporting_format: null
+    regulatory_compliant: false

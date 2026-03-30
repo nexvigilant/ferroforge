@@ -1,0 +1,67 @@
+name: gate-serious-high
+description: High serious outcome rate
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    pass:
+      type: return
+      value:
+        gate: true
+        met: true
+        threshold: serious_pct
+    check:
+      type: condition
+      variable: serious_pct
+      operator: gte
+      value: 30
+      true_next: pass
+      false_next: fail
+    fail:
+      type: return
+      value:
+        gate: false
+        threshold: serious_pct
+        met: false
+tests:
+- input:
+    serious_pct: 30
+  expect:
+    gate: true
+    met: true
+- input: {}
+  expect:
+    gate: false
+    met: false
+- input:
+    serious_pct: 0
+  expect:
+    threshold: serious_pct
+    gate: false
+    met: false
+- input:
+    serious_pct: -1
+  expect:
+    gate: false
+    met: false
+    threshold: serious_pct
+- input:
+    serious_pct: 29
+  expect:
+    threshold: serious_pct
+    met: false
+    gate: false
+- input:
+    serious_pct: 31
+  expect:
+    met: true
+    gate: true
+    threshold: serious_pct
+- input:
+    serious_pct: 3000
+  expect:
+    gate: true
+    met: true
+    threshold: serious_pct
+interface: null
+primitive_signature: null

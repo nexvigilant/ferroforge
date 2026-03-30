@@ -1,0 +1,112 @@
+name: tox-ototoxic
+description: 'Ototoxic toxicity gate: hearing_loss_db thresholds for ear'
+version: 0.1.0
+tree:
+  start: check_severe
+  nodes:
+    mild:
+      type: return
+      value:
+        severity: mild
+        action: monitor_closely
+        target: ear
+        organ: ototoxic
+    check_severe:
+      type: condition
+      variable: hearing_loss_db
+      operator: gte
+      value: 25
+      true_next: severe
+      false_next: check_mild
+    check_mild:
+      type: condition
+      variable: hearing_loss_db
+      operator: gte
+      value: 15
+      true_next: mild
+      false_next: normal
+    severe:
+      type: return
+      value:
+        target: ear
+        organ: ototoxic
+        action: discontinue
+        severity: severe
+    normal:
+      type: return
+      value:
+        action: continue
+        organ: ototoxic
+        severity: normal
+        target: ear
+tests:
+- input:
+    hearing_loss_db: 26
+  expect:
+    organ: ototoxic
+    severity: severe
+- input:
+    hearing_loss_db: 15
+  expect:
+    severity: mild
+    organ: ototoxic
+- input:
+    hearing_loss_db: 0
+  expect:
+    organ: ototoxic
+    severity: normal
+- input: {}
+  expect:
+    severity: normal
+    organ: ototoxic
+- input:
+    hearing_loss_db: -1
+  expect:
+    target: ear
+    action: continue
+    organ: ototoxic
+    severity: normal
+- input:
+    hearing_loss_db: 24
+  expect:
+    target: ear
+    action: monitor_closely
+    severity: mild
+    organ: ototoxic
+- input:
+    hearing_loss_db: 2500
+  expect:
+    severity: severe
+    organ: ototoxic
+    action: discontinue
+    target: ear
+- input:
+    hearing_loss_db: -1
+  expect:
+    target: ear
+    action: continue
+    severity: normal
+    organ: ototoxic
+- input:
+    hearing_loss_db: 14
+  expect:
+    organ: ototoxic
+    severity: normal
+    action: continue
+    target: ear
+- input:
+    hearing_loss_db: 16
+  expect:
+    action: monitor_closely
+    severity: mild
+    target: ear
+    organ: ototoxic
+- input:
+    hearing_loss_db: 1500
+  expect:
+    target: ear
+    organ: ototoxic
+    severity: severe
+    action: discontinue
+interface: null
+primitive_signature: null

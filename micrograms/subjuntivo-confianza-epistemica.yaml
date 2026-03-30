@@ -1,0 +1,220 @@
+name: subjuntivo-confianza-epistemica
+description: >
+  Clasifica la confianza epistémica del hablante basándose en el modo verbal
+  español (indicativo vs subjuntivo). El subjuntivo codifica incertidumbre
+  gramaticalmente — un primitivo de confianza que el inglés pierde.
+  Classifies speaker epistemic confidence from Spanish verb mood.
+  Subjunctive encodes uncertainty grammatically — a confidence primitive English lacks.
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(ς + ∂) — extracts comparison confidence from grammatical mood, restoring epistemic boundary'
+  primes: ['κ', 'ς', '∂']
+  arguments: ['modo_verbal']
+  chain_prediction: >
+    Spanish subjunctive is grammatically compulsory after doubt/desire/denial verbs.
+    "Creo que TIENE" (indicative) vs "Dudo que TENGA" (subjunctive) — the verb form
+    itself encodes speaker confidence. Maps to κ (comparison with certainty baseline).
+    Output feeds confidence weighting in signal detection and causality chains.
+interface:
+  inputs:
+    modo_verbal:
+      type: string
+      required: true
+      description: >
+        Modo del verbo: "indicativo" o "subjuntivo" (o formas conjugadas que
+        impliquen el modo). Spanish verb mood: indicative or subjunctive.
+    verbo_contexto:
+      type: string
+      required: false
+      description: >
+        Verbo rector que introduce la cláusula (creer, dudar, negar, esperar, etc.).
+        Governing verb that introduces the clause.
+  outputs:
+    confianza_epistemica:
+      type: string
+      description: "ALTA (indicativo) | BAJA (subjuntivo) | INDETERMINADA"
+    confidence_level:
+      type: string
+      description: "English: HIGH | LOW | INDETERMINATE"
+    peso_senal:
+      type: int
+      description: >
+        Peso para detección de señales 0-100. Indicativo = el reportante está
+        seguro, señal más fuerte. Subjuntivo = el reportante duda, señal más débil.
+    accion:
+      type: string
+      description: "Acción recomendada / Recommended action"
+    razon:
+      type: string
+      description: "Fundamento lingüístico / Linguistic rationale"
+tree:
+  start: check_modo_present
+  nodes:
+    check_modo_present:
+      type: condition
+      variable: modo_verbal
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_indicativo
+
+    reject_missing:
+      type: return
+      value:
+        confianza_epistemica: RECHAZADO
+        confidence_level: REJECTED
+        peso_senal: 0
+        accion: "RECHAZADO: modo_verbal es obligatorio"
+        razon: "Sin modo verbal no hay clasificación epistémica posible"
+
+    check_indicativo:
+      type: condition
+      variable: modo_verbal
+      operator: matches
+      value: "^(indicativo|tiene|presenta|muestra|causa|produce|desarrolla|sufre|padece|manifiesta|experimenta)$"
+      true_next: classify_high
+      false_next: check_subjuntivo
+
+    check_subjuntivo:
+      type: condition
+      variable: modo_verbal
+      operator: matches
+      value: "^(subjuntivo|tenga|presente|muestre|cause|produzca|desarrolle|sufra|padezca|manifieste|experimente)$"
+      true_next: classify_low
+      false_next: classify_indeterminate
+
+    classify_high:
+      type: return
+      value:
+        confianza_epistemica: ALTA
+        confidence_level: HIGH
+        peso_senal: 85
+        accion: "PONDERAR ALTO: el reportante expresa certeza sobre la asociación fármaco-evento"
+        razon: >
+          Modo indicativo = el hablante presenta la información como factual.
+          "El paciente TIENE hepatotoxicidad" — el reportante afirma, no duda.
+          En farmacovigilancia, reportes con indicativo merecen mayor peso en
+          la detección de señales porque el reportante se compromete con la veracidad.
+
+    classify_low:
+      type: return
+      value:
+        confianza_epistemica: BAJA
+        confidence_level: LOW
+        peso_senal: 40
+        accion: "PONDERAR BAJO: el reportante expresa duda sobre la asociación fármaco-evento"
+        razon: >
+          Modo subjuntivo = el hablante presenta la información como incierta.
+          "Es posible que TENGA hepatotoxicidad" — el reportante duda.
+          No descartamos la señal, pero reducimos su peso. El subjuntivo es
+          equivalente lingüístico de "possible" en escala Naranjo (confianza ~50%).
+
+    classify_indeterminate:
+      type: return
+      value:
+        confianza_epistemica: INDETERMINADA
+        confidence_level: INDETERMINATE
+        peso_senal: 60
+        accion: "REVISAR: modo verbal no clasificado — asignar confianza base"
+        razon: >
+          El modo verbal no fue reconocido como indicativo ni subjuntivo.
+          Posibilidades: imperativo, condicional, infinitivo, o error de entrada.
+          Se asigna peso neutro (60) pendiente de revisión humana.
+
+tests:
+# --- Indicativo (ALTA) ---
+- input:
+    modo_verbal: "indicativo"
+  expect:
+    confianza_epistemica: ALTA
+    confidence_level: HIGH
+    peso_senal: 85
+
+- input:
+    modo_verbal: "tiene"
+    verbo_contexto: "creer"
+  expect:
+    confianza_epistemica: ALTA
+    confidence_level: HIGH
+    peso_senal: 85
+
+- input:
+    modo_verbal: "presenta"
+  expect:
+    confianza_epistemica: ALTA
+    confidence_level: HIGH
+    peso_senal: 85
+
+- input:
+    modo_verbal: "causa"
+  expect:
+    confianza_epistemica: ALTA
+    confidence_level: HIGH
+    peso_senal: 85
+
+- input:
+    modo_verbal: "sufre"
+  expect:
+    confianza_epistemica: ALTA
+    confidence_level: HIGH
+    peso_senal: 85
+
+# --- Subjuntivo (BAJA) ---
+- input:
+    modo_verbal: "subjuntivo"
+  expect:
+    confianza_epistemica: BAJA
+    confidence_level: LOW
+    peso_senal: 40
+
+- input:
+    modo_verbal: "tenga"
+    verbo_contexto: "dudar"
+  expect:
+    confianza_epistemica: BAJA
+    confidence_level: LOW
+    peso_senal: 40
+
+- input:
+    modo_verbal: "presente"
+  expect:
+    confianza_epistemica: BAJA
+    confidence_level: LOW
+    peso_senal: 40
+
+- input:
+    modo_verbal: "cause"
+  expect:
+    confianza_epistemica: BAJA
+    confidence_level: LOW
+    peso_senal: 40
+
+- input:
+    modo_verbal: "padezca"
+  expect:
+    confianza_epistemica: BAJA
+    confidence_level: LOW
+    peso_senal: 40
+
+# --- Indeterminado ---
+- input:
+    modo_verbal: "tomaría"
+  expect:
+    confianza_epistemica: INDETERMINADA
+    confidence_level: INDETERMINATE
+    peso_senal: 60
+
+- input:
+    modo_verbal: "tomar"
+  expect:
+    confianza_epistemica: INDETERMINADA
+    confidence_level: INDETERMINATE
+    peso_senal: 60
+
+# --- Rejected ---
+- input: {}
+  expect:
+    confianza_epistemica: RECHAZADO
+    confidence_level: REJECTED
+    peso_senal: 0

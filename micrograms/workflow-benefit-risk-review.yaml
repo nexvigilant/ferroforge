@@ -1,0 +1,47 @@
+name: workflow-benefit-risk-review
+description: "Select benefit-risk assessment depth by product lifecycle stage"
+version: 0.1.0
+
+tree:
+  start: check_stage
+  nodes:
+    check_stage:
+      type: "condition"
+      variable: "lifecycle_stage"
+      operator: "eq"
+      value: "approval"
+      true_next: "full_review"
+      false_next: "check_psur"
+    full_review:
+      type: "return"
+      value:
+        depth: "comprehensive"
+        chain: "benefit-risk \u2192 epidemiology \u2192 compliance \u2192 ema"
+        assessors: 4
+    check_psur:
+      type: "condition"
+      variable: "lifecycle_stage"
+      operator: "eq"
+      value: "psur"
+      true_next: "periodic_review"
+      false_next: "ongoing"
+    periodic_review:
+      type: "return"
+      value:
+        depth: "periodic"
+        chain: "benefit-risk \u2192 ema \u2192 compliance"
+        assessors: 3
+    ongoing:
+      type: "return"
+      value:
+        depth: "signal_triggered"
+        chain: "benefit-risk \u2192 vigilance"
+        assessors: 2
+
+tests:
+  - input: {"lifecycle_stage": "approval"}
+    expect: {"depth": "comprehensive", "assessors": 4}
+  - input: {"lifecycle_stage": "psur"}
+    expect: {"depth": "periodic", "assessors": 3}
+  - input: {"lifecycle_stage": "post_market"}
+    expect: {"depth": "signal_triggered", "assessors": 2}

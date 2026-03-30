@@ -1,0 +1,83 @@
+name: signal-prioritize
+description: "Prioritize detected signals based on severity and clinical relevance"
+version: 0.1.0
+tree:
+  start: validate_signal
+  nodes:
+    validate_signal:
+      type: condition
+      variable: signal_validated
+      operator: eq
+      value: true
+      true_next: check_severity
+      false_next: priority_unknown
+    check_severity:
+      type: condition
+      variable: outcome_severity
+      operator: eq
+      value: "fatal"
+      true_next: critical_priority
+      false_next: check_serious
+    check_serious:
+      type: condition
+      variable: outcome_severity
+      operator: eq
+      value: "serious"
+      true_next: high_priority
+      false_next: moderate_priority
+    critical_priority:
+      type: return
+      value:
+        priority_level: 1
+        priority_category: "critical"
+        immediate_action_required: true
+        escalation_needed: true
+        signal_management_compliant: true
+    high_priority:
+      type: return
+      value:
+        priority_level: 2
+        priority_category: "high"
+        immediate_action_required: true
+        escalation_needed: true
+        signal_management_compliant: true
+    moderate_priority:
+      type: return
+      value:
+        priority_level: 3
+        priority_category: "moderate"
+        immediate_action_required: false
+        escalation_needed: false
+        signal_management_compliant: true
+    priority_unknown:
+      type: return
+      value:
+        priority_level: null
+        priority_category: "unknown"
+        immediate_action_required: null
+        escalation_needed: null
+        signal_management_compliant: false
+tests:
+- input:
+    signal_validated: true
+    outcome_severity: "fatal"
+  expect:
+    priority_level: 1
+    priority_category: "critical"
+    immediate_action_required: true
+- input:
+    signal_validated: true
+    outcome_severity: "serious"
+  expect:
+    priority_level: 2
+    priority_category: "high"
+- input:
+    signal_validated: true
+    outcome_severity: "mild"
+  expect:
+    priority_level: 3
+    priority_category: "moderate"
+- input: {}
+  expect:
+    priority_level: null
+    signal_management_compliant: false

@@ -1,0 +1,100 @@
+name: station-who-umc-pipeline
+description: Route WHO-UMC causality and signal methodology outputs to assessment pathways
+version: 0.1.0
+tree:
+  start: check_causality
+  nodes:
+    check_probable:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: probable
+      true_next: probable
+      false_next: check_possible
+    probable:
+      type: return
+      value:
+        route: causality_assessment
+        priority: high
+        action: investigate
+        reason: WHO-UMC Probable — likely causal, needs rechallenge or mechanism
+    check_possible:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: possible
+      true_next: possible
+      false_next: unlikely
+    unlikely:
+      type: return
+      value:
+        route: archive
+        action: archive
+        reason: WHO-UMC Unlikely/Unclassifiable — insufficient evidence for causality
+        priority: low
+    certain:
+      type: return
+      value:
+        priority: critical
+        reason: WHO-UMC Certain — causal relationship established
+        route: regulatory_action
+        action: confirm
+    possible:
+      type: return
+      value:
+        reason: WHO-UMC Possible — temporal but alternative explanations exist
+        route: signal_validation
+        action: validate
+        priority: moderate
+    check_causality:
+      type: condition
+      variable: causality_category
+      operator: eq
+      value: certain
+      true_next: certain
+      false_next: check_probable
+tests:
+- input:
+    causality_category: certain
+  expect:
+    priority: critical
+    route: regulatory_action
+    action: confirm
+- input:
+    causality_category: probable
+  expect:
+    action: investigate
+    route: causality_assessment
+    priority: high
+- input:
+    causality_category: possible
+  expect:
+    priority: moderate
+    action: validate
+    route: signal_validation
+- input:
+    causality_category: unlikely
+  expect:
+    priority: low
+    action: archive
+    route: archive
+- input: {}
+  expect:
+    priority: low
+    reason: WHO-UMC Unlikely/Unclassifiable — insufficient evidence for causality
+    route: archive
+    action: archive
+- input: {}
+  expect:
+    route: archive
+    action: archive
+    priority: low
+    reason: WHO-UMC Unlikely/Unclassifiable — insufficient evidence for causality
+- input: {}
+  expect:
+    reason: WHO-UMC Unlikely/Unclassifiable — insufficient evidence for causality
+    priority: low
+    action: archive
+    route: archive
+interface: null
+primitive_signature: null

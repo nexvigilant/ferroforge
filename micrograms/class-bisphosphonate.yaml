@@ -1,0 +1,74 @@
+name: class-bisphosphonate
+description: 'Bisphosphonates class safety: Osteonecrosis of jaw monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    alert:
+      type: return
+      value:
+        action: class_effect_investigation
+        concern: Osteonecrosis of jaw
+        alert: true
+        drug_class: Bisphosphonates
+    safe:
+      type: return
+      value:
+        drug_class: Bisphosphonates
+        alert: false
+        concern: Osteonecrosis of jaw
+        action: continue
+    check:
+      type: condition
+      variable: onj_risk
+      operator: gte
+      value: 2
+      true_next: alert
+      false_next: safe
+tests:
+- input:
+    onj_risk: 2
+  expect:
+    alert: true
+    drug_class: Bisphosphonates
+- input: {}
+  expect:
+    drug_class: Bisphosphonates
+    alert: false
+- input:
+    onj_risk: 0
+  expect:
+    concern: Osteonecrosis of jaw
+    drug_class: Bisphosphonates
+    alert: false
+    action: continue
+- input:
+    onj_risk: -1
+  expect:
+    drug_class: Bisphosphonates
+    concern: Osteonecrosis of jaw
+    action: continue
+    alert: false
+- input:
+    onj_risk: 1
+  expect:
+    drug_class: Bisphosphonates
+    alert: false
+    concern: Osteonecrosis of jaw
+    action: continue
+- input:
+    onj_risk: 3
+  expect:
+    alert: true
+    concern: Osteonecrosis of jaw
+    drug_class: Bisphosphonates
+    action: class_effect_investigation
+- input:
+    onj_risk: 200
+  expect:
+    concern: Osteonecrosis of jaw
+    drug_class: Bisphosphonates
+    action: class_effect_investigation
+    alert: true
+interface: null
+primitive_signature: null

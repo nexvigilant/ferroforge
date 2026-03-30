@@ -1,0 +1,71 @@
+name: sota-drift-detection
+description: 'Guardian SOTA Tracker: classify PV domain → check frontier movement → classify drift severity → recommend action'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+
+steps:
+  - sota-domain-classifier
+  - sota-frontier-check
+  - drift-alert-classifier
+
+tests:
+  # Paradigm shift in signal detection
+  - name: paradigm shift in signal detection with critical drift
+    input:
+      domain: signal_detection
+      evidence_level: 5
+      authority_weight: 5
+      novelty_score: 90
+      prr_change_pct: 80
+      time_window_days: 5
+    expect:
+      domain_label: Signal Detection
+      frontier_movement: PARADIGM_SHIFT
+      severity: CRITICAL_DRIFT
+      alert_level: P1
+
+  # Incremental advance in causality — stable drift
+  - name: incremental causality advance with stable drift
+    input:
+      domain: causality
+      evidence_level: 4
+      authority_weight: 2
+      novelty_score: 30
+      prr_change_pct: 5
+      time_window_days: 60
+    expect:
+      domain_label: Causality Assessment
+      frontier_movement: INCREMENTAL
+      severity: STABLE
+      alert_level: NONE
+
+  # Significant benefit-risk movement — moderate drift
+  - name: significant benefit-risk movement with moderate drift
+    input:
+      domain: benefit_risk
+      evidence_level: 3
+      authority_weight: 3
+      novelty_score: 55
+      prr_change_pct: 30
+      time_window_days: 10
+    expect:
+      domain_label: Benefit-Risk Assessment
+      frontier_movement: SIGNIFICANT
+      severity: MODERATE_DRIFT
+      alert_level: P2
+
+  # Unqualified finding — preprint, low evidence
+  - name: unqualified regulatory finding from preprint
+    input:
+      domain: regulatory
+      evidence_level: 1
+      authority_weight: 1
+      novelty_score: 95
+      prr_change_pct: 0
+      time_window_days: 90
+    expect:
+      domain_label: Regulatory Reporting
+      frontier_movement: UNQUALIFIED
+      severity: STABLE
+      alert_level: NONE

@@ -1,0 +1,82 @@
+name: signal-archive
+description: "Archive closed signal with complete documentation and retention metadata"
+version: 0.1.0
+tree:
+  start: validate_closure
+  nodes:
+    validate_closure:
+      type: condition
+      variable: signal_closed
+      operator: eq
+      value: true
+      true_next: check_documentation_complete
+      false_next: archive_not_ready
+    check_documentation_complete:
+      type: condition
+      variable: all_documents_attached
+      operator: eq
+      value: true
+      true_next: check_qc_approval
+      false_next: documentation_incomplete
+    check_qc_approval:
+      type: condition
+      variable: qc_approved
+      operator: eq
+      value: true
+      true_next: archive_approved
+      false_next: qc_pending
+    archive_approved:
+      type: return
+      value:
+        archive_status: "archived"
+        retention_period_years: 10
+        searchable: true
+        retrievable: true
+        archive_compliant: true
+    archive_not_ready:
+      type: return
+      value:
+        archive_status: "not_ready"
+        retention_period_years: null
+        searchable: false
+        retrievable: false
+        archive_compliant: false
+    documentation_incomplete:
+      type: return
+      value:
+        archive_status: "pending_documents"
+        retention_period_years: null
+        searchable: false
+        retrievable: false
+        archive_compliant: false
+    qc_pending:
+      type: return
+      value:
+        archive_status: "pending_qc"
+        retention_period_years: null
+        searchable: false
+        retrievable: false
+        archive_compliant: false
+tests:
+- input:
+    signal_closed: true
+    all_documents_attached: true
+    qc_approved: true
+  expect:
+    archive_status: "archived"
+    retention_period_years: 10
+    searchable: true
+- input:
+    signal_closed: false
+  expect:
+    archive_status: "not_ready"
+    archive_compliant: false
+- input:
+    signal_closed: true
+    all_documents_attached: false
+  expect:
+    archive_status: "pending_documents"
+- input: {}
+  expect:
+    archive_status: "not_ready"
+    archive_compliant: false

@@ -1,0 +1,64 @@
+name: organ-dermatological-safety
+description: "Dermatological safety assessment. Evaluates photosensitivity, severe skin reactions (SJS/TEN), and rash risk."
+version: 0.1.0
+tree:
+  start: check_photosensitivity
+  nodes:
+    check_photosensitivity:
+      type: condition
+      variable: history_severe_photosensitivity
+      operator: eq
+      value: true
+      true_next: photosensitivity_alert
+      false_next: check_sjs_history
+    photosensitivity_alert:
+      type: return
+      value:
+        organ: skin
+        risk_level: high
+        photoprotection_required: true
+        message: "History of severe photosensitivity; photosensitizing drugs contraindicated"
+    check_sjs_history:
+      type: condition
+      variable: prior_sjs_ten
+      operator: eq
+      value: true
+      true_next: sjs_alert
+      false_next: check_drug_rash
+    sjs_alert:
+      type: return
+      value:
+        organ: skin
+        risk_level: critical
+        contraindication: true
+        message: "Prior SJS/TEN; cross-reactive drugs contraindicated"
+    check_drug_rash:
+      type: condition
+      variable: recent_drug_rash
+      operator: eq
+      value: true
+      true_next: rash_monitoring
+      false_next: standard_dosing
+    rash_monitoring:
+      type: return
+      value:
+        organ: skin
+        risk_level: moderate
+        skin_monitoring: required
+        message: "Recent drug rash; monitor closely for repeat reaction"
+    standard_dosing:
+      type: return
+      value:
+        organ: skin
+        risk_level: low
+tests:
+  - input: { history_severe_photosensitivity: true, prior_sjs_ten: false, recent_drug_rash: false }
+    expect: { organ: skin, risk_level: high, photoprotection_required: true }
+  - input: { history_severe_photosensitivity: false, prior_sjs_ten: true, recent_drug_rash: false }
+    expect: { organ: skin, risk_level: critical, contraindication: true }
+  - input: { history_severe_photosensitivity: false, prior_sjs_ten: false, recent_drug_rash: true }
+    expect: { organ: skin, risk_level: moderate, skin_monitoring: required }
+  - input: { history_severe_photosensitivity: false, prior_sjs_ten: false, recent_drug_rash: false }
+    expect: { organ: skin, risk_level: low }
+  - input: {}
+    expect: {}

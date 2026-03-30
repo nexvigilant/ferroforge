@@ -1,0 +1,79 @@
+name: signal-close
+description: "Determine closure criteria and finalize signal investigation"
+version: 0.1.0
+tree:
+  start: validate_closure_readiness
+  nodes:
+    validate_closure_readiness:
+      type: condition
+      variable: investigation_complete
+      operator: eq
+      value: true
+      true_next: check_documentation
+      false_next: not_ready_for_closure
+    check_documentation:
+      type: condition
+      variable: documentation_complete
+      operator: eq
+      value: true
+      true_next: check_resolution
+      false_next: documentation_incomplete
+    check_resolution:
+      type: condition
+      variable: resolution_status
+      operator: is_not_null
+      value: null
+      true_next: closure_approved
+      false_next: resolution_pending
+    closure_approved:
+      type: return
+      value:
+        closure_status: "approved"
+        signal_status: "resolved"
+        requires_further_monitoring: false
+        closure_compliant: true
+    not_ready_for_closure:
+      type: return
+      value:
+        closure_status: "not_ready"
+        signal_status: "investigation_ongoing"
+        requires_further_monitoring: true
+        closure_compliant: true
+    documentation_incomplete:
+      type: return
+      value:
+        closure_status: "deferred"
+        signal_status: "pending_documentation"
+        requires_further_monitoring: true
+        closure_compliant: false
+    resolution_pending:
+      type: return
+      value:
+        closure_status: "pending"
+        signal_status: "awaiting_resolution"
+        requires_further_monitoring: true
+        closure_compliant: true
+tests:
+- input:
+    investigation_complete: true
+    documentation_complete: true
+    resolution_status: "resolved"
+  expect:
+    closure_status: "approved"
+    signal_status: "resolved"
+    requires_further_monitoring: false
+- input:
+    investigation_complete: false
+  expect:
+    closure_status: "not_ready"
+    signal_status: "investigation_ongoing"
+- input:
+    investigation_complete: true
+    documentation_complete: false
+  expect:
+    closure_status: "deferred"
+    closure_compliant: false
+- input: {}
+  expect:
+    closure_status: "not_ready"
+    requires_further_monitoring: true

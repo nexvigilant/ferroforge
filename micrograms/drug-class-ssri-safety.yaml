@@ -1,0 +1,64 @@
+name: drug-class-ssri-safety
+description: "Gate for SSRI (selective serotonin reuptake inhibitor) safety assessment. Evaluates risk based on drug, patient age, concurrent medications, and renal function."
+version: 0.1.0
+tree:
+  start: check_serotonin_syndrome_risk
+  nodes:
+    check_serotonin_syndrome_risk:
+      type: condition
+      variable: concurrent_maoi
+      operator: eq
+      value: true
+      true_next: serotonin_syndrome_alert
+      false_next: check_age_group
+    serotonin_syndrome_alert:
+      type: return
+      value:
+        risk_level: critical
+        contraindication: true
+        message: "Serotonin syndrome risk: MAOI contraindicated within 14 days of SSRI discontinuation"
+    check_age_group:
+      type: condition
+      variable: age_years
+      operator: lt
+      value: 18
+      true_next: pediatric_assessment
+      false_next: adult_assessment
+    pediatric_assessment:
+      type: return
+      value:
+        risk_level: high
+        age_group: pediatric
+        monitoring_required: true
+        message: "Increased suicidality risk in pediatric populations; black box warning applies"
+    adult_assessment:
+      type: condition
+      variable: renal_clearance_ml_min
+      operator: lt
+      value: 30
+      true_next: renal_impairment_dosing
+      false_next: standard_dosing
+    renal_impairment_dosing:
+      type: return
+      value:
+        risk_level: moderate
+        renal_adjustment: true
+        dose_adjustment_percent: 50
+        message: "Reduced renal clearance; recommend 50% dose reduction"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        renal_adjustment: false
+        message: "Standard SSRI dosing appropriate for age and renal function"
+tests:
+  - input: { concurrent_maoi: true, age_years: 35, renal_clearance_ml_min: 80 }
+    expect: { risk_level: critical, contraindication: true }
+  - input: { concurrent_maoi: false, age_years: 16, renal_clearance_ml_min: 90 }
+    expect: { risk_level: high, age_group: pediatric, monitoring_required: true }
+  - input: { concurrent_maoi: false, age_years: 55, renal_clearance_ml_min: 20 }
+    expect: { risk_level: moderate, renal_adjustment: true }
+  - input: { concurrent_maoi: false, age_years: 45, renal_clearance_ml_min: 75 }
+    expect: { risk_level: low, renal_adjustment: false }
+  - input: {}
+    expect: {}

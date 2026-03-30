@@ -1,0 +1,231 @@
+name: fda-immunogenicity-risk
+description: "FDA immunogenicity risk classification for therapeutic proteins: routes by product attributes and clinical impact per FDA Guidance 'Immunogenicity Assessment for Therapeutic Protein Products' (2014)"
+version: 0.1.0
+interface:
+  inputs:
+    product_origin:
+      type: string
+      required: true
+      description: "Protein origin: human, humanized, chimeric, murine, novel"
+    route_of_administration:
+      type: string
+      required: true
+      description: "Route: iv, sc, im, intrathecal, topical"
+    endogenous_counterpart:
+      type: bool
+      required: false
+      description: "Whether the protein has an endogenous counterpart (risk of cross-reactive antibodies)"
+    clinical_consequence:
+      type: string
+      required: false
+      description: "Consequence of immunogenicity: loss_of_efficacy, hypersensitivity, cross_neutralization, none"
+  outputs:
+    immunogenicity_risk:
+      type: string
+    testing_strategy:
+      type: string
+    monitoring_requirement:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_origin
+  nodes:
+    check_origin:
+      type: condition
+      variable: product_origin
+      operator: eq
+      value: "murine"
+      true_next: high_risk_origin
+      false_next: check_chimeric
+
+    check_chimeric:
+      type: condition
+      variable: product_origin
+      operator: eq
+      value: "chimeric"
+      true_next: high_risk_origin
+      false_next: check_novel
+
+    check_novel:
+      type: condition
+      variable: product_origin
+      operator: eq
+      value: "novel"
+      true_next: high_risk_origin
+      false_next: check_route
+
+    # HIGH RISK by origin (murine, chimeric, novel)
+    high_risk_origin:
+      type: condition
+      variable: endogenous_counterpart
+      operator: eq
+      value: true
+      true_next: critical_risk
+      false_next: high_risk_standard
+
+    critical_risk:
+      type: return
+      value:
+        immunogenicity_risk: "CRITICAL"
+        testing_strategy: "Multi-tiered ADA testing: screening → confirmatory → neutralizing antibody → cross-reactivity to endogenous protein. Validated assay with drug tolerance."
+        monitoring_requirement: "Pre-dose and regular post-dose ADA sampling. Monitor for loss of endogenous protein function (e.g., pure red cell aplasia for EPO)."
+        regulatory_reference: "FDA Guidance: Immunogenicity Assessment for Therapeutic Protein Products (2014), Section IV; ADA Testing Guidance (2019)"
+
+    high_risk_standard:
+      type: return
+      value:
+        immunogenicity_risk: "HIGH"
+        testing_strategy: "Multi-tiered ADA testing: screening → confirmatory → neutralizing antibody. Drug-tolerant assay methodology required."
+        monitoring_requirement: "Pre-dose and regular ADA sampling throughout clinical program. Correlate with PK, efficacy, and safety."
+        regulatory_reference: "FDA Guidance: Immunogenicity Assessment (2014), Section III.B; ADA Testing Guidance (2019)"
+
+    # HUMAN/HUMANIZED — check route
+    check_route:
+      type: condition
+      variable: route_of_administration
+      operator: eq
+      value: "sc"
+      true_next: moderate_sc
+      false_next: check_intrathecal
+
+    check_intrathecal:
+      type: condition
+      variable: route_of_administration
+      operator: eq
+      value: "intrathecal"
+      true_next: moderate_intrathecal
+      false_next: check_endogenous_low
+
+    # SC route increases immunogenicity risk
+    moderate_sc:
+      type: condition
+      variable: endogenous_counterpart
+      operator: eq
+      value: true
+      true_next: moderate_sc_endogenous
+      false_next: moderate_sc_standard
+
+    moderate_sc_endogenous:
+      type: return
+      value:
+        immunogenicity_risk: "MODERATE_HIGH"
+        testing_strategy: "Multi-tiered ADA testing with cross-reactivity assessment. SC injection site reactions as sentinel marker."
+        monitoring_requirement: "Regular ADA sampling. Monitor for injection site reactions, loss of efficacy, and cross-reactivity to endogenous protein."
+        regulatory_reference: "FDA Guidance: Immunogenicity Assessment (2014), Sections III.A, IV"
+
+    moderate_sc_standard:
+      type: return
+      value:
+        immunogenicity_risk: "MODERATE"
+        testing_strategy: "Standard multi-tiered ADA testing: screening → confirmatory → neutralizing antibody."
+        monitoring_requirement: "Pre-dose and periodic ADA sampling. Correlate with efficacy and adverse events."
+        regulatory_reference: "FDA Guidance: Immunogenicity Assessment (2014), Section III.A"
+
+    moderate_intrathecal:
+      type: return
+      value:
+        immunogenicity_risk: "MODERATE_HIGH"
+        testing_strategy: "ADA testing in both serum and CSF. Evaluate blood-brain barrier integrity."
+        monitoring_requirement: "CSF and serum ADA sampling. Enhanced neurological monitoring for immune-mediated CNS effects."
+        regulatory_reference: "FDA Guidance: Immunogenicity Assessment (2014), Section III.C"
+
+    # LOW RISK — human/humanized, IV or IM, no endogenous counterpart
+    check_endogenous_low:
+      type: condition
+      variable: endogenous_counterpart
+      operator: eq
+      value: true
+      true_next: low_moderate
+      false_next: low_risk
+
+    low_moderate:
+      type: return
+      value:
+        immunogenicity_risk: "LOW_MODERATE"
+        testing_strategy: "Standard ADA testing with cross-reactivity panel for endogenous protein."
+        monitoring_requirement: "Periodic ADA sampling. Monitor endogenous protein levels if clinically relevant."
+        regulatory_reference: "FDA Guidance: Immunogenicity Assessment (2014), Section III.A"
+
+    low_risk:
+      type: return
+      value:
+        immunogenicity_risk: "LOW"
+        testing_strategy: "Standard ADA testing: screening → confirmatory. Neutralizing antibody testing if ADA-positive."
+        monitoring_requirement: "Standard periodic ADA sampling per protocol."
+        regulatory_reference: "FDA Guidance: Immunogenicity Assessment (2014), Section III.A"
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(∂, ν) — immunogenicity risk classification by product boundary (origin/route) and endogenous frequency'
+  primes: ['κ', '∂', 'ν']
+  arguments: ['product_origin', 'route_of_administration', 'endogenous_counterpart']
+
+tests:
+# Murine + endogenous counterpart -> critical
+- input:
+    product_origin: "murine"
+    route_of_administration: "iv"
+    endogenous_counterpart: true
+  expect:
+    immunogenicity_risk: "CRITICAL"
+
+# Chimeric, no endogenous -> high
+- input:
+    product_origin: "chimeric"
+    route_of_administration: "iv"
+    endogenous_counterpart: false
+  expect:
+    immunogenicity_risk: "HIGH"
+
+# Humanized, SC, endogenous -> moderate-high
+- input:
+    product_origin: "humanized"
+    route_of_administration: "sc"
+    endogenous_counterpart: true
+  expect:
+    immunogenicity_risk: "MODERATE_HIGH"
+
+# Humanized, SC, no endogenous -> moderate
+- input:
+    product_origin: "humanized"
+    route_of_administration: "sc"
+    endogenous_counterpart: false
+  expect:
+    immunogenicity_risk: "MODERATE"
+
+# Human, intrathecal -> moderate-high
+- input:
+    product_origin: "human"
+    route_of_administration: "intrathecal"
+  expect:
+    immunogenicity_risk: "MODERATE_HIGH"
+
+# Human, IV, endogenous -> low-moderate
+- input:
+    product_origin: "human"
+    route_of_administration: "iv"
+    endogenous_counterpart: true
+  expect:
+    immunogenicity_risk: "LOW_MODERATE"
+
+# Human, IV, no endogenous -> low
+- input:
+    product_origin: "human"
+    route_of_administration: "iv"
+    endogenous_counterpart: false
+  expect:
+    immunogenicity_risk: "LOW"
+
+# Novel origin -> high
+- input:
+    product_origin: "novel"
+    route_of_administration: "im"
+    endogenous_counterpart: false
+  expect:
+    immunogenicity_risk: "HIGH"
+
+# Empty -> low
+- input: {}
+  expect:
+    immunogenicity_risk: "LOW"

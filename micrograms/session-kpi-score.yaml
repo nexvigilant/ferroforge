@@ -1,0 +1,557 @@
+name: session-kpi-score
+description: Score a Claude Code session across 5 KPI dimensions — velocity, efficiency, quality, tooling depth, and outcome — producing a composite session health score and business value indicator
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(ν(velocity) + κ(efficiency) + ∂(quality) + μ(depth) + ∃(outcome)) — compares session metrics against thresholds to score health'
+  primes: ['κ', 'ν', '∂', 'μ', '∃']
+  arguments: ['total_tools', 'duration_minutes', 'read_count', 'write_count', 'mcp_count', 'agent_count', 'files_modified', 'capa_triggered', 'capa_closed', 'verdict_score']
+  chain_prediction: 'Scores 5 dimensions independently then composes into session health. Feeds aggregate trending and business value computation.'
+interface:
+  inputs:
+    total_tools:
+      type: int
+      required: true
+      description: "Total tool calls in session"
+    duration_minutes:
+      type: int
+      required: true
+      description: "Session duration in minutes"
+    read_count:
+      type: int
+      required: true
+      description: "Read + Grep + Glob calls (exploration)"
+    write_count:
+      type: int
+      required: true
+      description: "Edit + Write calls (production)"
+    mcp_count:
+      type: int
+      required: true
+      description: "MCP tool calls (platform depth)"
+    agent_count:
+      type: int
+      required: true
+      description: "Agent spawns (orchestration)"
+    files_modified:
+      type: int
+      required: true
+      description: "Unique files touched"
+    capa_triggered:
+      type: int
+      required: true
+      description: "CAPA nonconformances detected this session"
+    capa_closed:
+      type: int
+      required: true
+      description: "CAPA records closed this session"
+    verdict_score:
+      type: int
+      required: true
+      description: "Session verdict: 3=fully_demonstrated, 2=partially, 1=not, 0=unmeasured"
+  outputs:
+    velocity:
+      type: string
+      description: "Tools per minute band: HIGH / NORMAL / LOW / IDLE"
+    efficiency:
+      type: string
+      description: "Read-to-write ratio band: PRODUCTIVE / BALANCED / EXPLORATORY / READ_ONLY"
+    quality:
+      type: string
+      description: "CAPA resolution band: CLEAN / RESOLVED / OPEN_ISSUES / UNTRACKED"
+    depth:
+      type: string
+      description: "Platform utilization band: DEEP / MODERATE / SHALLOW / BASIC"
+    outcome:
+      type: string
+      description: "Verdict band: DEMONSTRATED / PARTIAL / FAILED / UNMEASURED"
+    health_score:
+      type: int
+      description: "Composite 0-100 session health"
+    value_signal:
+      type: string
+      description: "Business value: GENERATING / BUILDING / EXPLORING / STALLED"
+tree:
+  start: check_inputs
+  nodes:
+    check_inputs:
+      type: condition
+      variable: total_tools
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: check_duration
+    check_duration:
+      type: condition
+      variable: duration_minutes
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: score_velocity
+
+    reject:
+      type: return
+      value:
+        velocity: UNKNOWN
+        efficiency: UNKNOWN
+        quality: UNKNOWN
+        depth: UNKNOWN
+        outcome: UNKNOWN
+        health_score: 0
+        value_signal: STALLED
+
+    # ── Velocity (tools/min) ────────────────────────────
+    score_velocity:
+      type: condition
+      variable: duration_minutes
+      operator: lte
+      value: 0
+      true_next: velocity_idle
+      false_next: velocity_check_high
+
+    velocity_idle:
+      type: condition
+      variable: total_tools
+      operator: gte
+      value: 1
+      true_next: velocity_high
+      false_next: velocity_idle_set
+
+    velocity_idle_set:
+      type: return
+      value:
+        velocity: IDLE
+        efficiency: READ_ONLY
+        quality: UNTRACKED
+        depth: BASIC
+        outcome: UNMEASURED
+        health_score: 5
+        value_signal: STALLED
+
+    # >5 tools/min = HIGH
+    velocity_check_high:
+      type: condition
+      variable: total_tools
+      operator: gte
+      value: 50
+      true_next: velocity_high
+      false_next: velocity_check_normal
+
+    velocity_high:
+      type: condition
+      variable: write_count
+      operator: gte
+      value: 5
+      true_next: score_efficiency_productive
+      false_next: score_efficiency_exploratory
+
+    # >1 tool/min = NORMAL
+    velocity_check_normal:
+      type: condition
+      variable: total_tools
+      operator: gte
+      value: 10
+      true_next: velocity_normal
+      false_next: velocity_low
+
+    velocity_normal:
+      type: condition
+      variable: write_count
+      operator: gte
+      value: 3
+      true_next: score_efficiency_productive
+      false_next: score_efficiency_balanced
+
+    velocity_low:
+      type: condition
+      variable: write_count
+      operator: gte
+      value: 1
+      true_next: score_efficiency_balanced
+      false_next: score_efficiency_readonly
+
+    # ── Efficiency (read:write ratio) ───────────────────
+    score_efficiency_productive:
+      type: condition
+      variable: mcp_count
+      operator: gte
+      value: 5
+      true_next: depth_deep_productive
+      false_next: depth_moderate_productive
+
+    score_efficiency_balanced:
+      type: condition
+      variable: mcp_count
+      operator: gte
+      value: 3
+      true_next: depth_moderate_balanced
+      false_next: depth_shallow_balanced
+
+    score_efficiency_exploratory:
+      type: condition
+      variable: mcp_count
+      operator: gte
+      value: 5
+      true_next: depth_deep_exploratory
+      false_next: depth_shallow_exploratory
+
+    score_efficiency_readonly:
+      type: condition
+      variable: mcp_count
+      operator: gte
+      value: 1
+      true_next: depth_shallow_readonly
+      false_next: depth_basic_readonly
+
+    # ── Depth + Quality + Outcome combos ────────────────
+    # PRODUCTIVE + DEEP
+    depth_deep_productive:
+      type: condition
+      variable: verdict_score
+      operator: gte
+      value: 3
+      true_next: best_outcome
+      false_next: deep_productive_partial
+
+    deep_productive_partial:
+      type: condition
+      variable: verdict_score
+      operator: gte
+      value: 2
+      true_next: good_outcome
+      false_next: productive_deep_weak
+
+    productive_deep_weak:
+      type: condition
+      variable: capa_triggered
+      operator: gte
+      value: 1
+      true_next: productive_deep_capa
+      false_next: productive_deep_unmeasured
+
+    productive_deep_capa:
+      type: condition
+      variable: capa_closed
+      operator: gte
+      value: 1
+      true_next: good_outcome_resolved
+      false_next: moderate_outcome_open
+
+    productive_deep_unmeasured:
+      type: return
+      value:
+        velocity: HIGH
+        efficiency: PRODUCTIVE
+        quality: UNTRACKED
+        depth: DEEP
+        outcome: UNMEASURED
+        health_score: 65
+        value_signal: BUILDING
+
+    best_outcome:
+      type: return
+      value:
+        velocity: HIGH
+        efficiency: PRODUCTIVE
+        quality: CLEAN
+        depth: DEEP
+        outcome: DEMONSTRATED
+        health_score: 95
+        value_signal: GENERATING
+
+    good_outcome:
+      type: return
+      value:
+        velocity: HIGH
+        efficiency: PRODUCTIVE
+        quality: CLEAN
+        depth: DEEP
+        outcome: PARTIAL
+        health_score: 80
+        value_signal: GENERATING
+
+    good_outcome_resolved:
+      type: return
+      value:
+        velocity: HIGH
+        efficiency: PRODUCTIVE
+        quality: RESOLVED
+        depth: DEEP
+        outcome: PARTIAL
+        health_score: 75
+        value_signal: GENERATING
+
+    moderate_outcome_open:
+      type: return
+      value:
+        velocity: HIGH
+        efficiency: PRODUCTIVE
+        quality: OPEN_ISSUES
+        depth: DEEP
+        outcome: PARTIAL
+        health_score: 60
+        value_signal: BUILDING
+
+    # PRODUCTIVE + MODERATE
+    depth_moderate_productive:
+      type: condition
+      variable: verdict_score
+      operator: gte
+      value: 3
+      true_next: moderate_productive_demonstrated
+      false_next: moderate_productive_other
+
+    moderate_productive_demonstrated:
+      type: return
+      value:
+        velocity: HIGH
+        efficiency: PRODUCTIVE
+        quality: CLEAN
+        depth: MODERATE
+        outcome: DEMONSTRATED
+        health_score: 85
+        value_signal: GENERATING
+
+    moderate_productive_other:
+      type: condition
+      variable: verdict_score
+      operator: gte
+      value: 2
+      true_next: moderate_productive_partial
+      false_next: moderate_productive_low
+
+    moderate_productive_partial:
+      type: return
+      value:
+        velocity: NORMAL
+        efficiency: PRODUCTIVE
+        quality: CLEAN
+        depth: MODERATE
+        outcome: PARTIAL
+        health_score: 70
+        value_signal: BUILDING
+
+    moderate_productive_low:
+      type: return
+      value:
+        velocity: NORMAL
+        efficiency: PRODUCTIVE
+        quality: UNTRACKED
+        depth: MODERATE
+        outcome: UNMEASURED
+        health_score: 55
+        value_signal: BUILDING
+
+    # BALANCED + MODERATE
+    depth_moderate_balanced:
+      type: condition
+      variable: verdict_score
+      operator: gte
+      value: 2
+      true_next: balanced_moderate_ok
+      false_next: balanced_moderate_low
+
+    balanced_moderate_ok:
+      type: return
+      value:
+        velocity: NORMAL
+        efficiency: BALANCED
+        quality: CLEAN
+        depth: MODERATE
+        outcome: PARTIAL
+        health_score: 60
+        value_signal: BUILDING
+
+    balanced_moderate_low:
+      type: return
+      value:
+        velocity: NORMAL
+        efficiency: BALANCED
+        quality: UNTRACKED
+        depth: MODERATE
+        outcome: UNMEASURED
+        health_score: 45
+        value_signal: EXPLORING
+
+    # BALANCED + SHALLOW
+    depth_shallow_balanced:
+      type: condition
+      variable: verdict_score
+      operator: gte
+      value: 2
+      true_next: shallow_balanced_ok
+      false_next: shallow_balanced_low
+
+    shallow_balanced_ok:
+      type: return
+      value:
+        velocity: NORMAL
+        efficiency: BALANCED
+        quality: CLEAN
+        depth: SHALLOW
+        outcome: PARTIAL
+        health_score: 50
+        value_signal: EXPLORING
+
+    shallow_balanced_low:
+      type: return
+      value:
+        velocity: LOW
+        efficiency: BALANCED
+        quality: UNTRACKED
+        depth: SHALLOW
+        outcome: UNMEASURED
+        health_score: 35
+        value_signal: EXPLORING
+
+    # EXPLORATORY paths
+    depth_deep_exploratory:
+      type: return
+      value:
+        velocity: HIGH
+        efficiency: EXPLORATORY
+        quality: CLEAN
+        depth: DEEP
+        outcome: PARTIAL
+        health_score: 55
+        value_signal: EXPLORING
+
+    depth_shallow_exploratory:
+      type: return
+      value:
+        velocity: HIGH
+        efficiency: EXPLORATORY
+        quality: UNTRACKED
+        depth: SHALLOW
+        outcome: UNMEASURED
+        health_score: 40
+        value_signal: EXPLORING
+
+    # READ_ONLY paths
+    depth_shallow_readonly:
+      type: return
+      value:
+        velocity: LOW
+        efficiency: READ_ONLY
+        quality: UNTRACKED
+        depth: SHALLOW
+        outcome: UNMEASURED
+        health_score: 20
+        value_signal: STALLED
+
+    depth_basic_readonly:
+      type: return
+      value:
+        velocity: LOW
+        efficiency: READ_ONLY
+        quality: UNTRACKED
+        depth: BASIC
+        outcome: UNMEASURED
+        health_score: 10
+        value_signal: STALLED
+
+tests:
+# ── Best case: high velocity, productive, deep, demonstrated
+- input:
+    total_tools: 80
+    duration_minutes: 15
+    read_count: 30
+    write_count: 12
+    mcp_count: 10
+    agent_count: 3
+    files_modified: 8
+    capa_triggered: 0
+    capa_closed: 0
+    verdict_score: 3
+  expect:
+    velocity: HIGH
+    efficiency: PRODUCTIVE
+    depth: DEEP
+    outcome: DEMONSTRATED
+    health_score: 95
+    value_signal: GENERATING
+
+# ── Normal productive session (35 tools, 6 writes, 2 MCP → MODERATE depth)
+- input:
+    total_tools: 35
+    duration_minutes: 20
+    read_count: 15
+    write_count: 6
+    mcp_count: 2
+    agent_count: 0
+    files_modified: 4
+    capa_triggered: 0
+    capa_closed: 0
+    verdict_score: 3
+  expect:
+    velocity: HIGH
+    efficiency: PRODUCTIVE
+    depth: MODERATE
+    outcome: DEMONSTRATED
+    health_score: 85
+    value_signal: GENERATING
+
+# ── Exploration session (lots of reads, few writes)
+- input:
+    total_tools: 60
+    duration_minutes: 10
+    read_count: 45
+    write_count: 2
+    mcp_count: 8
+    agent_count: 2
+    files_modified: 0
+    capa_triggered: 0
+    capa_closed: 0
+    verdict_score: 2
+  expect:
+    velocity: HIGH
+    efficiency: EXPLORATORY
+    depth: DEEP
+    health_score: 55
+    value_signal: EXPLORING
+
+# ── Stalled session
+- input:
+    total_tools: 3
+    duration_minutes: 30
+    read_count: 3
+    write_count: 0
+    mcp_count: 0
+    agent_count: 0
+    files_modified: 0
+    capa_triggered: 0
+    capa_closed: 0
+    verdict_score: 0
+  expect:
+    velocity: LOW
+    efficiency: READ_ONLY
+    depth: BASIC
+    health_score: 10
+    value_signal: STALLED
+
+# ── CAPA session with resolution (verdict=2, CAPA closed but verdict path takes precedence)
+- input:
+    total_tools: 50
+    duration_minutes: 25
+    read_count: 20
+    write_count: 8
+    mcp_count: 6
+    agent_count: 1
+    files_modified: 5
+    capa_triggered: 1
+    capa_closed: 1
+    verdict_score: 2
+  expect:
+    velocity: HIGH
+    efficiency: PRODUCTIVE
+    quality: CLEAN
+    depth: DEEP
+    outcome: PARTIAL
+    health_score: 80
+    value_signal: GENERATING
+
+# ── Missing input
+- input: {}
+  expect:
+    health_score: 0
+    value_signal: STALLED

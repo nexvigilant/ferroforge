@@ -1,0 +1,62 @@
+name: drug-profile-ibuprofen
+description: 'Safety triage for ibuprofen: PRR-based signal routing (Type A)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: signal
+      false_next: no_signal
+    signal:
+      type: return
+      value:
+        action: investigate
+        signal: true
+        harm_type: A
+        expected_prr: 3.5
+        drug: ibuprofen
+    no_signal:
+      type: return
+      value:
+        signal: false
+        drug: ibuprofen
+        action: monitor
+        harm_type: A
+        expected_prr: 3.5
+tests:
+- input:
+    prr: 3.5
+  expect:
+    signal: true
+    drug: ibuprofen
+- input:
+    prr: 0.5
+  expect:
+    drug: ibuprofen
+    signal: false
+- input: {}
+  expect:
+    signal: false
+    drug: ibuprofen
+- input:
+    prr: 1.999
+  expect:
+    signal: false
+    action: monitor
+    harm_type: A
+    drug: ibuprofen
+    expected_prr: 3.5
+- input:
+    prr: 2.001
+  expect:
+    harm_type: A
+    expected_prr: 3.5
+    signal: true
+    drug: ibuprofen
+    action: investigate
+interface: null
+primitive_signature: null

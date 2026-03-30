@@ -1,0 +1,65 @@
+name: organ-musculoskeletal-safety
+description: "Musculoskeletal safety assessment. Evaluates myopathy, tendon rupture, and bone loss risks."
+version: 0.1.0
+tree:
+  start: check_myopathy_history
+  nodes:
+    check_myopathy_history:
+      type: condition
+      variable: has_neuromuscular_disease
+      operator: eq
+      value: true
+      true_next: myopathy_alert
+      false_next: check_creatine_kinase
+    myopathy_alert:
+      type: return
+      value:
+        organ: musculoskeletal
+        risk_level: high
+        myotoxicity_risk: true
+        monitoring: required
+        message: "Neuromuscular disease present; myotoxic drugs require caution"
+    check_creatine_kinase:
+      type: condition
+      variable: baseline_creatine_kinase_iu_l
+      operator: gte
+      value: 1000
+      true_next: elevated_ck
+      false_next: check_tendon_disease
+    elevated_ck:
+      type: return
+      value:
+        organ: musculoskeletal
+        risk_level: high
+        rhabdomyolysis_risk: true
+        message: "Elevated baseline CK; myotoxic drugs contraindicated"
+    check_tendon_disease:
+      type: condition
+      variable: history_tendon_rupture
+      operator: eq
+      value: true
+      true_next: tendon_alert
+      false_next: standard_dosing
+    tendon_alert:
+      type: return
+      value:
+        organ: musculoskeletal
+        risk_level: high
+        tendinopathy_risk: true
+        message: "Prior tendon rupture; fluoroquinolones and certain drugs contraindicated"
+    standard_dosing:
+      type: return
+      value:
+        organ: musculoskeletal
+        risk_level: low
+tests:
+  - input: { has_neuromuscular_disease: true, baseline_creatine_kinase_iu_l: 500, history_tendon_rupture: false }
+    expect: { organ: musculoskeletal, risk_level: high, myotoxicity_risk: true }
+  - input: { has_neuromuscular_disease: false, baseline_creatine_kinase_iu_l: 1200, history_tendon_rupture: false }
+    expect: { organ: musculoskeletal, risk_level: high, rhabdomyolysis_risk: true }
+  - input: { has_neuromuscular_disease: false, baseline_creatine_kinase_iu_l: 500, history_tendon_rupture: true }
+    expect: { organ: musculoskeletal, risk_level: high, tendinopathy_risk: true }
+  - input: { has_neuromuscular_disease: false, baseline_creatine_kinase_iu_l: 500, history_tendon_rupture: false }
+    expect: { organ: musculoskeletal, risk_level: low }
+  - input: {}
+    expect: {}

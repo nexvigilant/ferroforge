@@ -1,0 +1,150 @@
+name: station-fda-safety-pipeline
+description: 'Triage FDA safety communications: classify by type, urgency, and route to appropriate action'
+version: 0.1.0
+tree:
+  start: check_comm_type
+  nodes:
+    safety_labeling:
+      type: return
+      value:
+        reason: Safety labeling change — compare before/after for new risks
+        priority: moderate
+        action: review
+        route: label_comparison
+    boxed_warning:
+      type: return
+      value:
+        route: labeling_urgent
+        priority: critical
+        action: escalate
+        reason: New boxed warning — highest FDA safety action, immediate labeling review
+    check_recall:
+      type: condition
+      variable: comm_type
+      operator: eq
+      value: recall
+      true_next: recall_class
+      false_next: check_medwatch
+    medwatch_alert:
+      type: return
+      value:
+        reason: MedWatch safety alert — new safety information emerging
+        action: investigate
+        route: signal_investigation
+        priority: high
+    recall_class:
+      type: condition
+      variable: recall_class
+      operator: eq
+      value: 1
+      true_next: class1_recall
+      false_next: class23_recall
+    class23_recall:
+      type: return
+      value:
+        priority: moderate
+        reason: Class II/III recall — temporary or unlikely adverse health consequences
+        action: investigate
+        route: recall_monitor
+    check_medwatch:
+      type: condition
+      variable: comm_type
+      operator: eq
+      value: medwatch
+      true_next: medwatch_alert
+      false_next: safety_labeling
+    check_comm_type:
+      type: condition
+      variable: comm_type
+      operator: eq
+      value: boxed_warning
+      true_next: boxed_warning
+      false_next: check_recall
+    class1_recall:
+      type: return
+      value:
+        reason: Class I recall — serious health consequences or death
+        action: escalate
+        priority: critical
+        route: recall_urgent
+tests:
+- input:
+    comm_type: boxed_warning
+  expect:
+    route: labeling_urgent
+    priority: critical
+    action: escalate
+- input:
+    comm_type: recall
+    recall_class: 1
+  expect:
+    route: recall_urgent
+    priority: critical
+    action: escalate
+- input:
+    comm_type: recall
+    recall_class: 2
+  expect:
+    priority: moderate
+    action: investigate
+    route: recall_monitor
+- input:
+    comm_type: medwatch
+  expect:
+    priority: high
+    route: signal_investigation
+    action: investigate
+- input:
+    comm_type: labeling_change
+  expect:
+    action: review
+    priority: moderate
+    route: label_comparison
+- input: {}
+  expect:
+    priority: moderate
+    route: label_comparison
+    reason: Safety labeling change — compare before/after for new risks
+    action: review
+- input:
+    recall_class: 0
+  expect:
+    priority: moderate
+    reason: Safety labeling change — compare before/after for new risks
+    route: label_comparison
+    action: review
+- input:
+    recall_class: -1
+  expect:
+    priority: moderate
+    route: label_comparison
+    action: review
+    reason: Safety labeling change — compare before/after for new risks
+- input:
+    recall_class: 0
+  expect:
+    priority: moderate
+    route: label_comparison
+    action: review
+    reason: Safety labeling change — compare before/after for new risks
+- input:
+    recall_class: 100
+  expect:
+    reason: Safety labeling change — compare before/after for new risks
+    action: review
+    route: label_comparison
+    priority: moderate
+- input: {}
+  expect:
+    reason: Safety labeling change — compare before/after for new risks
+    route: label_comparison
+    priority: moderate
+    action: review
+- input: {}
+  expect:
+    action: review
+    reason: Safety labeling change — compare before/after for new risks
+    priority: moderate
+    route: label_comparison
+interface: null
+primitive_signature: null

@@ -1,0 +1,315 @@
+name: fda-dmc-recommendation
+description: "FDA Data Monitoring Committee action recommendation: routes interim safety signal to DMC action per FDA Guidance 'Establishment and Operation of Clinical Trial Data Monitoring Committees' (2006)"
+version: 0.1.0
+interface:
+  inputs:
+    signal_type:
+      type: string
+      required: true
+      description: "Type of interim signal: excess_mortality, serious_safety_signal, futility, overwhelming_efficacy, protocol_deviation_pattern"
+    signal_strength:
+      type: string
+      required: true
+      description: "Statistical strength: definitive, suggestive, borderline"
+    trial_phase:
+      type: string
+      required: false
+      description: "Trial phase: phase1, phase2, phase3, phase4"
+  outputs:
+    dmc_recommendation:
+      type: string
+    action_urgency:
+      type: string
+    notification_required:
+      type: string
+    rationale:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_signal
+  nodes:
+    check_signal:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: "excess_mortality"
+      true_next: mortality_strength_check
+      false_next: check_serious_safety
+
+    check_serious_safety:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: "serious_safety_signal"
+      true_next: safety_strength_check
+      false_next: check_futility
+
+    check_futility:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: "futility"
+      true_next: futility_strength_check
+      false_next: check_overwhelming
+
+    check_overwhelming:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: "overwhelming_efficacy"
+      true_next: efficacy_strength_check
+      false_next: check_protocol
+
+    check_protocol:
+      type: condition
+      variable: signal_type
+      operator: eq
+      value: "protocol_deviation_pattern"
+      true_next: protocol_deviation
+      false_next: continue_default
+
+    # EXCESS MORTALITY
+    mortality_strength_check:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "definitive"
+      true_next: stop_trial_immediately
+      false_next: mortality_suggestive
+
+    mortality_suggestive:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "suggestive"
+      true_next: suspend_enrollment
+      false_next: increase_monitoring
+
+    stop_trial_immediately:
+      type: return
+      value:
+        dmc_recommendation: "STOP_TRIAL"
+        action_urgency: "IMMEDIATE"
+        notification_required: "Sponsor, FDA (IND Safety Report), IRBs, all investigators within 24 hours"
+        rationale: "Definitive excess mortality signal — ethical obligation to stop enrollment and treatment"
+        regulatory_reference: "FDA Guidance: Data Monitoring Committees (2006), Section V.B; 21 CFR 312.32"
+
+    suspend_enrollment:
+      type: return
+      value:
+        dmc_recommendation: "SUSPEND_ENROLLMENT"
+        action_urgency: "URGENT"
+        notification_required: "Sponsor, FDA, IRBs; consider IND Safety Report"
+        rationale: "Suggestive mortality signal — suspend new enrollment pending detailed safety review"
+        regulatory_reference: "FDA Guidance: Data Monitoring Committees (2006), Section V.B"
+
+    # SERIOUS SAFETY SIGNAL
+    safety_strength_check:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "definitive"
+      true_next: modify_or_stop
+      false_next: safety_suggestive
+
+    safety_suggestive:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "suggestive"
+      true_next: modify_protocol
+      false_next: increase_monitoring
+
+    modify_or_stop:
+      type: return
+      value:
+        dmc_recommendation: "MODIFY_OR_STOP"
+        action_urgency: "URGENT"
+        notification_required: "Sponsor, FDA, IRBs, all investigators"
+        rationale: "Definitive serious safety signal — recommend protocol modification or trial termination"
+        regulatory_reference: "FDA Guidance: Data Monitoring Committees (2006), Section V.C"
+
+    modify_protocol:
+      type: return
+      value:
+        dmc_recommendation: "MODIFY_PROTOCOL"
+        action_urgency: "STANDARD"
+        notification_required: "Sponsor; protocol amendment to IRB and FDA"
+        rationale: "Suggestive safety signal — recommend protocol modification (dose adjustment, additional monitoring, population restriction)"
+        regulatory_reference: "FDA Guidance: Data Monitoring Committees (2006), Section V.C"
+
+    # FUTILITY
+    futility_strength_check:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "definitive"
+      true_next: stop_futility
+      false_next: futility_suggestive
+
+    futility_suggestive:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "suggestive"
+      true_next: consider_stopping
+      false_next: continue_with_review
+
+    stop_futility:
+      type: return
+      value:
+        dmc_recommendation: "STOP_FOR_FUTILITY"
+        action_urgency: "STANDARD"
+        notification_required: "Sponsor; no expedited FDA report required for futility alone"
+        rationale: "Definitive futility — continued enrollment exposes subjects to risk without prospect of benefit"
+        regulatory_reference: "FDA Guidance: Data Monitoring Committees (2006), Section V.D"
+
+    consider_stopping:
+      type: return
+      value:
+        dmc_recommendation: "CONSIDER_STOPPING"
+        action_urgency: "ADVISORY"
+        notification_required: "Sponsor for decision"
+        rationale: "Suggestive futility — sponsor should evaluate whether to continue"
+        regulatory_reference: "FDA Guidance: Data Monitoring Committees (2006), Section V.D"
+
+    # OVERWHELMING EFFICACY
+    efficacy_strength_check:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "definitive"
+      true_next: stop_efficacy
+      false_next: continue_with_review
+
+    stop_efficacy:
+      type: return
+      value:
+        dmc_recommendation: "STOP_FOR_EFFICACY"
+        action_urgency: "STANDARD"
+        notification_required: "Sponsor; consider early NDA/BLA submission"
+        rationale: "Overwhelming efficacy — continued placebo arm may be unethical; early stopping boundaries met"
+        regulatory_reference: "FDA Guidance: Data Monitoring Committees (2006), Section V.E"
+
+    # PROTOCOL DEVIATION
+    protocol_deviation:
+      type: return
+      value:
+        dmc_recommendation: "RECOMMEND_CORRECTIVE_ACTION"
+        action_urgency: "STANDARD"
+        notification_required: "Sponsor and affected sites"
+        rationale: "Systematic protocol deviations detected — corrective action needed to preserve trial integrity"
+        regulatory_reference: "FDA Guidance: Data Monitoring Committees (2006), Section IV.C"
+
+    # DEFAULTS
+    increase_monitoring:
+      type: return
+      value:
+        dmc_recommendation: "INCREASE_MONITORING"
+        action_urgency: "ADVISORY"
+        notification_required: "Sponsor; schedule additional interim review"
+        rationale: "Borderline signal — increase monitoring frequency and schedule earlier review"
+        regulatory_reference: "FDA Guidance: Data Monitoring Committees (2006), Section V.A"
+
+    continue_with_review:
+      type: return
+      value:
+        dmc_recommendation: "CONTINUE_WITH_REVIEW"
+        action_urgency: "ROUTINE"
+        notification_required: "Standard DMC report to sponsor"
+        rationale: "No actionable signal at this interim — continue per protocol with standard monitoring"
+        regulatory_reference: "FDA Guidance: Data Monitoring Committees (2006), Section V.A"
+
+    continue_default:
+      type: return
+      value:
+        dmc_recommendation: "CONTINUE"
+        action_urgency: "ROUTINE"
+        notification_required: "Standard DMC report"
+        rationale: "No signal type matched — continue per protocol"
+        regulatory_reference: "FDA Guidance: Data Monitoring Committees (2006)"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(→, κ) — DMC action routing by signal causality and statistical strength'
+  primes: ['σ', '→', 'κ']
+  arguments: ['signal_type', 'signal_strength']
+
+tests:
+# Definitive excess mortality -> stop immediately
+- input:
+    signal_type: "excess_mortality"
+    signal_strength: "definitive"
+  expect:
+    dmc_recommendation: "STOP_TRIAL"
+    action_urgency: "IMMEDIATE"
+
+# Suggestive mortality -> suspend enrollment
+- input:
+    signal_type: "excess_mortality"
+    signal_strength: "suggestive"
+  expect:
+    dmc_recommendation: "SUSPEND_ENROLLMENT"
+    action_urgency: "URGENT"
+
+# Borderline mortality -> increase monitoring
+- input:
+    signal_type: "excess_mortality"
+    signal_strength: "borderline"
+  expect:
+    dmc_recommendation: "INCREASE_MONITORING"
+
+# Definitive safety signal -> modify or stop
+- input:
+    signal_type: "serious_safety_signal"
+    signal_strength: "definitive"
+  expect:
+    dmc_recommendation: "MODIFY_OR_STOP"
+
+# Suggestive safety -> modify protocol
+- input:
+    signal_type: "serious_safety_signal"
+    signal_strength: "suggestive"
+  expect:
+    dmc_recommendation: "MODIFY_PROTOCOL"
+
+# Definitive futility -> stop
+- input:
+    signal_type: "futility"
+    signal_strength: "definitive"
+  expect:
+    dmc_recommendation: "STOP_FOR_FUTILITY"
+
+# Overwhelming efficacy -> stop for efficacy
+- input:
+    signal_type: "overwhelming_efficacy"
+    signal_strength: "definitive"
+  expect:
+    dmc_recommendation: "STOP_FOR_EFFICACY"
+
+# Protocol deviations
+- input:
+    signal_type: "protocol_deviation_pattern"
+    signal_strength: "suggestive"
+  expect:
+    dmc_recommendation: "RECOMMEND_CORRECTIVE_ACTION"
+
+# Suggestive futility -> consider stopping
+- input:
+    signal_type: "futility"
+    signal_strength: "suggestive"
+  expect:
+    dmc_recommendation: "CONSIDER_STOPPING"
+
+# Overwhelming efficacy, suggestive -> continue with review
+- input:
+    signal_type: "overwhelming_efficacy"
+    signal_strength: "suggestive"
+  expect:
+    dmc_recommendation: "CONTINUE_WITH_REVIEW"
+
+# Empty input -> continue
+- input: {}
+  expect:
+    dmc_recommendation: "CONTINUE"

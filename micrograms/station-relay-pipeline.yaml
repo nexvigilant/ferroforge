@@ -1,0 +1,126 @@
+name: station-relay-pipeline
+description: 'Route relay fidelity checks: classify pipeline health by hop count and loss'
+version: 0.1.0
+tree:
+  start: check_fidelity
+  nodes:
+    check_fidelity:
+      type: condition
+      variable: total_fidelity
+      operator: gte
+      value: 0.9
+      true_next: high_fidelity
+      false_next: check_hops
+    long_chain:
+      type: return
+      value:
+        route: relay_optimization
+        priority: high
+        reason: 5+ hops with fidelity <90% — remove dead relays or merge stages
+        action: optimize
+    check_hops:
+      type: condition
+      variable: hop_count
+      operator: gte
+      value: 5
+      true_next: long_chain
+      false_next: short_degraded
+    short_degraded:
+      type: return
+      value:
+        action: diagnose
+        reason: Short chain with low fidelity — identify the lossy hop
+        priority: moderate
+        route: relay_diagnosis
+    high_fidelity:
+      type: return
+      value:
+        action: certify
+        reason: Relay fidelity ≥90% — pipeline operating within tolerance
+        route: archive
+        priority: low
+tests:
+- input:
+    total_fidelity: 0.95
+    hop_count: 3
+  expect:
+    route: archive
+    action: certify
+    priority: low
+- input:
+    total_fidelity: 0.7
+    hop_count: 8
+  expect:
+    priority: high
+    action: optimize
+    route: relay_optimization
+- input:
+    hop_count: 3
+    total_fidelity: 0.6
+  expect:
+    priority: moderate
+    action: diagnose
+    route: relay_diagnosis
+- input:
+    total_fidelity: 0.899
+  expect:
+    action: diagnose
+    priority: moderate
+    route: relay_diagnosis
+    reason: Short chain with low fidelity — identify the lossy hop
+- input:
+    total_fidelity: 0.901
+  expect:
+    priority: low
+    action: certify
+    route: archive
+    reason: Relay fidelity ≥90% — pipeline operating within tolerance
+- input: {}
+  expect:
+    route: relay_diagnosis
+    action: diagnose
+    priority: moderate
+    reason: Short chain with low fidelity — identify the lossy hop
+- input:
+    hop_count: 0
+  expect:
+    reason: Short chain with low fidelity — identify the lossy hop
+    action: diagnose
+    priority: moderate
+    route: relay_diagnosis
+- input:
+    hop_count: -1
+  expect:
+    action: diagnose
+    route: relay_diagnosis
+    reason: Short chain with low fidelity — identify the lossy hop
+    priority: moderate
+- input:
+    hop_count: 4
+  expect:
+    route: relay_diagnosis
+    action: diagnose
+    priority: moderate
+    reason: Short chain with low fidelity — identify the lossy hop
+- input:
+    hop_count: 6
+  expect:
+    action: optimize
+    reason: 5+ hops with fidelity <90% — remove dead relays or merge stages
+    priority: high
+    route: relay_optimization
+- input:
+    hop_count: 500
+  expect:
+    route: relay_optimization
+    priority: high
+    reason: 5+ hops with fidelity <90% — remove dead relays or merge stages
+    action: optimize
+- input: {}
+  expect:
+    priority: moderate
+    action: diagnose
+    reason: Short chain with low fidelity — identify the lossy hop
+    route: relay_diagnosis
+interface: null
+primitive_signature: null

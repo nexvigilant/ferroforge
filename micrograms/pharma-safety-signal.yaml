@@ -1,0 +1,110 @@
+name: pharma-safety-signal
+description: "Classifies a pharmaceutical company's FAERS signal volume tier. High-volume companies require continuous monitoring; low-volume companies can use monthly cycles."
+version: "1.0"
+interface:
+  inputs:
+    total_faers_reports:
+      type: int
+      required: false
+    top_reaction_count:
+      type: int
+      required: false
+  outputs:
+    signal_tier:
+      type: string
+    monitoring_frequency:
+      type: string
+tree:
+  start: check_high_reports
+  nodes:
+    check_high_reports:
+      type: condition
+      variable: total_faers_reports
+      operator: gte
+      value: 1000000
+      true_next: check_high_reactions
+      false_next: check_moderate_reports
+    check_high_reactions:
+      type: condition
+      variable: top_reaction_count
+      operator: gte
+      value: 100000
+      true_next: return_high
+      false_next: return_moderate
+    check_moderate_reports:
+      type: condition
+      variable: total_faers_reports
+      operator: gte
+      value: 100000
+      true_next: return_moderate
+      false_next: return_low
+    return_high:
+      type: return
+      value:
+        signal_tier: "high_signal_volume"
+        monitoring_frequency: "continuous"
+    return_moderate:
+      type: return
+      value:
+        signal_tier: "moderate_signal_volume"
+        monitoring_frequency: "weekly"
+    return_low:
+      type: return
+      value:
+        signal_tier: "low_signal_volume"
+        monitoring_frequency: "monthly"
+tests:
+  - name: "High signal — large reports and large top reactions"
+    input:
+      total_faers_reports: 2500000
+      top_reaction_count: 150000
+    expect:
+      signal_tier: "high_signal_volume"
+      monitoring_frequency: "continuous"
+  - name: "High signal — exactly at both thresholds"
+    input:
+      total_faers_reports: 1000000
+      top_reaction_count: 100000
+    expect:
+      signal_tier: "high_signal_volume"
+      monitoring_frequency: "continuous"
+  - name: "Moderate signal — high reports but top reactions below threshold"
+    input:
+      total_faers_reports: 1500000
+      top_reaction_count: 50000
+    expect:
+      signal_tier: "moderate_signal_volume"
+      monitoring_frequency: "weekly"
+  - name: "Moderate signal — reports between 100k and 1M"
+    input:
+      total_faers_reports: 500000
+      top_reaction_count: 20000
+    expect:
+      signal_tier: "moderate_signal_volume"
+      monitoring_frequency: "weekly"
+  - name: "Moderate signal — exactly 100k reports"
+    input:
+      total_faers_reports: 100000
+      top_reaction_count: 5000
+    expect:
+      signal_tier: "moderate_signal_volume"
+      monitoring_frequency: "weekly"
+  - name: "Low signal — below 100k reports"
+    input:
+      total_faers_reports: 12000
+      top_reaction_count: 500
+    expect:
+      signal_tier: "low_signal_volume"
+      monitoring_frequency: "monthly"
+  - name: "Low signal — minimal reports"
+    input:
+      total_faers_reports: 100
+      top_reaction_count: 10
+    expect:
+      signal_tier: "low_signal_volume"
+      monitoring_frequency: "monthly"
+  - name: "Null input safety"
+    input: {}
+    expect:
+      signal_tier: "low_signal_volume"
+      monitoring_frequency: "monthly"

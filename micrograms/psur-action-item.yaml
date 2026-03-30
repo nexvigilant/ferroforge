@@ -1,0 +1,81 @@
+name: psur-action-item
+description: "Identify and track action items resulting from PSUR conclusions"
+version: 0.1.0
+tree:
+  start: validate_psur_conclusion
+  nodes:
+    validate_psur_conclusion:
+      type: condition
+      variable: regulatory_action_required
+      operator: eq
+      value: true
+      true_next: check_action_type
+      false_next: no_action_items
+    check_action_type:
+      type: condition
+      variable: action_category
+      operator: eq
+      value: "label_update"
+      true_next: label_action
+      false_next: check_risk_mitigation
+    check_risk_mitigation:
+      type: condition
+      variable: action_category
+      operator: eq
+      value: "risk_minimization"
+      true_next: rmp_action
+      false_next: other_action
+    label_action:
+      type: return
+      value:
+        action_item: "update_product_label"
+        priority: "high"
+        implementation_timeline_days: 30
+        responsible_party: "marketing_authorization_holder"
+        psur_action_compliant: true
+    rmp_action:
+      type: return
+      value:
+        action_item: "update_risk_management_plan"
+        priority: "high"
+        implementation_timeline_days: 60
+        responsible_party: "marketing_authorization_holder"
+        psur_action_compliant: true
+    other_action:
+      type: return
+      value:
+        action_item: "other_regulatory_action"
+        priority: "routine"
+        implementation_timeline_days: 90
+        responsible_party: "marketing_authorization_holder"
+        psur_action_compliant: true
+    no_action_items:
+      type: return
+      value:
+        action_item: "continue_routine_monitoring"
+        priority: "none"
+        implementation_timeline_days: 0
+        responsible_party: null
+        psur_action_compliant: true
+tests:
+- input:
+    regulatory_action_required: true
+    action_category: "label_update"
+  expect:
+    action_item: "update_product_label"
+    priority: "high"
+    implementation_timeline_days: 30
+- input:
+    regulatory_action_required: true
+    action_category: "risk_minimization"
+  expect:
+    action_item: "update_risk_management_plan"
+    implementation_timeline_days: 60
+- input:
+    regulatory_action_required: false
+  expect:
+    action_item: "continue_routine_monitoring"
+- input: {}
+  expect:
+    action_item: "continue_routine_monitoring"
+    psur_action_compliant: true

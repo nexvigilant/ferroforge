@@ -1,0 +1,91 @@
+name: station-crystalbook-pipeline
+description: 'Route Crystalbook law diagnostics: classify by violated law and vice detection'
+version: 0.1.0
+tree:
+  start: check_law
+  nodes:
+    check_vice:
+      type: condition
+      variable: vice_detected
+      operator: eq
+      value: true
+      true_next: vice_annihilate
+      false_next: law_fix
+    check_law:
+      type: condition
+      variable: violated_law
+      operator: gte
+      value: 1
+      true_next: check_vice
+      false_next: clean
+    clean:
+      type: return
+      value:
+        action: certify
+        route: archive
+        priority: low
+        reason: No law violations — 8-law compliance verified
+    vice_annihilate:
+      type: return
+      value:
+        route: vice_remediation
+        action: annihilate
+        priority: critical
+        reason: Capital vice detected alongside law violation — destroy before it spreads
+    law_fix:
+      type: return
+      value:
+        action: remediate
+        route: law_compliance
+        priority: high
+        reason: Law violation without vice — structural fix needed
+tests:
+- input:
+    violated_law: 0
+    vice_detected: false
+  expect:
+    route: archive
+    action: certify
+    priority: low
+- input:
+    violated_law: 3
+    vice_detected: true
+  expect:
+    priority: critical
+    route: vice_remediation
+    action: annihilate
+- input:
+    vice_detected: false
+    violated_law: 2
+  expect:
+    route: law_compliance
+    priority: high
+    action: remediate
+- input: {}
+  expect:
+    priority: low
+    action: certify
+    reason: No law violations — 8-law compliance verified
+    route: archive
+- input:
+    violated_law: -1
+  expect:
+    action: certify
+    route: archive
+    priority: low
+    reason: No law violations — 8-law compliance verified
+- input:
+    violated_law: 100
+  expect:
+    route: law_compliance
+    action: remediate
+    priority: high
+    reason: Law violation without vice — structural fix needed
+- input: {}
+  expect:
+    priority: low
+    route: archive
+    reason: No law violations — 8-law compliance verified
+    action: certify
+interface: null
+primitive_signature: null

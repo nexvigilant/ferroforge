@@ -1,0 +1,171 @@
+name: station-clinicaltrials-pipeline
+description: 'Triage ClinicalTrials.gov SAE data: classify trial phase, flag serious AEs, route to signal detection'
+version: 0.1.0
+tree:
+  start: check_phase
+  nodes:
+    urgent_signal:
+      type: return
+      value:
+        route: signal_detection
+        priority: critical
+        reason: Fatal SAE in Phase 3+ trial — immediate signal investigation
+        action: investigate
+    standard_signal:
+      type: return
+      value:
+        reason: Multiple SAEs in Phase 3+ trial — standard signal triage
+        priority: moderate
+        route: signal_detection
+        action: investigate
+    early_phase:
+      type: return
+      value:
+        action: monitor
+        priority: low
+        reason: Early phase trial — insufficient population for signal detection
+        route: archive
+    check_sae_count:
+      type: condition
+      variable: sae_count
+      operator: gte
+      value: 5
+      true_next: check_fatal
+      false_next: low_sae
+    check_phase:
+      type: condition
+      variable: trial_phase
+      operator: gte
+      value: 3
+      true_next: check_sae_count
+      false_next: early_phase
+    low_sae:
+      type: return
+      value:
+        route: periodic_review
+        priority: low
+        action: monitor
+        reason: Phase 3+ with fewer than 5 SAEs — continue monitoring
+    check_fatal:
+      type: condition
+      variable: has_fatal
+      operator: eq
+      value: true
+      true_next: urgent_signal
+      false_next: standard_signal
+tests:
+- input:
+    sae_count: 2
+    trial_phase: 1
+    has_fatal: false
+  expect:
+    action: monitor
+    priority: low
+    route: archive
+- input:
+    has_fatal: false
+    trial_phase: 3
+    sae_count: 3
+  expect:
+    action: monitor
+    route: periodic_review
+    priority: low
+- input:
+    trial_phase: 3
+    sae_count: 10
+    has_fatal: true
+  expect:
+    priority: critical
+    route: signal_detection
+    action: investigate
+- input:
+    sae_count: 8
+    trial_phase: 4
+    has_fatal: false
+  expect:
+    route: signal_detection
+    action: investigate
+    priority: moderate
+- input:
+    sae_count: 0
+  expect:
+    reason: Early phase trial — insufficient population for signal detection
+    route: archive
+    action: monitor
+    priority: low
+- input:
+    sae_count: -1
+  expect:
+    priority: low
+    route: archive
+    reason: Early phase trial — insufficient population for signal detection
+    action: monitor
+- input:
+    sae_count: 4
+  expect:
+    reason: Early phase trial — insufficient population for signal detection
+    priority: low
+    route: archive
+    action: monitor
+- input:
+    sae_count: 6
+  expect:
+    priority: low
+    action: monitor
+    route: archive
+    reason: Early phase trial — insufficient population for signal detection
+- input:
+    sae_count: 500
+  expect:
+    action: monitor
+    priority: low
+    reason: Early phase trial — insufficient population for signal detection
+    route: archive
+- input: {}
+  expect:
+    route: archive
+    action: monitor
+    reason: Early phase trial — insufficient population for signal detection
+    priority: low
+- input:
+    trial_phase: 0
+  expect:
+    action: monitor
+    priority: low
+    reason: Early phase trial — insufficient population for signal detection
+    route: archive
+- input:
+    trial_phase: -1
+  expect:
+    action: monitor
+    reason: Early phase trial — insufficient population for signal detection
+    route: archive
+    priority: low
+- input:
+    trial_phase: 2
+  expect:
+    route: archive
+    action: monitor
+    priority: low
+    reason: Early phase trial — insufficient population for signal detection
+- input:
+    trial_phase: 300
+  expect:
+    route: periodic_review
+    priority: low
+    action: monitor
+    reason: Phase 3+ with fewer than 5 SAEs — continue monitoring
+- input: {}
+  expect:
+    priority: low
+    route: archive
+    reason: Early phase trial — insufficient population for signal detection
+    action: monitor
+- input: {}
+  expect:
+    action: monitor
+    priority: low
+    route: archive
+    reason: Early phase trial — insufficient population for signal detection
+interface: null
+primitive_signature: null

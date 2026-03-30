@@ -1,0 +1,112 @@
+name: tox-musculoskeletal
+description: 'Musculoskeletal toxicity gate: cpk_ratio thresholds for bone'
+version: 0.1.0
+tree:
+  start: check_severe
+  nodes:
+    check_severe:
+      type: condition
+      variable: cpk_ratio
+      operator: gte
+      value: 10
+      true_next: severe
+      false_next: check_mild
+    severe:
+      type: return
+      value:
+        action: discontinue
+        organ: musculoskeletal
+        target: bone
+        severity: severe
+    mild:
+      type: return
+      value:
+        severity: mild
+        action: monitor_closely
+        organ: musculoskeletal
+        target: bone
+    normal:
+      type: return
+      value:
+        target: bone
+        severity: normal
+        organ: musculoskeletal
+        action: continue
+    check_mild:
+      type: condition
+      variable: cpk_ratio
+      operator: gte
+      value: 5
+      true_next: mild
+      false_next: normal
+tests:
+- input:
+    cpk_ratio: 11
+  expect:
+    severity: severe
+    organ: musculoskeletal
+- input:
+    cpk_ratio: 5
+  expect:
+    organ: musculoskeletal
+    severity: mild
+- input:
+    cpk_ratio: 0
+  expect:
+    severity: normal
+    organ: musculoskeletal
+- input: {}
+  expect:
+    severity: normal
+    organ: musculoskeletal
+- input:
+    cpk_ratio: -1
+  expect:
+    target: bone
+    action: continue
+    organ: musculoskeletal
+    severity: normal
+- input:
+    cpk_ratio: 9
+  expect:
+    severity: mild
+    action: monitor_closely
+    target: bone
+    organ: musculoskeletal
+- input:
+    cpk_ratio: 1000
+  expect:
+    action: discontinue
+    severity: severe
+    target: bone
+    organ: musculoskeletal
+- input:
+    cpk_ratio: -1
+  expect:
+    action: continue
+    organ: musculoskeletal
+    severity: normal
+    target: bone
+- input:
+    cpk_ratio: 4
+  expect:
+    severity: normal
+    target: bone
+    organ: musculoskeletal
+    action: continue
+- input:
+    cpk_ratio: 6
+  expect:
+    severity: mild
+    action: monitor_closely
+    target: bone
+    organ: musculoskeletal
+- input:
+    cpk_ratio: 500
+  expect:
+    action: discontinue
+    severity: severe
+    organ: musculoskeletal
+    target: bone
+interface: null
+primitive_signature: null

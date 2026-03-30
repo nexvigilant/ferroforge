@@ -1,0 +1,67 @@
+name: gate-fatal-cluster
+description: Fatal outcome cluster
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    fail:
+      type: return
+      value:
+        met: false
+        gate: false
+        threshold: death_count
+    check:
+      type: condition
+      variable: death_count
+      operator: gte
+      value: 5
+      true_next: pass
+      false_next: fail
+    pass:
+      type: return
+      value:
+        met: true
+        gate: true
+        threshold: death_count
+tests:
+- input:
+    death_count: 5
+  expect:
+    gate: true
+    met: true
+- input: {}
+  expect:
+    gate: false
+    met: false
+- input:
+    death_count: 0
+  expect:
+    threshold: death_count
+    gate: false
+    met: false
+- input:
+    death_count: -1
+  expect:
+    threshold: death_count
+    met: false
+    gate: false
+- input:
+    death_count: 4
+  expect:
+    threshold: death_count
+    met: false
+    gate: false
+- input:
+    death_count: 6
+  expect:
+    met: true
+    gate: true
+    threshold: death_count
+- input:
+    death_count: 500
+  expect:
+    met: true
+    threshold: death_count
+    gate: true
+interface: null
+primitive_signature: null

@@ -1,0 +1,112 @@
+name: tox-vascular
+description: 'Vascular toxicity gate: thrombosis_risk thresholds for vessel'
+version: 0.1.0
+tree:
+  start: check_severe
+  nodes:
+    check_mild:
+      type: condition
+      variable: thrombosis_risk
+      operator: gte
+      value: 2
+      true_next: mild
+      false_next: normal
+    check_severe:
+      type: condition
+      variable: thrombosis_risk
+      operator: gte
+      value: 5
+      true_next: severe
+      false_next: check_mild
+    normal:
+      type: return
+      value:
+        severity: normal
+        organ: vascular
+        action: continue
+        target: vessel
+    severe:
+      type: return
+      value:
+        action: discontinue
+        organ: vascular
+        severity: severe
+        target: vessel
+    mild:
+      type: return
+      value:
+        organ: vascular
+        severity: mild
+        action: monitor_closely
+        target: vessel
+tests:
+- input:
+    thrombosis_risk: 6
+  expect:
+    severity: severe
+    organ: vascular
+- input:
+    thrombosis_risk: 2
+  expect:
+    severity: mild
+    organ: vascular
+- input:
+    thrombosis_risk: 0
+  expect:
+    organ: vascular
+    severity: normal
+- input: {}
+  expect:
+    organ: vascular
+    severity: normal
+- input:
+    thrombosis_risk: -1
+  expect:
+    severity: normal
+    action: continue
+    organ: vascular
+    target: vessel
+- input:
+    thrombosis_risk: 1
+  expect:
+    severity: normal
+    organ: vascular
+    target: vessel
+    action: continue
+- input:
+    thrombosis_risk: 3
+  expect:
+    target: vessel
+    organ: vascular
+    action: monitor_closely
+    severity: mild
+- input:
+    thrombosis_risk: 200
+  expect:
+    action: discontinue
+    target: vessel
+    organ: vascular
+    severity: severe
+- input:
+    thrombosis_risk: -1
+  expect:
+    action: continue
+    organ: vascular
+    severity: normal
+    target: vessel
+- input:
+    thrombosis_risk: 4
+  expect:
+    target: vessel
+    severity: mild
+    organ: vascular
+    action: monitor_closely
+- input:
+    thrombosis_risk: 500
+  expect:
+    target: vessel
+    organ: vascular
+    action: discontinue
+    severity: severe
+interface: null
+primitive_signature: null

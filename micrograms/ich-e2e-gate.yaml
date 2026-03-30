@@ -1,0 +1,33 @@
+name: ich-e2e-gate
+description: "ICH E2E compliance: Pharmacovigilance Planning"
+version: 0.1.0
+
+tree:
+  start: check
+  nodes:
+    check:
+      type: "condition"
+      variable: "has_pv_plan"
+      operator: "eq"
+      value: true
+      true_next: "compliant"
+      false_next: "gap"
+    compliant:
+      type: "return"
+      value:
+        guideline: "ICH E2E"
+        compliant: true
+        action: "proceed"
+    gap:
+      type: "return"
+      value:
+        guideline: "ICH E2E"
+        compliant: false
+        action: "remediate"
+        gap: "has_pv_plan"
+
+tests:
+  - input: {"has_pv_plan": true}
+    expect: {"compliant": true}
+  - input: {}
+    expect: {"compliant": false}

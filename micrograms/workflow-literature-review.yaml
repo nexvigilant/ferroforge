@@ -1,0 +1,47 @@
+name: workflow-literature-review
+description: "Route literature search strategy by question type"
+version: 0.1.0
+
+tree:
+  start: check_type
+  nodes:
+    check_type:
+      type: "condition"
+      variable: "question_type"
+      operator: "eq"
+      value: "case_report"
+      true_next: "case_chain"
+      false_next: "check_systematic"
+    case_chain:
+      type: "return"
+      value:
+        strategy: "case_report_mining"
+        chain: "pubmed \u2192 meddra \u2192 who-umc"
+        query_type: "case_report"
+    check_systematic:
+      type: "condition"
+      variable: "question_type"
+      operator: "eq"
+      value: "systematic"
+      true_next: "systematic_chain"
+      false_next: "exploratory_chain"
+    systematic_chain:
+      type: "return"
+      value:
+        strategy: "systematic_review"
+        chain: "pubmed \u2192 clinicaltrials \u2192 epidemiology \u2192 ich"
+        query_type: "review"
+    exploratory_chain:
+      type: "return"
+      value:
+        strategy: "exploratory_search"
+        chain: "pubmed \u2192 wikipedia \u2192 drugbank"
+        query_type: "broad"
+
+tests:
+  - input: {"question_type": "case_report"}
+    expect: {"strategy": "case_report_mining", "query_type": "case_report"}
+  - input: {"question_type": "systematic"}
+    expect: {"strategy": "systematic_review", "query_type": "review"}
+  - input: {"question_type": "exploratory"}
+    expect: {"strategy": "exploratory_search", "query_type": "broad"}

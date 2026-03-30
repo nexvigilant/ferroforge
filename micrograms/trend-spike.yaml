@@ -1,0 +1,67 @@
+name: trend-spike
+description: Sudden report spike
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: spike_ratio
+      operator: gte
+      value: 3
+      true_next: detected
+      false_next: not_detected
+    detected:
+      type: return
+      value:
+        action: investigate
+        detected: true
+        pattern: spike
+    not_detected:
+      type: return
+      value:
+        action: continue_monitoring
+        detected: false
+        pattern: spike
+tests:
+- input:
+    spike_ratio: 3
+  expect:
+    pattern: spike
+    detected: true
+- input: {}
+  expect:
+    pattern: spike
+    detected: false
+- input:
+    spike_ratio: 0
+  expect:
+    detected: false
+    action: continue_monitoring
+    pattern: spike
+- input:
+    spike_ratio: -1
+  expect:
+    action: continue_monitoring
+    pattern: spike
+    detected: false
+- input:
+    spike_ratio: 2
+  expect:
+    pattern: spike
+    detected: false
+    action: continue_monitoring
+- input:
+    spike_ratio: 4
+  expect:
+    pattern: spike
+    action: investigate
+    detected: true
+- input:
+    spike_ratio: 300
+  expect:
+    detected: true
+    pattern: spike
+    action: investigate
+interface: null
+primitive_signature: null

@@ -1,0 +1,51 @@
+name: age-lactation-safety
+description: "Lactation safety assessment. Evaluates transfer into breast milk and infant exposure risk."
+version: 0.1.0
+tree:
+  start: check_lactation_status
+  nodes:
+    check_lactation_status:
+      type: condition
+      variable: is_breastfeeding
+      operator: eq
+      value: true
+      true_next: check_drug_transfer
+      false_next: not_breastfeeding
+    check_drug_transfer:
+      type: condition
+      variable: high_milk_transfer
+      operator: eq
+      value: true
+      true_next: high_transfer_alert
+      false_next: moderate_transfer
+    high_transfer_alert:
+      type: return
+      value:
+        breastfeeding_status: lactating
+        transfer_risk: high
+        recommendation: contraindicated
+        message: "High milk transfer; drug contraindicated during breastfeeding"
+    moderate_transfer:
+      type: return
+      value:
+        breastfeeding_status: lactating
+        transfer_risk: low_to_moderate
+        recommendation: compatible
+        message: "Low/moderate milk transfer; generally compatible with breastfeeding"
+    not_breastfeeding:
+      type: return
+      value:
+        breastfeeding_status: not_breastfeeding
+        transfer_risk: none
+        message: "Not breastfeeding; standard dosing applies"
+tests:
+  - input: { is_breastfeeding: true, high_milk_transfer: true }
+    expect: { breastfeeding_status: lactating, transfer_risk: high, recommendation: contraindicated }
+  - input: { is_breastfeeding: true, high_milk_transfer: false }
+    expect: { breastfeeding_status: lactating, transfer_risk: low_to_moderate, recommendation: compatible }
+  - input: { is_breastfeeding: false, high_milk_transfer: false }
+    expect: { breastfeeding_status: not_breastfeeding, transfer_risk: none }
+  - input: { is_breastfeeding: false, high_milk_transfer: true }
+    expect: { breastfeeding_status: not_breastfeeding }
+  - input: {}
+    expect: {}

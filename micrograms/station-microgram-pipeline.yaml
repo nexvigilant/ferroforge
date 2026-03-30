@@ -1,0 +1,133 @@
+name: station-microgram-pipeline
+description: 'Route microgram ecosystem health: test results, coverage, and chain integrity'
+version: 0.1.0
+tree:
+  start: check_failures
+  nodes:
+    check_failures:
+      type: condition
+      variable: failure_count
+      operator: gte
+      value: 1
+      true_next: has_failures
+      false_next: check_coverage
+    healthy:
+      type: return
+      value:
+        action: certify
+        route: archive
+        priority: low
+        reason: All tests pass, coverage ≥80% — ecosystem healthy
+    has_failures:
+      type: return
+      value:
+        reason: Microgram test failures detected — decision logic may be wrong
+        route: microgram_repair
+        action: fix
+        priority: critical
+    check_coverage:
+      type: condition
+      variable: path_coverage_pct
+      operator: gte
+      value: 80
+      true_next: healthy
+      false_next: low_coverage
+    low_coverage:
+      type: return
+      value:
+        action: evolve
+        route: microgram_evolve
+        reason: Path coverage <80% — untested decision branches exist
+        priority: moderate
+tests:
+- input:
+    path_coverage_pct: 50
+    failure_count: 3
+  expect:
+    priority: critical
+    route: microgram_repair
+    action: fix
+- input:
+    failure_count: 0
+    path_coverage_pct: 60
+  expect:
+    action: evolve
+    route: microgram_evolve
+    priority: moderate
+- input:
+    failure_count: 0
+    path_coverage_pct: 95
+  expect:
+    priority: low
+    route: archive
+    action: certify
+- input:
+    failure_count: -1
+  expect:
+    route: microgram_evolve
+    priority: moderate
+    action: evolve
+    reason: Path coverage <80% — untested decision branches exist
+- input:
+    failure_count: 2
+  expect:
+    priority: critical
+    route: microgram_repair
+    reason: Microgram test failures detected — decision logic may be wrong
+    action: fix
+- input:
+    failure_count: 100
+  expect:
+    action: fix
+    reason: Microgram test failures detected — decision logic may be wrong
+    route: microgram_repair
+    priority: critical
+- input: {}
+  expect:
+    priority: moderate
+    action: evolve
+    reason: Path coverage <80% — untested decision branches exist
+    route: microgram_evolve
+- input:
+    path_coverage_pct: 0
+  expect:
+    reason: Path coverage <80% — untested decision branches exist
+    action: evolve
+    route: microgram_evolve
+    priority: moderate
+- input:
+    path_coverage_pct: -1
+  expect:
+    route: microgram_evolve
+    reason: Path coverage <80% — untested decision branches exist
+    priority: moderate
+    action: evolve
+- input:
+    path_coverage_pct: 79
+  expect:
+    route: microgram_evolve
+    priority: moderate
+    reason: Path coverage <80% — untested decision branches exist
+    action: evolve
+- input:
+    path_coverage_pct: 81
+  expect:
+    route: archive
+    priority: low
+    action: certify
+    reason: All tests pass, coverage ≥80% — ecosystem healthy
+- input:
+    path_coverage_pct: 8000
+  expect:
+    action: certify
+    reason: All tests pass, coverage ≥80% — ecosystem healthy
+    route: archive
+    priority: low
+- input: {}
+  expect:
+    action: evolve
+    route: microgram_evolve
+    reason: Path coverage <80% — untested decision branches exist
+    priority: moderate
+interface: null
+primitive_signature: null

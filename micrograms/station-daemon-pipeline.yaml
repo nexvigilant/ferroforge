@@ -1,0 +1,105 @@
+name: station-daemon-pipeline
+description: Route daemon/service health checks by uptime and error rate
+version: 0.1.0
+tree:
+  start: check_uptime
+  nodes:
+    check_uptime:
+      type: condition
+      variable: uptime_pct
+      operator: gte
+      value: 99.0
+      true_next: check_errors
+      false_next: degraded
+    healthy:
+      type: return
+      value:
+        route: archive
+        priority: low
+        reason: Uptime ≥99%, errors <1% — service healthy
+        action: certify
+    degraded:
+      type: return
+      value:
+        action: restart
+        priority: critical
+        reason: Uptime <99% — service degraded, restart needed
+        route: service_restart
+    error_spike:
+      type: return
+      value:
+        route: error_diagnosis
+        priority: high
+        action: diagnose
+        reason: Error rate ≥1% despite high uptime — silent failures
+    check_errors:
+      type: condition
+      variable: error_rate_pct
+      operator: gte
+      value: 1.0
+      true_next: error_spike
+      false_next: healthy
+tests:
+- input:
+    uptime_pct: 95.0
+    error_rate_pct: 3.0
+  expect:
+    route: service_restart
+    action: restart
+    priority: critical
+- input:
+    uptime_pct: 99.5
+    error_rate_pct: 2.0
+  expect:
+    route: error_diagnosis
+    priority: high
+    action: diagnose
+- input:
+    error_rate_pct: 0.1
+    uptime_pct: 99.9
+  expect:
+    route: archive
+    priority: low
+    action: certify
+- input:
+    uptime_pct: 98.999
+  expect:
+    action: restart
+    priority: critical
+    route: service_restart
+    reason: Uptime <99% — service degraded, restart needed
+- input:
+    uptime_pct: 99.001
+  expect:
+    priority: low
+    route: archive
+    action: certify
+    reason: Uptime ≥99%, errors <1% — service healthy
+- input: {}
+  expect:
+    priority: critical
+    reason: Uptime <99% — service degraded, restart needed
+    route: service_restart
+    action: restart
+- input:
+    error_rate_pct: 0.999
+  expect:
+    priority: critical
+    reason: Uptime <99% — service degraded, restart needed
+    action: restart
+    route: service_restart
+- input:
+    error_rate_pct: 1.001
+  expect:
+    reason: Uptime <99% — service degraded, restart needed
+    action: restart
+    priority: critical
+    route: service_restart
+- input: {}
+  expect:
+    route: service_restart
+    priority: critical
+    reason: Uptime <99% — service degraded, restart needed
+    action: restart
+interface: null
+primitive_signature: null

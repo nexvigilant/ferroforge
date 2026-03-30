@@ -1,0 +1,146 @@
+name: e2c-pbrer-interval
+description: 'ICH E2C(R2) Section 2: Determines PBRER reporting interval based on product lifecycle stage, approval duration, and risk management requirements'
+version: 0.1.0
+interface:
+  inputs:
+    years_since_approval:
+      type: number
+      required: true
+    renewal_granted:
+      type: bool
+      required: false
+    risk_management_plan_required:
+      type: bool
+      required: false
+  outputs:
+    interval_months:
+      type: number
+    regulatory_reference:
+      type: string
+tree:
+  start: check_years_lt_2
+  nodes:
+    check_years_lt_2:
+      type: condition
+      variable: years_since_approval
+      operator: lt
+      value: 2
+      true_next: check_rmp_6
+      false_next: check_years_lt_5
+    check_years_lt_5:
+      type: condition
+      variable: years_since_approval
+      operator: lt
+      value: 5
+      true_next: check_rmp_12
+      false_next: check_renewal
+    check_renewal:
+      type: condition
+      variable: renewal_granted
+      operator: eq
+      value: true
+      true_next: check_rmp_36
+      false_next: check_rmp_12
+    check_rmp_6:
+      type: condition
+      variable: risk_management_plan_required
+      operator: eq
+      value: true
+      true_next: return_6
+      false_next: return_6
+    check_rmp_12:
+      type: condition
+      variable: risk_management_plan_required
+      operator: eq
+      value: true
+      true_next: return_12_rmp
+      false_next: return_12
+    check_rmp_36:
+      type: condition
+      variable: risk_management_plan_required
+      operator: eq
+      value: true
+      true_next: return_12_rmp
+      false_next: return_36
+    return_6:
+      type: return
+      value:
+        interval_months: 6
+        regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+    return_12:
+      type: return
+      value:
+        interval_months: 12
+        regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+    return_12_rmp:
+      type: return
+      value:
+        interval_months: 12
+        regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+    return_36:
+      type: return
+      value:
+        interval_months: 36
+        regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+tests:
+# New product < 2 years
+- input:
+    years_since_approval: 1
+    renewal_granted: false
+    risk_management_plan_required: false
+  expect:
+    interval_months: 6
+    regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+# Product 2-5 years, no RMP
+- input:
+    years_since_approval: 3
+    renewal_granted: false
+    risk_management_plan_required: false
+  expect:
+    interval_months: 12
+    regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+# Product >= 5 years, no renewal
+- input:
+    years_since_approval: 7
+    renewal_granted: false
+    risk_management_plan_required: false
+  expect:
+    interval_months: 12
+    regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+# Product >= 5 years, renewal granted
+- input:
+    years_since_approval: 7
+    renewal_granted: true
+    risk_management_plan_required: false
+  expect:
+    interval_months: 36
+    regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+# Product >= 5 years, renewal granted but RMP required caps at 12
+- input:
+    years_since_approval: 7
+    renewal_granted: true
+    risk_management_plan_required: true
+  expect:
+    interval_months: 12
+    regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+# Product < 2 years with RMP (still 6)
+- input:
+    years_since_approval: 0.5
+    renewal_granted: false
+    risk_management_plan_required: true
+  expect:
+    interval_months: 6
+    regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+# Product 2-5 years with RMP (capped at 12)
+- input:
+    years_since_approval: 4
+    renewal_granted: false
+    risk_management_plan_required: true
+  expect:
+    interval_months: 12
+    regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+# Null safety - null years_since_approval falls through to >= 5 no-renewal path
+- input: {}
+  expect:
+    interval_months: 12
+    regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval

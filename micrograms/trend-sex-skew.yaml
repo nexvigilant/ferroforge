@@ -1,0 +1,67 @@
+name: trend-sex-skew
+description: Sex distribution skew
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    detected:
+      type: return
+      value:
+        action: investigate
+        pattern: sex_dependent
+        detected: true
+    not_detected:
+      type: return
+      value:
+        detected: false
+        action: continue_monitoring
+        pattern: sex_dependent
+    check:
+      type: condition
+      variable: sex_ratio
+      operator: gte
+      value: 2
+      true_next: detected
+      false_next: not_detected
+tests:
+- input:
+    sex_ratio: 2
+  expect:
+    pattern: sex_dependent
+    detected: true
+- input: {}
+  expect:
+    detected: false
+    pattern: sex_dependent
+- input:
+    sex_ratio: 0
+  expect:
+    detected: false
+    action: continue_monitoring
+    pattern: sex_dependent
+- input:
+    sex_ratio: -1
+  expect:
+    detected: false
+    action: continue_monitoring
+    pattern: sex_dependent
+- input:
+    sex_ratio: 1
+  expect:
+    action: continue_monitoring
+    detected: false
+    pattern: sex_dependent
+- input:
+    sex_ratio: 3
+  expect:
+    detected: true
+    pattern: sex_dependent
+    action: investigate
+- input:
+    sex_ratio: 200
+  expect:
+    detected: true
+    action: investigate
+    pattern: sex_dependent
+interface: null
+primitive_signature: null

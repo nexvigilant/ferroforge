@@ -1,0 +1,50 @@
+name: crypto-provenance-coverage
+description: 'Provenance manifest coverage for insight flywheel: GREEN (all signed), YELLOW (partial), GREY (none yet)'
+version: 1.0.0
+primitive_signature:
+  dominant: existence
+  expression: "E(provenance_manifests)"
+  primes: [existence, frequency, mapping]
+interface:
+  inputs:
+    manifests_count: { type: int, required: false }
+    all_signed: { type: bool, required: false }
+  outputs:
+    provenance: { type: string }
+    level: { type: string }
+    action: { type: string }
+tree:
+  start: check_exists
+  nodes:
+    check_exists:
+      type: condition
+      variable: manifests_count
+      operator: gte
+      value: 1
+      true_next: check_signed
+      false_next: no_manifests
+    check_signed:
+      type: condition
+      variable: all_signed
+      operator: eq
+      value: true
+      true_next: full
+      false_next: partial
+    full:
+      type: return
+      value: { provenance: full, level: green, action: none }
+    partial:
+      type: return
+      value: { provenance: partial, level: yellow, action: sign_unsigned_manifests }
+    no_manifests:
+      type: return
+      value: { provenance: none, level: grey, action: create_provenance_for_analyses }
+tests:
+- input: { manifests_count: 10, all_signed: true }
+  expect: { provenance: full, level: green, action: none }
+- input: { manifests_count: 10, all_signed: false }
+  expect: { provenance: partial, level: yellow, action: sign_unsigned_manifests }
+- input: { manifests_count: 0, all_signed: false }
+  expect: { provenance: none, level: grey, action: create_provenance_for_analyses }
+- input: {}
+  expect: { provenance: none, level: grey, action: create_provenance_for_analyses }

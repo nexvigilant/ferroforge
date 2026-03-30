@@ -1,0 +1,267 @@
+name: case-assessment-pipeline
+description: "Full case assessment: seriousness + expectedness + causality → regulatory action"
+version: "1.0.0"
+primitive_signature:
+  dominant: '→'
+  expression: '→(κ(ς_serious, ∂_listed) + N(naranjo) + Σ(action)) — routes case through seriousness × expectedness × causality to regulatory action'
+  primes: ['→', 'κ', 'ς', '∂', 'N', 'Σ']
+  arguments: ['seriousness', 'is_listed', 'naranjo_score']
+interface:
+  inputs:
+    drug:
+      type: string
+      required: true
+    event:
+      type: string
+      required: true
+    seriousness:
+      type: string
+      required: true
+    is_listed:
+      type: bool
+      required: true
+    naranjo_score:
+      type: int
+      required: true
+    has_rechallenge:
+      type: bool
+      required: false
+    reporter_type:
+      type: string
+      required: false
+  outputs:
+    causality_category:
+      type: string
+    expectedness:
+      type: string
+    expedited_report:
+      type: bool
+    reporting_timeline_days:
+      type: int
+    action:
+      type: string
+    priority:
+      type: string
+tree:
+  start: check_seriousness
+  nodes:
+    check_seriousness:
+      type: condition
+      variable: seriousness
+      operator: eq
+      value: "serious"
+      true_next: serious_definite
+      false_next: nonserious_probable
+    serious_definite:
+      type: condition
+      variable: naranjo_score
+      operator: gte
+      value: 9
+      true_next: return_serious_definite
+      false_next: serious_probable
+    return_serious_definite:
+      type: return
+      value:
+        causality_category: "definite"
+        expectedness: "unexpected"
+        expedited_report: true
+        reporting_timeline_days: 15
+        action: "expedited_report_and_signal_review"
+        priority: "critical"
+    serious_probable:
+      type: condition
+      variable: naranjo_score
+      operator: gte
+      value: 5
+      true_next: serious_probable_listed
+      false_next: serious_possible
+    serious_probable_listed:
+      type: condition
+      variable: is_listed
+      operator: eq
+      value: true
+      true_next: return_serious_probable_expected
+      false_next: return_serious_probable_unexpected
+    return_serious_probable_expected:
+      type: return
+      value:
+        causality_category: "probable"
+        expectedness: "expected"
+        expedited_report: false
+        reporting_timeline_days: 90
+        action: "periodic_report"
+        priority: "medium"
+    return_serious_probable_unexpected:
+      type: return
+      value:
+        causality_category: "probable"
+        expectedness: "unexpected"
+        expedited_report: true
+        reporting_timeline_days: 15
+        action: "expedited_report"
+        priority: "high"
+    serious_possible:
+      type: condition
+      variable: naranjo_score
+      operator: gte
+      value: 1
+      true_next: serious_possible_listed
+      false_next: return_serious_doubtful
+    serious_possible_listed:
+      type: condition
+      variable: is_listed
+      operator: eq
+      value: true
+      true_next: return_serious_possible_expected
+      false_next: return_serious_possible_unexpected
+    return_serious_possible_expected:
+      type: return
+      value:
+        causality_category: "possible"
+        expectedness: "expected"
+        expedited_report: false
+        reporting_timeline_days: 90
+        action: "monitor"
+        priority: "low"
+    return_serious_possible_unexpected:
+      type: return
+      value:
+        causality_category: "possible"
+        expectedness: "unexpected"
+        expedited_report: true
+        reporting_timeline_days: 15
+        action: "expedited_report"
+        priority: "medium"
+    return_serious_doubtful:
+      type: return
+      value:
+        causality_category: "doubtful"
+        expectedness: "expected"
+        expedited_report: false
+        reporting_timeline_days: 90
+        action: "periodic_report"
+        priority: "low"
+    nonserious_probable:
+      type: condition
+      variable: naranjo_score
+      operator: gte
+      value: 5
+      true_next: return_nonserious_probable
+      false_next: nonserious_possible
+    return_nonserious_probable:
+      type: return
+      value:
+        causality_category: "probable"
+        expectedness: "expected"
+        expedited_report: false
+        reporting_timeline_days: 90
+        action: "periodic_report"
+        priority: "medium"
+    nonserious_possible:
+      type: condition
+      variable: naranjo_score
+      operator: gte
+      value: 1
+      true_next: return_nonserious_possible
+      false_next: return_nonserious_doubtful
+    return_nonserious_possible:
+      type: return
+      value:
+        causality_category: "possible"
+        expectedness: "expected"
+        expedited_report: false
+        reporting_timeline_days: 90
+        action: "monitor"
+        priority: "low"
+    return_nonserious_doubtful:
+      type: return
+      value:
+        causality_category: "doubtful"
+        expectedness: "expected"
+        expedited_report: false
+        reporting_timeline_days: 90
+        action: "monitor"
+        priority: "low"
+tests:
+  - name: "Serious unexpected probable ADR"
+    input:
+      drug: "metformin"
+      event: "lactic acidosis"
+      seriousness: "serious"
+      is_listed: false
+      naranjo_score: 6
+      has_rechallenge: false
+      reporter_type: "healthcare_professional"
+    expect:
+      causality_category: "probable"
+      expedited_report: true
+      priority: "high"
+  - name: "Serious expected probable ADR"
+    input:
+      drug: "metformin"
+      event: "diarrhoea"
+      seriousness: "serious"
+      is_listed: true
+      naranjo_score: 6
+      has_rechallenge: false
+      reporter_type: "healthcare_professional"
+    expect:
+      causality_category: "probable"
+      expedited_report: false
+      priority: "medium"
+  - name: "Non-serious doubtful"
+    input:
+      drug: "amoxicillin"
+      event: "headache"
+      seriousness: "non-serious"
+      is_listed: true
+      naranjo_score: 0
+      has_rechallenge: false
+      reporter_type: "consumer"
+    expect:
+      causality_category: "doubtful"
+      expedited_report: false
+      priority: "low"
+  - name: "Serious definite unexpected"
+    input:
+      drug: "semaglutide"
+      event: "pancreatitis"
+      seriousness: "serious"
+      is_listed: false
+      naranjo_score: 9
+      has_rechallenge: true
+      reporter_type: "healthcare_professional"
+    expect:
+      causality_category: "definite"
+      expedited_report: true
+      priority: "critical"
+  - name: "Serious possible expected"
+    input:
+      drug: "atorvastatin"
+      event: "myalgia"
+      seriousness: "serious"
+      is_listed: true
+      naranjo_score: 3
+      has_rechallenge: false
+      reporter_type: "healthcare_professional"
+    expect:
+      causality_category: "possible"
+      expedited_report: false
+      priority: "low"
+  - name: "Non-serious probable"
+    input:
+      drug: "lisinopril"
+      event: "cough"
+      seriousness: "non-serious"
+      is_listed: true
+      naranjo_score: 7
+      has_rechallenge: false
+      reporter_type: "consumer"
+    expect:
+      causality_category: "probable"
+      expedited_report: false
+      priority: "medium"
+  - name: "Null input safety"
+    input: {}
+    expect:
+      causality_category: "doubtful"

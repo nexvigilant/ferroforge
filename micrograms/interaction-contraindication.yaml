@@ -1,0 +1,85 @@
+name: interaction-contraindication
+description: "Identify absolute contraindications and unsafe drug combinations"
+version: 0.1.0
+tree:
+  start: validate_combination
+  nodes:
+    validate_combination:
+      type: condition
+      variable: drug1
+      operator: is_not_null
+      value: null
+      true_next: check_contraindication_status
+      false_next: contraindication_unknown
+    check_contraindication_status:
+      type: condition
+      variable: is_contraindicated
+      operator: eq
+      value: true
+      true_next: absolute_contraindication
+      false_next: check_relative_contraindication
+    check_relative_contraindication:
+      type: condition
+      variable: relative_contraindication
+      operator: eq
+      value: true
+      true_next: relative_contraindication
+      false_next: no_contraindication
+    absolute_contraindication:
+      type: return
+      value:
+        contraindication_status: "absolute"
+        combination_permitted: false
+        risk_level: "critical"
+        requires_alternative: true
+        contraindication_compliant: true
+    relative_contraindication:
+      type: return
+      value:
+        contraindication_status: "relative"
+        combination_permitted: false
+        risk_level: "high"
+        requires_alternative: true
+        contraindication_compliant: true
+    no_contraindication:
+      type: return
+      value:
+        contraindication_status: "permitted"
+        combination_permitted: true
+        risk_level: "acceptable"
+        requires_alternative: false
+        contraindication_compliant: true
+    contraindication_unknown:
+      type: return
+      value:
+        contraindication_status: "unknown"
+        combination_permitted: null
+        risk_level: null
+        requires_alternative: null
+        contraindication_compliant: false
+tests:
+- input:
+    drug1: "monoamine_oxidase_inhibitor"
+    is_contraindicated: true
+  expect:
+    contraindication_status: "absolute"
+    combination_permitted: false
+    risk_level: "critical"
+- input:
+    drug1: "warfarin"
+    relative_contraindication: true
+  expect:
+    contraindication_status: "relative"
+    combination_permitted: false
+    risk_level: "high"
+- input:
+    drug1: "metformin"
+    is_contraindicated: false
+    relative_contraindication: false
+  expect:
+    contraindication_status: "permitted"
+    combination_permitted: true
+- input: {}
+  expect:
+    contraindication_status: "unknown"
+    contraindication_compliant: false

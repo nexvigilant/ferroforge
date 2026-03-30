@@ -1,0 +1,62 @@
+name: drug-class-sglt2-safety
+description: "SGLT2 inhibitor safety assessment. Evaluates diabetic ketoacidosis risk, genital infections, euglycemic DKA, and amputation signals."
+version: 0.1.0
+tree:
+  start: check_dka_risk
+  nodes:
+    check_dka_risk:
+      type: condition
+      variable: type1_diabetes
+      operator: eq
+      value: true
+      true_next: dka_alert
+      false_next: check_renal_function
+    dka_alert:
+      type: return
+      value:
+        risk_level: high
+        relative_contraindication: true
+        message: "Type 1 diabetes; SGLT2 inhibitor increases euglycemic DKA risk"
+    check_renal_function:
+      type: condition
+      variable: renal_clearance_ml_min
+      operator: lt
+      value: 45
+      true_next: renal_alert
+      false_next: check_gender
+    renal_alert:
+      type: return
+      value:
+        risk_level: moderate
+        efficacy_reduced: true
+        message: "Reduced renal function; SGLT2 inhibitor efficacy reduced"
+    check_gender:
+      type: condition
+      variable: is_female
+      operator: eq
+      value: true
+      true_next: female_assessment
+      false_next: standard_dosing
+    female_assessment:
+      type: return
+      value:
+        risk_level: moderate
+        genital_infection_education: required
+        message: "Female patients; increased genital mycotic infection risk; hygiene education"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        monitoring_required: true
+        message: "Standard SGLT2 inhibitor dosing appropriate"
+tests:
+  - input: { type1_diabetes: true, renal_clearance_ml_min: 60, is_female: false }
+    expect: { risk_level: high, relative_contraindication: true }
+  - input: { type1_diabetes: false, renal_clearance_ml_min: 40, is_female: false }
+    expect: { risk_level: moderate, efficacy_reduced: true }
+  - input: { type1_diabetes: false, renal_clearance_ml_min: 70, is_female: true }
+    expect: { risk_level: moderate, genital_infection_education: required }
+  - input: { type1_diabetes: false, renal_clearance_ml_min: 70, is_female: false }
+    expect: { risk_level: low, monitoring_required: true }
+  - input: {}
+    expect: {}

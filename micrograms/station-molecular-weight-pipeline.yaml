@@ -1,0 +1,144 @@
+name: station-molecular-weight-pipeline
+description: Route molecular weight computations for drug classification thresholds
+version: 0.1.0
+tree:
+  start: check_mw
+  nodes:
+    lipinski_fail:
+      type: return
+      value:
+        priority: moderate
+        reason: MW≥500 Da — Lipinski Rule of 5 violation, oral bioavailability concern
+        action: flag
+        route: admet_review
+    check_low:
+      type: condition
+      variable: molecular_weight
+      operator: lte
+      value: 100
+      true_next: fragment
+      false_next: normal
+    check_mw:
+      type: condition
+      variable: molecular_weight
+      operator: gte
+      value: 500
+      true_next: lipinski_fail
+      false_next: check_low
+    normal:
+      type: return
+      value:
+        reason: MW 100-500 Da — within drug-like range
+        action: pass
+        route: archive
+        priority: low
+    fragment:
+      type: return
+      value:
+        priority: low
+        action: classify
+        reason: MW≤100 Da — molecular fragment, not drug-like
+        route: archive
+tests:
+- input:
+    molecular_weight: 750
+  expect:
+    priority: moderate
+    route: admet_review
+    action: flag
+- input:
+    molecular_weight: 50
+  expect:
+    priority: low
+    route: archive
+    action: classify
+- input:
+    molecular_weight: 350
+  expect:
+    priority: low
+    route: archive
+    action: pass
+- input:
+    molecular_weight: 0
+  expect:
+    priority: low
+    reason: MW≤100 Da — molecular fragment, not drug-like
+    route: archive
+    action: classify
+- input:
+    molecular_weight: -1
+  expect:
+    reason: MW≤100 Da — molecular fragment, not drug-like
+    action: classify
+    priority: low
+    route: archive
+- input:
+    molecular_weight: 99
+  expect:
+    reason: MW≤100 Da — molecular fragment, not drug-like
+    priority: low
+    route: archive
+    action: classify
+- input:
+    molecular_weight: 101
+  expect:
+    priority: low
+    reason: MW 100-500 Da — within drug-like range
+    action: pass
+    route: archive
+- input:
+    molecular_weight: 10000
+  expect:
+    reason: MW≥500 Da — Lipinski Rule of 5 violation, oral bioavailability concern
+    action: flag
+    route: admet_review
+    priority: moderate
+- input: {}
+  expect:
+    action: pass
+    reason: MW 100-500 Da — within drug-like range
+    route: archive
+    priority: low
+- input:
+    molecular_weight: 0
+  expect:
+    priority: low
+    reason: MW≤100 Da — molecular fragment, not drug-like
+    route: archive
+    action: classify
+- input:
+    molecular_weight: -1
+  expect:
+    route: archive
+    priority: low
+    action: classify
+    reason: MW≤100 Da — molecular fragment, not drug-like
+- input:
+    molecular_weight: 499
+  expect:
+    priority: low
+    reason: MW 100-500 Da — within drug-like range
+    route: archive
+    action: pass
+- input:
+    molecular_weight: 501
+  expect:
+    reason: MW≥500 Da — Lipinski Rule of 5 violation, oral bioavailability concern
+    priority: moderate
+    action: flag
+    route: admet_review
+- input:
+    molecular_weight: 50000
+  expect:
+    route: admet_review
+    action: flag
+    reason: MW≥500 Da — Lipinski Rule of 5 violation, oral bioavailability concern
+    priority: moderate
+- input: {}
+  expect:
+    reason: MW 100-500 Da — within drug-like range
+    priority: low
+    route: archive
+    action: pass
+interface: null
+primitive_signature: null

@@ -15,6 +15,9 @@ interface:
     velocity_band:
       type: string
       required: false
+    crypto_health:
+      type: string
+      required: false
   outputs:
     action:
       type: string
@@ -31,13 +34,27 @@ tree:
       operator: eq
       value: RED
       true_next: red
+      false_next: check_crypto_red
+    check_crypto_red:
+      type: condition
+      variable: crypto_health
+      operator: eq
+      value: RED
+      true_next: red
       false_next: check_velocity_slow
     check_velocity_slow:
       type: condition
       variable: velocity_band
       operator: eq
       value: SLOW
-      true_next: red
+      true_next: yellow
+      false_next: check_crypto_yellow
+    check_crypto_yellow:
+      type: condition
+      variable: crypto_health
+      operator: eq
+      value: YELLOW
+      true_next: yellow
       false_next: check_live_nodes
     check_live_nodes:
       type: condition
@@ -91,6 +108,7 @@ tests:
     velocity_band: EXCEPTIONAL
     live_node_count: 2
     staging_node_count: 2
+    crypto_health: GREEN
   expect:
     composite_health: GREEN
     flywheel_operational: true
@@ -100,6 +118,7 @@ tests:
     velocity_band: TARGET
     live_node_count: 2
     staging_node_count: 2
+    crypto_health: GREEN
   expect:
     composite_health: GREEN
     flywheel_operational: true
@@ -109,6 +128,7 @@ tests:
     velocity_band: EXCEPTIONAL
     live_node_count: 2
     staging_node_count: 2
+    crypto_health: GREEN
   expect:
     composite_health: RED
     flywheel_operational: false
@@ -118,15 +138,17 @@ tests:
     velocity_band: SLOW
     live_node_count: 2
     staging_node_count: 2
+    crypto_health: GREEN
   expect:
-    composite_health: RED
-    flywheel_operational: false
-    action: intervene
+    composite_health: YELLOW
+    flywheel_operational: true
+    action: monitor
 - input:
     event_health: GREEN
     velocity_band: TARGET
     live_node_count: 0
     staging_node_count: 2
+    crypto_health: GREEN
   expect:
     composite_health: RED
     flywheel_operational: false
@@ -136,6 +158,7 @@ tests:
     velocity_band: TARGET
     live_node_count: 2
     staging_node_count: 2
+    crypto_health: GREEN
   expect:
     composite_health: YELLOW
     flywheel_operational: true
@@ -145,6 +168,7 @@ tests:
     velocity_band: ACCEPTABLE
     live_node_count: 2
     staging_node_count: 2
+    crypto_health: GREEN
   expect:
     composite_health: YELLOW
     flywheel_operational: true
@@ -163,6 +187,7 @@ tests:
     velocity_band: EXCEPTIONAL
     live_node_count: 3
     staging_node_count: 1
+    crypto_health: GREEN
   expect:
     composite_health: GREEN
     flywheel_operational: true
@@ -172,10 +197,11 @@ tests:
     velocity_band: SLOW
     live_node_count: 2
     staging_node_count: 2
+    crypto_health: GREEN
   expect:
-    composite_health: RED
-    flywheel_operational: false
-    action: intervene
+    composite_health: YELLOW
+    flywheel_operational: true
+    action: monitor
 - input: {}
   expect:
     action: intervene

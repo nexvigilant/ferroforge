@@ -1,0 +1,98 @@
+name: pharma-competitive-rank
+description: "Classifies a company's competitive position in FAERS relative to a named competitor. Accepts a pre-computed relative_ratio (total_reports / competitor_total_reports) and applies threshold comparisons to assign dominant, peer, or minor reporter status."
+version: "1.0"
+interface:
+  inputs:
+    total_reports:
+      type: int
+      required: false
+    competitor_total_reports:
+      type: int
+      required: false
+    relative_ratio:
+      type: float
+      required: false
+  outputs:
+    competitive_position:
+      type: string
+    interpretation:
+      type: string
+tree:
+  start: check_dominant
+  nodes:
+    check_dominant:
+      type: condition
+      variable: relative_ratio
+      operator: gte
+      value: 3.0
+      true_next: return_dominant
+      false_next: check_peer
+    check_peer:
+      type: condition
+      variable: relative_ratio
+      operator: gte
+      value: 1.0
+      true_next: return_peer
+      false_next: return_minor
+    return_dominant:
+      type: return
+      value:
+        competitive_position: "dominant_reporter"
+        interpretation: "Company has 3x or more FAERS reports than the named competitor — likely reflects greater market share, longer product history, or broader indication coverage."
+    return_peer:
+      type: return
+      value:
+        competitive_position: "peer_reporter"
+        interpretation: "Company reports at comparable or higher volume than the competitor — similar safety data density, warranting head-to-head signal comparison."
+    return_minor:
+      type: return
+      value:
+        competitive_position: "minor_reporter"
+        interpretation: "Company reports at lower volume than the competitor — may reflect smaller market share, newer products, or under-reporting relative to competitor baseline."
+tests:
+  - name: "Dominant reporter — 5x competitor volume"
+    input:
+      total_reports: 500000
+      competitor_total_reports: 100000
+      relative_ratio: 5.0
+    expect:
+      competitive_position: "dominant_reporter"
+  - name: "Dominant reporter — exactly 3x"
+    input:
+      total_reports: 300000
+      competitor_total_reports: 100000
+      relative_ratio: 3.0
+    expect:
+      competitive_position: "dominant_reporter"
+  - name: "Peer reporter — exactly 1x (equal volume)"
+    input:
+      total_reports: 100000
+      competitor_total_reports: 100000
+      relative_ratio: 1.0
+    expect:
+      competitive_position: "peer_reporter"
+  - name: "Peer reporter — 2x competitor"
+    input:
+      total_reports: 200000
+      competitor_total_reports: 100000
+      relative_ratio: 2.0
+    expect:
+      competitive_position: "peer_reporter"
+  - name: "Minor reporter — below competitor volume"
+    input:
+      total_reports: 40000
+      competitor_total_reports: 100000
+      relative_ratio: 0.4
+    expect:
+      competitive_position: "minor_reporter"
+  - name: "Minor reporter — just below 1x threshold"
+    input:
+      total_reports: 99000
+      competitor_total_reports: 100000
+      relative_ratio: 0.99
+    expect:
+      competitive_position: "minor_reporter"
+  - name: "Null input safety — defaults to minor reporter"
+    input: {}
+    expect:
+      competitive_position: "minor_reporter"

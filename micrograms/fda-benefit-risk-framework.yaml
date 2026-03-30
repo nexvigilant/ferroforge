@@ -1,0 +1,346 @@
+name: fda-benefit-risk-framework
+description: "FDA structured benefit-risk assessment framework: routes 5-dimension evaluation to approval recommendation per FDA Guidance 'Benefit-Risk Assessment for New Drug and Biological Products' (2023)"
+version: 0.1.0
+interface:
+  inputs:
+    unmet_medical_need:
+      type: string
+      required: true
+      description: "Level of unmet medical need: high, moderate, low"
+    benefit_evidence:
+      type: string
+      required: true
+      description: "Strength of efficacy evidence: strong, moderate, weak"
+    risk_severity:
+      type: string
+      required: true
+      description: "Severity of identified risks: severe, moderate, mild"
+    risk_management:
+      type: string
+      required: true
+      description: "Adequacy of risk management: adequate, partial, inadequate"
+    therapeutic_alternatives:
+      type: string
+      required: false
+      description: "Availability of alternatives: none, few, many"
+  outputs:
+    recommendation:
+      type: string
+    risk_benefit_balance:
+      type: string
+    regulatory_reference:
+      type: string
+    rationale:
+      type: string
+tree:
+  start: check_unmet_need
+  nodes:
+    check_unmet_need:
+      type: condition
+      variable: unmet_medical_need
+      operator: eq
+      value: "high"
+      true_next: high_need_benefit_check
+      false_next: check_moderate_need
+
+    check_moderate_need:
+      type: condition
+      variable: unmet_medical_need
+      operator: eq
+      value: "moderate"
+      true_next: moderate_need_benefit_check
+      false_next: low_need_benefit_check
+
+    # HIGH UNMET NEED PATH
+    high_need_benefit_check:
+      type: condition
+      variable: benefit_evidence
+      operator: eq
+      value: "weak"
+      true_next: high_need_weak_benefit
+      false_next: high_need_risk_check
+
+    high_need_risk_check:
+      type: condition
+      variable: risk_severity
+      operator: eq
+      value: "severe"
+      true_next: high_need_severe_risk_mgmt
+      false_next: high_need_favorable
+
+    high_need_severe_risk_mgmt:
+      type: condition
+      variable: risk_management
+      operator: eq
+      value: "inadequate"
+      true_next: high_need_severe_inadequate
+      false_next: high_need_favorable
+
+    high_need_favorable:
+      type: return
+      value:
+        recommendation: FAVORABLE
+        risk_benefit_balance: POSITIVE
+        rationale: "High unmet medical need with acceptable benefit-risk profile supports approval"
+        regulatory_reference: "FDA Guidance: Benefit-Risk Assessment for New Drug and Biological Products (2023), Dimension 1-5 Framework"
+
+    high_need_weak_benefit:
+      type: return
+      value:
+        recommendation: ADDITIONAL_DATA_NEEDED
+        risk_benefit_balance: UNCERTAIN
+        rationale: "High unmet need but weak efficacy evidence - additional clinical data required to establish benefit"
+        regulatory_reference: "FDA Guidance: Benefit-Risk Assessment for New Drug and Biological Products (2023), Dimension 2"
+
+    high_need_severe_inadequate:
+      type: return
+      value:
+        recommendation: REMS_REQUIRED
+        risk_benefit_balance: CONDITIONAL
+        rationale: "High unmet need justifies approval but severe risks with inadequate management require REMS"
+        regulatory_reference: "FDA Guidance: Benefit-Risk Assessment for New Drug and Biological Products (2023), Dimension 4-5"
+
+    # MODERATE UNMET NEED PATH
+    moderate_need_benefit_check:
+      type: condition
+      variable: benefit_evidence
+      operator: eq
+      value: "strong"
+      true_next: moderate_strong_risk_check
+      false_next: moderate_weak_benefit_check
+
+    moderate_weak_benefit_check:
+      type: condition
+      variable: benefit_evidence
+      operator: eq
+      value: "weak"
+      true_next: moderate_weak_unfavorable
+      false_next: moderate_moderate_risk_check
+
+    moderate_strong_risk_check:
+      type: condition
+      variable: risk_severity
+      operator: eq
+      value: "severe"
+      true_next: moderate_strong_severe_mgmt
+      false_next: moderate_favorable
+
+    moderate_moderate_risk_check:
+      type: condition
+      variable: risk_severity
+      operator: eq
+      value: "severe"
+      true_next: moderate_moderate_severe
+      false_next: moderate_favorable
+
+    moderate_strong_severe_mgmt:
+      type: condition
+      variable: risk_management
+      operator: eq
+      value: "adequate"
+      true_next: moderate_favorable
+      false_next: moderate_conditional
+
+    moderate_favorable:
+      type: return
+      value:
+        recommendation: FAVORABLE
+        risk_benefit_balance: POSITIVE
+        rationale: "Moderate unmet need with favorable benefit-risk balance supports approval"
+        regulatory_reference: "FDA Guidance: Benefit-Risk Assessment for New Drug and Biological Products (2023), Dimension 1-5 Framework"
+
+    moderate_conditional:
+      type: return
+      value:
+        recommendation: REMS_REQUIRED
+        risk_benefit_balance: CONDITIONAL
+        rationale: "Moderate unmet need with strong benefit but severe risks require risk mitigation strategy"
+        regulatory_reference: "FDA Guidance: Benefit-Risk Assessment for New Drug and Biological Products (2023), Dimension 4-5"
+
+    moderate_weak_unfavorable:
+      type: return
+      value:
+        recommendation: NOT_APPROVABLE
+        risk_benefit_balance: NEGATIVE
+        rationale: "Moderate unmet need with weak efficacy evidence does not support favorable benefit-risk conclusion"
+        regulatory_reference: "FDA Guidance: Benefit-Risk Assessment for New Drug and Biological Products (2023), Dimension 1-2"
+
+    moderate_moderate_severe:
+      type: return
+      value:
+        recommendation: ADDITIONAL_DATA_NEEDED
+        risk_benefit_balance: UNCERTAIN
+        rationale: "Moderate benefit against severe risks requires additional safety data or risk management plan"
+        regulatory_reference: "FDA Guidance: Benefit-Risk Assessment for New Drug and Biological Products (2023), Dimension 3-4"
+
+    # LOW UNMET NEED PATH
+    low_need_benefit_check:
+      type: condition
+      variable: benefit_evidence
+      operator: eq
+      value: "strong"
+      true_next: low_strong_risk_check
+      false_next: low_not_strong
+
+    low_strong_risk_check:
+      type: condition
+      variable: risk_severity
+      operator: eq
+      value: "mild"
+      true_next: low_favorable
+      false_next: low_strong_risk_mgmt
+
+    low_strong_risk_mgmt:
+      type: condition
+      variable: risk_management
+      operator: eq
+      value: "adequate"
+      true_next: low_favorable
+      false_next: low_conditional
+
+    low_favorable:
+      type: return
+      value:
+        recommendation: FAVORABLE
+        risk_benefit_balance: POSITIVE
+        rationale: "Strong benefit evidence with manageable risks supports approval even with low unmet need"
+        regulatory_reference: "FDA Guidance: Benefit-Risk Assessment for New Drug and Biological Products (2023), Dimension 1-5 Framework"
+
+    low_conditional:
+      type: return
+      value:
+        recommendation: ADDITIONAL_DATA_NEEDED
+        risk_benefit_balance: UNCERTAIN
+        rationale: "Low unmet need with alternatives available - higher bar for risk tolerance requires better risk management"
+        regulatory_reference: "FDA Guidance: Benefit-Risk Assessment for New Drug and Biological Products (2023), Dimension 5"
+
+    low_not_strong:
+      type: return
+      value:
+        recommendation: NOT_APPROVABLE
+        risk_benefit_balance: NEGATIVE
+        rationale: "Low unmet need with alternatives available and non-strong efficacy evidence - benefit-risk unfavorable"
+        regulatory_reference: "FDA Guidance: Benefit-Risk Assessment for New Drug and Biological Products (2023), Dimension 1-2"
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(σ) — multi-dimensional benefit-risk classification routed by medical need context'
+  primes: ['κ', 'σ', '∂']
+  arguments: ['unmet_medical_need', 'benefit_evidence', 'risk_severity', 'risk_management']
+
+tests:
+# High unmet need, strong benefit, mild risk
+- input:
+    unmet_medical_need: "high"
+    benefit_evidence: "strong"
+    risk_severity: "mild"
+    risk_management: "adequate"
+  expect:
+    recommendation: FAVORABLE
+    risk_benefit_balance: POSITIVE
+
+# High unmet need, weak benefit
+- input:
+    unmet_medical_need: "high"
+    benefit_evidence: "weak"
+    risk_severity: "mild"
+    risk_management: "adequate"
+  expect:
+    recommendation: ADDITIONAL_DATA_NEEDED
+    risk_benefit_balance: UNCERTAIN
+
+# High unmet need, severe risk, inadequate management -> REMS
+- input:
+    unmet_medical_need: "high"
+    benefit_evidence: "strong"
+    risk_severity: "severe"
+    risk_management: "inadequate"
+  expect:
+    recommendation: REMS_REQUIRED
+    risk_benefit_balance: CONDITIONAL
+
+# Moderate need, strong benefit, mild risk
+- input:
+    unmet_medical_need: "moderate"
+    benefit_evidence: "strong"
+    risk_severity: "mild"
+    risk_management: "adequate"
+  expect:
+    recommendation: FAVORABLE
+    risk_benefit_balance: POSITIVE
+
+# Moderate need, weak benefit -> not approvable
+- input:
+    unmet_medical_need: "moderate"
+    benefit_evidence: "weak"
+    risk_severity: "mild"
+    risk_management: "adequate"
+  expect:
+    recommendation: NOT_APPROVABLE
+    risk_benefit_balance: NEGATIVE
+
+# Low need, strong benefit, mild risk
+- input:
+    unmet_medical_need: "low"
+    benefit_evidence: "strong"
+    risk_severity: "mild"
+    risk_management: "adequate"
+  expect:
+    recommendation: FAVORABLE
+    risk_benefit_balance: POSITIVE
+
+# Low need, moderate benefit -> not approvable
+- input:
+    unmet_medical_need: "low"
+    benefit_evidence: "moderate"
+    risk_severity: "mild"
+    risk_management: "adequate"
+  expect:
+    recommendation: NOT_APPROVABLE
+    risk_benefit_balance: NEGATIVE
+
+# High need, strong benefit, severe risk, adequate mgmt -> favorable
+- input:
+    unmet_medical_need: "high"
+    benefit_evidence: "strong"
+    risk_severity: "severe"
+    risk_management: "adequate"
+  expect:
+    recommendation: FAVORABLE
+    risk_benefit_balance: POSITIVE
+
+# Moderate need, strong benefit, severe risk, inadequate mgmt -> REMS
+- input:
+    unmet_medical_need: "moderate"
+    benefit_evidence: "strong"
+    risk_severity: "severe"
+    risk_management: "inadequate"
+  expect:
+    recommendation: REMS_REQUIRED
+    risk_benefit_balance: CONDITIONAL
+
+# Moderate need, moderate benefit, severe risk -> additional data
+- input:
+    unmet_medical_need: "moderate"
+    benefit_evidence: "moderate"
+    risk_severity: "severe"
+    risk_management: "adequate"
+  expect:
+    recommendation: ADDITIONAL_DATA_NEEDED
+    risk_benefit_balance: UNCERTAIN
+
+# Low need, strong benefit, moderate risk, inadequate mgmt -> additional data
+- input:
+    unmet_medical_need: "low"
+    benefit_evidence: "strong"
+    risk_severity: "moderate"
+    risk_management: "inadequate"
+  expect:
+    recommendation: ADDITIONAL_DATA_NEEDED
+    risk_benefit_balance: UNCERTAIN
+
+# Empty input defaults
+- input: {}
+  expect:
+    recommendation: NOT_APPROVABLE
+    risk_benefit_balance: NEGATIVE

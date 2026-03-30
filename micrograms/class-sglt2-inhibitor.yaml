@@ -1,0 +1,74 @@
+name: class-sglt2-inhibitor
+description: 'SGLT2 inhibitors class safety: Diabetic ketoacidosis monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: dka_risk
+      operator: gte
+      value: 2
+      true_next: alert
+      false_next: safe
+    alert:
+      type: return
+      value:
+        action: class_effect_investigation
+        drug_class: SGLT2 inhibitors
+        concern: Diabetic ketoacidosis
+        alert: true
+    safe:
+      type: return
+      value:
+        action: continue
+        drug_class: SGLT2 inhibitors
+        concern: Diabetic ketoacidosis
+        alert: false
+tests:
+- input:
+    dka_risk: 2
+  expect:
+    drug_class: SGLT2 inhibitors
+    alert: true
+- input: {}
+  expect:
+    drug_class: SGLT2 inhibitors
+    alert: false
+- input:
+    dka_risk: 0
+  expect:
+    concern: Diabetic ketoacidosis
+    drug_class: SGLT2 inhibitors
+    action: continue
+    alert: false
+- input:
+    dka_risk: -1
+  expect:
+    concern: Diabetic ketoacidosis
+    action: continue
+    alert: false
+    drug_class: SGLT2 inhibitors
+- input:
+    dka_risk: 1
+  expect:
+    concern: Diabetic ketoacidosis
+    alert: false
+    drug_class: SGLT2 inhibitors
+    action: continue
+- input:
+    dka_risk: 3
+  expect:
+    action: class_effect_investigation
+    drug_class: SGLT2 inhibitors
+    alert: true
+    concern: Diabetic ketoacidosis
+- input:
+    dka_risk: 200
+  expect:
+    action: class_effect_investigation
+    drug_class: SGLT2 inhibitors
+    concern: Diabetic ketoacidosis
+    alert: true
+interface: null
+primitive_signature: null

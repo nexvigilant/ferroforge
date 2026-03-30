@@ -1,0 +1,72 @@
+name: psur-benefit-risk-conclusion
+description: "Formulate benefit-risk conclusion for PSUR reporting"
+version: 0.1.0
+tree:
+  start: validate_br_assessment
+  nodes:
+    validate_br_assessment:
+      type: condition
+      variable: benefit_risk_assessment_complete
+      operator: eq
+      value: true
+      true_next: check_br_balance
+      false_next: conclusion_incomplete
+    check_br_balance:
+      type: condition
+      variable: benefit_risk_status
+      operator: eq
+      value: "favorable"
+      true_next: favorable_conclusion
+      false_next: check_marginal
+    check_marginal:
+      type: condition
+      variable: benefit_risk_status
+      operator: eq
+      value: "marginal"
+      true_next: marginal_conclusion
+      false_next: unfavorable_conclusion
+    favorable_conclusion:
+      type: return
+      value:
+        br_conclusion: "benefit_risk_favorable"
+        recommendation: "continue_marketing"
+        regulatory_action: "none"
+        psur_br_compliant: true
+    marginal_conclusion:
+      type: return
+      value:
+        br_conclusion: "benefit_risk_marginal"
+        recommendation: "continue_with_restrictions"
+        regulatory_action: "label_update"
+        psur_br_compliant: true
+    unfavorable_conclusion:
+      type: return
+      value:
+        br_conclusion: "benefit_risk_unfavorable"
+        recommendation: "withdraw_or_restrict"
+        regulatory_action: "suspension_or_withdrawal"
+        psur_br_compliant: true
+    conclusion_incomplete:
+      type: return
+      value:
+        br_conclusion: null
+        recommendation: null
+        regulatory_action: null
+        psur_br_compliant: false
+tests:
+- input:
+    benefit_risk_assessment_complete: true
+    benefit_risk_status: "favorable"
+  expect:
+    br_conclusion: "benefit_risk_favorable"
+    recommendation: "continue_marketing"
+- input:
+    benefit_risk_assessment_complete: true
+    benefit_risk_status: "marginal"
+  expect:
+    br_conclusion: "benefit_risk_marginal"
+- input:
+    benefit_risk_assessment_complete: false
+  expect:
+    br_conclusion: null
+    psur_br_compliant: false

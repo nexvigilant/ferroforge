@@ -1,0 +1,61 @@
+name: trend-underreporting
+description: Underreporting suspected
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    detected:
+      type: return
+      value:
+        action: investigate
+        pattern: underreported
+        detected: true
+    not_detected:
+      type: return
+      value:
+        pattern: underreported
+        detected: false
+        action: continue_monitoring
+    check:
+      type: condition
+      variable: reporting_ratio
+      operator: lte
+      value: 0
+      true_next: detected
+      false_next: not_detected
+tests:
+- input:
+    reporting_ratio: 0
+  expect:
+    detected: true
+    pattern: underreported
+- input: {}
+  expect:
+    detected: false
+    pattern: underreported
+- input:
+    reporting_ratio: -1
+  expect:
+    detected: true
+    action: investigate
+    pattern: underreported
+- input:
+    reporting_ratio: -1
+  expect:
+    detected: true
+    pattern: underreported
+    action: investigate
+- input:
+    reporting_ratio: 1
+  expect:
+    action: continue_monitoring
+    pattern: underreported
+    detected: false
+- input:
+    reporting_ratio: 0
+  expect:
+    pattern: underreported
+    action: investigate
+    detected: true
+interface: null
+primitive_signature: null

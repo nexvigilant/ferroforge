@@ -1,0 +1,50 @@
+name: workflow-mesh-topology
+description: "Select mesh topology pattern based on signal density and geographic spread"
+version: 0.1.0
+
+tree:
+  start: check_density
+  nodes:
+    check_density:
+      type: "condition"
+      variable: "signal_count"
+      operator: "gte"
+      value: 5
+      true_next: "check_spread"
+      false_next: "star"
+    star:
+      type: "return"
+      value:
+        topology: "star"
+        center: "collector"
+        reason: "Low signal count \u2014 single collector hub"
+        max_hops: 1
+    check_spread:
+      type: "condition"
+      variable: "region_count"
+      operator: "gte"
+      value: 3
+      true_next: "mesh"
+      false_next: "ring"
+    mesh:
+      type: "return"
+      value:
+        topology: "full_mesh"
+        center: "distributed"
+        reason: "High density + multi-region \u2014 full mesh for gossip"
+        max_hops: 3
+    ring:
+      type: "return"
+      value:
+        topology: "ring"
+        center: "relay"
+        reason: "High density, few regions \u2014 ring with relay"
+        max_hops: 2
+
+tests:
+  - input: {"signal_count": 2, "region_count": 1}
+    expect: {"topology": "star", "max_hops": 1}
+  - input: {"signal_count": 8, "region_count": 5}
+    expect: {"topology": "full_mesh", "max_hops": 3}
+  - input: {"signal_count": 6, "region_count": 2}
+    expect: {"topology": "ring", "max_hops": 2}

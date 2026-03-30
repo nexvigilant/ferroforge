@@ -1,0 +1,100 @@
+name: drug-profile-tirzepatide
+description: "Safety profile classifier for tirzepatide. Routes by PRR signal strength and seriousness."
+version: "1.0"
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(×(N_prr, ∂_threshold)) → ς_classification'
+  primes: ['κ', 'N', '∂', 'ς', '→']
+  arguments: ['prr', 'case_count', 'serious_pct']
+interface:
+  inputs:
+    prr:
+      type: float
+      required: true
+    case_count:
+      type: int
+      required: false
+    serious_pct:
+      type: float
+      required: false
+  outputs:
+    risk_level:
+      type: string
+    monitoring:
+      type: string
+tree:
+  start: check_prr_present
+  nodes:
+    check_prr_present:
+      type: condition
+      variable: prr
+      operator: is_null
+      true_next: unknown
+      false_next: check_high_prr
+    check_high_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 3.0
+      true_next: check_serious
+      false_next: check_moderate_prr
+    check_serious:
+      type: condition
+      variable: serious_pct
+      operator: gte
+      value: 0.5
+      true_next: high_risk
+      false_next: elevated
+    high_risk:
+      type: return
+      value:
+        risk_level: HIGH
+        monitoring: weekly
+        drug: "tirzepatide"
+    elevated:
+      type: return
+      value:
+        risk_level: ELEVATED
+        monitoring: biweekly
+        drug: "tirzepatide"
+    check_moderate_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: moderate
+      false_next: low_risk
+    moderate:
+      type: return
+      value:
+        risk_level: MODERATE
+        monitoring: monthly
+        drug: "tirzepatide"
+    low_risk:
+      type: return
+      value:
+        risk_level: LOW
+        monitoring: quarterly
+        drug: "tirzepatide"
+    unknown:
+      type: return
+      value:
+        risk_level: UNKNOWN
+        monitoring: baseline
+        drug: "tirzepatide"
+tests:
+  - name: high risk — strong signal + serious
+    input: {prr: 4.5, case_count: 200, serious_pct: 0.7}
+    expect: {risk_level: HIGH, monitoring: weekly}
+  - name: elevated — strong signal but low serious
+    input: {prr: 3.5, case_count: 100, serious_pct: 0.3}
+    expect: {risk_level: ELEVATED, monitoring: biweekly}
+  - name: moderate — signal threshold
+    input: {prr: 2.5, case_count: 50, serious_pct: 0.4}
+    expect: {risk_level: MODERATE, monitoring: monthly}
+  - name: low risk — no signal
+    input: {prr: 1.2, case_count: 500, serious_pct: 0.1}
+    expect: {risk_level: LOW, monitoring: quarterly}
+  - name: null safety
+    input: {}
+    expect: {risk_level: UNKNOWN, monitoring: baseline}

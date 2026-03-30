@@ -1,0 +1,47 @@
+name: workflow-risk-management
+description: "Select risk management approach by risk category"
+version: 0.1.0
+
+tree:
+  start: check_category
+  nodes:
+    check_category:
+      type: "condition"
+      variable: "risk_category"
+      operator: "eq"
+      value: "identified"
+      true_next: "identified_risk"
+      false_next: "check_potential"
+    identified_risk:
+      type: "return"
+      value:
+        approach: "routine_minimization"
+        chain: "compliance \u2192 benefit-risk \u2192 ema"
+        actions: ["labeling", "PIL", "training"]
+    check_potential:
+      type: "condition"
+      variable: "risk_category"
+      operator: "eq"
+      value: "potential"
+      true_next: "potential_risk"
+      false_next: "missing_info"
+    potential_risk:
+      type: "return"
+      value:
+        approach: "additional_monitoring"
+        chain: "preemptive-pv \u2192 vigilance \u2192 epidemiology"
+        actions: ["PASS", "registry", "study"]
+    missing_info:
+      type: "return"
+      value:
+        approach: "information_gathering"
+        chain: "pubmed \u2192 clinicaltrials \u2192 epidemiology"
+        actions: ["literature_review", "observational_study"]
+
+tests:
+  - input: {"risk_category": "identified"}
+    expect: {"approach": "routine_minimization"}
+  - input: {"risk_category": "potential"}
+    expect: {"approach": "additional_monitoring"}
+  - input: {"risk_category": "missing"}
+    expect: {"approach": "information_gathering"}

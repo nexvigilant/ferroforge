@@ -1,0 +1,95 @@
+name: ich-e2e-planning
+description: "ICH E2E: Pharmacovigilance planning requirements for clinical development"
+version: 0.1.0
+tree:
+  start: validate_development_phase
+  nodes:
+    validate_development_phase:
+      type: condition
+      variable: development_phase
+      operator: is_not_null
+      value: null
+      true_next: check_phase_type
+      false_next: plan_unknown
+    check_phase_type:
+      type: condition
+      variable: development_phase
+      operator: eq
+      value: "phase1"
+      true_next: phase1_plan
+      false_next: check_phase2
+    check_phase2:
+      type: condition
+      variable: development_phase
+      operator: eq
+      value: "phase2"
+      true_next: phase2_plan
+      false_next: check_phase3
+    check_phase3:
+      type: condition
+      variable: development_phase
+      operator: eq
+      value: "phase3"
+      true_next: phase3_plan
+      false_next: post_approval_plan
+    phase1_plan:
+      type: return
+      value:
+        pv_plan_type: "phase1_safety_summary"
+        adverse_event_monitoring: "intensive"
+        serious_event_reporting: "within_24_hours"
+        pharmacovigilance_system: "minimized"
+        ich_e2e_compliant: true
+    phase2_plan:
+      type: return
+      value:
+        pv_plan_type: "phase2_safety_update"
+        adverse_event_monitoring: "comprehensive"
+        serious_event_reporting: "within_7_days"
+        pharmacovigilance_system: "established"
+        ich_e2e_compliant: true
+    phase3_plan:
+      type: return
+      value:
+        pv_plan_type: "phase3_development_safety_update"
+        adverse_event_monitoring: "intensive"
+        serious_event_reporting: "within_15_days"
+        pharmacovigilance_system: "full"
+        ich_e2e_compliant: true
+    post_approval_plan:
+      type: return
+      value:
+        pv_plan_type: "approved_product_safety_summary"
+        adverse_event_monitoring: "ongoing"
+        serious_event_reporting: "expedited"
+        pharmacovigilance_system: "regulatory_compliant"
+        ich_e2e_compliant: true
+    plan_unknown:
+      type: return
+      value:
+        pv_plan_type: null
+        adverse_event_monitoring: null
+        serious_event_reporting: null
+        pharmacovigilance_system: null
+        ich_e2e_compliant: false
+tests:
+- input:
+    development_phase: "phase1"
+  expect:
+    pv_plan_type: "phase1_safety_summary"
+    adverse_event_monitoring: "intensive"
+    serious_event_reporting: "within_24_hours"
+- input:
+    development_phase: "phase2"
+  expect:
+    pv_plan_type: "phase2_safety_update"
+    serious_event_reporting: "within_7_days"
+- input:
+    development_phase: "phase3"
+  expect:
+    pv_plan_type: "phase3_development_safety_update"
+    serious_event_reporting: "within_15_days"
+- input: {}
+  expect:
+    pv_plan_type: null
+    ich_e2e_compliant: false

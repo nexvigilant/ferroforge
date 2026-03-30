@@ -1,0 +1,80 @@
+name: patient-misuse-classifier
+description: "Classify patient drug misuse reports for pharmacovigilance tracking"
+version: 0.1.0
+tree:
+  start: validate_misuse_report
+  nodes:
+    validate_misuse_report:
+      type: condition
+      variable: misuse_reported
+      operator: eq
+      value: true
+      true_next: check_misuse_type
+      false_next: no_misuse
+    check_misuse_type:
+      type: condition
+      variable: misuse_category
+      operator: eq
+      value: "overdose"
+      true_next: overdose_misuse
+      false_next: check_non_compliant
+    check_non_compliant:
+      type: condition
+      variable: misuse_category
+      operator: eq
+      value: "non_compliance"
+      true_next: non_compliant_use
+      false_next: other_misuse
+    overdose_misuse:
+      type: return
+      value:
+        misuse_classification: "intentional_overdose"
+        clinical_consequence: "varies"
+        monitoring_required: true
+        patient_counseling_needed: true
+        misuse_compliant: true
+    non_compliant_use:
+      type: return
+      value:
+        misuse_classification: "non_compliant_dosing"
+        clinical_consequence: "reduced_efficacy_or_increased_risk"
+        monitoring_required: true
+        patient_counseling_needed: true
+        misuse_compliant: true
+    other_misuse:
+      type: return
+      value:
+        misuse_classification: "other_misuse"
+        clinical_consequence: "unpredictable"
+        monitoring_required: true
+        patient_counseling_needed: true
+        misuse_compliant: true
+    no_misuse:
+      type: return
+      value:
+        misuse_classification: "no_misuse"
+        clinical_consequence: "not_applicable"
+        monitoring_required: false
+        patient_counseling_needed: false
+        misuse_compliant: true
+tests:
+- input:
+    misuse_reported: true
+    misuse_category: "overdose"
+  expect:
+    misuse_classification: "intentional_overdose"
+    monitoring_required: true
+- input:
+    misuse_reported: true
+    misuse_category: "non_compliance"
+  expect:
+    misuse_classification: "non_compliant_dosing"
+- input:
+    misuse_reported: false
+  expect:
+    misuse_classification: "no_misuse"
+    monitoring_required: false
+- input: {}
+  expect:
+    misuse_classification: "no_misuse"
+    misuse_compliant: true

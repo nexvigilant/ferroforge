@@ -1,0 +1,190 @@
+name: spanish-subjunctive-gate
+description: Decides whether the subjunctive mood is required based on sentence semantics using the WEIRDO mnemonic
+version: 0.1.0
+interface:
+  inputs:
+    expresses_doubt:
+      type: bool
+      required: false
+    expresses_desire:
+      type: bool
+      required: false
+    expresses_emotion:
+      type: bool
+      required: false
+    is_command:
+      type: bool
+      required: false
+    is_factual:
+      type: bool
+      required: false
+  outputs:
+    mood:
+      type: string
+    reason:
+      type: string
+    mnemonic:
+      type: string
+tree:
+  start: check_factual_present
+  nodes:
+    check_factual_present:
+      type: condition
+      variable: is_factual
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_factual
+    reject_missing:
+      type: return
+      value:
+        mood: REJECTED
+        reason: "REJECTED: is_factual is required"
+        mnemonic: "N/A"
+    check_factual:
+      type: condition
+      variable: is_factual
+      operator: eq
+      value: true
+      true_next: indicative
+      false_next: check_doubt
+    check_doubt:
+      type: condition
+      variable: expresses_doubt
+      operator: eq
+      value: true
+      true_next: subjunctive_doubt
+      false_next: check_desire
+    check_desire:
+      type: condition
+      variable: expresses_desire
+      operator: eq
+      value: true
+      true_next: subjunctive_desire
+      false_next: check_emotion
+    check_emotion:
+      type: condition
+      variable: expresses_emotion
+      operator: eq
+      value: true
+      true_next: subjunctive_emotion
+      false_next: check_command
+    check_command:
+      type: condition
+      variable: is_command
+      operator: eq
+      value: true
+      true_next: subjunctive_command
+      false_next: indicative_default
+    indicative:
+      type: return
+      value:
+        mood: indicative
+        reason: "Factual statement — use indicative"
+        mnemonic: "WEIRDO does not apply to facts"
+    indicative_default:
+      type: return
+      value:
+        mood: indicative
+        reason: "No subjunctive trigger detected — default to indicative"
+        mnemonic: "WEIRDO: Wishes, Emotions, Impersonal, Recommendations, Doubt, Ojala"
+    subjunctive_doubt:
+      type: return
+      value:
+        mood: subjunctive
+        reason: "Expresses doubt — subjunctive required"
+        mnemonic: "WEIRDO: D = Doubt"
+    subjunctive_desire:
+      type: return
+      value:
+        mood: subjunctive
+        reason: "Expresses desire — subjunctive required"
+        mnemonic: "WEIRDO: W = Wishes"
+    subjunctive_emotion:
+      type: return
+      value:
+        mood: subjunctive
+        reason: "Expresses emotion — subjunctive required"
+        mnemonic: "WEIRDO: E = Emotions"
+    subjunctive_command:
+      type: return
+      value:
+        mood: subjunctive
+        reason: "Command or recommendation — subjunctive required"
+        mnemonic: "WEIRDO: R = Recommendations"
+tests:
+- input:
+    expresses_doubt: true
+    expresses_desire: false
+    expresses_emotion: false
+    is_command: false
+    is_factual: false
+  expect:
+    mood: subjunctive
+    reason: "Expresses doubt — subjunctive required"
+    mnemonic: "WEIRDO: D = Doubt"
+- input:
+    expresses_doubt: false
+    expresses_desire: true
+    expresses_emotion: false
+    is_command: false
+    is_factual: false
+  expect:
+    mood: subjunctive
+    reason: "Expresses desire — subjunctive required"
+    mnemonic: "WEIRDO: W = Wishes"
+- input:
+    expresses_doubt: false
+    expresses_desire: false
+    expresses_emotion: true
+    is_command: false
+    is_factual: false
+  expect:
+    mood: subjunctive
+    reason: "Expresses emotion — subjunctive required"
+    mnemonic: "WEIRDO: E = Emotions"
+- input:
+    expresses_doubt: false
+    expresses_desire: false
+    expresses_emotion: false
+    is_command: true
+    is_factual: false
+  expect:
+    mood: subjunctive
+    reason: "Command or recommendation — subjunctive required"
+    mnemonic: "WEIRDO: R = Recommendations"
+- input:
+    expresses_doubt: false
+    expresses_desire: false
+    expresses_emotion: false
+    is_command: false
+    is_factual: true
+  expect:
+    mood: indicative
+    reason: "Factual statement — use indicative"
+    mnemonic: "WEIRDO does not apply to facts"
+- input: {}
+  expect:
+    mood: REJECTED
+    reason: "REJECTED: is_factual is required"
+    mnemonic: "N/A"
+- input:
+    expresses_doubt: true
+    expresses_desire: true
+    expresses_emotion: false
+    is_command: false
+    is_factual: false
+  expect:
+    mood: subjunctive
+    reason: "Expresses doubt — subjunctive required"
+    mnemonic: "WEIRDO: D = Doubt"
+- input:
+    expresses_doubt: false
+    expresses_desire: false
+    expresses_emotion: false
+    is_command: false
+    is_factual: false
+  expect:
+    mood: indicative
+    reason: "No subjunctive trigger detected — default to indicative"
+    mnemonic: "WEIRDO: Wishes, Emotions, Impersonal, Recommendations, Doubt, Ojala"

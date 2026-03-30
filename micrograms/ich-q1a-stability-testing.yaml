@@ -1,0 +1,905 @@
+name: ich-q1a-stability-testing
+description: >
+  ICH Q1A(R2) Stability Testing of New Drug Substances and Products.
+  Routes stability study design based on product type, storage type,
+  long-term condition choice, and accelerated study outcome. Covers
+  general case, refrigerator, freezer, below -20C, impermeable containers,
+  and semi-permeable containers. Source: ICH Q1A(R2) Step 4, 6 Feb 2003.
+version: 0.2.0
+primitive_signature:
+  dominant: sequence
+  expression: "→(∂(ς))"
+  primes: [sequence, boundary, state]
+  arguments:
+    - "sequence: storage_type → conditions → frequency → shelf_life"
+    - "boundary: storage type and long-term condition choice determine condition boundary"
+    - "state: significant_change at accelerated triggers intermediate or limits extrapolation"
+tree:
+  start: check_has_input
+  nodes:
+    # ── Gate 0: Null safety ──
+    check_has_input:
+      type: condition
+      variable: product_type
+      operator: is_not_null
+      value: true
+      true_next: check_storage_type_null
+      false_next: default_missing
+
+    check_storage_type_null:
+      type: condition
+      variable: storage_type
+      operator: is_not_null
+      value: true
+      true_next: check_product_type
+      false_next: default_missing
+
+    # ── Gate 1: Product type ──
+    check_product_type:
+      type: condition
+      variable: product_type
+      operator: eq
+      value: drug_substance
+      true_next: ds_check_storage
+      false_next: dp_check_storage
+
+    # ══════════════════════════════════════
+    # DRUG SUBSTANCE paths
+    # ══════════════════════════════════════
+    ds_check_storage:
+      type: condition
+      variable: storage_type
+      operator: eq
+      value: general
+      true_next: ds_general_check_lt_choice
+      false_next: ds_check_refrigerator
+
+    ds_check_refrigerator:
+      type: condition
+      variable: storage_type
+      operator: eq
+      value: refrigerator
+      true_next: ds_refrigerator_check_sig
+      false_next: ds_check_freezer
+
+    ds_check_freezer:
+      type: condition
+      variable: storage_type
+      operator: eq
+      value: freezer
+      true_next: ds_freezer
+      false_next: ds_below_minus20
+
+    # ── DS General Case (§2.1.7.1) ──
+    ds_general_check_lt_choice:
+      type: condition
+      variable: long_term_condition
+      operator: eq
+      value: "30_65"
+      true_next: ds_general_30_65_check_sig
+      false_next: ds_general_25_60_check_sig
+
+    # DS General 25/60 path
+    ds_general_25_60_check_sig:
+      type: condition
+      variable: significant_change_accelerated
+      operator: eq
+      value: true
+      true_next: ds_general_25_60_check_timing
+      false_next: ds_general_25_60_no_change
+
+    ds_general_25_60_no_change:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.1.7.1"
+        product_type: drug_substance
+        storage_type: general
+        long_term_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / 75% RH ± 5% RH"
+        intermediate_required: false
+        long_term_frequency: "Every 3 months over first year, every 6 months over second year, then annually"
+        accelerated_frequency: "0, 3, 6 months minimum"
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        shelf_life_approach: extrapolate_from_long_term
+        extrapolation_limit: "Limited extrapolation beyond observed range if justified by degradation mechanism, accelerated data, mathematical model fit, batch size, and supporting data"
+        significant_change: false
+        significant_change_definition: "Failure to meet specification"
+        action: "No significant change — propose retest period from long-term data with statistical extrapolation"
+
+    ds_general_25_60_check_timing:
+      type: condition
+      variable: significant_change_timing
+      operator: eq
+      value: within_3_months
+      true_next: ds_general_25_60_sig_early
+      false_next: ds_general_25_60_sig_late
+
+    ds_general_25_60_sig_late:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.1.7.1"
+        product_type: drug_substance
+        storage_type: general
+        long_term_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / 75% RH ± 5% RH"
+        intermediate_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+        intermediate_required: true
+        long_term_frequency: "Every 3 months over first year, every 6 months over second year, then annually"
+        accelerated_frequency: "0, 3, 6 months minimum"
+        intermediate_frequency: "Minimum 4 time points including initial and final (e.g. 0, 6, 9, 12 months)"
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        intermediate_min_duration_months: 12
+        shelf_life_approach: long_term_data_only
+        extrapolation_limit: "Retest period based on real-time data at long-term condition"
+        significant_change: true
+        significant_change_timing: between_3_and_6_months
+        significant_change_definition: "Failure to meet specification"
+        action: "Significant change between 3-6 months — intermediate testing required (min 6 months data from 12-month study), retest period from long-term data only"
+
+    ds_general_25_60_sig_early:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.1.7.1"
+        product_type: drug_substance
+        storage_type: general
+        long_term_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / 75% RH ± 5% RH"
+        intermediate_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+        intermediate_required: true
+        long_term_frequency: "Every 3 months over first year, every 6 months over second year, then annually"
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 3
+        intermediate_min_duration_months: 12
+        shelf_life_approach: long_term_data_only
+        extrapolation_limit: "Retest period based on real-time data only — no extrapolation"
+        significant_change: true
+        significant_change_timing: within_3_months
+        significant_change_definition: "Failure to meet specification"
+        action: "Significant change within first 3 months — unnecessary to continue accelerated to 6 months. Provide discussion on short-term excursion effects. Intermediate testing required."
+
+    # DS General 30/65 path — NO intermediate condition exists
+    ds_general_30_65_check_sig:
+      type: condition
+      variable: significant_change_accelerated
+      operator: eq
+      value: true
+      true_next: ds_general_30_65_sig_change
+      false_next: ds_general_30_65_no_change
+
+    ds_general_30_65_no_change:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.1.7.1"
+        product_type: drug_substance
+        storage_type: general
+        long_term_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / 75% RH ± 5% RH"
+        intermediate_required: false
+        intermediate_note: "No intermediate condition when 30°C/65% RH is the long-term condition"
+        long_term_frequency: "Every 3 months over first year, every 6 months over second year, then annually"
+        accelerated_frequency: "0, 3, 6 months minimum"
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        shelf_life_approach: extrapolate_from_long_term
+        extrapolation_limit: "Limited extrapolation beyond observed range if justified"
+        significant_change: false
+        significant_change_definition: "Failure to meet specification"
+        action: "No significant change — propose retest period from long-term data"
+
+    ds_general_30_65_sig_change:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.1.7.1"
+        product_type: drug_substance
+        storage_type: general
+        long_term_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / 75% RH ± 5% RH"
+        intermediate_required: false
+        intermediate_note: "No intermediate condition when 30°C/65% RH is the long-term condition"
+        long_term_frequency: "Every 3 months over first year, every 6 months over second year, then annually"
+        accelerated_frequency: "0, 3, 6 months minimum"
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        shelf_life_approach: long_term_data_only
+        extrapolation_limit: "Retest period based on real-time data at long-term condition"
+        significant_change: true
+        significant_change_definition: "Failure to meet specification"
+        action: "Significant change at accelerated but no intermediate exists (30°C/65% is long-term). Retest period from long-term data only."
+
+    # ── DS Refrigerator (§2.1.7.2) ──
+    ds_refrigerator_check_sig:
+      type: condition
+      variable: significant_change_accelerated
+      operator: eq
+      value: true
+      true_next: ds_refrigerator_check_timing
+      false_next: ds_refrigerator_no_change
+
+    ds_refrigerator_no_change:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.1.7.2"
+        product_type: drug_substance
+        storage_type: refrigerator
+        long_term_conditions: "5°C ± 3°C"
+        accelerated_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        intermediate_required: false
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        shelf_life_approach: extrapolate_from_long_term
+        significant_change: false
+        significant_change_definition: "Failure to meet specification"
+        action: "No significant change at accelerated — propose retest period from long-term refrigerator data"
+
+    ds_refrigerator_check_timing:
+      type: condition
+      variable: significant_change_timing
+      operator: eq
+      value: within_3_months
+      true_next: ds_refrigerator_sig_early
+      false_next: ds_refrigerator_sig_late
+
+    ds_refrigerator_sig_late:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.1.7.2"
+        product_type: drug_substance
+        storage_type: refrigerator
+        long_term_conditions: "5°C ± 3°C"
+        accelerated_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        intermediate_required: false
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        shelf_life_approach: long_term_data_only
+        significant_change: true
+        significant_change_timing: between_3_and_6_months
+        significant_change_definition: "Failure to meet specification"
+        action: "Significant change between 3-6 months at accelerated — retest period based on real-time data at long-term (5°C) condition"
+
+    ds_refrigerator_sig_early:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.1.7.2"
+        product_type: drug_substance
+        storage_type: refrigerator
+        long_term_conditions: "5°C ± 3°C"
+        accelerated_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        intermediate_required: false
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 3
+        shelf_life_approach: long_term_data_only
+        significant_change: true
+        significant_change_timing: within_3_months
+        significant_change_definition: "Failure to meet specification"
+        action: "Significant change within first 3 months — unnecessary to continue accelerated. Discuss short-term excursion effects (shipping/handling)."
+
+    # ── DS Freezer (§2.1.7.3) ──
+    ds_freezer:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.1.7.3"
+        product_type: drug_substance
+        storage_type: freezer
+        long_term_conditions: "-20°C ± 5°C"
+        accelerated_conditions: "None defined — test single batch at elevated temp (e.g. 5°C ± 3°C or 25°C ± 2°C) for excursion assessment"
+        intermediate_required: false
+        long_term_min_duration_months: 12
+        shelf_life_approach: long_term_data_only
+        extrapolation_limit: "Retest period based on real-time data only"
+        significant_change: false
+        action: "Freezer storage — retest period from long-term data at -20°C. No standard accelerated condition; single-batch elevated temp testing for excursion assessment."
+
+    # ── DS Below -20°C (§2.1.7.4) ──
+    ds_below_minus20:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.1.7.4"
+        product_type: drug_substance
+        storage_type: below_minus_20
+        long_term_conditions: "Case-by-case basis"
+        intermediate_required: false
+        significant_change: false
+        action: "Storage below -20°C — treated on a case-by-case basis. No standard conditions defined."
+
+    # ══════════════════════════════════════
+    # DRUG PRODUCT paths
+    # ══════════════════════════════════════
+    dp_check_storage:
+      type: condition
+      variable: storage_type
+      operator: eq
+      value: general
+      true_next: dp_general_check_lt_choice
+      false_next: dp_check_semi_permeable
+
+    dp_check_semi_permeable:
+      type: condition
+      variable: storage_type
+      operator: eq
+      value: semi_permeable
+      true_next: dp_semi_permeable_check_lt
+      false_next: dp_check_impermeable
+
+    dp_check_impermeable:
+      type: condition
+      variable: storage_type
+      operator: eq
+      value: impermeable
+      true_next: dp_impermeable
+      false_next: dp_check_refrigerator
+
+    dp_check_refrigerator:
+      type: condition
+      variable: storage_type
+      operator: eq
+      value: refrigerator
+      true_next: dp_refrigerator_check_sig
+      false_next: dp_check_freezer
+
+    dp_check_freezer:
+      type: condition
+      variable: storage_type
+      operator: eq
+      value: freezer
+      true_next: dp_freezer
+      false_next: dp_below_minus20
+
+    # ── DP General Case (§2.2.7.1) ──
+    dp_general_check_lt_choice:
+      type: condition
+      variable: long_term_condition
+      operator: eq
+      value: "30_65"
+      true_next: dp_general_30_65_check_sig
+      false_next: dp_general_25_60_check_sig
+
+    # DP General 25/60 path
+    dp_general_25_60_check_sig:
+      type: condition
+      variable: significant_change_accelerated
+      operator: eq
+      value: true
+      true_next: dp_general_25_60_check_timing
+      false_next: dp_general_25_60_no_change
+
+    dp_general_25_60_no_change:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.1"
+        product_type: drug_product
+        storage_type: general
+        long_term_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / 75% RH ± 5% RH"
+        intermediate_required: false
+        long_term_frequency: "Every 3 months over first year, every 6 months over second year, then annually"
+        accelerated_frequency: "0, 3, 6 months minimum"
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        shelf_life_approach: extrapolate_from_long_term
+        significant_change: false
+        significant_change_criteria: "1) 5% change in assay or potency failure; 2) degradation product exceeding criterion; 3) appearance/physical/functionality failure; 4) pH criterion failure (dosage-form dependent); 5) dissolution failure for 12 units"
+        action: "No significant change — propose shelf life from long-term data with statistical extrapolation"
+
+    dp_general_25_60_check_timing:
+      type: condition
+      variable: significant_change_timing
+      operator: eq
+      value: within_3_months
+      true_next: dp_general_25_60_sig_early
+      false_next: dp_general_25_60_sig_late
+
+    dp_general_25_60_sig_late:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.1"
+        product_type: drug_product
+        storage_type: general
+        long_term_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / 75% RH ± 5% RH"
+        intermediate_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+        intermediate_required: true
+        long_term_frequency: "Every 3 months over first year, every 6 months over second year, then annually"
+        accelerated_frequency: "0, 3, 6 months minimum"
+        intermediate_frequency: "Minimum 4 time points including initial and final (e.g. 0, 6, 9, 12 months)"
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        intermediate_min_duration_months: 12
+        shelf_life_approach: long_term_data_only
+        significant_change: true
+        significant_change_timing: between_3_and_6_months
+        significant_change_criteria: "1) 5% change in assay or potency failure; 2) degradation product exceeding criterion; 3) appearance/physical/functionality failure; 4) pH criterion failure (dosage-form dependent); 5) dissolution failure for 12 units"
+        action: "Significant change between 3-6 months — intermediate testing required (min 6 months data from 12-month study), shelf life from long-term data only"
+
+    dp_general_25_60_sig_early:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.1"
+        product_type: drug_product
+        storage_type: general
+        long_term_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / 75% RH ± 5% RH"
+        intermediate_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+        intermediate_required: true
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 3
+        intermediate_min_duration_months: 12
+        shelf_life_approach: long_term_data_only
+        significant_change: true
+        significant_change_timing: within_3_months
+        significant_change_criteria: "1) 5% change in assay or potency failure; 2) degradation product exceeding criterion; 3) appearance/physical/functionality failure; 4) pH criterion failure (dosage-form dependent); 5) dissolution failure for 12 units"
+        action: "Significant change within first 3 months — unnecessary to continue accelerated to 6 months. Discuss short-term excursion effects. Intermediate testing required."
+
+    # DP General 30/65 path — NO intermediate
+    dp_general_30_65_check_sig:
+      type: condition
+      variable: significant_change_accelerated
+      operator: eq
+      value: true
+      true_next: dp_general_30_65_sig_change
+      false_next: dp_general_30_65_no_change
+
+    dp_general_30_65_no_change:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.1"
+        product_type: drug_product
+        storage_type: general
+        long_term_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / 75% RH ± 5% RH"
+        intermediate_required: false
+        intermediate_note: "No intermediate condition when 30°C/65% RH is the long-term condition"
+        long_term_frequency: "Every 3 months over first year, every 6 months over second year, then annually"
+        accelerated_frequency: "0, 3, 6 months minimum"
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        shelf_life_approach: extrapolate_from_long_term
+        significant_change: false
+        significant_change_criteria: "1) 5% change in assay or potency failure; 2) degradation product exceeding criterion; 3) appearance/physical/functionality failure; 4) pH criterion failure (dosage-form dependent); 5) dissolution failure for 12 units"
+        action: "No significant change — propose shelf life from long-term data"
+
+    dp_general_30_65_sig_change:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.1"
+        product_type: drug_product
+        storage_type: general
+        long_term_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / 75% RH ± 5% RH"
+        intermediate_required: false
+        intermediate_note: "No intermediate condition when 30°C/65% RH is the long-term condition"
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        shelf_life_approach: long_term_data_only
+        significant_change: true
+        significant_change_criteria: "1) 5% change in assay or potency failure; 2) degradation product exceeding criterion; 3) appearance/physical/functionality failure; 4) pH criterion failure (dosage-form dependent); 5) dissolution failure for 12 units"
+        action: "Significant change at accelerated but no intermediate exists (30°C/65% is long-term). Shelf life from long-term data only."
+
+    # ── DP Impermeable Containers (§2.2.7.2) ──
+    dp_impermeable:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.2"
+        product_type: drug_product
+        storage_type: impermeable
+        long_term_conditions: "25°C ± 2°C / any controlled or ambient RH (or 30°C ± 2°C / any RH)"
+        accelerated_conditions: "40°C ± 2°C / any controlled or ambient RH"
+        intermediate_required: false
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        humidity_note: "Moisture/solvent loss not a concern — impermeable containers provide permanent barrier. Humidity control not required."
+        action: "Impermeable container — follow general case conditions and timelines but humidity control is not required for storage studies"
+
+    # ── DP Semi-Permeable Containers (§2.2.7.3) ──
+    dp_semi_permeable_check_lt:
+      type: condition
+      variable: long_term_condition
+      operator: eq
+      value: "30_35"
+      true_next: dp_semi_perm_30_35
+      false_next: dp_semi_perm_25_40
+
+    dp_semi_perm_25_40:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.3"
+        product_type: drug_product
+        storage_type: semi_permeable
+        long_term_conditions: "25°C ± 2°C / 40% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / not more than (NMT) 25% RH"
+        intermediate_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+        intermediate_required: false
+        intermediate_note: "Intermediate required only if significant change at accelerated"
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        water_loss_significant_change: "5% loss in water from initial value after equivalent of 3 months at 40°C/NMT 25% RH. For small containers (1 mL or less) or unit-dose: 5% water loss may also be appropriate."
+        water_loss_rate_ratio: "At 40°C, calculated water loss at NMT 25% RH = measured rate at 75% RH × 3.0"
+        action: "Semi-permeable container at 25°C/40% RH — evaluate water loss in addition to physical/chemical/biological/microbiological stability"
+
+    dp_semi_perm_30_35:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.3"
+        product_type: drug_product
+        storage_type: semi_permeable
+        long_term_conditions: "30°C ± 2°C / 35% RH ± 5% RH"
+        accelerated_conditions: "40°C ± 2°C / not more than (NMT) 25% RH"
+        intermediate_required: false
+        intermediate_note: "No intermediate condition when 30°C/35% is the long-term condition"
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        water_loss_significant_change: "5% loss in water from initial value after equivalent of 3 months at 40°C/NMT 25% RH"
+        action: "Semi-permeable container at 30°C/35% RH — no intermediate condition exists"
+
+    # ── DP Refrigerator (§2.2.7.4) ──
+    dp_refrigerator_check_sig:
+      type: condition
+      variable: significant_change_accelerated
+      operator: eq
+      value: true
+      true_next: dp_refrigerator_check_timing
+      false_next: dp_refrigerator_no_change
+
+    dp_refrigerator_no_change:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.4"
+        product_type: drug_product
+        storage_type: refrigerator
+        long_term_conditions: "5°C ± 3°C"
+        accelerated_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        intermediate_required: false
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        shelf_life_approach: extrapolate_from_long_term
+        significant_change: false
+        action: "No significant change at accelerated — propose shelf life from long-term refrigerator data"
+
+    dp_refrigerator_check_timing:
+      type: condition
+      variable: significant_change_timing
+      operator: eq
+      value: within_3_months
+      true_next: dp_refrigerator_sig_early
+      false_next: dp_refrigerator_sig_late
+
+    dp_refrigerator_sig_late:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.4"
+        product_type: drug_product
+        storage_type: refrigerator
+        long_term_conditions: "5°C ± 3°C"
+        accelerated_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        intermediate_required: false
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 6
+        shelf_life_approach: long_term_data_only
+        significant_change: true
+        significant_change_timing: between_3_and_6_months
+        action: "Significant change between 3-6 months — shelf life based on real-time data at 5°C"
+
+    dp_refrigerator_sig_early:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.4"
+        product_type: drug_product
+        storage_type: refrigerator
+        long_term_conditions: "5°C ± 3°C"
+        accelerated_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+        intermediate_required: false
+        long_term_min_duration_months: 12
+        accelerated_min_duration_months: 3
+        shelf_life_approach: long_term_data_only
+        significant_change: true
+        significant_change_timing: within_3_months
+        action: "Significant change within first 3 months — unnecessary to continue accelerated to 6 months. Discuss short-term excursion effects (shipping/handling)."
+
+    # ── DP Freezer (§2.2.7.5) ──
+    dp_freezer:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.5"
+        product_type: drug_product
+        storage_type: freezer
+        long_term_conditions: "-20°C ± 5°C"
+        accelerated_conditions: "None defined — test single batch at elevated temp (e.g. 5°C ± 3°C or 25°C ± 2°C) for excursion assessment"
+        intermediate_required: false
+        long_term_min_duration_months: 12
+        shelf_life_approach: long_term_data_only
+        action: "Freezer storage — shelf life from long-term data at -20°C. No standard accelerated condition."
+
+    # ── DP Below -20°C (§2.2.7.6) ──
+    dp_below_minus20:
+      type: return
+      value:
+        guideline: "ICH Q1A(R2) §2.2.7.6"
+        product_type: drug_product
+        storage_type: below_minus_20
+        long_term_conditions: "Case-by-case basis"
+        intermediate_required: false
+        action: "Storage below -20°C — treated on a case-by-case basis. No standard conditions defined."
+
+    # ── Default ──
+    default_missing:
+      type: return
+      value:
+        guideline: ICH Q1A(R2)
+        action: "Insufficient input — provide product_type (drug_substance/drug_product), storage_type (general/refrigerator/freezer/below_minus_20/semi_permeable/impermeable)"
+        intermediate_required: false
+        significant_change: false
+
+interface:
+  inputs:
+    product_type:
+      type: string
+      required: true
+      description: "drug_substance or drug_product"
+    storage_type:
+      type: string
+      required: true
+      description: "general, refrigerator, freezer, below_minus_20, semi_permeable, impermeable"
+    long_term_condition:
+      type: string
+      required: false
+      description: "For general case: 25_60 (default) or 30_65. For semi-permeable: 25_40 (default) or 30_35."
+    significant_change_accelerated:
+      type: bool
+      required: false
+      description: "Whether significant change was observed during accelerated stability testing"
+    significant_change_timing:
+      type: string
+      required: false
+      description: "within_3_months or between_3_and_6_months"
+  outputs:
+    guideline:
+      type: string
+    product_type:
+      type: string
+    storage_type:
+      type: string
+    long_term_conditions:
+      type: string
+    accelerated_conditions:
+      type: string
+    intermediate_conditions:
+      type: string
+    intermediate_required:
+      type: bool
+    long_term_frequency:
+      type: string
+    accelerated_frequency:
+      type: string
+    intermediate_frequency:
+      type: string
+    long_term_min_duration_months:
+      type: int
+    accelerated_min_duration_months:
+      type: int
+    intermediate_min_duration_months:
+      type: int
+    shelf_life_approach:
+      type: string
+    extrapolation_limit:
+      type: string
+    significant_change:
+      type: bool
+    significant_change_criteria:
+      type: string
+    significant_change_definition:
+      type: string
+    significant_change_timing:
+      type: string
+    action:
+      type: string
+  aliases: {}
+
+tests:
+  # 1. DS General 25/60, no sig change
+  - input:
+      product_type: drug_substance
+      storage_type: general
+      long_term_condition: "25_60"
+      significant_change_accelerated: false
+    expect:
+      guideline: "ICH Q1A(R2) §2.1.7.1"
+      product_type: drug_substance
+      long_term_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+      intermediate_required: false
+      shelf_life_approach: extrapolate_from_long_term
+
+  # 2. DS General 25/60, sig change 3-6 months
+  - input:
+      product_type: drug_substance
+      storage_type: general
+      long_term_condition: "25_60"
+      significant_change_accelerated: true
+      significant_change_timing: between_3_and_6_months
+    expect:
+      guideline: "ICH Q1A(R2) §2.1.7.1"
+      intermediate_required: true
+      intermediate_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+      shelf_life_approach: long_term_data_only
+      significant_change_timing: between_3_and_6_months
+
+  # 3. DS General 25/60, sig change within 3 months
+  - input:
+      product_type: drug_substance
+      storage_type: general
+      long_term_condition: "25_60"
+      significant_change_accelerated: true
+      significant_change_timing: within_3_months
+    expect:
+      guideline: "ICH Q1A(R2) §2.1.7.1"
+      intermediate_required: true
+      significant_change_timing: within_3_months
+      accelerated_min_duration_months: 3
+
+  # 4. DS General 30/65, no sig change — NO intermediate
+  - input:
+      product_type: drug_substance
+      storage_type: general
+      long_term_condition: "30_65"
+      significant_change_accelerated: false
+    expect:
+      guideline: "ICH Q1A(R2) §2.1.7.1"
+      long_term_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+      intermediate_required: false
+      shelf_life_approach: extrapolate_from_long_term
+
+  # 5. DS General 30/65, sig change — still no intermediate
+  - input:
+      product_type: drug_substance
+      storage_type: general
+      long_term_condition: "30_65"
+      significant_change_accelerated: true
+    expect:
+      guideline: "ICH Q1A(R2) §2.1.7.1"
+      intermediate_required: false
+      shelf_life_approach: long_term_data_only
+      significant_change: true
+
+  # 6. DS Refrigerator, no sig change
+  - input:
+      product_type: drug_substance
+      storage_type: refrigerator
+      significant_change_accelerated: false
+    expect:
+      guideline: "ICH Q1A(R2) §2.1.7.2"
+      long_term_conditions: "5°C ± 3°C"
+      accelerated_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+      intermediate_required: false
+
+  # 7. DS Refrigerator, sig change late
+  - input:
+      product_type: drug_substance
+      storage_type: refrigerator
+      significant_change_accelerated: true
+      significant_change_timing: between_3_and_6_months
+    expect:
+      guideline: "ICH Q1A(R2) §2.1.7.2"
+      shelf_life_approach: long_term_data_only
+      significant_change: true
+
+  # 8. DS Freezer
+  - input:
+      product_type: drug_substance
+      storage_type: freezer
+    expect:
+      guideline: "ICH Q1A(R2) §2.1.7.3"
+      long_term_conditions: "-20°C ± 5°C"
+      long_term_min_duration_months: 12
+
+  # 9. DS Below -20
+  - input:
+      product_type: drug_substance
+      storage_type: below_minus_20
+    expect:
+      guideline: "ICH Q1A(R2) §2.1.7.4"
+
+  # 10. DP General 25/60, no sig change
+  - input:
+      product_type: drug_product
+      storage_type: general
+      long_term_condition: "25_60"
+      significant_change_accelerated: false
+    expect:
+      guideline: "ICH Q1A(R2) §2.2.7.1"
+      product_type: drug_product
+      long_term_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+      intermediate_required: false
+      shelf_life_approach: extrapolate_from_long_term
+
+  # 11. DP General 25/60, sig change late
+  - input:
+      product_type: drug_product
+      storage_type: general
+      long_term_condition: "25_60"
+      significant_change_accelerated: true
+      significant_change_timing: between_3_and_6_months
+    expect:
+      guideline: "ICH Q1A(R2) §2.2.7.1"
+      intermediate_required: true
+      intermediate_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+      significant_change_timing: between_3_and_6_months
+
+  # 12. DP General 30/65, no intermediate
+  - input:
+      product_type: drug_product
+      storage_type: general
+      long_term_condition: "30_65"
+      significant_change_accelerated: false
+    expect:
+      guideline: "ICH Q1A(R2) §2.2.7.1"
+      intermediate_required: false
+      long_term_conditions: "30°C ± 2°C / 65% RH ± 5% RH"
+
+  # 13. DP Impermeable container
+  - input:
+      product_type: drug_product
+      storage_type: impermeable
+    expect:
+      guideline: "ICH Q1A(R2) §2.2.7.2"
+      storage_type: impermeable
+
+  # 14. DP Semi-permeable 25/40
+  - input:
+      product_type: drug_product
+      storage_type: semi_permeable
+      long_term_condition: "25_40"
+    expect:
+      guideline: "ICH Q1A(R2) §2.2.7.3"
+      long_term_conditions: "25°C ± 2°C / 40% RH ± 5% RH"
+      accelerated_conditions: "40°C ± 2°C / not more than (NMT) 25% RH"
+
+  # 15. DP Semi-permeable 30/35
+  - input:
+      product_type: drug_product
+      storage_type: semi_permeable
+      long_term_condition: "30_35"
+    expect:
+      guideline: "ICH Q1A(R2) §2.2.7.3"
+      long_term_conditions: "30°C ± 2°C / 35% RH ± 5% RH"
+
+  # 16. DP Refrigerator, no sig change
+  - input:
+      product_type: drug_product
+      storage_type: refrigerator
+      significant_change_accelerated: false
+    expect:
+      guideline: "ICH Q1A(R2) §2.2.7.4"
+      long_term_conditions: "5°C ± 3°C"
+      accelerated_conditions: "25°C ± 2°C / 60% RH ± 5% RH"
+
+  # 17. DP Refrigerator, sig change early
+  - input:
+      product_type: drug_product
+      storage_type: refrigerator
+      significant_change_accelerated: true
+      significant_change_timing: within_3_months
+    expect:
+      guideline: "ICH Q1A(R2) §2.2.7.4"
+      significant_change_timing: within_3_months
+      accelerated_min_duration_months: 3
+
+  # 18. DP Freezer
+  - input:
+      product_type: drug_product
+      storage_type: freezer
+    expect:
+      guideline: "ICH Q1A(R2) §2.2.7.5"
+      long_term_conditions: "-20°C ± 5°C"
+
+  # 19. DP Below -20
+  - input:
+      product_type: drug_product
+      storage_type: below_minus_20
+    expect:
+      guideline: "ICH Q1A(R2) §2.2.7.6"
+
+  # 20. Null safety
+  - input: {}
+    expect:
+      intermediate_required: false
+      significant_change: false

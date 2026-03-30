@@ -1,0 +1,67 @@
+name: gate-compliance-pass
+description: Compliance passing
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: compliance_score
+      operator: gte
+      value: 80
+      true_next: pass
+      false_next: fail
+    fail:
+      type: return
+      value:
+        threshold: compliance_score
+        met: false
+        gate: false
+    pass:
+      type: return
+      value:
+        gate: true
+        met: true
+        threshold: compliance_score
+tests:
+- input:
+    compliance_score: 80
+  expect:
+    met: true
+    gate: true
+- input: {}
+  expect:
+    gate: false
+    met: false
+- input:
+    compliance_score: 0
+  expect:
+    met: false
+    threshold: compliance_score
+    gate: false
+- input:
+    compliance_score: -1
+  expect:
+    threshold: compliance_score
+    gate: false
+    met: false
+- input:
+    compliance_score: 79
+  expect:
+    threshold: compliance_score
+    met: false
+    gate: false
+- input:
+    compliance_score: 81
+  expect:
+    threshold: compliance_score
+    gate: true
+    met: true
+- input:
+    compliance_score: 8000
+  expect:
+    gate: true
+    met: true
+    threshold: compliance_score
+interface: null
+primitive_signature: null

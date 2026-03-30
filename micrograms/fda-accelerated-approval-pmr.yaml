@@ -1,0 +1,260 @@
+name: fda-accelerated-approval-pmr
+description: "FDA accelerated approval postmarketing requirements: routes by approval pathway and evidence status per FDA Guidance 'Labeling for Accelerated Approval' (2019) and PMR/PMC Annual Status (2023)"
+version: 0.1.0
+interface:
+  inputs:
+    approval_pathway:
+      type: string
+      required: true
+      description: "Approval pathway: accelerated, priority_review, breakthrough, fast_track, standard"
+    confirmatory_trial_status:
+      type: string
+      required: false
+      description: "Status of confirmatory trial: not_started, ongoing, completed_positive, completed_negative, delayed"
+    surrogate_endpoint_validated:
+      type: bool
+      required: false
+      description: "Whether the surrogate endpoint has been validated as predicting clinical benefit"
+  outputs:
+    pmr_status:
+      type: string
+    labeling_requirement:
+      type: string
+    withdrawal_risk:
+      type: string
+    annual_report_type:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_pathway
+  nodes:
+    check_pathway:
+      type: condition
+      variable: approval_pathway
+      operator: eq
+      value: "accelerated"
+      true_next: check_confirmatory
+      false_next: check_breakthrough
+
+    check_breakthrough:
+      type: condition
+      variable: approval_pathway
+      operator: eq
+      value: "breakthrough"
+      true_next: breakthrough_path
+      false_next: check_fast_track
+
+    check_fast_track:
+      type: condition
+      variable: approval_pathway
+      operator: eq
+      value: "fast_track"
+      true_next: fast_track_path
+      false_next: standard_path
+
+    # ACCELERATED APPROVAL — confirmatory trial required
+    check_confirmatory:
+      type: condition
+      variable: confirmatory_trial_status
+      operator: eq
+      value: "completed_positive"
+      true_next: confirmatory_positive
+      false_next: check_negative
+
+    check_negative:
+      type: condition
+      variable: confirmatory_trial_status
+      operator: eq
+      value: "completed_negative"
+      true_next: confirmatory_negative
+      false_next: check_delayed
+
+    check_delayed:
+      type: condition
+      variable: confirmatory_trial_status
+      operator: eq
+      value: "delayed"
+      true_next: confirmatory_delayed
+      false_next: check_ongoing
+
+    check_ongoing:
+      type: condition
+      variable: confirmatory_trial_status
+      operator: eq
+      value: "ongoing"
+      true_next: confirmatory_ongoing
+      false_next: confirmatory_not_started
+
+    confirmatory_positive:
+      type: condition
+      variable: surrogate_endpoint_validated
+      operator: eq
+      value: true
+      true_next: convert_to_regular
+      false_next: maintain_accelerated_label
+
+    convert_to_regular:
+      type: return
+      value:
+        pmr_status: "PMR_FULFILLED"
+        labeling_requirement: "Remove accelerated approval limitations statement. Update indication to reflect confirmed clinical benefit."
+        withdrawal_risk: "NONE"
+        annual_report_type: "FDA Form 3988 — Final Report"
+        regulatory_reference: "FDA Guidance: Labeling for Accelerated Approval (2019), Section IV; 21 CFR 314.530"
+
+    maintain_accelerated_label:
+      type: return
+      value:
+        pmr_status: "PMR_PARTIALLY_FULFILLED"
+        labeling_requirement: "Maintain accelerated approval limitations statement until surrogate fully validated. Update efficacy data."
+        withdrawal_risk: "LOW"
+        annual_report_type: "FDA Form 3988 — Progress Report"
+        regulatory_reference: "FDA Guidance: Labeling for Accelerated Approval (2019), Section III"
+
+    confirmatory_negative:
+      type: return
+      value:
+        pmr_status: "PMR_FAILED"
+        labeling_requirement: "FDA may initiate expedited withdrawal proceedings under FDARA Section 506(e). Labeling update to reflect negative confirmatory data."
+        withdrawal_risk: "HIGH"
+        annual_report_type: "FDA Form 3988 — Final Report with negative outcome"
+        regulatory_reference: "21 CFR 314.530; FDARA Section 901 (2022 Accelerated Approval amendments)"
+
+    confirmatory_delayed:
+      type: return
+      value:
+        pmr_status: "PMR_DELAYED"
+        labeling_requirement: "Maintain accelerated approval limitations. FDA may require accelerated timeline or initiate withdrawal proceedings."
+        withdrawal_risk: "ELEVATED"
+        annual_report_type: "FDA Form 3988 — Delay justification required"
+        regulatory_reference: "FDA Annual Status Report Guidance (2023); FDARA Section 901"
+
+    confirmatory_ongoing:
+      type: return
+      value:
+        pmr_status: "PMR_PENDING"
+        labeling_requirement: "Maintain limitations statement: 'This indication is approved under accelerated approval based on [surrogate]. Continued approval may be contingent upon verification.'"
+        withdrawal_risk: "LOW"
+        annual_report_type: "FDA Form 3988 — Annual Progress Report"
+        regulatory_reference: "FDA Guidance: Labeling for Accelerated Approval (2019), Section III.A"
+
+    confirmatory_not_started:
+      type: return
+      value:
+        pmr_status: "PMR_NOT_INITIATED"
+        labeling_requirement: "Maintain limitations statement. FDA expects confirmatory trial initiation within agreed timeline."
+        withdrawal_risk: "MODERATE"
+        annual_report_type: "FDA Form 3988 — Initiation timeline required"
+        regulatory_reference: "FDA Annual Status Report Guidance (2023), Section II"
+
+    # BREAKTHROUGH — may have PMC
+    breakthrough_path:
+      type: return
+      value:
+        pmr_status: "PMC_MAY_APPLY"
+        labeling_requirement: "Standard labeling. PMCs may be agreed upon at approval for additional safety or efficacy data."
+        withdrawal_risk: "NONE"
+        annual_report_type: "FDA Form 3989 — PMC Annual Report (if applicable)"
+        regulatory_reference: "21 CFR 314.81(b)(2); FDA Annual Status Report Guidance (2023)"
+
+    # FAST TRACK — standard PMCs
+    fast_track_path:
+      type: return
+      value:
+        pmr_status: "STANDARD_PMC"
+        labeling_requirement: "Standard labeling. Any PMCs negotiated at approval."
+        withdrawal_risk: "NONE"
+        annual_report_type: "FDA Form 3989 — PMC Annual Report (if applicable)"
+        regulatory_reference: "21 CFR 314.81(b)(2)"
+
+    # STANDARD
+    standard_path:
+      type: return
+      value:
+        pmr_status: "STANDARD_APPROVAL"
+        labeling_requirement: "Standard labeling with routine annual report."
+        withdrawal_risk: "NONE"
+        annual_report_type: "NDA/BLA Annual Report per 21 CFR 314.81(b)(2)"
+        regulatory_reference: "21 CFR 314.81(b)(2)"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(→, ∃) — postmarket obligation routing by confirmatory evidence causality and existence'
+  primes: ['σ', '→', '∃', '∂']
+  arguments: ['approval_pathway', 'confirmatory_trial_status', 'surrogate_endpoint_validated']
+
+tests:
+# Accelerated, confirmatory positive, surrogate validated -> convert
+- input:
+    approval_pathway: "accelerated"
+    confirmatory_trial_status: "completed_positive"
+    surrogate_endpoint_validated: true
+  expect:
+    pmr_status: "PMR_FULFILLED"
+    withdrawal_risk: "NONE"
+
+# Accelerated, confirmatory negative -> high withdrawal risk
+- input:
+    approval_pathway: "accelerated"
+    confirmatory_trial_status: "completed_negative"
+  expect:
+    pmr_status: "PMR_FAILED"
+    withdrawal_risk: "HIGH"
+
+# Accelerated, delayed -> elevated risk
+- input:
+    approval_pathway: "accelerated"
+    confirmatory_trial_status: "delayed"
+  expect:
+    pmr_status: "PMR_DELAYED"
+    withdrawal_risk: "ELEVATED"
+
+# Accelerated, ongoing
+- input:
+    approval_pathway: "accelerated"
+    confirmatory_trial_status: "ongoing"
+  expect:
+    pmr_status: "PMR_PENDING"
+    withdrawal_risk: "LOW"
+
+# Accelerated, not started
+- input:
+    approval_pathway: "accelerated"
+    confirmatory_trial_status: "not_started"
+  expect:
+    pmr_status: "PMR_NOT_INITIATED"
+    withdrawal_risk: "MODERATE"
+
+# Breakthrough therapy
+- input:
+    approval_pathway: "breakthrough"
+  expect:
+    pmr_status: "PMC_MAY_APPLY"
+
+# Accelerated, positive but surrogate not validated -> maintain label
+- input:
+    approval_pathway: "accelerated"
+    confirmatory_trial_status: "completed_positive"
+    surrogate_endpoint_validated: false
+  expect:
+    pmr_status: "PMR_PARTIALLY_FULFILLED"
+    withdrawal_risk: "LOW"
+
+# Fast track
+- input:
+    approval_pathway: "fast_track"
+  expect:
+    pmr_status: "STANDARD_PMC"
+
+# Standard approval
+- input:
+    approval_pathway: "standard"
+  expect:
+    pmr_status: "STANDARD_APPROVAL"
+    withdrawal_risk: "NONE"
+
+# Empty -> standard
+- input: {}
+  expect:
+    pmr_status: "STANDARD_APPROVAL"

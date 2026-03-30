@@ -1,0 +1,76 @@
+name: psur-interval-calculator
+description: "Calculate PSUR (Periodic Safety Update Report) submission interval and dates"
+version: 0.1.0
+tree:
+  start: validate_approval_date
+  nodes:
+    validate_approval_date:
+      type: condition
+      variable: market_authorization_date
+      operator: is_not_null
+      value: null
+      true_next: check_years_on_market
+      false_next: interval_unknown
+    check_years_on_market:
+      type: condition
+      variable: years_on_market
+      operator: lt
+      value: 2
+      true_next: annual_psur
+      false_next: check_three_years
+    check_three_years:
+      type: condition
+      variable: years_on_market
+      operator: lt
+      value: 3
+      true_next: annual_psur
+      false_next: check_established_safety
+    check_established_safety:
+      type: condition
+      variable: is_established_safety_profile
+      operator: eq
+      value: true
+      true_next: triennial_psur
+      false_next: annual_psur
+    annual_psur:
+      type: return
+      value:
+        psur_interval_months: 12
+        submission_frequency: "annual"
+        next_submission_due: "12_months_from_last"
+        submission_type: "regular"
+        psur_compliant: true
+    triennial_psur:
+      type: return
+      value:
+        psur_interval_months: 36
+        submission_frequency: "triennial"
+        next_submission_due: "36_months_from_last"
+        submission_type: "regular"
+        psur_compliant: true
+    interval_unknown:
+      type: return
+      value:
+        psur_interval_months: null
+        submission_frequency: null
+        next_submission_due: null
+        submission_type: null
+        psur_compliant: false
+tests:
+- input:
+    market_authorization_date: "2023-06-15"
+    years_on_market: 0.5
+  expect:
+    psur_interval_months: 12
+    submission_frequency: "annual"
+- input:
+    market_authorization_date: "2020-01-10"
+    years_on_market: 4
+    is_established_safety_profile: true
+  expect:
+    psur_interval_months: 36
+    submission_frequency: "triennial"
+- input: {}
+  expect:
+    psur_interval_months: null
+    psur_compliant: false

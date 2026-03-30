@@ -1,0 +1,70 @@
+name: pop-geriatric-65
+description: Geriatric — polypharmacy and renal decline
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    at_risk:
+      type: return
+      value:
+        action: special_monitoring
+        at_risk: true
+        population: geriatric-65
+        reason: Geriatric — polypharmacy and renal decline
+    check:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 65
+      true_next: at_risk
+      false_next: standard
+    standard:
+      type: return
+      value:
+        at_risk: false
+        population: geriatric-65
+        action: standard_care
+tests:
+- input:
+    age_years: 65
+  expect:
+    population: geriatric-65
+    at_risk: true
+- input: {}
+  expect:
+    population: geriatric-65
+    at_risk: false
+- input:
+    age_years: 0
+  expect:
+    population: geriatric-65
+    at_risk: false
+    action: standard_care
+- input:
+    age_years: -1
+  expect:
+    action: standard_care
+    population: geriatric-65
+    at_risk: false
+- input:
+    age_years: 64
+  expect:
+    action: standard_care
+    population: geriatric-65
+    at_risk: false
+- input:
+    age_years: 66
+  expect:
+    at_risk: true
+    population: geriatric-65
+    action: special_monitoring
+    reason: Geriatric — polypharmacy and renal decline
+- input:
+    age_years: 6500
+  expect:
+    action: special_monitoring
+    reason: Geriatric — polypharmacy and renal decline
+    at_risk: true
+    population: geriatric-65
+interface: null
+primitive_signature: null

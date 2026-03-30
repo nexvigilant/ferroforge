@@ -1,0 +1,104 @@
+name: epi-study-design-router
+description: "Route pharmacovigilance data to appropriate epidemiologic study design"
+version: 0.1.0
+tree:
+  start: validate_data_availability
+  nodes:
+    validate_data_availability:
+      type: condition
+      variable: exposure_and_outcome_data_available
+      operator: eq
+      value: true
+      true_next: check_temporal_sequence
+      false_next: design_unknown
+    check_temporal_sequence:
+      type: condition
+      variable: temporal_sequence_known
+      operator: eq
+      value: true
+      true_next: cohort_design
+      false_next: check_case_availability
+    check_case_availability:
+      type: condition
+      variable: cases_already_occurred
+      operator: eq
+      value: true
+      true_next: check_control_source
+      false_next: cross_sectional_design
+    check_control_source:
+      type: condition
+      variable: population_based_controls_available
+      operator: eq
+      value: true
+      true_next: case_control_design
+      false_next: case_cohort_design
+    cohort_design:
+      type: return
+      value:
+        study_design: "cohort"
+        design_type: "prospective"
+        exposure_assessment: "baseline"
+        follow_up_required: true
+        statistical_analysis: "risk_ratio_or_hazard_ratio"
+        epi_design_compliant: true
+    case_control_design:
+      type: return
+      value:
+        study_design: "case_control"
+        design_type: "retrospective"
+        exposure_assessment: "historical"
+        follow_up_required: false
+        statistical_analysis: "odds_ratio"
+        epi_design_compliant: true
+    case_cohort_design:
+      type: return
+      value:
+        study_design: "case_cohort"
+        design_type: "hybrid"
+        exposure_assessment: "nested"
+        follow_up_required: false
+        statistical_analysis: "hazard_ratio"
+        epi_design_compliant: true
+    cross_sectional_design:
+      type: return
+      value:
+        study_design: "cross_sectional"
+        design_type: "observational"
+        exposure_assessment: "concurrent"
+        follow_up_required: false
+        statistical_analysis: "prevalence_ratio"
+        epi_design_compliant: true
+    design_unknown:
+      type: return
+      value:
+        study_design: null
+        design_type: null
+        exposure_assessment: null
+        follow_up_required: null
+        statistical_analysis: null
+        epi_design_compliant: false
+tests:
+- input:
+    exposure_and_outcome_data_available: true
+    temporal_sequence_known: true
+  expect:
+    study_design: "cohort"
+    design_type: "prospective"
+    follow_up_required: true
+- input:
+    exposure_and_outcome_data_available: true
+    temporal_sequence_known: false
+    cases_already_occurred: true
+    population_based_controls_available: true
+  expect:
+    study_design: "case_control"
+- input:
+    exposure_and_outcome_data_available: true
+    temporal_sequence_known: false
+    cases_already_occurred: false
+  expect:
+    study_design: "cross_sectional"
+- input: {}
+  expect:
+    study_design: null
+    epi_design_compliant: false

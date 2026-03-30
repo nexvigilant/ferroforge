@@ -1,0 +1,92 @@
+name: station-drugbank-pipeline
+description: 'Triage DrugBank data: classify drug interactions, flag contraindications, route pharmacology insights'
+version: 0.1.0
+tree:
+  start: check_interaction
+  nodes:
+    interaction_severity:
+      type: condition
+      variable: interaction_severity
+      operator: eq
+      value: major
+      true_next: major_interaction
+      false_next: minor_interaction
+    major_interaction:
+      type: return
+      value:
+        action: alert
+        priority: high
+        reason: Major drug interaction detected — cross-reference with FAERS for AE signal
+        route: interaction_signal
+    check_interaction:
+      type: condition
+      variable: has_interaction
+      operator: eq
+      value: true
+      true_next: interaction_severity
+      false_next: check_contraindication
+    check_contraindication:
+      type: condition
+      variable: has_contraindication
+      operator: eq
+      value: true
+      true_next: contraindication_alert
+      false_next: pharmacology_review
+    contraindication_alert:
+      type: return
+      value:
+        priority: high
+        route: label_comparison
+        reason: Contraindication found — verify against current labeling
+        action: alert
+    minor_interaction:
+      type: return
+      value:
+        priority: low
+        action: note
+        route: interaction_log
+        reason: Minor/moderate interaction — log for polypharmacy analysis
+    pharmacology_review:
+      type: return
+      value:
+        action: review
+        reason: Clean pharmacology profile — archive for reference
+        priority: low
+        route: archive
+tests:
+- input:
+    interaction_severity: major
+    has_interaction: true
+  expect:
+    priority: high
+    action: alert
+    route: interaction_signal
+- input:
+    has_interaction: true
+    interaction_severity: moderate
+  expect:
+    priority: low
+    action: note
+    route: interaction_log
+- input:
+    has_interaction: false
+    has_contraindication: true
+  expect:
+    route: label_comparison
+    action: alert
+    priority: high
+- input:
+    has_interaction: false
+    has_contraindication: false
+  expect:
+    route: archive
+    action: review
+    priority: low
+- input: {}
+  expect:
+    route: archive
+    priority: low
+    reason: Clean pharmacology profile — archive for reference
+    action: review
+interface: null
+primitive_signature: null

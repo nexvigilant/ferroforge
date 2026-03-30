@@ -1,0 +1,67 @@
+name: trend-lag-short
+description: Short onset latency
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: median_onset_days
+      operator: lte
+      value: 7
+      true_next: detected
+      false_next: not_detected
+    detected:
+      type: return
+      value:
+        pattern: acute
+        action: investigate
+        detected: true
+    not_detected:
+      type: return
+      value:
+        detected: false
+        pattern: acute
+        action: continue_monitoring
+tests:
+- input:
+    median_onset_days: 7
+  expect:
+    pattern: acute
+    detected: true
+- input: {}
+  expect:
+    detected: false
+    pattern: acute
+- input:
+    median_onset_days: 0
+  expect:
+    pattern: acute
+    detected: true
+    action: investigate
+- input:
+    median_onset_days: -1
+  expect:
+    detected: true
+    pattern: acute
+    action: investigate
+- input:
+    median_onset_days: 6
+  expect:
+    pattern: acute
+    action: investigate
+    detected: true
+- input:
+    median_onset_days: 8
+  expect:
+    detected: false
+    pattern: acute
+    action: continue_monitoring
+- input:
+    median_onset_days: 700
+  expect:
+    pattern: acute
+    action: continue_monitoring
+    detected: false
+interface: null
+primitive_signature: null

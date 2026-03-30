@@ -1,0 +1,216 @@
+name: station-recall-pipeline
+description: 'Routes FDA recall and safety data through urgency classification: evaluates recall class, recall count, MedWatch alerts, and REMS requirements to determine safety status'
+version: 0.1.0
+tree:
+  start: check_class_one
+  nodes:
+    urgent_rems:
+      type: return
+      value:
+        risk_factors: REMS required — FDA has determined serious risk requiring mitigation strategy
+        next_step: rems_compliance_review
+        safety_status: urgent
+        recommended_action: Verify REMS compliance and review elements to assure safe use
+    standard_recall:
+      type: return
+      value:
+        safety_status: standard
+        next_step: routine_monitoring
+        recommended_action: Review recall details and assess current relevance
+        risk_factors: Active recall on record
+    check_class_three:
+      type: condition
+      variable: recall_class
+      operator: eq
+      value: III
+      true_next: standard_class_three
+      false_next: check_any_recalls
+    check_class_two:
+      type: condition
+      variable: recall_class
+      operator: eq
+      value: II
+      true_next: elevated_class_two
+      false_next: check_medwatch
+    standard_class_three:
+      type: return
+      value:
+        risk_factors: Class III recall — not likely to cause adverse health consequences
+        next_step: routine_monitoring
+        recommended_action: Monitor recall resolution and document for safety database
+        safety_status: standard
+    elevated_class_two:
+      type: return
+      value:
+        next_step: recall_scope_review
+        safety_status: elevated
+        recommended_action: Review recall scope and assess patient exposure
+        risk_factors: Class II recall — may cause temporary or medically reversible adverse health consequences
+    check_rems:
+      type: condition
+      variable: rems_required
+      operator: eq
+      value: true
+      true_next: urgent_rems
+      false_next: check_class_two
+    check_any_recalls:
+      type: condition
+      variable: recall_count
+      operator: gte
+      value: 1
+      true_next: standard_recall
+      false_next: clear_status
+    check_medwatch:
+      type: condition
+      variable: medwatch_alert_count
+      operator: gte
+      value: 2
+      true_next: elevated_medwatch
+      false_next: check_class_three
+    urgent_class_one:
+      type: return
+      value:
+        risk_factors: Class I recall — reasonable probability of serious adverse health consequences or death
+        safety_status: urgent
+        next_step: urgent_safety_action
+        recommended_action: Immediate distribution halt and patient notification required
+    clear_status:
+      type: return
+      value:
+        recommended_action: Standard post-market surveillance
+        next_step: no_action
+        safety_status: clear
+        risk_factors: No active recalls or safety alerts
+    elevated_medwatch:
+      type: return
+      value:
+        safety_status: elevated
+        recommended_action: Review MedWatch alerts and assess cumulative safety signal
+        next_step: safety_alert_review
+        risk_factors: Multiple MedWatch safety alerts issued
+    check_class_one:
+      type: condition
+      variable: recall_class
+      operator: eq
+      value: I
+      true_next: urgent_class_one
+      false_next: check_rems
+tests:
+- input:
+    rems_required: false
+    medwatch_alert_count: 3
+    recall_count: 1
+    recall_class: I
+  expect:
+    next_step: urgent_safety_action
+    safety_status: urgent
+- input:
+    recall_class: II
+    recall_count: 1
+    rems_required: true
+  expect:
+    safety_status: urgent
+    next_step: rems_compliance_review
+- input:
+    medwatch_alert_count: 1
+    recall_count: 2
+    recall_class: II
+    rems_required: false
+  expect:
+    safety_status: elevated
+    next_step: recall_scope_review
+- input:
+    medwatch_alert_count: 3
+    rems_required: false
+    recall_class: none
+  expect:
+    next_step: safety_alert_review
+    safety_status: elevated
+- input:
+    recall_class: III
+    recall_count: 1
+    rems_required: false
+  expect:
+    safety_status: standard
+    next_step: routine_monitoring
+- input:
+    rems_required: false
+    medwatch_alert_count: 0
+    recall_count: 2
+  expect:
+    next_step: routine_monitoring
+    safety_status: standard
+- input:
+    recall_count: 0
+    rems_required: false
+    medwatch_alert_count: 0
+  expect:
+    safety_status: clear
+    next_step: no_action
+- input: {}
+  expect:
+    safety_status: clear
+    next_step: no_action
+- input:
+    recall_class: I
+    rems_required: true
+  expect:
+    safety_status: urgent
+    next_step: urgent_safety_action
+- input:
+    recall_count: -1
+  expect:
+    risk_factors: No active recalls or safety alerts
+    safety_status: clear
+    next_step: no_action
+    recommended_action: Standard post-market surveillance
+- input:
+    recall_count: 100
+  expect:
+    next_step: routine_monitoring
+    recommended_action: Review recall details and assess current relevance
+    safety_status: standard
+    risk_factors: Active recall on record
+- input:
+    medwatch_alert_count: -1
+  expect:
+    recommended_action: Standard post-market surveillance
+    safety_status: clear
+    next_step: no_action
+    risk_factors: No active recalls or safety alerts
+- input:
+    medwatch_alert_count: 200
+  expect:
+    risk_factors: Multiple MedWatch safety alerts issued
+    safety_status: elevated
+    next_step: safety_alert_review
+    recommended_action: Review MedWatch alerts and assess cumulative safety signal
+interface:
+  inputs:
+    recall_class:
+      type: string
+      required: false
+    rems_required:
+      type: bool
+      required: false
+    medwatch_alert_count:
+      type: int
+      required: false
+    recall_count:
+      type: int
+      required: false
+  outputs:
+    recommended_action:
+      type: string
+      required: false
+    next_step:
+      type: string
+      required: false
+    safety_status:
+      type: string
+      required: false
+    risk_factors:
+      type: string
+      required: false
+  aliases: {}
+primitive_signature: null

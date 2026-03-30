@@ -1,0 +1,125 @@
+name: station-cioms-pipeline
+description: 'Route CIOMS form and reporting data: classify by form type and deadline urgency'
+version: 0.1.0
+tree:
+  start: check_form
+  nodes:
+    check_form:
+      type: condition
+      variable: form_type
+      operator: eq
+      value: I
+      true_next: cioms_i
+      false_next: check_form_ii
+    cioms_i:
+      type: condition
+      variable: days_to_deadline
+      operator: lte
+      value: 3
+      true_next: urgent_report
+      false_next: standard_report
+    other_form:
+      type: return
+      value:
+        route: archive
+        action: reference
+        priority: low
+        reason: CIOMS working group reference — informational
+    standard_report:
+      type: return
+      value:
+        route: case_submission
+        priority: moderate
+        reason: CIOMS I form within deadline — standard submission workflow
+        action: submit
+    cioms_ii:
+      type: return
+      value:
+        priority: moderate
+        action: review
+        reason: CIOMS II periodic safety report — aggregate analysis
+        route: periodic_review
+    check_form_ii:
+      type: condition
+      variable: form_type
+      operator: eq
+      value: II
+      true_next: cioms_ii
+      false_next: other_form
+    urgent_report:
+      type: return
+      value:
+        priority: critical
+        reason: CIOMS I form with ≤3 days to deadline — expedited submission required
+        route: expedited_reporting
+        action: expedite
+tests:
+- input:
+    form_type: I
+    days_to_deadline: 2
+  expect:
+    action: expedite
+    priority: critical
+    route: expedited_reporting
+- input:
+    form_type: I
+    days_to_deadline: 10
+  expect:
+    action: submit
+    priority: moderate
+    route: case_submission
+- input:
+    form_type: II
+    days_to_deadline: 30
+  expect:
+    action: review
+    priority: moderate
+    route: periodic_review
+- input:
+    form_type: V
+    days_to_deadline: 90
+  expect:
+    action: reference
+    priority: low
+    route: archive
+- input: {}
+  expect:
+    reason: CIOMS working group reference — informational
+    action: reference
+    priority: low
+    route: archive
+- input:
+    days_to_deadline: 0
+  expect:
+    route: archive
+    reason: CIOMS working group reference — informational
+    action: reference
+    priority: low
+- input:
+    days_to_deadline: -1
+  expect:
+    action: reference
+    priority: low
+    reason: CIOMS working group reference — informational
+    route: archive
+- input:
+    days_to_deadline: 4
+  expect:
+    route: archive
+    priority: low
+    action: reference
+    reason: CIOMS working group reference — informational
+- input: {}
+  expect:
+    action: reference
+    priority: low
+    reason: CIOMS working group reference — informational
+    route: archive
+- input: {}
+  expect:
+    action: reference
+    priority: low
+    route: archive
+    reason: CIOMS working group reference — informational
+interface: null
+primitive_signature: null

@@ -1,0 +1,49 @@
+name: crypto-signature-coverage
+description: 'Microgram signature coverage for immunity flywheel: GREEN (100%), YELLOW (partial), RED (none)'
+version: 1.0.0
+primitive_signature:
+  dominant: frequency
+  expression: "v(signed / total)"
+  primes: [frequency, quantity, boundary]
+interface:
+  inputs:
+    coverage_pct: { type: int, required: false }
+  outputs:
+    coverage: { type: string }
+    level: { type: string }
+    action: { type: string }
+tree:
+  start: check_full
+  nodes:
+    check_full:
+      type: condition
+      variable: coverage_pct
+      operator: gte
+      value: 100
+      true_next: full
+      false_next: check_partial
+    check_partial:
+      type: condition
+      variable: coverage_pct
+      operator: gte
+      value: 1
+      true_next: partial
+      false_next: none_signed
+    full:
+      type: return
+      value: { coverage: full, level: green, action: none }
+    partial:
+      type: return
+      value: { coverage: partial, level: yellow, action: run_nv_sign_chain }
+    none_signed:
+      type: return
+      value: { coverage: none, level: red, action: run_nv_sign_chain }
+tests:
+- input: { coverage_pct: 100 }
+  expect: { coverage: full, level: green, action: none }
+- input: { coverage_pct: 50 }
+  expect: { coverage: partial, level: yellow, action: run_nv_sign_chain }
+- input: { coverage_pct: 0 }
+  expect: { coverage: none, level: red, action: run_nv_sign_chain }
+- input: {}
+  expect: { coverage: none, level: red, action: run_nv_sign_chain }

@@ -1,0 +1,65 @@
+name: meddra-smq-narrow
+description: "Determine if adverse event matches narrow MedDRA Standardized MedDRA Query (SMQ)"
+version: 0.1.0
+tree:
+  start: validate_pt
+  nodes:
+    validate_pt:
+      type: condition
+      variable: meddra_pt_code
+      operator: is_not_null
+      value: null
+      true_next: check_smq_inclusion
+      false_next: smq_match_unknown
+    check_smq_inclusion:
+      type: condition
+      variable: is_smq_included_narrow
+      operator: eq
+      value: true
+      true_next: smq_match_found
+      false_next: smq_no_match
+    smq_match_found:
+      type: return
+      value:
+        smq_code: "20000001"
+        smq_name: "Cardiac arrhythmias"
+        smq_scope: "narrow"
+        included_pt: true
+        hierarchical_level: "hlt"
+        smq_compliant: true
+    smq_no_match:
+      type: return
+      value:
+        smq_code: null
+        smq_name: null
+        smq_scope: "narrow"
+        included_pt: false
+        hierarchical_level: null
+        smq_compliant: true
+    smq_match_unknown:
+      type: return
+      value:
+        smq_code: null
+        smq_name: null
+        smq_scope: "narrow"
+        included_pt: null
+        hierarchical_level: null
+        smq_compliant: false
+tests:
+- input:
+    meddra_pt_code: "10007585"
+    is_smq_included_narrow: true
+  expect:
+    smq_code: "20000001"
+    smq_name: "Cardiac arrhythmias"
+    included_pt: true
+- input:
+    meddra_pt_code: "10033633"
+    is_smq_included_narrow: false
+  expect:
+    smq_code: null
+    included_pt: false
+- input: {}
+  expect:
+    smq_code: null
+    smq_compliant: false

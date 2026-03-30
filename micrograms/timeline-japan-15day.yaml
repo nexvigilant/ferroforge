@@ -1,0 +1,74 @@
+name: timeline-japan-15day
+description: Japan 15-day report
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    due:
+      type: return
+      value:
+        jurisdiction: JP
+        report_type: expedited
+        due: true
+        action: submit
+    check:
+      type: condition
+      variable: days_to_deadline
+      operator: lte
+      value: 15
+      true_next: due
+      false_next: not_due
+    not_due:
+      type: return
+      value:
+        jurisdiction: JP
+        due: false
+        report_type: expedited
+        action: schedule
+tests:
+- input:
+    days_to_deadline: 15
+  expect:
+    jurisdiction: JP
+    due: true
+- input: {}
+  expect:
+    due: false
+    jurisdiction: JP
+- input:
+    days_to_deadline: 0
+  expect:
+    report_type: expedited
+    jurisdiction: JP
+    due: true
+    action: submit
+- input:
+    days_to_deadline: -1
+  expect:
+    action: submit
+    jurisdiction: JP
+    due: true
+    report_type: expedited
+- input:
+    days_to_deadline: 14
+  expect:
+    report_type: expedited
+    jurisdiction: JP
+    action: submit
+    due: true
+- input:
+    days_to_deadline: 16
+  expect:
+    jurisdiction: JP
+    due: false
+    report_type: expedited
+    action: schedule
+- input:
+    days_to_deadline: 1500
+  expect:
+    action: schedule
+    due: false
+    report_type: expedited
+    jurisdiction: JP
+interface: null
+primitive_signature: null

@@ -1,0 +1,62 @@
+name: drug-class-statin-safety
+description: "Statin safety assessment. Monitors myopathy risk, liver function, and drug-drug interactions."
+version: 0.1.0
+tree:
+  start: check_muscle_symptoms
+  nodes:
+    check_muscle_symptoms:
+      type: condition
+      variable: has_unexplained_myalgia
+      operator: eq
+      value: true
+      true_next: myopathy_alert
+      false_next: check_liver_function
+    myopathy_alert:
+      type: return
+      value:
+        risk_level: high
+        monitoring_required: true
+        creatine_kinase_check: required
+        message: "Unexplained muscle pain; check CK level immediately"
+    check_liver_function:
+      type: condition
+      variable: alt_iu_l
+      operator: gte
+      value: 200
+      true_next: liver_impairment
+      false_next: check_drug_interactions
+    liver_impairment:
+      type: return
+      value:
+        risk_level: high
+        dose_adjustment: required
+        message: "Elevated ALT; reduce statin dose or consider discontinuation"
+    check_drug_interactions:
+      type: condition
+      variable: concurrent_cyp3a4_inhibitor
+      operator: eq
+      value: true
+      true_next: interaction_alert
+      false_next: standard_dosing
+    interaction_alert:
+      type: return
+      value:
+        risk_level: moderate
+        dose_reduction: required
+        message: "CYP3A4 inhibitor present; reduce statin dose to avoid myopathy"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard statin dosing appropriate"
+tests:
+  - input: { has_unexplained_myalgia: true, alt_iu_l: 150, concurrent_cyp3a4_inhibitor: false }
+    expect: { risk_level: high, creatine_kinase_check: required }
+  - input: { has_unexplained_myalgia: false, alt_iu_l: 220, concurrent_cyp3a4_inhibitor: false }
+    expect: { risk_level: high, dose_adjustment: required }
+  - input: { has_unexplained_myalgia: false, alt_iu_l: 80, concurrent_cyp3a4_inhibitor: true }
+    expect: { risk_level: moderate, dose_reduction: required }
+  - input: { has_unexplained_myalgia: false, alt_iu_l: 80, concurrent_cyp3a4_inhibitor: false }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

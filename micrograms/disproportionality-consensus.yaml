@@ -1,0 +1,430 @@
+name: disproportionality-consensus
+description: 'Consensus signal classifier across 4 disproportionality measures (PRR, ROR, IC, EBGM). Counts how many methods detect a signal using standard thresholds: PRR>=2.0, ROR lower CI>1, IC025>0, EB05>1.0. Classifies as STRONG (4/4), MODERATE (3/4), WEAK (2/4), MARGINAL (1/4), or NONE (0/4).'
+version: 0.1.0
+primitive_signature:
+  dominant: frequency
+  expression: v(PRR) × v(ROR) × v(IC) × v(EBGM)
+  primes: [frequency, threshold, comparison]
+  arguments: [amount, boundary]
+interface:
+  inputs:
+    prr:
+      type: float
+      required: false
+    prr_ci_lower:
+      type: float
+      required: false
+    ror_ci_lower:
+      type: float
+      required: false
+    ic025:
+      type: float
+      required: false
+    eb05:
+      type: float
+      required: false
+    n_cases:
+      type: int
+      required: false
+  outputs:
+    consensus:
+      type: string
+    signals_detected:
+      type: int
+    methods_triggered:
+      type: string
+    action:
+      type: string
+    signal_detected:
+      type: bool
+tree:
+  start: check_n
+  nodes:
+    check_n:
+      type: condition
+      variable: n_cases
+      operator: gte
+      value: 3
+      true_next: check_prr
+      false_next: insufficient
+    insufficient:
+      type: return
+      value:
+        consensus: INSUFFICIENT
+        signals_detected: 0
+        methods_triggered: none
+        action: need_more_cases
+        signal_detected: false
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: prr_yes_check_ror
+      false_next: prr_no_check_ror
+    prr_yes_check_ror:
+      type: condition
+      variable: ror_ci_lower
+      operator: gt
+      value: 1.0
+      true_next: prr_ror_yes_check_ic
+      false_next: prr_only_check_ic
+    prr_no_check_ror:
+      type: condition
+      variable: ror_ci_lower
+      operator: gt
+      value: 1.0
+      true_next: ror_only_check_ic
+      false_next: none_check_ic
+    prr_ror_yes_check_ic:
+      type: condition
+      variable: ic025
+      operator: gt
+      value: 0.0
+      true_next: prr_ror_ic_check_eb
+      false_next: prr_ror_check_eb
+    prr_only_check_ic:
+      type: condition
+      variable: ic025
+      operator: gt
+      value: 0.0
+      true_next: prr_ic_check_eb
+      false_next: prr_check_eb
+    ror_only_check_ic:
+      type: condition
+      variable: ic025
+      operator: gt
+      value: 0.0
+      true_next: ror_ic_check_eb
+      false_next: ror_check_eb
+    none_check_ic:
+      type: condition
+      variable: ic025
+      operator: gt
+      value: 0.0
+      true_next: ic_check_eb
+      false_next: zero_check_eb
+    # 4 methods accumulated, check EBGM
+    prr_ror_ic_check_eb:
+      type: condition
+      variable: eb05
+      operator: gt
+      value: 1.0
+      true_next: strong_signal
+      false_next: moderate_signal_prr_ror_ic
+    # 3 methods: PRR+ROR
+    prr_ror_check_eb:
+      type: condition
+      variable: eb05
+      operator: gt
+      value: 1.0
+      true_next: moderate_signal_prr_ror_eb
+      false_next: weak_signal_prr_ror
+    # 3 methods: PRR+IC
+    prr_ic_check_eb:
+      type: condition
+      variable: eb05
+      operator: gt
+      value: 1.0
+      true_next: moderate_signal_prr_ic_eb
+      false_next: weak_signal_prr_ic
+    # 3 methods: ROR+IC
+    ror_ic_check_eb:
+      type: condition
+      variable: eb05
+      operator: gt
+      value: 1.0
+      true_next: moderate_signal_ror_ic_eb
+      false_next: weak_signal_ror_ic
+    # 2 methods: PRR only
+    prr_check_eb:
+      type: condition
+      variable: eb05
+      operator: gt
+      value: 1.0
+      true_next: weak_signal_prr_eb
+      false_next: marginal_prr
+    # 2 methods: ROR only
+    ror_check_eb:
+      type: condition
+      variable: eb05
+      operator: gt
+      value: 1.0
+      true_next: weak_signal_ror_eb
+      false_next: marginal_ror
+    # 2 methods: IC only
+    ic_check_eb:
+      type: condition
+      variable: eb05
+      operator: gt
+      value: 1.0
+      true_next: weak_signal_ic_eb
+      false_next: marginal_ic
+    # 0 methods so far
+    zero_check_eb:
+      type: condition
+      variable: eb05
+      operator: gt
+      value: 1.0
+      true_next: marginal_eb
+      false_next: no_signal
+    # Terminal nodes
+    strong_signal:
+      type: return
+      value:
+        consensus: STRONG
+        signals_detected: 4
+        methods_triggered: PRR+ROR+IC+EBGM
+        action: expedited_review
+        signal_detected: true
+    moderate_signal_prr_ror_ic:
+      type: return
+      value:
+        consensus: MODERATE
+        signals_detected: 3
+        methods_triggered: PRR+ROR+IC
+        action: standard_review
+        signal_detected: true
+    moderate_signal_prr_ror_eb:
+      type: return
+      value:
+        consensus: MODERATE
+        signals_detected: 3
+        methods_triggered: PRR+ROR+EBGM
+        action: standard_review
+        signal_detected: true
+    moderate_signal_prr_ic_eb:
+      type: return
+      value:
+        consensus: MODERATE
+        signals_detected: 3
+        methods_triggered: PRR+IC+EBGM
+        action: standard_review
+        signal_detected: true
+    moderate_signal_ror_ic_eb:
+      type: return
+      value:
+        consensus: MODERATE
+        signals_detected: 3
+        methods_triggered: ROR+IC+EBGM
+        action: standard_review
+        signal_detected: true
+    weak_signal_prr_ror:
+      type: return
+      value:
+        consensus: WEAK
+        signals_detected: 2
+        methods_triggered: PRR+ROR
+        action: monitor
+        signal_detected: true
+    weak_signal_prr_ic:
+      type: return
+      value:
+        consensus: WEAK
+        signals_detected: 2
+        methods_triggered: PRR+IC
+        action: monitor
+        signal_detected: true
+    weak_signal_ror_ic:
+      type: return
+      value:
+        consensus: WEAK
+        signals_detected: 2
+        methods_triggered: ROR+IC
+        action: monitor
+        signal_detected: true
+    weak_signal_prr_eb:
+      type: return
+      value:
+        consensus: WEAK
+        signals_detected: 2
+        methods_triggered: PRR+EBGM
+        action: monitor
+        signal_detected: true
+    weak_signal_ror_eb:
+      type: return
+      value:
+        consensus: WEAK
+        signals_detected: 2
+        methods_triggered: ROR+EBGM
+        action: monitor
+        signal_detected: true
+    weak_signal_ic_eb:
+      type: return
+      value:
+        consensus: WEAK
+        signals_detected: 2
+        methods_triggered: IC+EBGM
+        action: monitor
+        signal_detected: true
+    marginal_prr:
+      type: return
+      value:
+        consensus: MARGINAL
+        signals_detected: 1
+        methods_triggered: PRR
+        action: investigate
+        signal_detected: false
+    marginal_ror:
+      type: return
+      value:
+        consensus: MARGINAL
+        signals_detected: 1
+        methods_triggered: ROR
+        action: investigate
+        signal_detected: false
+    marginal_ic:
+      type: return
+      value:
+        consensus: MARGINAL
+        signals_detected: 1
+        methods_triggered: IC
+        action: investigate
+        signal_detected: false
+    marginal_eb:
+      type: return
+      value:
+        consensus: MARGINAL
+        signals_detected: 1
+        methods_triggered: EBGM
+        action: investigate
+        signal_detected: false
+    no_signal:
+      type: return
+      value:
+        consensus: NONE
+        signals_detected: 0
+        methods_triggered: none
+        action: no_action
+        signal_detected: false
+tests:
+# Strong: all 4 agree (semaglutide nausea-like)
+- input:
+    prr: 3.95
+    prr_ci_lower: 3.88
+    ror_ci_lower: 4.37
+    ic025: 1.94
+    eb05: 3.82
+    n_cases: 11511
+  expect:
+    consensus: STRONG
+    signals_detected: 4
+    methods_triggered: PRR+ROR+IC+EBGM
+    action: expedited_review
+    signal_detected: true
+# No signal: all below threshold
+- input:
+    prr: 1.2
+    prr_ci_lower: 0.9
+    ror_ci_lower: 0.8
+    ic025: -0.5
+    eb05: 0.7
+    n_cases: 50
+  expect:
+    consensus: NONE
+    signals_detected: 0
+    methods_triggered: none
+    action: no_action
+    signal_detected: false
+# Marginal: only PRR triggers
+- input:
+    prr: 2.5
+    prr_ci_lower: 2.1
+    ror_ci_lower: 0.9
+    ic025: -0.1
+    eb05: 0.8
+    n_cases: 10
+  expect:
+    consensus: MARGINAL
+    signals_detected: 1
+    methods_triggered: PRR
+    action: investigate
+    signal_detected: false
+# Weak: PRR + EBGM
+- input:
+    prr: 2.1
+    prr_ci_lower: 1.8
+    ror_ci_lower: 0.95
+    ic025: -0.2
+    eb05: 1.5
+    n_cases: 25
+  expect:
+    consensus: WEAK
+    signals_detected: 2
+    methods_triggered: PRR+EBGM
+    action: monitor
+    signal_detected: true
+# Moderate: PRR + ROR + IC (no EBGM)
+- input:
+    prr: 3.0
+    prr_ci_lower: 2.5
+    ror_ci_lower: 2.3
+    ic025: 0.8
+    eb05: 0.9
+    n_cases: 100
+  expect:
+    consensus: MODERATE
+    signals_detected: 3
+    methods_triggered: PRR+ROR+IC
+    action: standard_review
+    signal_detected: true
+# Insufficient cases
+- input:
+    prr: 5.0
+    ror_ci_lower: 4.0
+    ic025: 2.0
+    eb05: 3.0
+    n_cases: 2
+  expect:
+    consensus: INSUFFICIENT
+    signals_detected: 0
+    methods_triggered: none
+    action: need_more_cases
+    signal_detected: false
+# Empty input
+- input: {}
+  expect:
+    consensus: INSUFFICIENT
+    signals_detected: 0
+    methods_triggered: none
+    action: need_more_cases
+    signal_detected: false
+# Boundary: exactly at thresholds
+- input:
+    prr: 2.0
+    ror_ci_lower: 1.01
+    ic025: 0.01
+    eb05: 1.01
+    n_cases: 3
+  expect:
+    consensus: STRONG
+    signals_detected: 4
+    methods_triggered: PRR+ROR+IC+EBGM
+    action: expedited_review
+    signal_detected: true
+# Only EBGM signals (rare but possible with shrinkage)
+- input:
+    prr: 1.8
+    ror_ci_lower: 0.9
+    ic025: -0.1
+    eb05: 1.5
+    n_cases: 15
+  expect:
+    consensus: MARGINAL
+    signals_detected: 1
+    methods_triggered: EBGM
+    action: investigate
+    signal_detected: false
+# Moderate: ROR + IC + EBGM (PRR below threshold)
+- input:
+    prr: 1.9
+    ror_ci_lower: 1.5
+    ic025: 0.5
+    eb05: 2.0
+    n_cases: 200
+  expect:
+    consensus: MODERATE
+    signals_detected: 3
+    methods_triggered: ROR+IC+EBGM
+    action: standard_review
+    signal_detected: true

@@ -1,0 +1,96 @@
+name: crypto-composite
+description: 'Aggregate 4 crypto micrograms into single GREEN/YELLOW/RED. RED if any red, YELLOW if any yellow, GREEN otherwise (grey=green).'
+version: 1.0.0
+primitive_signature:
+  dominant: sum
+  expression: "S(health, sigs, backups, provenance)"
+  primes: [sum, boundary, state]
+interface:
+  inputs:
+    health_level: { type: string, required: false }
+    sig_level: { type: string, required: false }
+    backup_level: { type: string, required: false }
+    prov_level: { type: string, required: false }
+  outputs:
+    crypto_health: { type: string }
+    action: { type: string }
+tree:
+  start: check_health_red
+  nodes:
+    check_health_red:
+      type: condition
+      variable: health_level
+      operator: eq
+      value: red
+      true_next: red
+      false_next: check_sig_red
+    check_sig_red:
+      type: condition
+      variable: sig_level
+      operator: eq
+      value: red
+      true_next: red
+      false_next: check_backup_red
+    check_backup_red:
+      type: condition
+      variable: backup_level
+      operator: eq
+      value: red
+      true_next: red
+      false_next: check_health_yellow
+    check_health_yellow:
+      type: condition
+      variable: health_level
+      operator: eq
+      value: yellow
+      true_next: yellow
+      false_next: check_sig_yellow
+    check_sig_yellow:
+      type: condition
+      variable: sig_level
+      operator: eq
+      value: yellow
+      true_next: yellow
+      false_next: check_backup_yellow
+    check_backup_yellow:
+      type: condition
+      variable: backup_level
+      operator: eq
+      value: yellow
+      true_next: yellow
+      false_next: check_prov_yellow
+    check_prov_yellow:
+      type: condition
+      variable: prov_level
+      operator: eq
+      value: yellow
+      true_next: yellow
+      false_next: green
+    green:
+      type: return
+      value: { crypto_health: GREEN, action: none }
+    yellow:
+      type: return
+      value: { crypto_health: YELLOW, action: monitor }
+    red:
+      type: return
+      value: { crypto_health: RED, action: intervene }
+tests:
+- input: { health_level: green, sig_level: green, backup_level: green, prov_level: green }
+  expect: { crypto_health: GREEN, action: none }
+- input: { health_level: green, sig_level: green, backup_level: green, prov_level: grey }
+  expect: { crypto_health: GREEN, action: none }
+- input: { health_level: red, sig_level: green, backup_level: green, prov_level: green }
+  expect: { crypto_health: RED, action: intervene }
+- input: { health_level: green, sig_level: red, backup_level: green, prov_level: green }
+  expect: { crypto_health: RED, action: intervene }
+- input: { health_level: green, sig_level: green, backup_level: red, prov_level: green }
+  expect: { crypto_health: RED, action: intervene }
+- input: { health_level: yellow, sig_level: green, backup_level: green, prov_level: green }
+  expect: { crypto_health: YELLOW, action: monitor }
+- input: { health_level: green, sig_level: yellow, backup_level: green, prov_level: green }
+  expect: { crypto_health: YELLOW, action: monitor }
+- input: { health_level: green, sig_level: green, backup_level: green, prov_level: yellow }
+  expect: { crypto_health: YELLOW, action: monitor }
+- input: {}
+  expect: { crypto_health: GREEN, action: none }

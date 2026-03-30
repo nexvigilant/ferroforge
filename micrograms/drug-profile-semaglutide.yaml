@@ -1,0 +1,62 @@
+name: drug-profile-semaglutide
+description: 'Safety triage for semaglutide: PRR-based signal routing (Type A)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: signal
+      false_next: no_signal
+    signal:
+      type: return
+      value:
+        signal: true
+        action: investigate
+        drug: semaglutide
+        expected_prr: 6.9
+        harm_type: A
+    no_signal:
+      type: return
+      value:
+        expected_prr: 6.9
+        harm_type: A
+        signal: false
+        action: monitor
+        drug: semaglutide
+tests:
+- input:
+    prr: 6.9
+  expect:
+    drug: semaglutide
+    signal: true
+- input:
+    prr: 0.5
+  expect:
+    drug: semaglutide
+    signal: false
+- input: {}
+  expect:
+    signal: false
+    drug: semaglutide
+- input:
+    prr: 1.999
+  expect:
+    signal: false
+    action: monitor
+    harm_type: A
+    drug: semaglutide
+    expected_prr: 6.9
+- input:
+    prr: 2.001
+  expect:
+    signal: true
+    drug: semaglutide
+    expected_prr: 6.9
+    action: investigate
+    harm_type: A
+interface: null
+primitive_signature: null

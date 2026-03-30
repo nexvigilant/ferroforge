@@ -1,0 +1,165 @@
+name: e2a-reporting-obligation
+description: 'ICH E2A Section III.A: Sponsor reporting obligation gate — determines whether a case must be reported as an expedited SUSAR, combining seriousness + unexpectedness + causality in a clinical trial context'
+version: 1.0.0
+interface:
+  inputs:
+    causality_excluded:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+    study_drug_related:
+      type: bool
+      required: false
+  outputs:
+    obligation:
+      type: string
+    rationale:
+      type: string
+    regulatory_reference:
+      type: string
+    report_as_susar:
+      type: bool
+tree:
+  start: check_serious
+  nodes:
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_unexpected
+      false_next: no_susar_not_serious
+    check_unexpected:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: check_causality_excluded
+      false_next: no_susar_expected
+    check_causality_excluded:
+      type: condition
+      variable: causality_excluded
+      operator: eq
+      value: true
+      true_next: no_susar_causality_excluded
+      false_next: check_drug_related
+    check_drug_related:
+      type: condition
+      variable: study_drug_related
+      operator: eq
+      value: true
+      true_next: susar_required
+      false_next: susar_possible_review
+    susar_required:
+      type: return
+      value:
+        report_as_susar: true
+        obligation: MANDATORY_EXPEDITED
+        rationale: Serious + unexpected + study drug related — SUSAR reporting to regulatory authorities and ethics committees required
+        regulatory_reference: ICH E2A Section III.A - Sponsor obligation to report SUSARs expeditiously
+    susar_possible_review:
+      type: return
+      value:
+        report_as_susar: true
+        obligation: EXPEDITED_PENDING_REVIEW
+        rationale: Serious + unexpected but drug relatedness not confirmed — report as SUSAR pending causality review
+        regulatory_reference: ICH E2A Section III.A - When causality cannot be excluded, assume related for reporting purposes
+    no_susar_expected:
+      type: return
+      value:
+        report_as_susar: false
+        obligation: PERIODIC_REPORTING
+        rationale: Serious but expected reaction — not a SUSAR, include in periodic safety updates
+        regulatory_reference: ICH E2A Section III.A - Expected serious reactions do not require expedited reporting
+    no_susar_not_serious:
+      type: return
+      value:
+        report_as_susar: false
+        obligation: NO_EXPEDITED_REPORTING
+        rationale: Non-serious adverse event — no expedited reporting obligation under E2A
+        regulatory_reference: ICH E2A Section III.A - Non-serious events do not require expedited reporting
+    no_susar_causality_excluded:
+      type: return
+      value:
+        report_as_susar: false
+        obligation: NO_EXPEDITED_REPORTING
+        rationale: Causality to study drug definitively excluded — no SUSAR reporting obligation
+        regulatory_reference: ICH E2A Section III.A - Events with excluded causality do not require SUSAR reporting
+primitive_signature:
+  dominant: '→'
+  expression: '→ — causal obligation gate: serious × unexpected × related → SUSAR'
+  primes: ['→', 'κ', '∂']
+  arguments: ['is_serious', 'is_unexpected', 'study_drug_related', 'causality_excluded']
+  chain_prediction: 'Receives from case-seriousness (is_serious) + e2a-expectedness-check (is_unexpected). Feeds into e2a-reporting-timeline for deadline assignment.'
+tests:
+# All three criteria met = mandatory SUSAR
+- input:
+    is_serious: true
+    is_unexpected: true
+    study_drug_related: true
+    causality_excluded: false
+  expect:
+    report_as_susar: true
+    obligation: MANDATORY_EXPEDITED
+    regulatory_reference: ICH E2A Section III.A - Sponsor obligation to report SUSARs expeditiously
+# Serious + unexpected + causality not confirmed = pending review SUSAR
+- input:
+    is_serious: true
+    is_unexpected: true
+    study_drug_related: false
+    causality_excluded: false
+  expect:
+    report_as_susar: true
+    obligation: EXPEDITED_PENDING_REVIEW
+    regulatory_reference: ICH E2A Section III.A - When causality cannot be excluded, assume related for reporting purposes
+# Serious + expected = periodic only
+- input:
+    is_serious: true
+    is_unexpected: false
+    study_drug_related: true
+    causality_excluded: false
+  expect:
+    report_as_susar: false
+    obligation: PERIODIC_REPORTING
+    regulatory_reference: ICH E2A Section III.A - Expected serious reactions do not require expedited reporting
+# Non-serious = no expedited reporting
+- input:
+    is_serious: false
+    is_unexpected: true
+    study_drug_related: true
+    causality_excluded: false
+  expect:
+    report_as_susar: false
+    obligation: NO_EXPEDITED_REPORTING
+    regulatory_reference: ICH E2A Section III.A - Non-serious events do not require expedited reporting
+# Causality excluded = no SUSAR even if serious + unexpected
+- input:
+    is_serious: true
+    is_unexpected: true
+    study_drug_related: false
+    causality_excluded: true
+  expect:
+    report_as_susar: false
+    obligation: NO_EXPEDITED_REPORTING
+    regulatory_reference: ICH E2A Section III.A - Events with excluded causality do not require SUSAR reporting
+# Empty input = not serious, no reporting
+- input: {}
+  expect:
+    report_as_susar: false
+    obligation: NO_EXPEDITED_REPORTING
+    regulatory_reference: ICH E2A Section III.A - Non-serious events do not require expedited reporting
+# Serious + unexpected + related + causality_excluded = no SUSAR (exclusion overrides)
+- input:
+    is_serious: true
+    is_unexpected: true
+    study_drug_related: true
+    causality_excluded: true
+  expect:
+    report_as_susar: false
+    obligation: NO_EXPEDITED_REPORTING
+    regulatory_reference: ICH E2A Section III.A - Events with excluded causality do not require SUSAR reporting

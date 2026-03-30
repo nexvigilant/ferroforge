@@ -1,0 +1,85 @@
+name: patient-lack-of-efficacy
+description: "Classify lack of drug efficacy reports for patient safety assessment"
+version: 0.1.0
+tree:
+  start: validate_efficacy_report
+  nodes:
+    validate_efficacy_report:
+      type: condition
+      variable: lack_of_efficacy_reported
+      operator: eq
+      value: true
+      true_next: check_treatment_duration
+      false_next: efficacy_normal
+    check_treatment_duration:
+      type: condition
+      variable: treatment_duration_weeks
+      operator: gte
+      value: 4
+      true_next: check_expected_timeframe
+      false_next: inadequate_treatment_period
+    check_expected_timeframe:
+      type: condition
+      variable: is_within_expected_timeframe
+      operator: eq
+      value: true
+      true_next: confirmed_lack_of_efficacy
+      false_next: early_lack_of_efficacy
+    confirmed_lack_of_efficacy:
+      type: return
+      value:
+        efficacy_status: "confirmed_lack_of_efficacy"
+        patient_safety_concern: "treatment_failure"
+        alternative_therapy_needed: true
+        monitoring_required: true
+        efficacy_compliant: true
+    early_lack_of_efficacy:
+      type: return
+      value:
+        efficacy_status: "early_report"
+        patient_safety_concern: "possible_non_response"
+        alternative_therapy_needed: false
+        monitoring_required: true
+        efficacy_compliant: true
+    inadequate_treatment_period:
+      type: return
+      value:
+        efficacy_status: "insufficient_observation_period"
+        patient_safety_concern: "premature_evaluation"
+        alternative_therapy_needed: false
+        monitoring_required: false
+        efficacy_compliant: false
+    efficacy_normal:
+      type: return
+      value:
+        efficacy_status: "expected_response"
+        patient_safety_concern: "none"
+        alternative_therapy_needed: false
+        monitoring_required: false
+        efficacy_compliant: true
+tests:
+- input:
+    lack_of_efficacy_reported: true
+    treatment_duration_weeks: 8
+    is_within_expected_timeframe: true
+  expect:
+    efficacy_status: "confirmed_lack_of_efficacy"
+    alternative_therapy_needed: true
+    monitoring_required: true
+- input:
+    lack_of_efficacy_reported: true
+    treatment_duration_weeks: 8
+    is_within_expected_timeframe: false
+  expect:
+    efficacy_status: "early_report"
+    alternative_therapy_needed: false
+- input:
+    lack_of_efficacy_reported: true
+    treatment_duration_weeks: 2
+  expect:
+    efficacy_status: "insufficient_observation_period"
+    efficacy_compliant: false
+- input: {}
+  expect:
+    efficacy_status: "expected_response"
+    monitoring_required: false

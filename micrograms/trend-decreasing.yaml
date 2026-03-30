@@ -1,0 +1,55 @@
+name: trend-decreasing
+description: Signal reports decreasing
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    detected:
+      type: return
+      value:
+        pattern: decreasing
+        detected: true
+        action: investigate
+    not_detected:
+      type: return
+      value:
+        detected: false
+        pattern: decreasing
+        action: continue_monitoring
+    check:
+      type: condition
+      variable: trend_slope
+      operator: lt
+      value: 0
+      true_next: detected
+      false_next: not_detected
+tests:
+- input:
+    trend_slope: -1
+  expect:
+    pattern: decreasing
+    detected: true
+- input: {}
+  expect:
+    pattern: decreasing
+    detected: false
+- input:
+    trend_slope: 0
+  expect:
+    detected: false
+    action: continue_monitoring
+    pattern: decreasing
+- input:
+    trend_slope: 1
+  expect:
+    detected: false
+    action: continue_monitoring
+    pattern: decreasing
+- input:
+    trend_slope: 0
+  expect:
+    action: continue_monitoring
+    detected: false
+    pattern: decreasing
+interface: null
+primitive_signature: null

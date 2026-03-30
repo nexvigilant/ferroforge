@@ -1,0 +1,194 @@
+name: e2d-minimum-case-criteria
+description: 'ICH E2D Section 3.1: Validates minimum four-element criteria for any post-approval ICSR — identifiable reporter, identifiable patient, suspect drug, adverse event. Applies to all source types.'
+version: 0.1.0
+interface:
+  inputs:
+    identifiable_reporter:
+      type: bool
+      required: false
+    identifiable_patient:
+      type: bool
+      required: false
+    suspect_drug:
+      type: bool
+      required: false
+    adverse_event:
+      type: bool
+      required: false
+    reporter_type:
+      type: string
+      required: false
+  outputs:
+    minimum_criteria_met:
+      type: bool
+    missing_element:
+      type: string
+    case_priority:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_reporter
+  nodes:
+    check_reporter:
+      type: condition
+      variable: identifiable_reporter
+      operator: eq
+      value: true
+      true_next: check_patient
+      false_next: return_missing_reporter
+    check_patient:
+      type: condition
+      variable: identifiable_patient
+      operator: eq
+      value: true
+      true_next: check_drug
+      false_next: return_missing_patient
+    check_drug:
+      type: condition
+      variable: suspect_drug
+      operator: eq
+      value: true
+      true_next: check_event
+      false_next: return_missing_drug
+    check_event:
+      type: condition
+      variable: adverse_event
+      operator: eq
+      value: true
+      true_next: check_reporter_type
+      false_next: return_missing_event
+    check_reporter_type:
+      type: condition
+      variable: reporter_type
+      operator: eq
+      value: healthcare_professional
+      true_next: return_valid_hcp
+      false_next: return_valid_standard
+    return_valid_hcp:
+      type: return
+      value:
+        minimum_criteria_met: true
+        missing_element: NONE
+        case_priority: HIGH
+        regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+    return_valid_standard:
+      type: return
+      value:
+        minimum_criteria_met: true
+        missing_element: NONE
+        case_priority: STANDARD
+        regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+    return_missing_reporter:
+      type: return
+      value:
+        minimum_criteria_met: false
+        missing_element: IDENTIFIABLE_REPORTER
+        case_priority: INSUFFICIENT
+        regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+    return_missing_patient:
+      type: return
+      value:
+        minimum_criteria_met: false
+        missing_element: IDENTIFIABLE_PATIENT
+        case_priority: INSUFFICIENT
+        regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+    return_missing_drug:
+      type: return
+      value:
+        minimum_criteria_met: false
+        missing_element: SUSPECT_DRUG
+        case_priority: INSUFFICIENT
+        regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+    return_missing_event:
+      type: return
+      value:
+        minimum_criteria_met: false
+        missing_element: ADVERSE_EVENT
+        case_priority: INSUFFICIENT
+        regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — ICH E2D four-element minimum criteria gate for post-approval ICSR validity'
+  primes: ['σ', '∂']
+  arguments: ['identifiable_reporter', 'identifiable_patient', 'suspect_drug', 'adverse_event', 'reporter_type']
+tests:
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspect_drug: true
+    adverse_event: true
+    reporter_type: healthcare_professional
+  expect:
+    minimum_criteria_met: true
+    missing_element: NONE
+    case_priority: HIGH
+    regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspect_drug: true
+    adverse_event: true
+    reporter_type: patient
+  expect:
+    minimum_criteria_met: true
+    missing_element: NONE
+    case_priority: STANDARD
+    regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+- input:
+    identifiable_reporter: false
+    identifiable_patient: true
+    suspect_drug: true
+    adverse_event: true
+  expect:
+    minimum_criteria_met: false
+    missing_element: IDENTIFIABLE_REPORTER
+    case_priority: INSUFFICIENT
+    regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+- input:
+    identifiable_reporter: true
+    identifiable_patient: false
+    suspect_drug: true
+    adverse_event: true
+  expect:
+    minimum_criteria_met: false
+    missing_element: IDENTIFIABLE_PATIENT
+    case_priority: INSUFFICIENT
+    regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspect_drug: false
+    adverse_event: true
+  expect:
+    minimum_criteria_met: false
+    missing_element: SUSPECT_DRUG
+    case_priority: INSUFFICIENT
+    regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspect_drug: true
+    adverse_event: false
+  expect:
+    minimum_criteria_met: false
+    missing_element: ADVERSE_EVENT
+    case_priority: INSUFFICIENT
+    regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+- input: {}
+  expect:
+    minimum_criteria_met: false
+    missing_element: IDENTIFIABLE_REPORTER
+    case_priority: INSUFFICIENT
+    regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity
+- input:
+    identifiable_reporter: true
+    identifiable_patient: true
+    suspect_drug: true
+    adverse_event: true
+    reporter_type: consumer
+  expect:
+    minimum_criteria_met: true
+    missing_element: NONE
+    case_priority: STANDARD
+    regulatory_reference: ICH E2D Section 3.1 - Minimum Criteria for Case Validity

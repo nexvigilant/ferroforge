@@ -1,0 +1,74 @@
+name: drug-class-tnf-inhibitor-safety
+description: "TNF-alpha inhibitor safety assessment. Evaluates TB reactivation, opportunistic infections, and autoimmune complications."
+version: 0.1.0
+tree:
+  start: check_tb_status
+  nodes:
+    check_tb_status:
+      type: condition
+      variable: tb_positive
+      operator: eq
+      value: true
+      true_next: tb_alert
+      false_next: check_active_infection
+    tb_alert:
+      type: return
+      value:
+        risk_level: critical
+        prophylaxis_required: true
+        message: "TB-positive; require TB prophylaxis before starting TNF inhibitor"
+    check_active_infection:
+      type: condition
+      variable: has_active_infection
+      operator: eq
+      value: true
+      true_next: infection_alert
+      false_next: check_hbv
+    infection_alert:
+      type: return
+      value:
+        risk_level: critical
+        contraindication: true
+        message: "Active infection present; defer TNF inhibitor until resolved"
+    check_hbv:
+      type: condition
+      variable: hbv_surface_antigen
+      operator: eq
+      value: true
+      true_next: hbv_reactivation_risk
+      false_next: check_cytopenias
+    hbv_reactivation_risk:
+      type: return
+      value:
+        risk_level: high
+        antiviral_prophylaxis: required
+        message: "HBsAg positive; require antiviral prophylaxis to prevent reactivation"
+    check_cytopenias:
+      type: condition
+      variable: wbc_k_ul
+      operator: lt
+      value: 2.0
+      true_next: cytopenia_alert
+      false_next: standard_dosing
+    cytopenia_alert:
+      type: return
+      value:
+        risk_level: moderate
+        monitoring_required: true
+        message: "Borderline leukopenia; monitor CBC closely during TNF inhibitor therapy"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard TNF inhibitor dosing appropriate"
+tests:
+  - input: { tb_positive: true, has_active_infection: false, hbv_surface_antigen: false, wbc_k_ul: 5.0 }
+    expect: { risk_level: critical, prophylaxis_required: true }
+  - input: { tb_positive: false, has_active_infection: true, hbv_surface_antigen: false, wbc_k_ul: 5.0 }
+    expect: { risk_level: critical, contraindication: true }
+  - input: { tb_positive: false, has_active_infection: false, hbv_surface_antigen: true, wbc_k_ul: 5.0 }
+    expect: { risk_level: high, antiviral_prophylaxis: required }
+  - input: { tb_positive: false, has_active_infection: false, hbv_surface_antigen: false, wbc_k_ul: 5.0 }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

@@ -1,0 +1,62 @@
+name: workflow-causality-assessment
+description: "Route causality assessment by evidence type: rechallenge, temporal, mechanism"
+version: 0.1.0
+
+tree:
+  start: check_rechallenge
+  nodes:
+    check_rechallenge:
+      type: "condition"
+      variable: "rechallenge_positive"
+      operator: "eq"
+      value: true
+      true_next: "certain"
+      false_next: "check_temporal"
+    certain:
+      type: "return"
+      value:
+        causality: "certain"
+        chain: "who-umc \u2192 harm-taxonomy \u2192 fda-safety"
+        confidence: 0.95
+    check_temporal:
+      type: "condition"
+      variable: "temporal_clear"
+      operator: "eq"
+      value: true
+      true_next: "check_mechanism"
+      false_next: "unlikely"
+    check_mechanism:
+      type: "condition"
+      variable: "mechanism_known"
+      operator: "eq"
+      value: true
+      true_next: "probable"
+      false_next: "possible"
+    probable:
+      type: "return"
+      value:
+        causality: "probable"
+        chain: "who-umc \u2192 drugbank \u2192 calculation"
+        confidence: 0.8
+    possible:
+      type: "return"
+      value:
+        causality: "possible"
+        chain: "who-umc \u2192 meddra \u2192 epidemiology"
+        confidence: 0.5
+    unlikely:
+      type: "return"
+      value:
+        causality: "unlikely"
+        chain: "who-umc"
+        confidence: 0.2
+
+tests:
+  - input: {"rechallenge_positive": true, "temporal_clear": true, "mechanism_known": true}
+    expect: {"causality": "certain", "confidence": 0.95}
+  - input: {"rechallenge_positive": false, "temporal_clear": true, "mechanism_known": true}
+    expect: {"causality": "probable", "confidence": 0.8}
+  - input: {"rechallenge_positive": false, "temporal_clear": true, "mechanism_known": false}
+    expect: {"causality": "possible", "confidence": 0.5}
+  - input: {"rechallenge_positive": false, "temporal_clear": false, "mechanism_known": false}
+    expect: {"causality": "unlikely", "confidence": 0.2}

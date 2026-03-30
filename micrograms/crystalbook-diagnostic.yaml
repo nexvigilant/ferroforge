@@ -1,0 +1,416 @@
+name: crystalbook-diagnostic
+description: 'Crystalbook Full Diagnostic: 4-primitive conservation check + 2-law triage → combined diagnosis with prescription. Input: 4 evidence strings + 2 virtue scores. Output: conservation status, law statuses, overall verdict, prescription. Source: Crystalbook v2.0 by Matthew A. Campion, PharmD.'
+version: 0.1.0
+interface:
+  inputs:
+    existence_evidence:
+      type: string
+      required: false
+    boundary_description:
+      type: string
+      required: false
+    state_observation:
+      type: string
+      required: false
+    void_identification:
+      type: string
+      required: false
+    humility_score:
+      type: integer
+      required: false
+    charity_score:
+      type: integer
+      required: false
+  outputs:
+    conservation_holds:
+      type: bool
+    degraded_count:
+      type: integer
+    primitive_diagnosis:
+      type: string
+    law_i_status:
+      type: string
+    law_ii_status:
+      type: string
+    overall_verdict:
+      type: string
+    prescription:
+      type: string
+    source:
+      type: string
+tree:
+  start: check_existence
+  nodes:
+    # --- Phase 1: 4-Primitive Conservation Check ---
+    check_existence:
+      type: condition
+      variable: existence_evidence
+      operator: is_not_null
+      true_next: check_boundary
+      false_next: no_existence
+
+    check_boundary:
+      type: condition
+      variable: boundary_description
+      operator: is_not_null
+      true_next: check_state
+      false_next: partial_conservation
+
+    check_state:
+      type: condition
+      variable: state_observation
+      operator: is_not_null
+      true_next: check_void
+      false_next: partial_conservation
+
+    check_void:
+      type: condition
+      variable: void_identification
+      operator: is_not_null
+      true_next: conservation_holds_check_laws
+      false_next: partial_conservation
+
+    # --- No existence = immediate non-existent ---
+    no_existence:
+      type: return
+      value:
+        conservation_holds: false
+        degraded_count: 4
+        primitive_diagnosis: NON_EXISTENT
+        law_i_status: UNASSESSED
+        law_ii_status: UNASSESSED
+        overall_verdict: NON_EXISTENT
+        prescription: 'The system does not exist. Establish existence (∃) before assessing health.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    # --- Partial conservation: at least one primitive missing ---
+    partial_conservation:
+      type: condition
+      variable: humility_score
+      operator: lt
+      value: 4
+      true_next: partial_law_i_violated
+      false_next: partial_check_law_i_satisfied
+
+    partial_check_law_i_satisfied:
+      type: condition
+      variable: humility_score
+      operator: gte
+      value: 7
+      true_next: partial_law_i_satisfied
+      false_next: partial_law_i_at_risk
+
+    partial_law_i_violated:
+      type: return
+      value:
+        conservation_holds: false
+        degraded_count: 1
+        primitive_diagnosis: STRESSED
+        law_i_status: VIOLATED
+        law_ii_status: UNASSESSED
+        overall_verdict: CRITICAL
+        prescription: 'Conservation stressed AND Law I (Pride) violated. First: fill the missing primitives. Then: calibrate against reality — measure before claiming.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    partial_law_i_at_risk:
+      type: return
+      value:
+        conservation_holds: false
+        degraded_count: 1
+        primitive_diagnosis: STRESSED
+        law_i_status: AT_RISK
+        law_ii_status: UNASSESSED
+        overall_verdict: DEGRADED
+        prescription: 'Conservation stressed AND Law I at risk. Fill the missing primitives (∂, ς, or ∅) and strengthen measurement discipline.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    partial_law_i_satisfied:
+      type: return
+      value:
+        conservation_holds: false
+        degraded_count: 1
+        primitive_diagnosis: STRESSED
+        law_i_status: SATISFIED
+        law_ii_status: UNASSESSED
+        overall_verdict: STRESSED
+        prescription: 'Conservation stressed but measurement discipline is strong. Fill the missing primitives to restore full conservation.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    # --- Full conservation: all 4 primitives present, now check laws ---
+    conservation_holds_check_laws:
+      type: condition
+      variable: humility_score
+      operator: lt
+      value: 4
+      true_next: conserved_law_i_violated
+      false_next: conserved_check_law_i_satisfied
+
+    conserved_check_law_i_satisfied:
+      type: condition
+      variable: humility_score
+      operator: gte
+      value: 7
+      true_next: conserved_law_i_satisfied
+      false_next: conserved_law_i_at_risk
+
+    # Law I VIOLATED + conservation holds
+    conserved_law_i_violated:
+      type: condition
+      variable: charity_score
+      operator: lt
+      value: 4
+      true_next: conserved_i_v_ii_v
+      false_next: conserved_i_v_check_ii_sat
+
+    conserved_i_v_check_ii_sat:
+      type: condition
+      variable: charity_score
+      operator: gte
+      value: 7
+      true_next: conserved_i_v_ii_s
+      false_next: conserved_i_v_ii_r
+
+    conserved_i_v_ii_v:
+      type: return
+      value:
+        conservation_holds: true
+        degraded_count: 0
+        primitive_diagnosis: CONSERVING
+        law_i_status: VIOLATED
+        law_ii_status: VIOLATED
+        overall_verdict: CRITICAL
+        prescription: 'System exists but Laws I and II are violated. Pride and Greed are active. Urgent: restore external validation (Law I) and resource circulation (Law II).'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    conserved_i_v_ii_s:
+      type: return
+      value:
+        conservation_holds: true
+        degraded_count: 0
+        primitive_diagnosis: CONSERVING
+        law_i_status: VIOLATED
+        law_ii_status: SATISFIED
+        overall_verdict: DEGRADED
+        prescription: 'Law I (Pride) violated — the system believes its own model is the territory. Restore external validation. Cost of being wrong must exceed comfort of being certain.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    conserved_i_v_ii_r:
+      type: return
+      value:
+        conservation_holds: true
+        degraded_count: 0
+        primitive_diagnosis: CONSERVING
+        law_i_status: VIOLATED
+        law_ii_status: AT_RISK
+        overall_verdict: DEGRADED
+        prescription: 'Law I (Pride) violated and Law II (Greed) at risk. Priority: restore measurement discipline, then check resource circulation.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    # Law I AT_RISK + conservation holds
+    conserved_law_i_at_risk:
+      type: condition
+      variable: charity_score
+      operator: lt
+      value: 4
+      true_next: conserved_i_r_ii_v
+      false_next: conserved_i_r_check_ii_sat
+
+    conserved_i_r_check_ii_sat:
+      type: condition
+      variable: charity_score
+      operator: gte
+      value: 7
+      true_next: conserved_i_r_ii_s
+      false_next: conserved_i_r_ii_r
+
+    conserved_i_r_ii_v:
+      type: return
+      value:
+        conservation_holds: true
+        degraded_count: 0
+        primitive_diagnosis: CONSERVING
+        law_i_status: AT_RISK
+        law_ii_status: VIOLATED
+        overall_verdict: DEGRADED
+        prescription: 'Law II (Greed) violated — resources hoarded beyond capacity to use. Release what cannot be metabolized. Law I also at risk.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    conserved_i_r_ii_s:
+      type: return
+      value:
+        conservation_holds: true
+        degraded_count: 0
+        primitive_diagnosis: CONSERVING
+        law_i_status: AT_RISK
+        law_ii_status: SATISFIED
+        overall_verdict: GUARDED
+        prescription: 'System conserving with Law I at risk. Monitor measurement discipline — ensure no internal state is exempt from external validation.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    conserved_i_r_ii_r:
+      type: return
+      value:
+        conservation_holds: true
+        degraded_count: 0
+        primitive_diagnosis: CONSERVING
+        law_i_status: AT_RISK
+        law_ii_status: AT_RISK
+        overall_verdict: GUARDED
+        prescription: 'Laws I and II both at risk. Strengthen measurement (Law I) and circulation (Law II) before either degrades to violation.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    # Law I SATISFIED + conservation holds
+    conserved_law_i_satisfied:
+      type: condition
+      variable: charity_score
+      operator: lt
+      value: 4
+      true_next: conserved_i_s_ii_v
+      false_next: conserved_i_s_check_ii_sat
+
+    conserved_i_s_check_ii_sat:
+      type: condition
+      variable: charity_score
+      operator: gte
+      value: 7
+      true_next: conserved_i_s_ii_s
+      false_next: conserved_i_s_ii_r
+
+    conserved_i_s_ii_v:
+      type: return
+      value:
+        conservation_holds: true
+        degraded_count: 0
+        primitive_diagnosis: CONSERVING
+        law_i_status: SATISFIED
+        law_ii_status: VIOLATED
+        overall_verdict: DEGRADED
+        prescription: 'Law II (Greed) violated — resource hoarding despite strong measurement. Release what you hold beyond diminishing returns.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    conserved_i_s_ii_s:
+      type: return
+      value:
+        conservation_holds: true
+        degraded_count: 0
+        primitive_diagnosis: CONSERVING
+        law_i_status: SATISFIED
+        law_ii_status: SATISFIED
+        overall_verdict: HEALTHY
+        prescription: 'System is conserving and both foundation laws are satisfied. Continue the practice. The river stays a river by eroding what blocks it and depositing what sustains its banks.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+    conserved_i_s_ii_r:
+      type: return
+      value:
+        conservation_holds: true
+        degraded_count: 0
+        primitive_diagnosis: CONSERVING
+        law_i_status: SATISFIED
+        law_ii_status: AT_RISK
+        overall_verdict: GUARDED
+        prescription: 'Law II (Greed) at risk — check whether resources are circulating or pooling. What cannot be metabolized must be released.'
+        source: 'Crystalbook v2.0 — Full Diagnostic'
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — full diagnostic measurement of system conservation and law adherence'
+  primes: ['κ', '∂', 'ς', '∅']
+  arguments: []
+
+tests:
+# Fully healthy: all primitives present, both laws satisfied
+- input:
+    existence_evidence: 'Running process at pid 1234'
+    boundary_description: 'Scope: crystalbook plugin directory'
+    state_observation: 'All 8 laws loaded, functional'
+    void_identification: 'No hooks, no MCP tools'
+    humility_score: 9
+    charity_score: 8
+  expect:
+    conservation_holds: true
+    degraded_count: 0
+    primitive_diagnosis: CONSERVING
+    law_i_status: SATISFIED
+    law_ii_status: SATISFIED
+    overall_verdict: HEALTHY
+    prescription: 'System is conserving and both foundation laws are satisfied. Continue the practice. The river stays a river by eroding what blocks it and depositing what sustains its banks.'
+    source: 'Crystalbook v2.0 — Full Diagnostic'
+
+# Nothing provided — non-existent
+- input: {}
+  expect:
+    conservation_holds: false
+    degraded_count: 4
+    primitive_diagnosis: NON_EXISTENT
+    law_i_status: UNASSESSED
+    law_ii_status: UNASSESSED
+    overall_verdict: NON_EXISTENT
+    prescription: 'The system does not exist. Establish existence (∃) before assessing health.'
+    source: 'Crystalbook v2.0 — Full Diagnostic'
+
+# Conservation holds but both laws violated — critical
+- input:
+    existence_evidence: 'Exists'
+    boundary_description: 'Bounded'
+    state_observation: 'Running'
+    void_identification: 'Missing tests'
+    humility_score: 1
+    charity_score: 2
+  expect:
+    conservation_holds: true
+    degraded_count: 0
+    primitive_diagnosis: CONSERVING
+    law_i_status: VIOLATED
+    law_ii_status: VIOLATED
+    overall_verdict: CRITICAL
+    prescription: 'System exists but Laws I and II are violated. Pride and Greed are active. Urgent: restore external validation (Law I) and resource circulation (Law II).'
+    source: 'Crystalbook v2.0 — Full Diagnostic'
+
+# Partial conservation + law I at risk
+- input:
+    existence_evidence: 'File on disk'
+    boundary_description: 'Module scope'
+    humility_score: 5
+  expect:
+    conservation_holds: false
+    degraded_count: 1
+    primitive_diagnosis: STRESSED
+    law_i_status: AT_RISK
+    law_ii_status: UNASSESSED
+    overall_verdict: DEGRADED
+    prescription: 'Conservation stressed AND Law I at risk. Fill the missing primitives (∂, ς, or ∅) and strengthen measurement discipline.'
+    source: 'Crystalbook v2.0 — Full Diagnostic'
+
+# Conservation holds, guarded (both at risk)
+- input:
+    existence_evidence: 'Active'
+    boundary_description: 'Clear boundary'
+    state_observation: 'Measured state'
+    void_identification: 'Known gaps'
+    humility_score: 5
+    charity_score: 5
+  expect:
+    conservation_holds: true
+    degraded_count: 0
+    primitive_diagnosis: CONSERVING
+    law_i_status: AT_RISK
+    law_ii_status: AT_RISK
+    overall_verdict: GUARDED
+    prescription: 'Laws I and II both at risk. Strengthen measurement (Law I) and circulation (Law II) before either degrades to violation.'
+    source: 'Crystalbook v2.0 — Full Diagnostic'
+
+# Partial conservation + law I satisfied — stressed but strong measurement
+- input:
+    existence_evidence: 'Binary on disk'
+    boundary_description: 'Cargo.toml boundary'
+    humility_score: 9
+  expect:
+    conservation_holds: false
+    degraded_count: 1
+    primitive_diagnosis: STRESSED
+    law_i_status: SATISFIED
+    law_ii_status: UNASSESSED
+    overall_verdict: STRESSED
+    prescription: 'Conservation stressed but measurement discipline is strong. Fill the missing primitives to restore full conservation.'
+    source: 'Crystalbook v2.0 — Full Diagnostic'

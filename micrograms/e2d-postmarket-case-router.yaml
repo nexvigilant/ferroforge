@@ -1,0 +1,236 @@
+name: e2d-postmarket-case-router
+description: 'ICH E2D Section 1-4 workflow orchestrator: Routes a post-approval ICSR through source classification, minimum criteria, seriousness, and reporting pathway determination. Top-level E2D entry point.'
+version: 0.1.0
+interface:
+  inputs:
+    source:
+      type: string
+      required: false
+    minimum_criteria_met:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+    is_fatal:
+      type: bool
+      required: false
+    is_life_threatening:
+      type: bool
+      required: false
+  outputs:
+    routing_decision:
+      type: string
+    next_microgram:
+      type: string
+    priority:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_minimum_criteria
+  nodes:
+    check_minimum_criteria:
+      type: condition
+      variable: minimum_criteria_met
+      operator: eq
+      value: true
+      true_next: check_source
+      false_next: return_insufficient_data
+    check_source:
+      type: condition
+      variable: source
+      operator: eq
+      value: literature
+      true_next: return_literature_route
+      false_next: check_source_regulatory
+    check_source_regulatory:
+      type: condition
+      variable: source
+      operator: eq
+      value: regulatory_authority
+      true_next: return_regulatory_forward
+      false_next: check_serious
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_unexpected
+      false_next: return_periodic_route
+    check_unexpected:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: check_fatal_lt
+      false_next: return_expected_serious
+    check_fatal_lt:
+      type: condition
+      variable: is_fatal
+      operator: eq
+      value: true
+      true_next: return_7day_expedited
+      false_next: check_lt
+    check_lt:
+      type: condition
+      variable: is_life_threatening
+      operator: eq
+      value: true
+      true_next: return_7day_expedited
+      false_next: return_15day_expedited
+    return_7day_expedited:
+      type: return
+      value:
+        routing_decision: EXPEDITED_7_DAY
+        next_microgram: e2d-mah-reporting-obligation
+        priority: CRITICAL
+        regulatory_reference: ICH E2D Section 4.1 - Fatal/Life-Threatening Unexpected ADR
+    return_15day_expedited:
+      type: return
+      value:
+        routing_decision: EXPEDITED_15_DAY
+        next_microgram: e2d-mah-reporting-obligation
+        priority: HIGH
+        regulatory_reference: ICH E2D Section 4.1 - Serious Unexpected ADR
+    return_expected_serious:
+      type: return
+      value:
+        routing_decision: PERIODIC_PSUR_INCLUSION
+        next_microgram: e2d-psur-interval-gate
+        priority: STANDARD
+        regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+    return_periodic_route:
+      type: return
+      value:
+        routing_decision: PERIODIC_LINE_LISTING
+        next_microgram: e2d-psur-interval-gate
+        priority: LOW
+        regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+    return_literature_route:
+      type: return
+      value:
+        routing_decision: LITERATURE_SCREENING_REQUIRED
+        next_microgram: e2d-literature-screening
+        priority: STANDARD
+        regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+    return_regulatory_forward:
+      type: return
+      value:
+        routing_decision: REGULATORY_AUTHORITY_FORWARD
+        next_microgram: e2d-mah-reporting-obligation
+        priority: HIGH
+        regulatory_reference: ICH E2D Section 4 - MAH Reporting Obligations
+    return_insufficient_data:
+      type: return
+      value:
+        routing_decision: HOLD_PENDING_FOLLOWUP
+        next_microgram: e2d-followup-obligation
+        priority: STANDARD
+        regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — top-level E2D postmarket case router orchestrating source, criteria, seriousness, and reporting pathway'
+  primes: ['σ', '→', 'μ']
+  arguments: ['source', 'minimum_criteria_met', 'is_serious', 'is_unexpected', 'is_fatal', 'is_life_threatening']
+  chain_prediction: 'e2d-postmarket-case-router → e2d-mah-reporting-obligation | e2d-psur-interval-gate | e2d-followup-obligation | e2d-literature-screening'
+tests:
+- input:
+    minimum_criteria_met: true
+    source: healthcare_professional
+    is_serious: true
+    is_unexpected: true
+    is_fatal: true
+    is_life_threatening: false
+  expect:
+    routing_decision: EXPEDITED_7_DAY
+    next_microgram: e2d-mah-reporting-obligation
+    priority: CRITICAL
+    regulatory_reference: ICH E2D Section 4.1 - Fatal/Life-Threatening Unexpected ADR
+- input:
+    minimum_criteria_met: true
+    source: healthcare_professional
+    is_serious: true
+    is_unexpected: true
+    is_fatal: false
+    is_life_threatening: true
+  expect:
+    routing_decision: EXPEDITED_7_DAY
+    next_microgram: e2d-mah-reporting-obligation
+    priority: CRITICAL
+    regulatory_reference: ICH E2D Section 4.1 - Fatal/Life-Threatening Unexpected ADR
+- input:
+    minimum_criteria_met: true
+    source: healthcare_professional
+    is_serious: true
+    is_unexpected: true
+    is_fatal: false
+    is_life_threatening: false
+  expect:
+    routing_decision: EXPEDITED_15_DAY
+    next_microgram: e2d-mah-reporting-obligation
+    priority: HIGH
+    regulatory_reference: ICH E2D Section 4.1 - Serious Unexpected ADR
+- input:
+    minimum_criteria_met: true
+    source: healthcare_professional
+    is_serious: true
+    is_unexpected: false
+    is_fatal: false
+    is_life_threatening: false
+  expect:
+    routing_decision: PERIODIC_PSUR_INCLUSION
+    next_microgram: e2d-psur-interval-gate
+    priority: STANDARD
+    regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+- input:
+    minimum_criteria_met: true
+    source: healthcare_professional
+    is_serious: false
+    is_unexpected: false
+    is_fatal: false
+    is_life_threatening: false
+  expect:
+    routing_decision: PERIODIC_LINE_LISTING
+    next_microgram: e2d-psur-interval-gate
+    priority: LOW
+    regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+- input:
+    minimum_criteria_met: true
+    source: literature
+    is_serious: true
+    is_unexpected: true
+  expect:
+    routing_decision: LITERATURE_SCREENING_REQUIRED
+    next_microgram: e2d-literature-screening
+    priority: STANDARD
+    regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+- input:
+    minimum_criteria_met: true
+    source: regulatory_authority
+    is_serious: true
+    is_unexpected: true
+  expect:
+    routing_decision: REGULATORY_AUTHORITY_FORWARD
+    next_microgram: e2d-mah-reporting-obligation
+    priority: HIGH
+    regulatory_reference: ICH E2D Section 4 - MAH Reporting Obligations
+- input:
+    minimum_criteria_met: false
+    source: healthcare_professional
+    is_serious: true
+    is_unexpected: true
+  expect:
+    routing_decision: HOLD_PENDING_FOLLOWUP
+    next_microgram: e2d-followup-obligation
+    priority: STANDARD
+    regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+- input: {}
+  expect:
+    routing_decision: HOLD_PENDING_FOLLOWUP
+    next_microgram: e2d-followup-obligation
+    priority: STANDARD
+    regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports

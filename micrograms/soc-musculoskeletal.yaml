@@ -1,0 +1,52 @@
+name: soc-musculoskeletal
+description: "Classify Musculoskeletal disorders by seriousness"
+version: 0.1.0
+
+tree:
+  start: check_serious
+  nodes:
+    check_serious:
+      type: "condition"
+      variable: "is_serious"
+      operator: "eq"
+      value: true
+      true_next: "check_fatal"
+      false_next: "non_serious"
+    check_fatal:
+      type: "condition"
+      variable: "is_fatal"
+      operator: "eq"
+      value: true
+      true_next: "fatal"
+      false_next: "serious"
+    fatal:
+      type: "return"
+      value:
+        soc: "Musculoskeletal"
+        severity: "fatal"
+        priority: "critical"
+        route: "causality_assessment"
+    serious:
+      type: "return"
+      value:
+        soc: "Musculoskeletal"
+        severity: "serious"
+        priority: "high"
+        route: "signal_investigation"
+    non_serious:
+      type: "return"
+      value:
+        soc: "Musculoskeletal"
+        severity: "non_serious"
+        priority: "low"
+        route: "periodic_review"
+
+tests:
+  - input: {"is_serious": true, "is_fatal": true}
+    expect: {"soc": "Musculoskeletal", "severity": "fatal"}
+  - input: {"is_serious": true, "is_fatal": false}
+    expect: {"soc": "Musculoskeletal", "severity": "serious"}
+  - input: {"is_serious": false, "is_fatal": false}
+    expect: {"soc": "Musculoskeletal", "severity": "non_serious"}
+  - input: {}
+    expect: {"soc": "Musculoskeletal", "severity": "non_serious"}

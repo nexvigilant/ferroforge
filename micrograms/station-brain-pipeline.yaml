@@ -1,0 +1,171 @@
+name: station-brain-pipeline
+description: 'Route brain system health: session verdicts, artifact freshness, dual-store sync'
+version: 0.1.0
+tree:
+  start: check_verdict
+  nodes:
+    sync_broken:
+      type: return
+      value:
+        route: brain_reconcile
+        action: repair
+        reason: Dual-store divergence — JSON and SQLite disagree
+        priority: critical
+    check_sync:
+      type: condition
+      variable: dual_store_synced
+      operator: eq
+      value: true
+      true_next: check_artifacts
+      false_next: sync_broken
+    check_artifacts:
+      type: condition
+      variable: stale_artifact_count
+      operator: gte
+      value: 20
+      true_next: artifact_bloat
+      false_next: healthy
+    artifact_bloat:
+      type: return
+      value:
+        reason: 20+ stale artifacts — archive or resolve
+        action: prune
+        priority: moderate
+        route: artifact_cleanup
+    healthy:
+      type: return
+      value:
+        reason: Brain healthy — verdicts flowing, stores synced, artifacts fresh
+        priority: low
+        route: archive
+        action: certify
+    check_verdict:
+      type: condition
+      variable: verdict_rate_pct
+      operator: gte
+      value: 50
+      true_next: check_sync
+      false_next: low_verdicts
+    low_verdicts:
+      type: return
+      value:
+        route: session_discipline
+        action: alert
+        priority: high
+        reason: Model verdict rate <50% — most sessions unmeasured
+tests:
+- input:
+    stale_artifact_count: 5
+    verdict_rate_pct: 30
+    dual_store_synced: true
+  expect:
+    route: session_discipline
+    priority: high
+    action: alert
+- input:
+    verdict_rate_pct: 60
+    dual_store_synced: false
+    stale_artifact_count: 0
+  expect:
+    priority: critical
+    route: brain_reconcile
+    action: repair
+- input:
+    verdict_rate_pct: 70
+    stale_artifact_count: 30
+    dual_store_synced: true
+  expect:
+    priority: moderate
+    route: artifact_cleanup
+    action: prune
+- input:
+    verdict_rate_pct: 80
+    stale_artifact_count: 5
+    dual_store_synced: true
+  expect:
+    priority: low
+    route: archive
+    action: certify
+- input: {}
+  expect:
+    route: session_discipline
+    action: alert
+    priority: high
+    reason: Model verdict rate <50% — most sessions unmeasured
+- input:
+    stale_artifact_count: -1
+  expect:
+    reason: Model verdict rate <50% — most sessions unmeasured
+    route: session_discipline
+    action: alert
+    priority: high
+- input:
+    stale_artifact_count: 19
+  expect:
+    action: alert
+    priority: high
+    reason: Model verdict rate <50% — most sessions unmeasured
+    route: session_discipline
+- input:
+    stale_artifact_count: 21
+  expect:
+    route: session_discipline
+    action: alert
+    reason: Model verdict rate <50% — most sessions unmeasured
+    priority: high
+- input:
+    stale_artifact_count: 2000
+  expect:
+    route: session_discipline
+    priority: high
+    action: alert
+    reason: Model verdict rate <50% — most sessions unmeasured
+- input: {}
+  expect:
+    route: session_discipline
+    reason: Model verdict rate <50% — most sessions unmeasured
+    priority: high
+    action: alert
+- input:
+    verdict_rate_pct: 0
+  expect:
+    action: alert
+    route: session_discipline
+    priority: high
+    reason: Model verdict rate <50% — most sessions unmeasured
+- input:
+    verdict_rate_pct: -1
+  expect:
+    priority: high
+    reason: Model verdict rate <50% — most sessions unmeasured
+    route: session_discipline
+    action: alert
+- input:
+    verdict_rate_pct: 49
+  expect:
+    route: session_discipline
+    action: alert
+    priority: high
+    reason: Model verdict rate <50% — most sessions unmeasured
+- input:
+    verdict_rate_pct: 51
+  expect:
+    action: repair
+    reason: Dual-store divergence — JSON and SQLite disagree
+    route: brain_reconcile
+    priority: critical
+- input:
+    verdict_rate_pct: 5000
+  expect:
+    route: brain_reconcile
+    action: repair
+    priority: critical
+    reason: Dual-store divergence — JSON and SQLite disagree
+- input: {}
+  expect:
+    reason: Model verdict rate <50% — most sessions unmeasured
+    action: alert
+    priority: high
+    route: session_discipline
+interface: null
+primitive_signature: null

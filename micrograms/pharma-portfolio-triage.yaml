@@ -1,0 +1,96 @@
+name: pharma-portfolio-triage
+description: "Routes a pharmaceutical company to a portfolio tier based on pipeline size. Determines analysis depth for competitive intelligence workflows."
+version: "1.0"
+interface:
+  inputs:
+    company_key:
+      type: string
+      required: false
+    portfolio_size:
+      type: int
+      required: false
+  outputs:
+    portfolio_tier:
+      type: string
+    recommended_depth:
+      type: string
+tree:
+  start: check_large
+  nodes:
+    check_large:
+      type: condition
+      variable: portfolio_size
+      operator: gte
+      value: 50
+      true_next: return_large
+      false_next: check_mid
+    check_mid:
+      type: condition
+      variable: portfolio_size
+      operator: gte
+      value: 20
+      true_next: return_mid
+      false_next: return_niche
+    return_large:
+      type: return
+      value:
+        portfolio_tier: "large_portfolio"
+        recommended_depth: "deep"
+    return_mid:
+      type: return
+      value:
+        portfolio_tier: "mid_portfolio"
+        recommended_depth: "standard"
+    return_niche:
+      type: return
+      value:
+        portfolio_tier: "niche_portfolio"
+        recommended_depth: "focused"
+tests:
+  - name: "Large pharma — exactly 50 products"
+    input:
+      company_key: "pfizer"
+      portfolio_size: 50
+    expect:
+      portfolio_tier: "large_portfolio"
+      recommended_depth: "deep"
+  - name: "Large pharma — well above threshold"
+    input:
+      company_key: "roche"
+      portfolio_size: 120
+    expect:
+      portfolio_tier: "large_portfolio"
+      recommended_depth: "deep"
+  - name: "Mid portfolio — exactly 20 products"
+    input:
+      company_key: "biomarin"
+      portfolio_size: 20
+    expect:
+      portfolio_tier: "mid_portfolio"
+      recommended_depth: "standard"
+  - name: "Mid portfolio — mid-range"
+    input:
+      company_key: "jazz-pharma"
+      portfolio_size: 35
+    expect:
+      portfolio_tier: "mid_portfolio"
+      recommended_depth: "standard"
+  - name: "Niche portfolio — below 20 products"
+    input:
+      company_key: "ultragenyx"
+      portfolio_size: 8
+    expect:
+      portfolio_tier: "niche_portfolio"
+      recommended_depth: "focused"
+  - name: "Niche portfolio — boundary below 20"
+    input:
+      company_key: "agios"
+      portfolio_size: 19
+    expect:
+      portfolio_tier: "niche_portfolio"
+      recommended_depth: "focused"
+  - name: "Null input safety"
+    input: {}
+    expect:
+      portfolio_tier: "niche_portfolio"
+      recommended_depth: "focused"

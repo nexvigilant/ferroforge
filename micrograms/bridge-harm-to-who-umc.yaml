@@ -1,0 +1,64 @@
+name: bridge-harm-to-who-umc
+description: 'Bridge: converts harm taxonomy classification into WHO-UMC causality input'
+version: 0.1.0
+tree:
+  start: check_action
+  nodes:
+    check_investigate:
+      type: condition
+      variable: action
+      operator: eq
+      value: investigate
+      true_next: probable
+      false_next: possible
+    check_action:
+      type: condition
+      variable: action
+      operator: eq
+      value: escalate
+      true_next: certain
+      false_next: check_investigate
+    possible:
+      type: return
+      value:
+        bridge: harm-to-who-umc
+        causality_category: possible
+    probable:
+      type: return
+      value:
+        bridge: harm-to-who-umc
+        causality_category: probable
+    certain:
+      type: return
+      value:
+        causality_category: certain
+        bridge: harm-to-who-umc
+tests:
+- input:
+    priority: critical
+    action: escalate
+  expect:
+    bridge: harm-to-who-umc
+    causality_category: certain
+- input:
+    action: investigate
+    priority: high
+  expect:
+    bridge: harm-to-who-umc
+    causality_category: probable
+- input:
+    action: monitor
+    priority: moderate
+  expect:
+    causality_category: possible
+    bridge: harm-to-who-umc
+- input: {}
+  expect:
+    causality_category: possible
+    bridge: harm-to-who-umc
+- input: {}
+  expect:
+    causality_category: possible
+    bridge: harm-to-who-umc
+interface: null
+primitive_signature: null

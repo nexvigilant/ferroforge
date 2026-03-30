@@ -1,0 +1,83 @@
+name: risk-action-tracker
+description: "Track risk management action items and completion status"
+version: 0.1.0
+tree:
+  start: validate_actions
+  nodes:
+    validate_actions:
+      type: condition
+      variable: action_list
+      operator: is_not_null
+      value: null
+      true_next: check_completion_status
+      false_next: tracking_unknown
+    check_completion_status:
+      type: condition
+      variable: percent_complete
+      operator: gte
+      value: 100
+      true_next: all_actions_complete
+      false_next: check_in_progress
+    check_in_progress:
+      type: condition
+      variable: percent_complete
+      operator: gte
+      value: 50
+      true_next: actions_in_progress
+      false_next: actions_not_started
+    all_actions_complete:
+      type: return
+      value:
+        tracking_status: "closed"
+        action_status: "all_complete"
+        overdue_actions: 0
+        review_required: true
+        tracking_compliant: true
+    actions_in_progress:
+      type: return
+      value:
+        tracking_status: "active"
+        action_status: "in_progress"
+        overdue_actions: 0
+        review_required: false
+        tracking_compliant: true
+    actions_not_started:
+      type: return
+      value:
+        tracking_status: "open"
+        action_status: "pending"
+        overdue_actions: 0
+        review_required: false
+        tracking_compliant: true
+    tracking_unknown:
+      type: return
+      value:
+        tracking_status: null
+        action_status: null
+        overdue_actions: null
+        review_required: null
+        tracking_compliant: false
+tests:
+- input:
+    action_list: ["action1", "action2"]
+    percent_complete: 100
+  expect:
+    tracking_status: "closed"
+    action_status: "all_complete"
+    overdue_actions: 0
+- input:
+    action_list: ["action1", "action2"]
+    percent_complete: 75
+  expect:
+    tracking_status: "active"
+    action_status: "in_progress"
+- input:
+    action_list: ["action1", "action2"]
+    percent_complete: 25
+  expect:
+    tracking_status: "open"
+    action_status: "pending"
+- input: {}
+  expect:
+    tracking_status: null
+    tracking_compliant: false

@@ -1,0 +1,226 @@
+name: e2d-blinded-study-unblinding
+description: 'ICH E2D Section 4.3: Determines whether a blinded post-approval study case requires unblinding for expedited reporting purposes'
+version: 0.1.0
+interface:
+  inputs:
+    study_blinded:
+      type: bool
+      required: false
+    is_serious:
+      type: bool
+      required: false
+    is_unexpected:
+      type: bool
+      required: false
+    is_fatal:
+      type: bool
+      required: false
+    is_life_threatening:
+      type: bool
+      required: false
+    unblinding_sop_exists:
+      type: bool
+      required: false
+  outputs:
+    unblind_required:
+      type: bool
+    unblind_urgency:
+      type: string
+    report_after_unblinding:
+      type: bool
+    regulatory_reference:
+      type: string
+tree:
+  start: check_blinded
+  nodes:
+    check_blinded:
+      type: condition
+      variable: study_blinded
+      operator: eq
+      value: true
+      true_next: check_serious
+      false_next: return_not_blinded
+    check_serious:
+      type: condition
+      variable: is_serious
+      operator: eq
+      value: true
+      true_next: check_unexpected
+      false_next: return_no_unblind
+    check_unexpected:
+      type: condition
+      variable: is_unexpected
+      operator: eq
+      value: true
+      true_next: check_fatal
+      false_next: return_no_unblind_expected
+    check_fatal:
+      type: condition
+      variable: is_fatal
+      operator: eq
+      value: true
+      true_next: check_sop_urgent
+      false_next: check_lt
+    check_lt:
+      type: condition
+      variable: is_life_threatening
+      operator: eq
+      value: true
+      true_next: check_sop_urgent
+      false_next: check_sop_standard
+    check_sop_urgent:
+      type: condition
+      variable: unblinding_sop_exists
+      operator: eq
+      value: true
+      true_next: return_unblind_urgent
+      false_next: return_unblind_urgent_no_sop
+    check_sop_standard:
+      type: condition
+      variable: unblinding_sop_exists
+      operator: eq
+      value: true
+      true_next: return_unblind_standard
+      false_next: return_unblind_standard_no_sop
+    return_unblind_urgent:
+      type: return
+      value:
+        unblind_required: true
+        unblind_urgency: IMMEDIATE_7_DAY
+        report_after_unblinding: true
+        regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+    return_unblind_urgent_no_sop:
+      type: return
+      value:
+        unblind_required: true
+        unblind_urgency: IMMEDIATE_7_DAY_ESTABLISH_SOP
+        report_after_unblinding: true
+        regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+    return_unblind_standard:
+      type: return
+      value:
+        unblind_required: true
+        unblind_urgency: STANDARD_15_DAY
+        report_after_unblinding: true
+        regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+    return_unblind_standard_no_sop:
+      type: return
+      value:
+        unblind_required: true
+        unblind_urgency: STANDARD_15_DAY_ESTABLISH_SOP
+        report_after_unblinding: true
+        regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+    return_not_blinded:
+      type: return
+      value:
+        unblind_required: false
+        unblind_urgency: NOT_APPLICABLE_OPEN_STUDY
+        report_after_unblinding: false
+        regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+    return_no_unblind:
+      type: return
+      value:
+        unblind_required: false
+        unblind_urgency: NOT_REQUIRED_NON_SERIOUS
+        report_after_unblinding: false
+        regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+    return_no_unblind_expected:
+      type: return
+      value:
+        unblind_required: false
+        unblind_urgency: NOT_REQUIRED_EXPECTED
+        report_after_unblinding: false
+        regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — blinded post-approval study unblinding trigger per ICH E2D Section 4.3'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['study_blinded', 'is_serious', 'is_unexpected', 'is_fatal', 'is_life_threatening', 'unblinding_sop_exists']
+tests:
+- input:
+    study_blinded: true
+    is_serious: true
+    is_unexpected: true
+    is_fatal: true
+    is_life_threatening: false
+    unblinding_sop_exists: true
+  expect:
+    unblind_required: true
+    unblind_urgency: IMMEDIATE_7_DAY
+    report_after_unblinding: true
+    regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+- input:
+    study_blinded: true
+    is_serious: true
+    is_unexpected: true
+    is_fatal: false
+    is_life_threatening: true
+    unblinding_sop_exists: false
+  expect:
+    unblind_required: true
+    unblind_urgency: IMMEDIATE_7_DAY_ESTABLISH_SOP
+    report_after_unblinding: true
+    regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+- input:
+    study_blinded: true
+    is_serious: true
+    is_unexpected: true
+    is_fatal: false
+    is_life_threatening: false
+    unblinding_sop_exists: true
+  expect:
+    unblind_required: true
+    unblind_urgency: STANDARD_15_DAY
+    report_after_unblinding: true
+    regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+- input:
+    study_blinded: true
+    is_serious: true
+    is_unexpected: true
+    is_fatal: false
+    is_life_threatening: false
+    unblinding_sop_exists: false
+  expect:
+    unblind_required: true
+    unblind_urgency: STANDARD_15_DAY_ESTABLISH_SOP
+    report_after_unblinding: true
+    regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+- input:
+    study_blinded: false
+    is_serious: true
+    is_unexpected: true
+    is_fatal: true
+    is_life_threatening: false
+  expect:
+    unblind_required: false
+    unblind_urgency: NOT_APPLICABLE_OPEN_STUDY
+    report_after_unblinding: false
+    regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+- input:
+    study_blinded: true
+    is_serious: false
+    is_unexpected: true
+    is_fatal: false
+    is_life_threatening: false
+  expect:
+    unblind_required: false
+    unblind_urgency: NOT_REQUIRED_NON_SERIOUS
+    report_after_unblinding: false
+    regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+- input:
+    study_blinded: true
+    is_serious: true
+    is_unexpected: false
+    is_fatal: true
+    is_life_threatening: false
+  expect:
+    unblind_required: false
+    unblind_urgency: NOT_REQUIRED_EXPECTED
+    report_after_unblinding: false
+    regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+- input: {}
+  expect:
+    unblind_required: false
+    unblind_urgency: NOT_APPLICABLE_OPEN_STUDY
+    report_after_unblinding: false
+    regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes

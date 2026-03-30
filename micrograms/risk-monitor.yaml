@@ -1,0 +1,81 @@
+name: risk-monitor
+description: "Establish monitoring protocol and frequency for managed risks"
+version: 0.1.0
+tree:
+  start: validate_monitoring_plan
+  nodes:
+    validate_monitoring_plan:
+      type: condition
+      variable: risk_mitigation_active
+      operator: eq
+      value: true
+      true_next: check_intensity_level
+      false_next: monitoring_unknown
+    check_intensity_level:
+      type: condition
+      variable: monitoring_intensity
+      operator: eq
+      value: "intensive"
+      true_next: intensive_protocol
+      false_next: check_standard_intensity
+    check_standard_intensity:
+      type: condition
+      variable: monitoring_intensity
+      operator: eq
+      value: "standard"
+      true_next: standard_protocol
+      false_next: routine_protocol
+    intensive_protocol:
+      type: return
+      value:
+        monitoring_frequency: "monthly"
+        monitoring_parameters: "lab_values,clinical_assessment,patient_questionnaire"
+        reporting_requirements: "case_by_case"
+        adverse_event_follow_up: "within_7_days"
+        monitoring_compliant: true
+    standard_protocol:
+      type: return
+      value:
+        monitoring_frequency: "quarterly"
+        monitoring_parameters: "clinical_assessment,lab_values"
+        reporting_requirements: "aggregate_periodic"
+        adverse_event_follow_up: "within_14_days"
+        monitoring_compliant: true
+    routine_protocol:
+      type: return
+      value:
+        monitoring_frequency: "annually"
+        monitoring_parameters: "annual_safety_review"
+        reporting_requirements: "aggregate_annual"
+        adverse_event_follow_up: "within_30_days"
+        monitoring_compliant: true
+    monitoring_unknown:
+      type: return
+      value:
+        monitoring_frequency: null
+        monitoring_parameters: null
+        reporting_requirements: null
+        adverse_event_follow_up: null
+        monitoring_compliant: false
+tests:
+- input:
+    risk_mitigation_active: true
+    monitoring_intensity: "intensive"
+  expect:
+    monitoring_frequency: "monthly"
+    adverse_event_follow_up: "within_7_days"
+- input:
+    risk_mitigation_active: true
+    monitoring_intensity: "standard"
+  expect:
+    monitoring_frequency: "quarterly"
+    adverse_event_follow_up: "within_14_days"
+- input:
+    risk_mitigation_active: true
+    monitoring_intensity: "routine"
+  expect:
+    monitoring_frequency: "annually"
+- input: {}
+  expect:
+    monitoring_frequency: null
+    monitoring_compliant: false

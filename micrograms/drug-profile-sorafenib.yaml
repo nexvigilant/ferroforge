@@ -1,0 +1,62 @@
+name: drug-profile-sorafenib
+description: 'Safety triage for sorafenib: PRR-based signal routing (Type B)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    no_signal:
+      type: return
+      value:
+        expected_prr: 8.4
+        drug: sorafenib
+        harm_type: B
+        signal: false
+        action: monitor
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5.0
+      true_next: signal
+      false_next: no_signal
+    signal:
+      type: return
+      value:
+        drug: sorafenib
+        signal: true
+        harm_type: B
+        action: investigate
+        expected_prr: 8.4
+tests:
+- input:
+    prr: 8.4
+  expect:
+    drug: sorafenib
+    signal: true
+- input:
+    prr: 0.5
+  expect:
+    drug: sorafenib
+    signal: false
+- input: {}
+  expect:
+    drug: sorafenib
+    signal: false
+- input:
+    prr: 4.999
+  expect:
+    drug: sorafenib
+    signal: false
+    harm_type: B
+    expected_prr: 8.4
+    action: monitor
+- input:
+    prr: 5.001
+  expect:
+    action: investigate
+    signal: true
+    drug: sorafenib
+    expected_prr: 8.4
+    harm_type: B
+interface: null
+primitive_signature: null

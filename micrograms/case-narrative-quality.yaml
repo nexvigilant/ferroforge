@@ -1,0 +1,85 @@
+name: case-narrative-quality
+description: "Assess quality and completeness of case narrative in adverse event report"
+version: 0.1.0
+tree:
+  start: validate_narrative
+  nodes:
+    validate_narrative:
+      type: condition
+      variable: narrative_text_length
+      operator: gte
+      value: 50
+      true_next: check_medical_history
+      false_next: quality_poor
+    check_medical_history:
+      type: condition
+      variable: medical_history_included
+      operator: eq
+      value: true
+      true_next: check_chronology
+      false_next: quality_fair
+    check_chronology:
+      type: condition
+      variable: temporal_sequence_clear
+      operator: eq
+      value: true
+      true_next: check_outcome_description
+      false_next: quality_fair
+    check_outcome_description:
+      type: condition
+      variable: outcome_described
+      operator: eq
+      value: true
+      true_next: quality_good
+      false_next: quality_fair
+    quality_good:
+      type: return
+      value:
+        narrative_quality: "high"
+        quality_score: 9
+        reviewable_without_follow_up: true
+        case_completeness_percent: 95
+        processing_compliant: true
+    quality_fair:
+      type: return
+      value:
+        narrative_quality: "moderate"
+        quality_score: 6
+        reviewable_without_follow_up: false
+        case_completeness_percent: 70
+        processing_compliant: true
+    quality_poor:
+      type: return
+      value:
+        narrative_quality: "low"
+        quality_score: 3
+        reviewable_without_follow_up: false
+        case_completeness_percent: 40
+        processing_compliant: false
+tests:
+- input:
+    narrative_text_length: 300
+    medical_history_included: true
+    temporal_sequence_clear: true
+    outcome_described: true
+  expect:
+    narrative_quality: "high"
+    quality_score: 9
+    reviewable_without_follow_up: true
+- input:
+    narrative_text_length: 150
+    medical_history_included: false
+    temporal_sequence_clear: true
+    outcome_described: true
+  expect:
+    narrative_quality: "moderate"
+    quality_score: 6
+- input:
+    narrative_text_length: 20
+  expect:
+    narrative_quality: "low"
+    quality_score: 3
+- input: {}
+  expect:
+    narrative_quality: "low"
+    processing_compliant: false

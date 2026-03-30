@@ -1,0 +1,138 @@
+name: cybercinetics-verdict-classifier
+description: Classifies Controller::tick verdicts into escalation tiers. Maps STABLE/FREQ_DECAY/FIDELITY_DEGRADED/RECURSION_SATURATED/COMPOUND to T0-T3 escalation with recommended actions.
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(verdict, tier_thresholds) at ∂(escalation) — classification of controller output'
+  primes: ['κ', '∂', 'μ']
+  arguments: ['verdict', 'f_total', 'nu_health_ratio']
+  chain_prediction: 'κ only — verdict classification is static mapping, no temporal causality.'
+interface:
+  inputs:
+    verdict:
+      type: string
+      required: true
+    f_total:
+      type: float
+      required: false
+    nu_health_ratio:
+      type: float
+      required: false
+  outputs:
+    tier:
+      type: string
+    escalation:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_stable
+  nodes:
+    check_stable:
+      type: condition
+      variable: verdict
+      operator: eq
+      value: STABLE
+      true_next: tier_0
+      false_next: check_freq_decay
+    check_freq_decay:
+      type: condition
+      variable: verdict
+      operator: eq
+      value: FREQ_DECAY
+      true_next: tier_1
+      false_next: check_fidelity
+    check_fidelity:
+      type: condition
+      variable: verdict
+      operator: eq
+      value: FIDELITY_DEGRADED
+      true_next: check_fidelity_severity
+      false_next: check_recursion
+    check_fidelity_severity:
+      type: condition
+      variable: f_total
+      operator: lt
+      value: 0.5
+      true_next: tier_2_critical
+      false_next: tier_1_fidelity
+    check_recursion:
+      type: condition
+      variable: verdict
+      operator: eq
+      value: RECURSION_SATURATED
+      true_next: tier_2_recursion
+      false_next: tier_3_compound
+    tier_0:
+      type: return
+      value:
+        tier: T0
+        escalation: NONE
+        action: Continue normal operation
+    tier_1:
+      type: return
+      value:
+        tier: T1
+        escalation: MONITOR
+        action: Increase observation frequency, check hook execution window
+    tier_1_fidelity:
+      type: return
+      value:
+        tier: T1
+        escalation: MONITOR
+        action: Identify weakest causal link, consider pipeline repair
+    tier_2_critical:
+      type: return
+      value:
+        tier: T2
+        escalation: INTERVENE
+        action: Fidelity critically low — decay_all or rebuild causal chain
+    tier_2_recursion:
+      type: return
+      value:
+        tier: T2
+        escalation: INTERVENE
+        action: Recursion saturated — surface and reset observation depth
+    tier_3_compound:
+      type: return
+      value:
+        tier: T3
+        escalation: ESCALATE
+        action: Multiple failure modes active — escalate to Matthew for review
+tests:
+- input:
+    verdict: STABLE
+  expect:
+    tier: T0
+    escalation: NONE
+- input:
+    verdict: FREQ_DECAY
+  expect:
+    tier: T1
+    escalation: MONITOR
+- input:
+    verdict: FIDELITY_DEGRADED
+    f_total: 0.3
+  expect:
+    tier: T2
+    escalation: INTERVENE
+- input:
+    verdict: FIDELITY_DEGRADED
+    f_total: 0.7
+  expect:
+    tier: T1
+    escalation: MONITOR
+- input:
+    verdict: RECURSION_SATURATED
+  expect:
+    tier: T2
+    escalation: INTERVENE
+- input:
+    verdict: "COMPOUND(FREQ_DECAY+FIDELITY_DEGRADED)"
+  expect:
+    tier: T3
+    escalation: ESCALATE
+- input: {}
+  expect:
+    tier: T3
+    escalation: ESCALATE

@@ -1,0 +1,61 @@
+name: trend-age-skew
+description: Age distribution skew
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: age_skew_pvalue
+      operator: lte
+      value: 0
+      true_next: detected
+      false_next: not_detected
+    not_detected:
+      type: return
+      value:
+        pattern: age_dependent
+        detected: false
+        action: continue_monitoring
+    detected:
+      type: return
+      value:
+        action: investigate
+        pattern: age_dependent
+        detected: true
+tests:
+- input:
+    age_skew_pvalue: 0
+  expect:
+    detected: true
+    pattern: age_dependent
+- input: {}
+  expect:
+    detected: false
+    pattern: age_dependent
+- input:
+    age_skew_pvalue: -1
+  expect:
+    action: investigate
+    detected: true
+    pattern: age_dependent
+- input:
+    age_skew_pvalue: -1
+  expect:
+    detected: true
+    pattern: age_dependent
+    action: investigate
+- input:
+    age_skew_pvalue: 1
+  expect:
+    pattern: age_dependent
+    detected: false
+    action: continue_monitoring
+- input:
+    age_skew_pvalue: 0
+  expect:
+    pattern: age_dependent
+    action: investigate
+    detected: true
+interface: null
+primitive_signature: null

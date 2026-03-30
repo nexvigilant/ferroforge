@@ -1,0 +1,57 @@
+name: schema-version-check
+description: 'Station operations: schema-version-check'
+version: 0.1.0
+interface:
+  inputs:
+    metric:
+      type: int
+      required: false
+    threshold:
+      type: int
+      required: false
+  outputs:
+    health:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_healthy
+  nodes:
+    check_healthy:
+      type: condition
+      variable: metric
+      operator: gte
+      value: 90
+      true_next: healthy
+      false_next: check_degraded
+    check_degraded:
+      type: condition
+      variable: metric
+      operator: gte
+      value: 50
+      true_next: degraded
+      false_next: unhealthy
+    healthy:
+      type: return
+      value:
+        health: HEALTHY
+        action: none
+    degraded:
+      type: return
+      value:
+        health: DEGRADED
+        action: investigate
+    unhealthy:
+      type: return
+      value:
+        health: UNHEALTHY
+        action: alert
+tests:
+- input: {metric: 95, threshold: 90}
+  expect: {health: HEALTHY, action: none}
+- input: {metric: 70, threshold: 90}
+  expect: {health: DEGRADED, action: investigate}
+- input: {metric: 30, threshold: 90}
+  expect: {health: UNHEALTHY, action: alert}
+- input: {}
+  expect: {health: UNHEALTHY, action: alert}

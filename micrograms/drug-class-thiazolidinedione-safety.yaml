@@ -1,0 +1,62 @@
+name: drug-class-thiazolidinedione-safety
+description: "Thiazolidinedione safety assessment. Evaluates heart failure risk, weight gain, bone loss, and bladder cancer signal."
+version: 0.1.0
+tree:
+  start: check_heart_failure
+  nodes:
+    check_heart_failure:
+      type: condition
+      variable: has_heart_failure
+      operator: eq
+      value: true
+      true_next: hf_alert
+      false_next: check_bladder_cancer
+    hf_alert:
+      type: return
+      value:
+        risk_level: high
+        relative_contraindication: true
+        message: "Heart failure present; thiazolidinedione may worsen fluid retention and HF"
+    check_bladder_cancer:
+      type: condition
+      variable: prior_bladder_cancer
+      operator: eq
+      value: true
+      true_next: cancer_alert
+      false_next: check_duration
+    cancer_alert:
+      type: return
+      value:
+        risk_level: high
+        relative_contraindication: true
+        message: "Prior bladder cancer; thiazolidinedione signal warrants avoidance"
+    check_duration:
+      type: condition
+      variable: tzd_duration_years
+      operator: gte
+      value: 3
+      true_next: long_term_assessment
+      false_next: standard_dosing
+    long_term_assessment:
+      type: return
+      value:
+        risk_level: moderate
+        bone_density_screening: required
+        weight_monitoring: required
+        message: "Long-term TZD use; monitor bone density and weight gain"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard thiazolidinedione dosing appropriate"
+tests:
+  - input: { has_heart_failure: true, prior_bladder_cancer: false, tzd_duration_years: 2 }
+    expect: { risk_level: high, relative_contraindication: true }
+  - input: { has_heart_failure: false, prior_bladder_cancer: true, tzd_duration_years: 2 }
+    expect: { risk_level: high, relative_contraindication: true }
+  - input: { has_heart_failure: false, prior_bladder_cancer: false, tzd_duration_years: 4 }
+    expect: { risk_level: moderate, bone_density_screening: required }
+  - input: { has_heart_failure: false, prior_bladder_cancer: false, tzd_duration_years: 1 }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

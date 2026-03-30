@@ -1,0 +1,63 @@
+name: workflow-self-healing
+description: "The involution terminus — select self-repair chain based on system failure mode"
+version: 0.1.0
+
+tree:
+  start: check_mode
+  nodes:
+    check_mode:
+      type: "condition"
+      variable: "failure_mode"
+      operator: "eq"
+      value: "dual_store_drift"
+      true_next: "drift_repair"
+      false_next: "check_corruption"
+    drift_repair:
+      type: "return"
+      value:
+        repair: "reconcile"
+        chain: "brain \u2192 primitives \u2192 crystalbook \u2192 microgram"
+        involution_depth: 4
+    check_corruption:
+      type: "condition"
+      variable: "failure_mode"
+      operator: "eq"
+      value: "data_corruption"
+      true_next: "corruption_repair"
+      false_next: "check_stale"
+    corruption_repair:
+      type: "return"
+      value:
+        repair: "decontaminate"
+        chain: "brain \u2192 relay \u2192 entropy"
+        involution_depth: 3
+        antibody: "SERIAL-001"
+    check_stale:
+      type: "condition"
+      variable: "failure_mode"
+      operator: "eq"
+      value: "stale_knowledge"
+      true_next: "staleness_repair"
+      false_next: "generic_repair"
+    staleness_repair:
+      type: "return"
+      value:
+        repair: "refresh"
+        chain: "brain \u2192 crystalbook \u2192 primitives"
+        involution_depth: 3
+    generic_repair:
+      type: "return"
+      value:
+        repair: "restart"
+        chain: "daemon \u2192 brain"
+        involution_depth: 2
+
+tests:
+  - input: {"failure_mode": "dual_store_drift"}
+    expect: {"repair": "reconcile", "involution_depth": 4}
+  - input: {"failure_mode": "data_corruption"}
+    expect: {"repair": "decontaminate", "antibody": "SERIAL-001"}
+  - input: {"failure_mode": "stale_knowledge"}
+    expect: {"repair": "refresh", "involution_depth": 3}
+  - input: {"failure_mode": "other"}
+    expect: {"repair": "restart", "involution_depth": 2}

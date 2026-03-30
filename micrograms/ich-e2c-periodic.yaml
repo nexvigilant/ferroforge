@@ -1,0 +1,146 @@
+name: ich-e2c-periodic
+description: 'ICH E2C: Determine PSUR (Periodic Safety Update Report) submission interval'
+version: 0.1.0
+tree:
+  start: validate_approval_date
+  nodes:
+    check_safety_profile:
+      type: condition
+      variable: is_established_safety_profile
+      operator: eq
+      value: true
+      true_next: triennial_interval
+      false_next: annual_interval
+    annual_interval:
+      type: return
+      value:
+        ich_e2c_compliant: true
+        next_submission_deadline: standard
+        submission_frequency: annual
+        psur_interval_months: 12
+    validate_approval_date:
+      type: condition
+      variable: market_authorization_date
+      operator: is_not_null
+      value: null
+      true_next: check_years_on_market
+      false_next: interval_unknown
+    triennial_interval:
+      type: return
+      value:
+        ich_e2c_compliant: true
+        next_submission_deadline: extended
+        psur_interval_months: 36
+        submission_frequency: triennial
+    check_three_years:
+      type: condition
+      variable: years_on_market
+      operator: lt
+      value: 3
+      true_next: annual_interval
+      false_next: check_safety_profile
+    interval_unknown:
+      type: return
+      value:
+        ich_e2c_compliant: false
+        psur_interval_months: null
+        submission_frequency: unknown
+        next_submission_deadline: null
+    check_years_on_market:
+      type: condition
+      variable: years_on_market
+      operator: lt
+      value: 2
+      true_next: annual_interval
+      false_next: check_three_years
+tests:
+- input:
+    years_on_market: 0.5
+    market_authorization_date: 2023-06-15
+    is_established_safety_profile: false
+  expect:
+    psur_interval_months: 12
+    submission_frequency: annual
+- input:
+    is_established_safety_profile: true
+    market_authorization_date: 2020-01-10
+    years_on_market: 4
+  expect:
+    submission_frequency: triennial
+    psur_interval_months: 36
+- input:
+    years_on_market: 4
+    is_established_safety_profile: false
+    market_authorization_date: 2020-01-10
+  expect:
+    psur_interval_months: 12
+    submission_frequency: annual
+- input: {}
+  expect:
+    psur_interval_months: null
+    ich_e2c_compliant: false
+- input:
+    years_on_market: 0
+  expect:
+    submission_frequency: unknown
+    next_submission_deadline: null
+    ich_e2c_compliant: false
+    psur_interval_months: null
+- input:
+    years_on_market: -1
+  expect:
+    ich_e2c_compliant: false
+    psur_interval_months: null
+    submission_frequency: unknown
+    next_submission_deadline: null
+- input:
+    years_on_market: 2
+  expect:
+    next_submission_deadline: null
+    submission_frequency: unknown
+    ich_e2c_compliant: false
+    psur_interval_months: null
+- input:
+    years_on_market: 300
+  expect:
+    ich_e2c_compliant: false
+    psur_interval_months: null
+    submission_frequency: unknown
+    next_submission_deadline: null
+- input:
+    years_on_market: 0
+  expect:
+    ich_e2c_compliant: false
+    psur_interval_months: null
+    submission_frequency: unknown
+    next_submission_deadline: null
+- input:
+    years_on_market: -1
+  expect:
+    submission_frequency: unknown
+    psur_interval_months: null
+    ich_e2c_compliant: false
+    next_submission_deadline: null
+- input:
+    years_on_market: 1
+  expect:
+    submission_frequency: unknown
+    ich_e2c_compliant: false
+    psur_interval_months: null
+    next_submission_deadline: null
+- input:
+    years_on_market: 3
+  expect:
+    ich_e2c_compliant: false
+    submission_frequency: unknown
+    psur_interval_months: null
+    next_submission_deadline: null
+- input:
+    years_on_market: 200
+  expect:
+    next_submission_deadline: null
+    submission_frequency: unknown
+    psur_interval_months: null
+    ich_e2c_compliant: false
+interface: null
+primitive_signature: null

@@ -1,0 +1,136 @@
+name: station-meddra-pipeline
+description: 'Route MedDRA coded terms: classify by hierarchy level, SMQ membership, and coding quality'
+version: 0.1.0
+tree:
+  start: check_level
+  nodes:
+    check_smq:
+      type: condition
+      variable: in_smq
+      operator: eq
+      value: true
+      true_next: smq_narrow
+      false_next: standard_pt
+    smq_narrow:
+      type: condition
+      variable: smq_scope
+      operator: eq
+      value: narrow
+      true_next: narrow_smq
+      false_next: broad_smq
+    soc_route:
+      type: return
+      value:
+        route: soc_trending
+        priority: low
+        action: aggregate
+        reason: SOC-level term — aggregate for system organ class trending
+    check_level:
+      type: condition
+      variable: hierarchy_level
+      operator: eq
+      value: PT
+      true_next: check_smq
+      false_next: check_soc
+    check_soc:
+      type: condition
+      variable: hierarchy_level
+      operator: eq
+      value: SOC
+      true_next: soc_route
+      false_next: llt_route
+    llt_route:
+      type: return
+      value:
+        route: term_standardization
+        priority: moderate
+        reason: LLT/HLT term — upcode to PT for signal detection
+        action: upcode
+    broad_smq:
+      type: return
+      value:
+        priority: moderate
+        action: validate
+        route: signal_validation
+        reason: PT in broad SMQ — validate specificity before signal analysis
+    standard_pt:
+      type: return
+      value:
+        priority: low
+        action: code
+        route: archive
+        reason: Standard PT not in SMQ — routine coding
+    narrow_smq:
+      type: return
+      value:
+        action: flag
+        reason: PT in narrow SMQ — high-specificity safety grouping
+        route: signal_detection
+        priority: high
+tests:
+- input:
+    smq_scope: none
+    in_smq: false
+    hierarchy_level: SOC
+  expect:
+    route: soc_trending
+    action: aggregate
+    priority: low
+- input:
+    smq_scope: none
+    in_smq: false
+    hierarchy_level: LLT
+  expect:
+    route: term_standardization
+    action: upcode
+    priority: moderate
+- input:
+    hierarchy_level: PT
+    smq_scope: narrow
+    in_smq: true
+  expect:
+    action: flag
+    route: signal_detection
+    priority: high
+- input:
+    smq_scope: broad
+    hierarchy_level: PT
+    in_smq: true
+  expect:
+    route: signal_validation
+    action: validate
+    priority: moderate
+- input:
+    hierarchy_level: PT
+    smq_scope: none
+    in_smq: false
+  expect:
+    action: code
+    priority: low
+    route: archive
+- input: {}
+  expect:
+    action: upcode
+    reason: LLT/HLT term — upcode to PT for signal detection
+    priority: moderate
+    route: term_standardization
+- input: {}
+  expect:
+    priority: moderate
+    reason: LLT/HLT term — upcode to PT for signal detection
+    route: term_standardization
+    action: upcode
+- input: {}
+  expect:
+    reason: LLT/HLT term — upcode to PT for signal detection
+    route: term_standardization
+    action: upcode
+    priority: moderate
+- input: {}
+  expect:
+    route: term_standardization
+    reason: LLT/HLT term — upcode to PT for signal detection
+    action: upcode
+    priority: moderate
+interface: null
+primitive_signature: null

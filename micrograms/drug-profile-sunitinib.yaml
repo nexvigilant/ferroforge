@@ -1,0 +1,62 @@
+name: drug-profile-sunitinib
+description: 'Safety triage for sunitinib: PRR-based signal routing (Type B)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    signal:
+      type: return
+      value:
+        harm_type: B
+        action: investigate
+        drug: sunitinib
+        signal: true
+        expected_prr: 7.1
+    no_signal:
+      type: return
+      value:
+        drug: sunitinib
+        expected_prr: 7.1
+        harm_type: B
+        signal: false
+        action: monitor
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 5.0
+      true_next: signal
+      false_next: no_signal
+tests:
+- input:
+    prr: 7.1
+  expect:
+    signal: true
+    drug: sunitinib
+- input:
+    prr: 0.5
+  expect:
+    drug: sunitinib
+    signal: false
+- input: {}
+  expect:
+    drug: sunitinib
+    signal: false
+- input:
+    prr: 4.999
+  expect:
+    action: monitor
+    drug: sunitinib
+    harm_type: B
+    signal: false
+    expected_prr: 7.1
+- input:
+    prr: 5.001
+  expect:
+    drug: sunitinib
+    signal: true
+    action: investigate
+    harm_type: B
+    expected_prr: 7.1
+interface: null
+primitive_signature: null

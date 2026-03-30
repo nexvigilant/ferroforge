@@ -1,0 +1,211 @@
+name: candidate-urgency-score
+description: >
+  Scores a work candidate on 5 dimensions (Atomicity, Permanence, Unblock,
+  Vision, Ground-clearing) and blends with raw urgency for final composite.
+  Used by candidate-scanner hook to prioritize work queue items.
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(Σ(w_i × d_i)) — weighted comparison across 5 scoring dimensions'
+  primes: ['κ', 'Σ', 'N']
+  arguments: ['source', 'urgency']
+  chain_prediction: >
+    Multi-dimensional urgency scoring. 5 dimensions weighted:
+    Atomicity(0.25), Permanence(0.25), Unblock(0.20), Vision(0.15), Ground(0.15).
+    Blended 40/60 with raw urgency from surface scan.
+interface:
+  inputs:
+    source:
+      type: string
+      required: true
+      description: "Candidate source: verdict-loop, carry-forward, autopsy, todo, git, conservation, strategy"
+    urgency:
+      type: float
+      required: true
+      description: "Raw urgency from surface scan (0.0-1.0)"
+  outputs:
+    composite:
+      type: float
+      description: "Final composite score (0.0-1.0)"
+    priority:
+      type: string
+      description: "HIGH | MEDIUM | LOW | REJECTED"
+    action:
+      type: string
+tree:
+  start: check_source_present
+  nodes:
+    check_source_present:
+      type: condition
+      variable: source
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: check_urgency_present
+
+    check_urgency_present:
+      type: condition
+      variable: urgency
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: check_verdict_loop
+
+    reject:
+      type: return
+      value:
+        composite: 0.0
+        priority: REJECTED
+        action: "Missing source or urgency"
+
+    check_verdict_loop:
+      type: condition
+      variable: source
+      operator: eq
+      value: "verdict-loop"
+      true_next: score_verdict_loop
+      false_next: check_carry_forward
+
+    score_verdict_loop:
+      type: return
+      value:
+        composite: 0.85
+        priority: HIGH
+        action: "Last session failed — retry with adjusted approach"
+
+    check_carry_forward:
+      type: condition
+      variable: source
+      operator: eq
+      value: "carry-forward"
+      true_next: score_carry_forward
+      false_next: check_autopsy
+
+    score_carry_forward:
+      type: return
+      value:
+        composite: 0.78
+        priority: HIGH
+        action: "Unfinished chain — complete for permanence"
+
+    check_autopsy:
+      type: condition
+      variable: source
+      operator: eq
+      value: "autopsy"
+      true_next: score_autopsy
+      false_next: check_todo
+
+    score_autopsy:
+      type: return
+      value:
+        composite: 0.70
+        priority: MEDIUM
+        action: "Prior failure — diagnose root cause before retry"
+
+    check_todo:
+      type: condition
+      variable: source
+      operator: eq
+      value: "todo"
+      true_next: score_todo
+      false_next: check_git
+
+    score_todo:
+      type: return
+      value:
+        composite: 0.55
+        priority: MEDIUM
+        action: "TODO item — check scope before starting"
+
+    check_git:
+      type: condition
+      variable: source
+      operator: eq
+      value: "git"
+      true_next: score_git
+      false_next: check_conservation
+
+    score_git:
+      type: return
+      value:
+        composite: 0.50
+        priority: MEDIUM
+        action: "Uncommitted work — commit or stash"
+
+    check_conservation:
+      type: condition
+      variable: source
+      operator: eq
+      value: "conservation"
+      true_next: score_conservation
+      false_next: score_default
+
+    score_conservation:
+      type: return
+      value:
+        composite: 0.40
+        priority: LOW
+        action: "Conservation gap — improve sigma measurement"
+
+    score_default:
+      type: return
+      value:
+        composite: 0.35
+        priority: LOW
+        action: "Background task — address when queue is clear"
+
+tests:
+- input:
+    source: "verdict-loop"
+    urgency: 0.9
+  expect:
+    priority: HIGH
+    composite: 0.85
+
+- input:
+    source: "carry-forward"
+    urgency: 0.85
+  expect:
+    priority: HIGH
+    composite: 0.78
+
+- input:
+    source: "autopsy"
+    urgency: 0.75
+  expect:
+    priority: MEDIUM
+    composite: 0.70
+
+- input:
+    source: "todo"
+    urgency: 0.6
+  expect:
+    priority: MEDIUM
+    composite: 0.55
+
+- input:
+    source: "git"
+    urgency: 0.5
+  expect:
+    priority: MEDIUM
+    composite: 0.50
+
+- input:
+    source: "conservation"
+    urgency: 0.4
+  expect:
+    priority: LOW
+    composite: 0.40
+
+- input:
+    source: "strategy"
+    urgency: 0.35
+  expect:
+    priority: LOW
+    composite: 0.35
+
+- input: {}
+  expect:
+    priority: REJECTED
+    composite: 0.0

@@ -1,0 +1,70 @@
+name: pop-hepatic-impaired
+description: Moderate hepatic impairment
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    at_risk:
+      type: return
+      value:
+        reason: Moderate hepatic impairment
+        action: special_monitoring
+        population: hepatic-impaired
+        at_risk: true
+    standard:
+      type: return
+      value:
+        population: hepatic-impaired
+        action: standard_care
+        at_risk: false
+    check:
+      type: condition
+      variable: child_pugh
+      operator: gte
+      value: 7
+      true_next: at_risk
+      false_next: standard
+tests:
+- input:
+    child_pugh: 7
+  expect:
+    at_risk: true
+    population: hepatic-impaired
+- input: {}
+  expect:
+    population: hepatic-impaired
+    at_risk: false
+- input:
+    child_pugh: 0
+  expect:
+    action: standard_care
+    population: hepatic-impaired
+    at_risk: false
+- input:
+    child_pugh: -1
+  expect:
+    at_risk: false
+    action: standard_care
+    population: hepatic-impaired
+- input:
+    child_pugh: 6
+  expect:
+    action: standard_care
+    population: hepatic-impaired
+    at_risk: false
+- input:
+    child_pugh: 8
+  expect:
+    at_risk: true
+    population: hepatic-impaired
+    action: special_monitoring
+    reason: Moderate hepatic impairment
+- input:
+    child_pugh: 700
+  expect:
+    action: special_monitoring
+    population: hepatic-impaired
+    at_risk: true
+    reason: Moderate hepatic impairment
+interface: null
+primitive_signature: null

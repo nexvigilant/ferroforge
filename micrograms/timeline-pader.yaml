@@ -1,0 +1,74 @@
+name: timeline-pader
+description: PADER filing
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: months_since_pader
+      operator: gte
+      value: 12
+      true_next: due
+      false_next: not_due
+    due:
+      type: return
+      value:
+        jurisdiction: US
+        due: true
+        report_type: pader
+        action: submit
+    not_due:
+      type: return
+      value:
+        action: schedule
+        jurisdiction: US
+        due: false
+        report_type: pader
+tests:
+- input:
+    months_since_pader: 12
+  expect:
+    jurisdiction: US
+    due: true
+- input: {}
+  expect:
+    due: false
+    jurisdiction: US
+- input:
+    months_since_pader: 0
+  expect:
+    report_type: pader
+    action: schedule
+    jurisdiction: US
+    due: false
+- input:
+    months_since_pader: -1
+  expect:
+    jurisdiction: US
+    report_type: pader
+    action: schedule
+    due: false
+- input:
+    months_since_pader: 11
+  expect:
+    action: schedule
+    due: false
+    report_type: pader
+    jurisdiction: US
+- input:
+    months_since_pader: 13
+  expect:
+    action: submit
+    report_type: pader
+    jurisdiction: US
+    due: true
+- input:
+    months_since_pader: 1200
+  expect:
+    due: true
+    jurisdiction: US
+    report_type: pader
+    action: submit
+interface: null
+primitive_signature: null

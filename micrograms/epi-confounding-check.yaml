@@ -1,0 +1,66 @@
+name: epi-confounding-check
+description: "Identify and assess potential confounding variables in epidemiologic analysis"
+version: 0.1.0
+tree:
+  start: validate_study_design
+  nodes:
+    validate_study_design:
+      type: condition
+      variable: confounding_variables_assessed
+      operator: eq
+      value: true
+      true_next: check_confounding_strength
+      false_next: confounding_unknown
+    check_confounding_strength:
+      type: condition
+      variable: confounding_adjustment_percent
+      operator: gte
+      value: 25
+      true_next: significant_confounding
+      false_next: minimal_confounding
+    significant_confounding:
+      type: return
+      value:
+        confounding_status: "significant_confounding_present"
+        adjustment_strategy: "stratification_or_regression"
+        sensitivity_analysis_needed: true
+        results_interpretation: "must_account_for_confounding"
+        epi_compliant: true
+    minimal_confounding:
+      type: return
+      value:
+        confounding_status: "minimal_confounding"
+        adjustment_strategy: "standard_analysis"
+        sensitivity_analysis_needed: false
+        results_interpretation: "confounding_unlikely_to_alter_conclusions"
+        epi_compliant: true
+    confounding_unknown:
+      type: return
+      value:
+        confounding_status: "confounding_not_assessed"
+        adjustment_strategy: null
+        sensitivity_analysis_needed: true
+        results_interpretation: "results_may_be_confounded"
+        epi_compliant: false
+tests:
+- input:
+    confounding_variables_assessed: true
+    confounding_adjustment_percent: 45
+  expect:
+    confounding_status: "significant_confounding_present"
+    sensitivity_analysis_needed: true
+- input:
+    confounding_variables_assessed: true
+    confounding_adjustment_percent: 10
+  expect:
+    confounding_status: "minimal_confounding"
+    sensitivity_analysis_needed: false
+- input:
+    confounding_variables_assessed: false
+  expect:
+    confounding_status: "confounding_not_assessed"
+    epi_compliant: false
+- input: {}
+  expect:
+    confounding_status: "confounding_not_assessed"
+    epi_compliant: false

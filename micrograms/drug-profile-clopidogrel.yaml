@@ -1,0 +1,62 @@
+name: drug-profile-clopidogrel
+description: 'Safety triage for clopidogrel: PRR-based signal routing (Type A)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    signal:
+      type: return
+      value:
+        harm_type: A
+        expected_prr: 2.6
+        drug: clopidogrel
+        signal: true
+        action: investigate
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: signal
+      false_next: no_signal
+    no_signal:
+      type: return
+      value:
+        harm_type: A
+        action: monitor
+        expected_prr: 2.6
+        signal: false
+        drug: clopidogrel
+tests:
+- input:
+    prr: 2.6
+  expect:
+    signal: true
+    drug: clopidogrel
+- input:
+    prr: 0.5
+  expect:
+    signal: false
+    drug: clopidogrel
+- input: {}
+  expect:
+    drug: clopidogrel
+    signal: false
+- input:
+    prr: 1.999
+  expect:
+    action: monitor
+    signal: false
+    drug: clopidogrel
+    harm_type: A
+    expected_prr: 2.6
+- input:
+    prr: 2.001
+  expect:
+    expected_prr: 2.6
+    drug: clopidogrel
+    harm_type: A
+    signal: true
+    action: investigate
+interface: null
+primitive_signature: null

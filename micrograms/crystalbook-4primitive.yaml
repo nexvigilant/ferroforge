@@ -1,0 +1,329 @@
+name: crystalbook-4primitive
+description: 'Crystalbook Conservation Law: check 4 primitives (Existence, Boundary, State, Nothing) for system health. Source: Crystalbook v2.0 by Matthew A. Campion, PharmD.'
+version: 0.1.0
+interface:
+  inputs:
+    existence_evidence:
+      type: string
+      required: false
+    boundary_description:
+      type: string
+      required: false
+    state_observation:
+      type: string
+      required: false
+    void_identification:
+      type: string
+      required: false
+  outputs:
+    existence_status:
+      type: string
+    boundary_status:
+      type: string
+    state_status:
+      type: string
+    void_status:
+      type: string
+    conservation_holds:
+      type: bool
+    degraded_count:
+      type: integer
+    diagnosis:
+      type: string
+    source:
+      type: string
+tree:
+  start: check_existence
+  nodes:
+    # Gate 1: Existence (∃) — does the thing actually exist?
+    check_existence:
+      type: condition
+      variable: existence_evidence
+      operator: is_not_null
+      true_next: check_boundary
+      false_next: existence_absent
+    existence_absent:
+      type: condition
+      variable: boundary_description
+      operator: is_not_null
+      true_next: boundary_present_no_existence
+      false_next: all_absent
+
+    # Gate 2: Boundary (∂) — is scope clearly defined?
+    check_boundary:
+      type: condition
+      variable: boundary_description
+      operator: is_not_null
+      true_next: check_state
+      false_next: boundary_absent
+
+    # Gate 3: State (ς) — is current state observed?
+    check_state:
+      type: condition
+      variable: state_observation
+      operator: is_not_null
+      true_next: check_void
+      false_next: state_absent
+
+    # Gate 4: Nothing (∅) — is absence recognized?
+    check_void:
+      type: condition
+      variable: void_identification
+      operator: is_not_null
+      true_next: all_conserved
+      false_next: void_unnamed
+
+    # Terminal: all 4 present
+    all_conserved:
+      type: return
+      value:
+        existence_status: PRESENT
+        boundary_status: CLEAR
+        state_status: OBSERVED
+        void_status: NAMED
+        conservation_holds: true
+        degraded_count: 0
+        diagnosis: CONSERVING
+        source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+    # Terminal: void missing (3/4)
+    void_unnamed:
+      type: return
+      value:
+        existence_status: PRESENT
+        boundary_status: CLEAR
+        state_status: OBSERVED
+        void_status: UNNAMED
+        conservation_holds: false
+        degraded_count: 1
+        diagnosis: STRESSED
+        source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+    # Terminal: state missing (2/4 at best)
+    state_absent:
+      type: condition
+      variable: void_identification
+      operator: is_not_null
+      true_next: state_absent_void_present
+      false_next: state_and_void_absent
+
+    state_absent_void_present:
+      type: return
+      value:
+        existence_status: PRESENT
+        boundary_status: CLEAR
+        state_status: INFERRED
+        void_status: NAMED
+        conservation_holds: false
+        degraded_count: 1
+        diagnosis: STRESSED
+        source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+    state_and_void_absent:
+      type: return
+      value:
+        existence_status: PRESENT
+        boundary_status: CLEAR
+        state_status: INFERRED
+        void_status: UNNAMED
+        conservation_holds: false
+        degraded_count: 2
+        diagnosis: LOSING_COHERENCE
+        source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+    # Terminal: boundary missing
+    boundary_absent:
+      type: condition
+      variable: state_observation
+      operator: is_not_null
+      true_next: boundary_absent_state_present
+      false_next: boundary_and_state_absent
+
+    boundary_absent_state_present:
+      type: condition
+      variable: void_identification
+      operator: is_not_null
+      true_next: boundary_absent_rest_present
+      false_next: boundary_and_void_absent
+
+    boundary_absent_rest_present:
+      type: return
+      value:
+        existence_status: PRESENT
+        boundary_status: AMBIGUOUS
+        state_status: OBSERVED
+        void_status: NAMED
+        conservation_holds: false
+        degraded_count: 1
+        diagnosis: STRESSED
+        source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+    boundary_and_void_absent:
+      type: return
+      value:
+        existence_status: PRESENT
+        boundary_status: AMBIGUOUS
+        state_status: OBSERVED
+        void_status: UNNAMED
+        conservation_holds: false
+        degraded_count: 2
+        diagnosis: LOSING_COHERENCE
+        source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+    boundary_and_state_absent:
+      type: return
+      value:
+        existence_status: PRESENT
+        boundary_status: AMBIGUOUS
+        state_status: INFERRED
+        void_status: UNNAMED
+        conservation_holds: false
+        degraded_count: 3
+        diagnosis: LOSING_COHERENCE
+        source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+    # Terminal: existence absent but boundary present (paradox — boundary without existence)
+    boundary_present_no_existence:
+      type: return
+      value:
+        existence_status: ABSENT
+        boundary_status: CLEAR
+        state_status: INFERRED
+        void_status: UNNAMED
+        conservation_holds: false
+        degraded_count: 3
+        diagnosis: LOSING_COHERENCE
+        source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+    # Terminal: nothing provided
+    all_absent:
+      type: return
+      value:
+        existence_status: ABSENT
+        boundary_status: DISSOLVED
+        state_status: STALE
+        void_status: IGNORED
+        conservation_holds: false
+        degraded_count: 4
+        diagnosis: NON_EXISTENT
+        source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — measurement and classification of system conservation'
+  primes: ['κ', '∂']
+  arguments: []
+
+tests:
+# All 4 primitives present — conservation holds
+- input:
+    existence_evidence: 'Running process observed at pid 1234'
+    boundary_description: 'Scope limited to crystalbook plugin directory'
+    state_observation: 'All 8 laws loaded, diagnostic functional'
+    void_identification: 'No hooks wired, no MCP tools exposed'
+  expect:
+    existence_status: PRESENT
+    boundary_status: CLEAR
+    state_status: OBSERVED
+    void_status: NAMED
+    conservation_holds: true
+    degraded_count: 0
+    diagnosis: CONSERVING
+    source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+# Void missing — stressed
+- input:
+    existence_evidence: 'Binary exists on disk'
+    boundary_description: 'Crate boundary defined in Cargo.toml'
+    state_observation: 'Compiles successfully'
+  expect:
+    existence_status: PRESENT
+    boundary_status: CLEAR
+    state_status: OBSERVED
+    void_status: UNNAMED
+    conservation_holds: false
+    degraded_count: 1
+    diagnosis: STRESSED
+    source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+# State and void missing — losing coherence
+- input:
+    existence_evidence: 'File exists'
+    boundary_description: 'Module boundary'
+  expect:
+    existence_status: PRESENT
+    boundary_status: CLEAR
+    state_status: INFERRED
+    void_status: UNNAMED
+    conservation_holds: false
+    degraded_count: 2
+    diagnosis: LOSING_COHERENCE
+    source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+# Only existence — boundary, state, void all missing
+- input:
+    existence_evidence: 'Something is there'
+  expect:
+    existence_status: PRESENT
+    boundary_status: AMBIGUOUS
+    state_status: INFERRED
+    void_status: UNNAMED
+    conservation_holds: false
+    degraded_count: 3
+    diagnosis: LOSING_COHERENCE
+    source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+# Empty input — non-existent
+- input: {}
+  expect:
+    existence_status: ABSENT
+    boundary_status: DISSOLVED
+    state_status: STALE
+    void_status: IGNORED
+    conservation_holds: false
+    degraded_count: 4
+    diagnosis: NON_EXISTENT
+    source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+# Existence absent but boundary present (paradox)
+- input:
+    boundary_description: 'A boundary with nothing inside it'
+  expect:
+    existence_status: ABSENT
+    boundary_status: CLEAR
+    state_status: INFERRED
+    void_status: UNNAMED
+    conservation_holds: false
+    degraded_count: 3
+    diagnosis: LOSING_COHERENCE
+    source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+# State present, void present, boundary absent — stressed
+- input:
+    existence_evidence: 'Process running'
+    state_observation: 'Healthy'
+    void_identification: 'Missing docs'
+  expect:
+    existence_status: PRESENT
+    boundary_status: AMBIGUOUS
+    state_status: OBSERVED
+    void_status: NAMED
+    conservation_holds: false
+    degraded_count: 1
+    diagnosis: STRESSED
+    source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'
+
+# State absent, void present — stressed (boundary present)
+- input:
+    existence_evidence: 'Artifact on disk'
+    boundary_description: 'Defined scope'
+    void_identification: 'No tests'
+  expect:
+    existence_status: PRESENT
+    boundary_status: CLEAR
+    state_status: INFERRED
+    void_status: NAMED
+    conservation_holds: false
+    degraded_count: 1
+    diagnosis: STRESSED
+    source: 'Crystalbook v2.0 — Conservation Law: ∃ = ∂(×(ς, ∅))'

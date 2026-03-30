@@ -1,0 +1,115 @@
+name: benefit-risk-exercise
+description: "Academy L2: Given QBRI score and component weights, classify benefit-risk balance and provide regulatory learning feedback."
+version: 0.1.0
+
+interface:
+  inputs:
+    qbri_score:
+      type: float
+      required: true
+    benefit_weight:
+      type: float
+      required: false
+    risk_weight:
+      type: float
+      required: false
+  outputs:
+    zone:
+      type: string
+    action:
+      type: string
+    learning_note:
+      type: string
+
+tree:
+  start: check_score
+  nodes:
+    check_score:
+      type: condition
+      variable: qbri_score
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: check_favorable
+
+    reject:
+      type: return
+      value:
+        zone: REJECTED
+        action: "Provide a QBRI score"
+        learning_note: "QBRI score is required for benefit-risk classification."
+
+    check_favorable:
+      type: condition
+      variable: qbri_score
+      operator: gte
+      value: 1.5
+      true_next: favorable
+      false_next: check_acceptable
+
+    favorable:
+      type: return
+      value:
+        zone: Favorable
+        action: "Benefits clearly outweigh risks — supports approval or continued marketing"
+        learning_note: "QBRI >= 1.5 indicates strong benefit-risk balance. In regulatory submissions, this supports a positive benefit-risk conclusion in Module 2.5 (Clinical Overview) and PSUR/PBRER Section 16."
+
+    check_acceptable:
+      type: condition
+      variable: qbri_score
+      operator: gte
+      value: 1.0
+      true_next: acceptable
+      false_next: check_borderline
+
+    acceptable:
+      type: return
+      value:
+        zone: Acceptable
+        action: "Benefits outweigh risks with monitoring — consider risk minimization measures"
+        learning_note: "QBRI 1.0-1.5 is acceptable but warrants risk management. Common measures: Dear Healthcare Professional Communications, Medication Guides, restricted distribution programs."
+
+    check_borderline:
+      type: condition
+      variable: qbri_score
+      operator: gte
+      value: 0.5
+      true_next: borderline
+      false_next: unfavorable
+
+    borderline:
+      type: return
+      value:
+        zone: Borderline
+        action: "Benefits may not outweigh risks — requires additional data or risk minimization"
+        learning_note: "QBRI 0.5-1.0 is concerning. Regulators may require a Risk Management Plan (RMP) with additional pharmacovigilance activities, or request post-marketing studies. The EMA and FDA may differ in their threshold for action."
+
+    unfavorable:
+      type: return
+      value:
+        zone: Unfavorable
+        action: "Risks outweigh benefits — consider withdrawal, restriction, or reformulation"
+        learning_note: "QBRI < 0.5 indicates the drug's risks exceed its benefits for the indicated population. Historical examples: rofecoxib (Vioxx) withdrawal, rosiglitazone (Avandia) restrictions. Regulatory options include market withdrawal, black box warning, or REMS."
+
+tests:
+  - name: "Strongly favorable"
+    input: { qbri_score: 2.3 }
+    expect: { zone: Favorable }
+  - name: "Acceptable with monitoring"
+    input: { qbri_score: 1.2 }
+    expect: { zone: Acceptable }
+  - name: "Borderline"
+    input: { qbri_score: 0.7 }
+    expect: { zone: Borderline }
+  - name: "Unfavorable"
+    input: { qbri_score: 0.3 }
+    expect: { zone: Unfavorable }
+  - name: "Exactly favorable threshold"
+    input: { qbri_score: 1.5 }
+    expect: { zone: Favorable }
+  - name: "Exactly acceptable threshold"
+    input: { qbri_score: 1.0 }
+    expect: { zone: Acceptable }
+  - name: "Missing input"
+    input: {}
+    expect: { zone: REJECTED }

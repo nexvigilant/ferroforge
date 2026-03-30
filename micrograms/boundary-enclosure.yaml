@@ -1,0 +1,584 @@
+name: boundary-enclosure
+description: "Therapeutic boundary enclosure protocol — 5-phase disease state management (MAP→ENCLOSE→COMPRESS→ANNIHILATE→VIGIL)"
+version: 0.1.0
+tree:
+  start: phase_router
+  nodes:
+    # PHASE ROUTER: Identify which phase of the protocol is active
+    phase_router:
+      type: condition
+      variable: phase
+      operator: eq
+      value: "map"
+      true_next: map_phase
+      false_next: check_enclose_phase
+
+    check_enclose_phase:
+      type: condition
+      variable: phase
+      operator: eq
+      value: "enclose"
+      true_next: enclose_phase
+      false_next: check_compress_phase
+
+    check_compress_phase:
+      type: condition
+      variable: phase
+      operator: eq
+      value: "compress"
+      true_next: compress_phase
+      false_next: check_annihilate_phase
+
+    check_annihilate_phase:
+      type: condition
+      variable: phase
+      operator: eq
+      value: "annihilate"
+      true_next: annihilate_phase
+      false_next: check_vigil_phase
+
+    check_vigil_phase:
+      type: condition
+      variable: phase
+      operator: eq
+      value: "vigil"
+      true_next: vigil_phase
+      false_next: phase_unknown
+
+    # ====================
+    # PHASE 1: MAP
+    # Define disease boundary in biomarker space
+    # ====================
+    map_phase:
+      type: condition
+      variable: boundary_sharpness
+      operator: gte
+      value: 0.7
+      true_next: boundary_sharp
+      false_next: check_boundary_refinement
+
+    check_boundary_refinement:
+      type: condition
+      variable: boundary_sharpness
+      operator: gte
+      value: 0.4
+      true_next: boundary_refine
+      false_next: boundary_discover
+
+    boundary_sharp:
+      type: return
+      value:
+        phase: "map"
+        action: "enclose"
+        phase_status: "complete"
+        boundary_sharpness: null
+        recommendation: "Boundary is well-defined. Proceed to ENCLOSE phase."
+        next_phase: "enclose"
+        enclosure_ready: true
+
+    boundary_refine:
+      type: return
+      value:
+        phase: "map"
+        action: "refine_mapping"
+        phase_status: "in_progress"
+        boundary_sharpness: null
+        recommendation: "Boundary clarity intermediate. Refine biomarker profile before enclosure."
+        next_phase: "map"
+        enclosure_ready: false
+
+    boundary_discover:
+      type: return
+      value:
+        phase: "map"
+        action: "discover"
+        phase_status: "incomplete"
+        boundary_sharpness: null
+        recommendation: "Boundary is poorly defined. Conduct discovery workflow to clarify disease state boundaries."
+        next_phase: "map"
+        enclosure_ready: false
+
+    # ====================
+    # PHASE 2: ENCLOSE
+    # Wrap therapeutic boundary around disease boundary
+    # ====================
+    enclose_phase:
+      type: condition
+      variable: enclosure_type
+      operator: eq
+      value: "shrink_delta"
+      true_next: enclose_shrink
+      false_next: check_harden_enclose
+
+    check_harden_enclose:
+      type: condition
+      variable: enclosure_type
+      operator: eq
+      value: "harden_delta"
+      true_next: enclose_harden
+      false_next: check_dissolve_enclose
+
+    check_dissolve_enclose:
+      type: condition
+      variable: enclosure_type
+      operator: eq
+      value: "dissolve_delta"
+      true_next: enclose_dissolve
+      false_next: check_compress_enclose
+
+    check_compress_enclose:
+      type: condition
+      variable: enclosure_type
+      operator: eq
+      value: "compress_delta"
+      true_next: enclose_compress
+      false_next: enclosure_unknown_type
+
+    enclose_shrink:
+      type: return
+      value:
+        phase: "enclose"
+        enclosure_type: "shrink_delta"
+        therapeutic_strategy: "targeted_therapy"
+        strategy_description: "Reduce disease state space via targeted molecular/cellular intervention"
+        phase_status: "complete"
+        next_phase: "compress"
+        enclosure_complete: true
+
+    enclose_harden:
+      type: return
+      value:
+        phase: "enclose"
+        enclosure_type: "harden_delta"
+        therapeutic_strategy: "prophylaxis"
+        strategy_description: "Make boundary impermeable to disease progression via preventive mechanism"
+        phase_status: "complete"
+        next_phase: "compress"
+        enclosure_complete: true
+
+    enclose_dissolve:
+      type: return
+      value:
+        phase: "enclose"
+        enclosure_type: "dissolve_delta"
+        therapeutic_strategy: "immunotherapy"
+        strategy_description: "Remove disease defensive boundary via immune system activation"
+        phase_status: "complete"
+        next_phase: "compress"
+        enclosure_complete: true
+
+    enclose_compress:
+      type: return
+      value:
+        phase: "enclose"
+        enclosure_type: "compress_delta"
+        therapeutic_strategy: "containerized_medicine"
+        strategy_description: "Wrap and compress disease state into inactive form"
+        phase_status: "complete"
+        next_phase: "compress"
+        enclosure_complete: true
+
+    enclosure_unknown_type:
+      type: return
+      value:
+        phase: "enclose"
+        enclosure_type: null
+        therapeutic_strategy: null
+        strategy_description: null
+        phase_status: "error"
+        next_phase: "enclose"
+        enclosure_complete: false
+
+    # ====================
+    # PHASE 3: COMPRESS
+    # Reduce the enclosed volume
+    # ====================
+    compress_phase:
+      type: condition
+      variable: escape_monitoring
+      operator: eq
+      value: true
+      true_next: monitor_escape
+      false_next: compress_unmonitored
+
+    monitor_escape:
+      type: condition
+      variable: compression_rate
+      operator: gt
+      value: 0
+      true_next: compress_continue
+      false_next: compress_halted
+
+    compress_continue:
+      type: return
+      value:
+        phase: "compress"
+        compression_status: "active"
+        compression_rate: null
+        escape_detected: false
+        phase_status: "in_progress"
+        recommendation: "Continue compression with active escape monitoring."
+        next_phase: "compress"
+        ready_to_annihilate: false
+
+    compress_unmonitored:
+      type: return
+      value:
+        phase: "compress"
+        compression_status: "unmonitored"
+        compression_rate: null
+        escape_detected: null
+        phase_status: "warning"
+        recommendation: "Compression without escape monitoring. Enable monitoring for safety."
+        next_phase: "compress"
+        ready_to_annihilate: false
+
+    compress_halted:
+      type: return
+      value:
+        phase: "compress"
+        compression_status: "halted"
+        compression_rate: 0
+        escape_detected: false
+        phase_status: "stalled"
+        recommendation: "No active compression. Resume or transition to next phase."
+        next_phase: "compress"
+        ready_to_annihilate: false
+
+    # ====================
+    # PHASE 4: ANNIHILATE
+    # Disease boundary collapsed, ς → ∅
+    # ====================
+    annihilate_phase:
+      type: condition
+      variable: boundary_status
+      operator: eq
+      value: "collapsed"
+      true_next: annihilate_success
+      false_next: check_contained_status
+
+    check_contained_status:
+      type: condition
+      variable: boundary_status
+      operator: eq
+      value: "contained"
+      true_next: annihilate_contained
+      false_next: annihilate_escaped
+
+    annihilate_success:
+      type: return
+      value:
+        phase: "annihilate"
+        boundary_status: "collapsed"
+        annihilation_status: "successful"
+        residual_state: null
+        phase_status: "complete"
+        recommendation: "Disease boundary fully collapsed. Disease state reduced to null (∅). Proceed to VIGIL phase."
+        next_phase: "vigil"
+        annihilation_successful: true
+
+    annihilate_contained:
+      type: return
+      value:
+        phase: "annihilate"
+        boundary_status: "contained"
+        annihilation_status: "partial"
+        residual_state: "quiescent"
+        phase_status: "complete"
+        recommendation: "Disease state contained but not eliminated. Monitor continuously in VIGIL phase."
+        next_phase: "vigil"
+        annihilation_successful: true
+
+    annihilate_escaped:
+      type: return
+      value:
+        phase: "annihilate"
+        boundary_status: "escaped"
+        annihilation_status: "failed"
+        residual_state: "active"
+        phase_status: "failure"
+        recommendation: "Disease boundary breached. Escape detected. Return to MAP phase with updated boundary model."
+        next_phase: "map"
+        annihilation_successful: false
+
+    # ====================
+    # PHASE 5: VIGIL
+    # Post-annihilation monitoring (corkscrew spiral pattern)
+    # ====================
+    vigil_phase:
+      type: condition
+      variable: monitoring_interval
+      operator: eq
+      value: "daily"
+      true_next: vigil_daily
+      false_next: check_vigil_weekly
+
+    check_vigil_weekly:
+      type: condition
+      variable: monitoring_interval
+      operator: eq
+      value: "weekly"
+      true_next: vigil_weekly
+      false_next: check_vigil_monthly
+
+    check_vigil_monthly:
+      type: condition
+      variable: monitoring_interval
+      operator: eq
+      value: "monthly"
+      true_next: vigil_monthly
+      false_next: check_vigil_quarterly
+
+    check_vigil_quarterly:
+      type: condition
+      variable: monitoring_interval
+      operator: eq
+      value: "quarterly"
+      true_next: vigil_quarterly
+      false_next: vigil_unknown_interval
+
+    vigil_daily:
+      type: return
+      value:
+        phase: "vigil"
+        monitoring_interval: "daily"
+        spiral_position: "innermost"
+        recurrence_check: true
+        phase_status: "active"
+        recommendation: "Daily monitoring. Watch for earliest signs of recurrence. Tight boundary control."
+        next_phase: "vigil"
+        monitoring_active: true
+
+    vigil_weekly:
+      type: return
+      value:
+        phase: "vigil"
+        monitoring_interval: "weekly"
+        spiral_position: "inner"
+        recurrence_check: true
+        phase_status: "active"
+        recommendation: "Weekly monitoring. Disease remains stable. Continue corkscrew descent."
+        next_phase: "vigil"
+        monitoring_active: true
+
+    vigil_monthly:
+      type: return
+      value:
+        phase: "vigil"
+        monitoring_interval: "monthly"
+        spiral_position: "middle"
+        recurrence_check: true
+        phase_status: "active"
+        recommendation: "Monthly monitoring. Disease quiescent. Standard maintenance mode."
+        next_phase: "vigil"
+        monitoring_active: true
+
+    vigil_quarterly:
+      type: return
+      value:
+        phase: "vigil"
+        monitoring_interval: "quarterly"
+        spiral_position: "outer"
+        recurrence_check: true
+        phase_status: "maintenance"
+        recommendation: "Quarterly monitoring. Long-term surveillance. Minimal intervention expected."
+        next_phase: "vigil"
+        monitoring_active: true
+
+    vigil_unknown_interval:
+      type: return
+      value:
+        phase: "vigil"
+        monitoring_interval: null
+        spiral_position: null
+        recurrence_check: false
+        phase_status: "error"
+        recommendation: "Unknown monitoring interval. Specify daily/weekly/monthly/quarterly."
+        next_phase: "vigil"
+        monitoring_active: false
+
+    # ====================
+    # ERROR STATES
+    # ====================
+    phase_unknown:
+      type: return
+      value:
+        phase: null
+        phase_status: "error"
+        recommendation: "Unknown phase. Specify one of: map, enclose, compress, annihilate, vigil."
+        next_phase: null
+        protocol_valid: false
+
+tests:
+  # MAP PHASE TESTS
+  - input:
+      phase: "map"
+      boundary_sharpness: 0.8
+    expect:
+      phase: "map"
+      action: "enclose"
+      enclosure_ready: true
+
+  - input:
+      phase: "map"
+      boundary_sharpness: 0.55
+    expect:
+      phase: "map"
+      action: "refine_mapping"
+      enclosure_ready: false
+
+  - input:
+      phase: "map"
+      boundary_sharpness: 0.2
+    expect:
+      phase: "map"
+      action: "discover"
+      enclosure_ready: false
+
+  # ENCLOSE PHASE TESTS
+  - input:
+      phase: "enclose"
+      enclosure_type: "shrink_delta"
+    expect:
+      phase: "enclose"
+      enclosure_type: "shrink_delta"
+      therapeutic_strategy: "targeted_therapy"
+      enclosure_complete: true
+
+  - input:
+      phase: "enclose"
+      enclosure_type: "harden_delta"
+    expect:
+      phase: "enclose"
+      therapeutic_strategy: "prophylaxis"
+      enclosure_complete: true
+
+  - input:
+      phase: "enclose"
+      enclosure_type: "dissolve_delta"
+    expect:
+      phase: "enclose"
+      therapeutic_strategy: "immunotherapy"
+      enclosure_complete: true
+
+  - input:
+      phase: "enclose"
+      enclosure_type: "compress_delta"
+    expect:
+      phase: "enclose"
+      therapeutic_strategy: "containerized_medicine"
+      enclosure_complete: true
+
+  # COMPRESS PHASE TESTS
+  - input:
+      phase: "compress"
+      escape_monitoring: true
+      compression_rate: 0.8
+    expect:
+      phase: "compress"
+      compression_status: "active"
+      escape_detected: false
+      ready_to_annihilate: false
+
+  - input:
+      phase: "compress"
+      escape_monitoring: false
+    expect:
+      phase: "compress"
+      compression_status: "unmonitored"
+      ready_to_annihilate: false
+
+  - input:
+      phase: "compress"
+      escape_monitoring: true
+      compression_rate: 0
+    expect:
+      phase: "compress"
+      compression_status: "halted"
+      ready_to_annihilate: false
+
+  # ANNIHILATE PHASE TESTS
+  - input:
+      phase: "annihilate"
+      boundary_status: "collapsed"
+    expect:
+      phase: "annihilate"
+      boundary_status: "collapsed"
+      annihilation_status: "successful"
+      next_phase: "vigil"
+      annihilation_successful: true
+
+  - input:
+      phase: "annihilate"
+      boundary_status: "contained"
+    expect:
+      phase: "annihilate"
+      boundary_status: "contained"
+      annihilation_status: "partial"
+      next_phase: "vigil"
+      annihilation_successful: true
+
+  - input:
+      phase: "annihilate"
+      boundary_status: "escaped"
+    expect:
+      phase: "annihilate"
+      boundary_status: "escaped"
+      annihilation_status: "failed"
+      next_phase: "map"
+      annihilation_successful: false
+
+  # VIGIL PHASE TESTS
+  - input:
+      phase: "vigil"
+      monitoring_interval: "daily"
+    expect:
+      phase: "vigil"
+      monitoring_interval: "daily"
+      spiral_position: "innermost"
+      monitoring_active: true
+
+  - input:
+      phase: "vigil"
+      monitoring_interval: "weekly"
+    expect:
+      phase: "vigil"
+      monitoring_interval: "weekly"
+      spiral_position: "inner"
+      monitoring_active: true
+
+  - input:
+      phase: "vigil"
+      monitoring_interval: "monthly"
+    expect:
+      phase: "vigil"
+      monitoring_interval: "monthly"
+      monitoring_active: true
+
+  - input:
+      phase: "vigil"
+      monitoring_interval: "quarterly"
+    expect:
+      phase: "vigil"
+      monitoring_interval: "quarterly"
+      spiral_position: "outer"
+      monitoring_active: true
+
+  # ERROR/EDGE CASES
+  - input: {}
+    expect:
+      phase: null
+      protocol_valid: false
+
+  - input:
+      phase: "unknown_phase"
+    expect:
+      phase: null
+      protocol_valid: false
+
+  - input:
+      phase: "enclose"
+      enclosure_type: "invalid_type"
+    expect:
+      phase: "enclose"
+      enclosure_complete: false

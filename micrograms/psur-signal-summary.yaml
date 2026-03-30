@@ -1,0 +1,52 @@
+name: psur-signal-summary
+description: "Summarize identified safety signals for PSUR reporting"
+version: 0.1.0
+tree:
+  start: validate_signals
+  nodes:
+    validate_signals:
+      type: condition
+      variable: signals_identified
+      operator: eq
+      value: true
+      true_next: check_signal_count
+      false_next: no_signals
+    check_signal_count:
+      type: condition
+      variable: signal_count
+      operator: gte
+      value: 1
+      true_next: summarize_signals
+      false_next: no_signals
+    summarize_signals:
+      type: return
+      value:
+        signal_summary_required: true
+        summary_content: "signal_list,causality_assessment,recommendations"
+        escalation_required: true
+        label_update_indicated: true
+        psur_signal_compliant: true
+    no_signals:
+      type: return
+      value:
+        signal_summary_required: false
+        summary_content: "statement_no_new_signals"
+        escalation_required: false
+        label_update_indicated: false
+        psur_signal_compliant: true
+tests:
+- input:
+    signals_identified: true
+    signal_count: 2
+  expect:
+    signal_summary_required: true
+    escalation_required: true
+- input:
+    signals_identified: false
+  expect:
+    signal_summary_required: false
+    escalation_required: false
+- input: {}
+  expect:
+    signal_summary_required: false
+    psur_signal_compliant: true

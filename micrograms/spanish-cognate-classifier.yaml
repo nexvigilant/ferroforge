@@ -1,0 +1,126 @@
+name: spanish-cognate-classifier
+description: Classifies English-to-Spanish cognate confidence based on morphological features
+version: 0.1.0
+interface:
+  inputs:
+    latin_root:
+      type: bool
+      required: false
+    ends_in_tion:
+      type: bool
+      required: false
+    ends_in_al:
+      type: bool
+      required: false
+    syllable_count:
+      type: int
+      required: false
+  outputs:
+    cognate_confidence:
+      type: string
+    learning_strategy:
+      type: string
+tree:
+  start: check_latin_root_present
+  nodes:
+    check_latin_root_present:
+      type: condition
+      variable: latin_root
+      operator: is_null
+      value: null
+      true_next: reject_missing
+      false_next: check_latin_root
+    reject_missing:
+      type: return
+      value:
+        cognate_confidence: REJECTED
+        learning_strategy: "REJECTED: latin_root is required"
+    check_latin_root:
+      type: condition
+      variable: latin_root
+      operator: eq
+      value: true
+      true_next: check_tion
+      false_next: low_confidence
+    check_tion:
+      type: condition
+      variable: ends_in_tion
+      operator: eq
+      value: true
+      true_next: high_confidence
+      false_next: check_al
+    check_al:
+      type: condition
+      variable: ends_in_al
+      operator: eq
+      value: true
+      true_next: high_confidence
+      false_next: moderate_confidence
+    high_confidence:
+      type: return
+      value:
+        cognate_confidence: high
+        learning_strategy: transfer
+    moderate_confidence:
+      type: return
+      value:
+        cognate_confidence: moderate
+        learning_strategy: pattern_match
+    low_confidence:
+      type: return
+      value:
+        cognate_confidence: low
+        learning_strategy: memorize
+tests:
+- input:
+    latin_root: true
+    ends_in_tion: true
+    ends_in_al: false
+    syllable_count: 3
+  expect:
+    cognate_confidence: high
+    learning_strategy: transfer
+- input:
+    latin_root: true
+    ends_in_tion: false
+    ends_in_al: true
+    syllable_count: 3
+  expect:
+    cognate_confidence: high
+    learning_strategy: transfer
+- input:
+    latin_root: true
+    ends_in_tion: false
+    ends_in_al: false
+    syllable_count: 2
+  expect:
+    cognate_confidence: moderate
+    learning_strategy: pattern_match
+- input:
+    latin_root: false
+    ends_in_tion: false
+    ends_in_al: false
+    syllable_count: 1
+  expect:
+    cognate_confidence: low
+    learning_strategy: memorize
+- input: {}
+  expect:
+    cognate_confidence: REJECTED
+    learning_strategy: "REJECTED: latin_root is required"
+- input:
+    latin_root: true
+    ends_in_tion: true
+    ends_in_al: true
+    syllable_count: 4
+  expect:
+    cognate_confidence: high
+    learning_strategy: transfer
+- input:
+    latin_root: false
+    ends_in_tion: true
+    ends_in_al: false
+    syllable_count: 3
+  expect:
+    cognate_confidence: low
+    learning_strategy: memorize

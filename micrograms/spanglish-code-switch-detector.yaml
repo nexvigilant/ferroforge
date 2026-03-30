@@ -1,0 +1,273 @@
+name: spanglish-code-switch-detector
+description: >
+  Detecta cambios de código español↔inglés en texto clínico y extrae señales
+  de causalidad de los puntos de cambio. El cambio de código en sí ES la señal:
+  switching to Spanish for symptoms often means English can't capture the nuance.
+  "Está feeling dizzy" preserves estar's temporal signal with English vocabulary.
+  "Es diabetic" preserves ser's identity signal through the switch.
+  Detects code-switch patterns and classifies the PV-relevant signal they carry.
+version: 0.1.0
+primitive_signature:
+  dominant: '∂'
+  expression: '∂(μ(L1, L2)) — boundary detection at language-switch points, each switch is a mapping between linguistic systems'
+  primes: ['∂', 'μ', 'ς', 'κ']
+  arguments: ['text_fragment']
+  chain_prediction: >
+    Code-switching points are boundaries (∂). Each boundary carries information:
+    Spanish→English switch at symptom = English lacks the nuance.
+    English→Spanish switch at symptom = Spanish temporal precision invoked.
+    The ser/estar signal persists through Spanglish — "está feeling dizzy"
+    is STILL estar-coded (transient). Feeds into ser-estar-temporal-classifier.
+interface:
+  inputs:
+    text_fragment:
+      type: string
+      required: true
+      description: >
+        Clinical text fragment that may contain Spanglish code-switching.
+        Examples: "Está feeling dizzy", "Patient es diabetic", "Se siente very nauseous"
+    switch_direction:
+      type: string
+      required: false
+      description: >
+        Direction of code-switch: "es_to_en" (Spanish frame, English content),
+        "en_to_es" (English frame, Spanish content), or "mixed".
+        If absent, auto-detected from text_fragment.
+  outputs:
+    pattern:
+      type: string
+      description: "ESTAR_FRAME | SER_FRAME | SENTIRSE_FRAME | TENER_FRAME | ENGLISH_ONLY | SPANISH_ONLY | UNCLASSIFIED"
+    temporal_signal:
+      type: string
+      description: "TRANSIENT | PERMANENT | NEUTRAL"
+    confidence_boost:
+      type: int
+      description: >
+        0-100. Code-switching to Spanish for symptoms INCREASES relevance
+        because the speaker invoked a more precise system. +20 for estar frame,
+        +10 for sentirse frame, 0 for ser frame (identity, not ADR).
+    verbo_extraido:
+      type: string
+      description: "The Spanish verb extracted from the Spanglish text, for downstream chain"
+    accion:
+      type: string
+tree:
+  start: check_text_present
+  nodes:
+    check_text_present:
+      type: condition
+      variable: text_fragment
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: check_estar_frame
+
+    reject:
+      type: return
+      value:
+        pattern: UNCLASSIFIED
+        temporal_signal: NEUTRAL
+        confidence_boost: 0
+        verbo_extraido: ""
+        accion: "REJECTED: text_fragment is required"
+
+    # Estar-frame Spanglish: "está feeling dizzy", "estaba very confused"
+    check_estar_frame:
+      type: condition
+      variable: text_fragment
+      operator: matches
+      value: "(?i)(est[áa]|estaba|estaban|estuvo|estuve|estando|est[ée])"
+      true_next: estar_detected
+      false_next: check_ser_frame
+
+    estar_detected:
+      type: return
+      value:
+        pattern: ESTAR_FRAME
+        temporal_signal: TRANSIENT
+        confidence_boost: 20
+        verbo_extraido: "estar"
+        accion: >
+          INVESTIGAR: estar-frame Spanglish detected. The speaker switched to
+          Spanish estar to describe a TRANSIENT state, then continued in English.
+          This is a stronger temporal signal than pure English — the speaker
+          chose the more precise language for the symptom description.
+
+    # Ser-frame Spanglish: "es diabetic", "es hypertensive"
+    check_ser_frame:
+      type: condition
+      variable: text_fragment
+      operator: matches
+      value: "(?i)(\\bes\\b|\\bson\\b|\\bera\\b|\\beran\\b|\\bfue\\b|\\bsiendo\\b|\\bsea\\b)"
+      true_next: ser_detected
+      false_next: check_sentirse_frame
+
+    ser_detected:
+      type: return
+      value:
+        pattern: SER_FRAME
+        temporal_signal: PERMANENT
+        confidence_boost: 0
+        verbo_extraido: "ser"
+        accion: >
+          DOCUMENTAR: ser-frame Spanglish detected. The speaker used ser
+          (identity/permanent) for this condition. Likely pre-existing,
+          not drug-induced. No confidence boost — ser signals identity.
+
+    # Sentirse-frame: "se siente very nauseous", "se sentía dizzy"
+    check_sentirse_frame:
+      type: condition
+      variable: text_fragment
+      operator: matches
+      value: "(?i)(se siente|se sent[ií]a|se sinti[óo]|sinti[ée]ndose|me siento)"
+      true_next: sentirse_detected
+      false_next: check_tener_frame
+
+    sentirse_detected:
+      type: return
+      value:
+        pattern: SENTIRSE_FRAME
+        temporal_signal: TRANSIENT
+        confidence_boost: 10
+        verbo_extraido: "sentirse"
+        accion: >
+          INVESTIGAR: sentirse-frame Spanglish detected. "Se siente" (feels)
+          is reflexive estar — the patient experiences a transient state.
+          Moderate confidence boost — sentirse implies subjective symptom
+          report, weaker than medical estar but still temporal.
+
+    # Tener-frame: "tiene headache", "tenía fever"
+    check_tener_frame:
+      type: condition
+      variable: text_fragment
+      operator: matches
+      value: "(?i)(\\btiene\\b|\\bten[ií]a\\b|\\btuvo\\b|\\btengo\\b|\\btenga\\b)"
+      true_next: tener_detected
+      false_next: check_pure_english
+
+    tener_detected:
+      type: return
+      value:
+        pattern: TENER_FRAME
+        temporal_signal: TRANSIENT
+        confidence_boost: 15
+        verbo_extraido: "tener"
+        accion: >
+          INVESTIGAR: tener-frame Spanglish detected. "Tiene" (has) in
+          medical Spanglish typically describes current symptoms.
+          Stronger than sentirse — "tiene fever" is more assertive than
+          "se siente with fever". Temporal: current possession of symptom.
+
+    # Pure English — no Spanish frame detected
+    check_pure_english:
+      type: condition
+      variable: text_fragment
+      operator: matches
+      value: "(?i)^[a-z0-9 ,.'\"!?;:\\-]+$"
+      true_next: english_only
+      false_next: unclassified
+
+    english_only:
+      type: return
+      value:
+        pattern: ENGLISH_ONLY
+        temporal_signal: NEUTRAL
+        confidence_boost: 0
+        verbo_extraido: ""
+        accion: "No code-switch detected — pure English. No temporal signal from grammar."
+
+    unclassified:
+      type: return
+      value:
+        pattern: UNCLASSIFIED
+        temporal_signal: NEUTRAL
+        confidence_boost: 0
+        verbo_extraido: ""
+        accion: "Code pattern not recognized — may be pure Spanish or other switch pattern."
+
+tests:
+# Estar-frame Spanglish
+- input:
+    text_fragment: "Está feeling very dizzy since starting the medication"
+  expect:
+    pattern: ESTAR_FRAME
+    temporal_signal: TRANSIENT
+    confidence_boost: 20
+    verbo_extraido: "estar"
+
+- input:
+    text_fragment: "Patient estaba very confused after the infusion"
+  expect:
+    pattern: ESTAR_FRAME
+    temporal_signal: TRANSIENT
+    confidence_boost: 20
+
+- input:
+    text_fragment: "Estuvo vomiting toda la noche"
+  expect:
+    pattern: ESTAR_FRAME
+    temporal_signal: TRANSIENT
+    confidence_boost: 20
+
+# Ser-frame Spanglish
+- input:
+    text_fragment: "Patient es diabetic, on metformin"
+  expect:
+    pattern: SER_FRAME
+    temporal_signal: PERMANENT
+    confidence_boost: 0
+    verbo_extraido: "ser"
+
+- input:
+    text_fragment: "Era hypertensive before starting treatment"
+  expect:
+    pattern: SER_FRAME
+    temporal_signal: PERMANENT
+    confidence_boost: 0
+
+# Sentirse-frame
+- input:
+    text_fragment: "Se siente very nauseous after taking the pills"
+  expect:
+    pattern: SENTIRSE_FRAME
+    temporal_signal: TRANSIENT
+    confidence_boost: 10
+    verbo_extraido: "sentirse"
+
+- input:
+    text_fragment: "Me siento really tired since the dose increase"
+  expect:
+    pattern: SENTIRSE_FRAME
+    temporal_signal: TRANSIENT
+    confidence_boost: 10
+
+# Tener-frame
+- input:
+    text_fragment: "Tiene headache and joint pain"
+  expect:
+    pattern: TENER_FRAME
+    temporal_signal: TRANSIENT
+    confidence_boost: 15
+    verbo_extraido: "tener"
+
+- input:
+    text_fragment: "Tenía fever for three days"
+  expect:
+    pattern: TENER_FRAME
+    temporal_signal: TRANSIENT
+    confidence_boost: 15
+
+# Pure English
+- input:
+    text_fragment: "Patient reported dizziness and nausea"
+  expect:
+    pattern: ENGLISH_ONLY
+    temporal_signal: NEUTRAL
+    confidence_boost: 0
+
+# Null input
+- input: {}
+  expect:
+    pattern: UNCLASSIFIED
+    temporal_signal: NEUTRAL
+    confidence_boost: 0

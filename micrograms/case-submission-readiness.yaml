@@ -1,0 +1,71 @@
+name: case-submission-readiness
+description: "Assess case readiness for regulatory submission or reporting"
+version: 0.1.0
+tree:
+  start: validate_case_completeness
+  nodes:
+    validate_case_completeness:
+      type: condition
+      variable: all_required_fields_filled
+      operator: eq
+      value: true
+      true_next: check_data_quality
+      false_next: not_ready
+    check_data_quality:
+      type: condition
+      variable: data_quality_score
+      operator: gte
+      value: 90
+      true_next: check_coding
+      false_next: not_ready
+    check_coding:
+      type: condition
+      variable: coding_verified
+      operator: eq
+      value: true
+      true_next: check_medical_review
+      false_next: not_ready
+    check_medical_review:
+      type: condition
+      variable: medical_review_completed
+      operator: eq
+      value: true
+      true_next: ready_for_submission
+      false_next: not_ready
+    ready_for_submission:
+      type: return
+      value:
+        submission_ready: true
+        submission_status: "approved"
+        submission_timeline_days: 0
+        submission_compliant: true
+    not_ready:
+      type: return
+      value:
+        submission_ready: false
+        submission_status: "pending_corrections"
+        submission_timeline_days: 0
+        submission_compliant: false
+tests:
+- input:
+    all_required_fields_filled: true
+    data_quality_score: 95
+    coding_verified: true
+    medical_review_completed: true
+  expect:
+    submission_ready: true
+    submission_status: "approved"
+- input:
+    all_required_fields_filled: false
+  expect:
+    submission_ready: false
+    submission_status: "pending_corrections"
+- input:
+    all_required_fields_filled: true
+    data_quality_score: 85
+  expect:
+    submission_ready: false
+- input: {}
+  expect:
+    submission_ready: false
+    submission_compliant: false

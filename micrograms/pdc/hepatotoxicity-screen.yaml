@@ -1,0 +1,57 @@
+name: hepatotoxicity-screen
+description: 'Clinical safety: hepatotoxicity-screen'
+version: 0.1.0
+interface:
+  inputs:
+    risk_score:
+      type: int
+      required: false
+    evidence_level:
+      type: string
+      required: false
+  outputs:
+    classification:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_high_risk
+  nodes:
+    check_high_risk:
+      type: condition
+      variable: risk_score
+      operator: gte
+      value: 80
+      true_next: high_risk
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: risk_score
+      operator: gte
+      value: 40
+      true_next: moderate_risk
+      false_next: low_risk
+    high_risk:
+      type: return
+      value:
+        classification: HIGH_RISK
+        action: contraindicate_or_monitor
+    moderate_risk:
+      type: return
+      value:
+        classification: MODERATE_RISK
+        action: monitor_closely
+    low_risk:
+      type: return
+      value:
+        classification: LOW_RISK
+        action: standard_care
+tests:
+- input: {risk_score: 90, evidence_level: strong}
+  expect: {classification: HIGH_RISK, action: contraindicate_or_monitor}
+- input: {risk_score: 50, evidence_level: moderate}
+  expect: {classification: MODERATE_RISK, action: monitor_closely}
+- input: {risk_score: 20, evidence_level: weak}
+  expect: {classification: LOW_RISK, action: standard_care}
+- input: {}
+  expect: {classification: LOW_RISK, action: standard_care}

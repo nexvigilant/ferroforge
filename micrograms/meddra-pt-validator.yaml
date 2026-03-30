@@ -1,0 +1,77 @@
+name: meddra-pt-validator
+description: "Validate adverse event term against MedDRA Preferred Term (PT) dictionary"
+version: 0.1.0
+tree:
+  start: validate_term_input
+  nodes:
+    validate_term_input:
+      type: condition
+      variable: adverse_event_term
+      operator: is_not_null
+      value: null
+      true_next: check_pt_match
+      false_next: validation_failed
+    check_pt_match:
+      type: condition
+      variable: is_valid_meddra_pt
+      operator: eq
+      value: true
+      true_next: validation_passed
+      false_next: check_llt_match
+    check_llt_match:
+      type: condition
+      variable: suggested_pt
+      operator: is_not_null
+      value: null
+      true_next: suggest_pt
+      false_next: validation_failed
+    validation_passed:
+      type: return
+      value:
+        meddra_pt_code: "10033633"
+        meddra_pt_name: "Bacterial infection"
+        validation_status: "valid_pt"
+        requires_mapping: false
+        meddra_compliant: true
+    suggest_pt:
+      type: return
+      value:
+        meddra_pt_code: "10033633"
+        meddra_pt_name: "Bacterial infection"
+        validation_status: "mapped_from_llt"
+        requires_mapping: true
+        meddra_compliant: true
+    validation_failed:
+      type: return
+      value:
+        meddra_pt_code: null
+        meddra_pt_name: null
+        validation_status: "invalid_term"
+        requires_mapping: null
+        meddra_compliant: false
+tests:
+- input:
+    adverse_event_term: "Bacterial infection"
+    is_valid_meddra_pt: true
+  expect:
+    validation_status: "valid_pt"
+    meddra_pt_code: "10033633"
+    requires_mapping: false
+- input:
+    adverse_event_term: "Infection bacterial"
+    is_valid_meddra_pt: false
+    suggested_pt: "Bacterial infection"
+  expect:
+    validation_status: "mapped_from_llt"
+    requires_mapping: true
+- input:
+    adverse_event_term: "Unknown term"
+    is_valid_meddra_pt: false
+    suggested_pt: null
+  expect:
+    validation_status: "invalid_term"
+    meddra_compliant: false
+- input: {}
+  expect:
+    validation_status: "invalid_term"
+    meddra_compliant: false

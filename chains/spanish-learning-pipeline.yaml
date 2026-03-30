@@ -1,0 +1,46 @@
+name: spanish-learning-pipeline
+description: "Route a word through cognate analysis → conjugation tier → subjunctive mood gate"
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - spanish-cognate-classifier
+  - spanish-conjugation-tier
+  - spanish-subjunctive-gate
+tests:
+  - name: Latin root regular -ar verb, factual
+    input:
+      latin_root: true
+      ends_in_tion: true
+      ends_in_al: false
+      syllable_count: 3
+      verb_ending: "ar"
+      is_regular: true
+      is_reflexive: false
+      is_factual: true
+      expresses_doubt: false
+      expresses_desire: false
+      expresses_emotion: false
+      is_command: false
+    expect:
+      cognate_confidence: high
+      tier: 1
+      mood: indicative
+  - name: Non-Latin irregular reflexive, subjunctive doubt
+    input:
+      latin_root: false
+      ends_in_tion: false
+      ends_in_al: false
+      syllable_count: 1
+      verb_ending: "ir"
+      is_regular: false
+      is_reflexive: true
+      is_factual: false
+      expresses_doubt: true
+      expresses_desire: false
+      expresses_emotion: false
+      is_command: false
+    expect:
+      cognate_confidence: low
+      tier: 4
+      mood: subjunctive

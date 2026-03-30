@@ -1,0 +1,65 @@
+name: organ-cardiac-safety
+description: "Cardiac (heart) safety assessment. Evaluates QT prolongation, heart failure, and myocarditis risk."
+version: 0.1.0
+tree:
+  start: check_baseline_qt
+  nodes:
+    check_baseline_qt:
+      type: condition
+      variable: baseline_qtc_ms
+      operator: gte
+      value: 500
+      true_next: prolonged_qt_alert
+      false_next: check_ejection_fraction
+    prolonged_qt_alert:
+      type: return
+      value:
+        organ: heart
+        risk_level: high
+        arrhythmia_risk: true
+        message: "Baseline QTc >=500 ms; QT-prolonging drugs contraindicated"
+    check_ejection_fraction:
+      type: condition
+      variable: ejection_fraction_percent
+      operator: lt
+      value: 35
+      true_next: reduced_ef_alert
+      false_next: check_troponin
+    reduced_ef_alert:
+      type: return
+      value:
+        organ: heart
+        risk_level: high
+        cardiomyopathy_risk: true
+        message: "Reduced EF <35%; cardiotoxic drugs contraindicated"
+    check_troponin:
+      type: condition
+      variable: baseline_troponin_ng_ml
+      operator: gt
+      value: 0.04
+      true_next: elevated_troponin
+      false_next: standard_dosing
+    elevated_troponin:
+      type: return
+      value:
+        organ: heart
+        risk_level: moderate
+        myocardial_damage: present
+        monitoring: required
+    standard_dosing:
+      type: return
+      value:
+        organ: heart
+        risk_level: low
+        baseline_ecg: recommended
+tests:
+  - input: { baseline_qtc_ms: 520, ejection_fraction_percent: 50, baseline_troponin_ng_ml: 0.02 }
+    expect: { organ: heart, risk_level: high, arrhythmia_risk: true }
+  - input: { baseline_qtc_ms: 420, ejection_fraction_percent: 30, baseline_troponin_ng_ml: 0.02 }
+    expect: { organ: heart, risk_level: high, cardiomyopathy_risk: true }
+  - input: { baseline_qtc_ms: 420, ejection_fraction_percent: 50, baseline_troponin_ng_ml: 0.06 }
+    expect: { organ: heart, risk_level: moderate, myocardial_damage: present }
+  - input: { baseline_qtc_ms: 400, ejection_fraction_percent: 55, baseline_troponin_ng_ml: 0.01 }
+    expect: { organ: heart, risk_level: low }
+  - input: {}
+    expect: {}

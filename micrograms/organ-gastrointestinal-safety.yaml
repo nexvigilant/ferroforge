@@ -1,0 +1,65 @@
+name: organ-gastrointestinal-safety
+description: "Gastrointestinal safety assessment. Evaluates GI ulceration, severe diarrhea, and hepatotoxicity risks."
+version: 0.1.0
+tree:
+  start: check_gi_ulcer_history
+  nodes:
+    check_gi_ulcer_history:
+      type: condition
+      variable: prior_gi_ulcer_perforation
+      operator: eq
+      value: true
+      true_next: ulcer_alert
+      false_next: check_ibd
+    ulcer_alert:
+      type: return
+      value:
+        organ: gastrointestinal
+        risk_level: high
+        ulcerogenic_risk: true
+        gastroprotection: required
+        message: "Prior GI ulcer/perforation; ulcerogenic drugs contraindicated or require PPI"
+    check_ibd:
+      type: condition
+      variable: has_inflammatory_bowel_disease
+      operator: eq
+      value: true
+      true_next: ibd_alert
+      false_next: check_severe_diarrhea
+    ibd_alert:
+      type: return
+      value:
+        organ: gastrointestinal
+        risk_level: moderate
+        diarrhea_monitoring: required
+        message: "IBD present; diarrhea-inducing drugs may worsen disease"
+    check_severe_diarrhea:
+      type: condition
+      variable: has_recent_severe_diarrhea
+      operator: eq
+      value: true
+      true_next: diarrhea_alert
+      false_next: standard_dosing
+    diarrhea_alert:
+      type: return
+      value:
+        organ: gastrointestinal
+        risk_level: moderate
+        gi_tolerance: monitor
+        message: "Recent severe diarrhea; monitor GI tolerability"
+    standard_dosing:
+      type: return
+      value:
+        organ: gastrointestinal
+        risk_level: low
+tests:
+  - input: { prior_gi_ulcer_perforation: true, has_inflammatory_bowel_disease: false, has_recent_severe_diarrhea: false }
+    expect: { organ: gastrointestinal, risk_level: high, ulcerogenic_risk: true }
+  - input: { prior_gi_ulcer_perforation: false, has_inflammatory_bowel_disease: true, has_recent_severe_diarrhea: false }
+    expect: { organ: gastrointestinal, risk_level: moderate, diarrhea_monitoring: required }
+  - input: { prior_gi_ulcer_perforation: false, has_inflammatory_bowel_disease: false, has_recent_severe_diarrhea: true }
+    expect: { organ: gastrointestinal, risk_level: moderate, gi_tolerance: monitor }
+  - input: { prior_gi_ulcer_perforation: false, has_inflammatory_bowel_disease: false, has_recent_severe_diarrhea: false }
+    expect: { organ: gastrointestinal, risk_level: low }
+  - input: {}
+    expect: {}

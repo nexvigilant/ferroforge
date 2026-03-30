@@ -1,0 +1,91 @@
+name: station-science-drug-targets-pipeline
+description: 'Route drug target analysis: classify by target class and druggability'
+version: 0.1.0
+tree:
+  start: check_druggable
+  nodes:
+    check_druggable:
+      type: condition
+      variable: druggability_score
+      operator: gte
+      value: 0.7
+      true_next: druggable
+      false_next: check_novel
+    novel:
+      type: return
+      value:
+        route: target_research
+        action: research
+        priority: moderate
+        reason: Novel target, low druggability — needs structural biology work
+    check_novel:
+      type: condition
+      variable: is_novel_target
+      operator: eq
+      value: true
+      true_next: novel
+      false_next: undruggable
+    druggable:
+      type: return
+      value:
+        priority: high
+        action: prioritize
+        reason: Druggability ≥0.7 — viable target for drug development
+        route: target_development
+    undruggable:
+      type: return
+      value:
+        action: archive
+        route: archive
+        reason: Known undruggable target — deprioritize
+        priority: low
+tests:
+- input:
+    druggability_score: 0.85
+    is_novel_target: false
+  expect:
+    priority: high
+    route: target_development
+    action: prioritize
+- input:
+    is_novel_target: true
+    druggability_score: 0.3
+  expect:
+    action: research
+    priority: moderate
+    route: target_research
+- input:
+    is_novel_target: false
+    druggability_score: 0.2
+  expect:
+    action: archive
+    route: archive
+    priority: low
+- input:
+    druggability_score: 0.699
+  expect:
+    reason: Known undruggable target — deprioritize
+    priority: low
+    action: archive
+    route: archive
+- input:
+    druggability_score: 0.701
+  expect:
+    priority: high
+    action: prioritize
+    reason: Druggability ≥0.7 — viable target for drug development
+    route: target_development
+- input: {}
+  expect:
+    action: archive
+    priority: low
+    reason: Known undruggable target — deprioritize
+    route: archive
+- input: {}
+  expect:
+    action: archive
+    route: archive
+    reason: Known undruggable target — deprioritize
+    priority: low
+interface: null
+primitive_signature: null

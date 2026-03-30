@@ -1,0 +1,45 @@
+name: sustained-release-pk
+description: 'Pharmacokinetics: sustained-release-pk assessment'
+version: 0.1.0
+interface:
+  inputs:
+    value: {type: int, required: false}
+    threshold: {type: int, required: false}
+  outputs:
+    assessment: {type: string}
+    action: {type: string}
+tree:
+  start: check_high
+  nodes:
+    check_high:
+      type: condition
+      variable: value
+      operator: gte
+      value: 70
+      true_next: high
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: value
+      operator: gte
+      value: 30
+      true_next: moderate
+      false_next: low
+    high:
+      type: return
+      value: {assessment: HIGH, action: monitor}
+    moderate:
+      type: return
+      value: {assessment: MODERATE, action: standard}
+    low:
+      type: return
+      value: {assessment: LOW, action: investigate}
+tests:
+- input: {value: 80, threshold: 50}
+  expect: {assessment: HIGH, action: monitor}
+- input: {value: 50, threshold: 50}
+  expect: {assessment: MODERATE, action: standard}
+- input: {value: 10, threshold: 50}
+  expect: {assessment: LOW, action: investigate}
+- input: {value: 0, threshold: 0}
+  expect: {assessment: LOW, action: investigate}

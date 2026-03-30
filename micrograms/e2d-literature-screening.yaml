@@ -1,0 +1,181 @@
+name: e2d-literature-screening
+description: 'ICH E2D Section 3.3: Determines if a literature article requires safety case extraction based on article type and content'
+version: 0.1.0
+interface:
+  inputs:
+    article_type:
+      type: string
+      required: false
+    drug_mentioned:
+      type: bool
+      required: false
+    adverse_event_described:
+      type: bool
+      required: false
+    new_safety_information:
+      type: bool
+      required: false
+    safety_data_reported:
+      type: bool
+      required: false
+  outputs:
+    extract_case:
+      type: bool
+    priority:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_drug_mentioned
+  nodes:
+    check_drug_mentioned:
+      type: condition
+      variable: drug_mentioned
+      operator: eq
+      value: true
+      true_next: check_preclinical
+      false_next: return_no_extract
+    check_preclinical:
+      type: condition
+      variable: article_type
+      operator: eq
+      value: preclinical
+      true_next: return_no_extract_preclinical
+      false_next: check_case_report
+    check_case_report:
+      type: condition
+      variable: article_type
+      operator: eq
+      value: case_report
+      true_next: check_ae_described
+      false_next: check_clinical_trial
+    check_ae_described:
+      type: condition
+      variable: adverse_event_described
+      operator: eq
+      value: true
+      true_next: return_case_report_high
+      false_next: return_no_extract
+    check_clinical_trial:
+      type: condition
+      variable: article_type
+      operator: eq
+      value: clinical_trial
+      true_next: check_safety_data
+      false_next: check_review
+    check_safety_data:
+      type: condition
+      variable: safety_data_reported
+      operator: eq
+      value: true
+      true_next: return_trial_high
+      false_next: return_no_extract
+    check_review:
+      type: condition
+      variable: article_type
+      operator: eq
+      value: review
+      true_next: check_new_safety
+      false_next: return_no_extract
+    check_new_safety:
+      type: condition
+      variable: new_safety_information
+      operator: eq
+      value: true
+      true_next: return_review_medium
+      false_next: return_no_extract
+    return_case_report_high:
+      type: return
+      value:
+        extract_case: true
+        priority: high
+        regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+    return_trial_high:
+      type: return
+      value:
+        extract_case: true
+        priority: high
+        regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+    return_review_medium:
+      type: return
+      value:
+        extract_case: true
+        priority: medium
+        regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+    return_no_extract:
+      type: return
+      value:
+        extract_case: false
+        priority: none
+        regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+    return_no_extract_preclinical:
+      type: return
+      value:
+        extract_case: false
+        priority: none
+        regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ — literature screening gate for pharmacovigilance case extraction'
+  primes: ['σ', '∂', 'κ']
+  arguments: ['article_type', 'drug_mentioned', 'adverse_event_described', 'new_safety_information', 'safety_data_reported']
+tests:
+- input:
+    article_type: case_report
+    drug_mentioned: true
+    adverse_event_described: true
+  expect:
+    extract_case: true
+    priority: high
+    regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+- input:
+    article_type: review
+    drug_mentioned: true
+    new_safety_information: true
+  expect:
+    extract_case: true
+    priority: medium
+    regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+- input:
+    article_type: clinical_trial
+    drug_mentioned: true
+    safety_data_reported: true
+  expect:
+    extract_case: true
+    priority: high
+    regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+- input:
+    article_type: case_report
+    drug_mentioned: false
+  expect:
+    extract_case: false
+    priority: none
+    regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+- input:
+    article_type: preclinical
+    drug_mentioned: true
+  expect:
+    extract_case: false
+    priority: none
+    regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+- input:
+    article_type: review
+    drug_mentioned: true
+    new_safety_information: false
+  expect:
+    extract_case: false
+    priority: none
+    regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+- input:
+    article_type: clinical_trial
+    drug_mentioned: true
+    safety_data_reported: false
+  expect:
+    extract_case: false
+    priority: none
+    regulatory_reference: ICH E2D Section 3.3 - Literature Reports
+- input: {}
+  expect:
+    extract_case: false
+    priority: none
+    regulatory_reference: ICH E2D Section 3.3 - Literature Reports

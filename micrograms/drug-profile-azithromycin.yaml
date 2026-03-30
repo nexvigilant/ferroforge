@@ -1,0 +1,62 @@
+name: drug-profile-azithromycin
+description: 'Safety triage for azithromycin: PRR-based signal routing (Type A)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: signal
+      false_next: no_signal
+    signal:
+      type: return
+      value:
+        harm_type: A
+        expected_prr: 2.0
+        signal: true
+        drug: azithromycin
+        action: investigate
+    no_signal:
+      type: return
+      value:
+        harm_type: A
+        drug: azithromycin
+        signal: false
+        expected_prr: 2.0
+        action: monitor
+tests:
+- input:
+    prr: 2.0
+  expect:
+    signal: true
+    drug: azithromycin
+- input:
+    prr: 0.5
+  expect:
+    signal: false
+    drug: azithromycin
+- input: {}
+  expect:
+    signal: false
+    drug: azithromycin
+- input:
+    prr: 1.999
+  expect:
+    action: monitor
+    drug: azithromycin
+    signal: false
+    harm_type: A
+    expected_prr: 2.0
+- input:
+    prr: 2.001
+  expect:
+    action: investigate
+    expected_prr: 2.0
+    signal: true
+    harm_type: A
+    drug: azithromycin
+interface: null
+primitive_signature: null

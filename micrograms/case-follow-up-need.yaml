@@ -1,0 +1,84 @@
+name: case-follow-up-need
+description: "Determine if adverse event case requires follow-up information gathering"
+version: 0.1.0
+tree:
+  start: validate_case_data
+  nodes:
+    validate_case_data:
+      type: condition
+      variable: case_received
+      operator: eq
+      value: true
+      true_next: check_completeness_level
+      false_next: follow_up_unknown
+    check_completeness_level:
+      type: condition
+      variable: data_completeness_percent
+      operator: gte
+      value: 90
+      true_next: no_follow_up
+      false_next: check_moderate_completeness
+    check_moderate_completeness:
+      type: condition
+      variable: data_completeness_percent
+      operator: gte
+      value: 70
+      true_next: limited_follow_up
+      false_next: comprehensive_follow_up
+    no_follow_up:
+      type: return
+      value:
+        follow_up_required: false
+        follow_up_type: null
+        follow_up_timeline_days: 0
+        priority_level: "none"
+        follow_up_compliant: true
+    limited_follow_up:
+      type: return
+      value:
+        follow_up_required: true
+        follow_up_type: "targeted_questions"
+        follow_up_timeline_days: 30
+        priority_level: "routine"
+        follow_up_compliant: true
+    comprehensive_follow_up:
+      type: return
+      value:
+        follow_up_required: true
+        follow_up_type: "comprehensive_clarification"
+        follow_up_timeline_days: 14
+        priority_level: "urgent"
+        follow_up_compliant: true
+    follow_up_unknown:
+      type: return
+      value:
+        follow_up_required: null
+        follow_up_type: null
+        follow_up_timeline_days: null
+        priority_level: null
+        follow_up_compliant: false
+tests:
+- input:
+    case_received: true
+    data_completeness_percent: 95
+  expect:
+    follow_up_required: false
+    follow_up_type: null
+- input:
+    case_received: true
+    data_completeness_percent: 80
+  expect:
+    follow_up_required: true
+    follow_up_type: "targeted_questions"
+    follow_up_timeline_days: 30
+- input:
+    case_received: true
+    data_completeness_percent: 50
+  expect:
+    follow_up_required: true
+    follow_up_type: "comprehensive_clarification"
+    follow_up_timeline_days: 14
+- input: {}
+  expect:
+    follow_up_required: null
+    follow_up_compliant: false

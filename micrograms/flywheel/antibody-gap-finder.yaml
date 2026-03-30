@@ -1,0 +1,74 @@
+name: antibody-gap-finder
+description: 'Flywheel operational: antibody-gap-finder'
+version: 0.1.0
+interface:
+  inputs:
+    current_value:
+      type: int
+      required: false
+    target_value:
+      type: int
+      required: false
+    trend:
+      type: string
+      required: false
+  outputs:
+    status:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_on_target
+  nodes:
+    check_on_target:
+      type: condition
+      variable: current_value
+      operator: gte
+      value: 80
+      true_next: on_target
+      false_next: check_approaching
+    check_approaching:
+      type: condition
+      variable: current_value
+      operator: gte
+      value: 50
+      true_next: check_trend
+      false_next: behind
+    check_trend:
+      type: condition
+      variable: trend
+      operator: eq
+      value: rising
+      true_next: approaching
+      false_next: stalled
+    on_target:
+      type: return
+      value:
+        status: ON_TARGET
+        action: maintain
+    approaching:
+      type: return
+      value:
+        status: APPROACHING
+        action: sustain_momentum
+    stalled:
+      type: return
+      value:
+        status: STALLED
+        action: investigate_blockers
+    behind:
+      type: return
+      value:
+        status: BEHIND
+        action: prioritize_growth
+tests:
+- input: {current_value: 85, target_value: 80, trend: rising}
+  expect: {status: ON_TARGET, action: maintain}
+- input: {current_value: 60, target_value: 80, trend: rising}
+  expect: {status: APPROACHING, action: sustain_momentum}
+- input: {current_value: 55, target_value: 80, trend: flat}
+  expect: {status: STALLED, action: investigate_blockers}
+- input: {current_value: 30, target_value: 80, trend: falling}
+  expect: {status: BEHIND, action: prioritize_growth}
+- input: {}
+  expect: {status: BEHIND, action: prioritize_growth}

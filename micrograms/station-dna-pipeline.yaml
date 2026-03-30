@@ -1,0 +1,77 @@
+name: station-dna-pipeline
+description: Route DNA/nucleotide encoding operations through validation gates
+version: 0.1.0
+tree:
+  start: check_valid
+  nodes:
+    invalid:
+      type: return
+      value:
+        action: reject
+        route: encoding_repair
+        priority: high
+        reason: Invalid DNA encoding — non-ACGT characters or length mismatch
+    certified:
+      type: return
+      value:
+        route: archive
+        action: certify
+        priority: low
+        reason: Bijective DNA encoding verified — lossless round-trip
+    lossy:
+      type: return
+      value:
+        reason: Encoding valid but not bijective — information loss on decode
+        priority: moderate
+        route: encoding_review
+        action: flag
+    check_valid:
+      type: condition
+      variable: encoding_valid
+      operator: eq
+      value: true
+      true_next: check_bijective
+      false_next: invalid
+    check_bijective:
+      type: condition
+      variable: is_bijective
+      operator: eq
+      value: true
+      true_next: certified
+      false_next: lossy
+tests:
+- input:
+    encoding_valid: false
+    is_bijective: false
+  expect:
+    action: reject
+    priority: high
+    route: encoding_repair
+- input:
+    encoding_valid: true
+    is_bijective: true
+  expect:
+    route: archive
+    priority: low
+    action: certify
+- input:
+    encoding_valid: true
+    is_bijective: false
+  expect:
+    action: flag
+    route: encoding_review
+    priority: moderate
+- input: {}
+  expect:
+    priority: high
+    route: encoding_repair
+    action: reject
+    reason: Invalid DNA encoding — non-ACGT characters or length mismatch
+- input: {}
+  expect:
+    route: encoding_repair
+    reason: Invalid DNA encoding — non-ACGT characters or length mismatch
+    priority: high
+    action: reject
+interface: null
+primitive_signature: null

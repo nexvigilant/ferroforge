@@ -1,0 +1,43 @@
+name: age-child
+description: "Child age classifier. Identifies subjects aged 1-6 years."
+version: 0.1.0
+tree:
+  start: check_lower_bound
+  nodes:
+    check_lower_bound:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 1
+      true_next: check_upper_bound
+      false_next: not_child
+    check_upper_bound:
+      type: condition
+      variable: age_years
+      operator: lte
+      value: 6
+      true_next: is_child
+      false_next: not_child
+    is_child:
+      type: return
+      value:
+        age_group: child
+        age_range: "1-6 years"
+        developmental_stage: early_childhood
+        cognitive_development: emerging
+    not_child:
+      type: return
+      value:
+        age_group: other
+        is_child: false
+tests:
+  - input: { age_years: 3 }
+    expect: { age_group: child, developmental_stage: early_childhood }
+  - input: { age_years: 1 }
+    expect: { age_group: child }
+  - input: { age_years: 6 }
+    expect: { age_group: child }
+  - input: { age_years: 7 }
+    expect: { age_group: other, is_child: false }
+  - input: {}
+    expect: {}

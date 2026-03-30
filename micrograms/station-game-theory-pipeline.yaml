@@ -1,0 +1,77 @@
+name: station-game-theory-pipeline
+description: Route Nash equilibrium and payoff analysis for competitive PV strategy
+version: 0.1.0
+tree:
+  start: check_equilibrium
+  nodes:
+    check_dominant:
+      type: condition
+      variable: dominant_strategy_exists
+      operator: eq
+      value: true
+      true_next: dominant
+      false_next: mixed
+    check_equilibrium:
+      type: condition
+      variable: has_nash
+      operator: eq
+      value: true
+      true_next: check_dominant
+      false_next: no_equilibrium
+    dominant:
+      type: return
+      value:
+        priority: high
+        reason: Dominant strategy exists — clear competitive advantage path
+        route: strategy_execution
+        action: execute
+    mixed:
+      type: return
+      value:
+        action: analyze
+        priority: moderate
+        route: strategy_analysis
+        reason: Nash exists but no dominance — analyze mixed strategy probabilities
+    no_equilibrium:
+      type: return
+      value:
+        route: strategy_simulation
+        reason: No Nash equilibrium — mixed strategy needed, run simulation
+        priority: moderate
+        action: simulate
+tests:
+- input:
+    has_nash: false
+    dominant_strategy_exists: false
+  expect:
+    priority: moderate
+    route: strategy_simulation
+    action: simulate
+- input:
+    dominant_strategy_exists: true
+    has_nash: true
+  expect:
+    action: execute
+    route: strategy_execution
+    priority: high
+- input:
+    has_nash: true
+    dominant_strategy_exists: false
+  expect:
+    action: analyze
+    priority: moderate
+    route: strategy_analysis
+- input: {}
+  expect:
+    priority: moderate
+    reason: No Nash equilibrium — mixed strategy needed, run simulation
+    action: simulate
+    route: strategy_simulation
+- input: {}
+  expect:
+    route: strategy_simulation
+    priority: moderate
+    action: simulate
+    reason: No Nash equilibrium — mixed strategy needed, run simulation
+interface: null
+primitive_signature: null

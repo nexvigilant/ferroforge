@@ -1,0 +1,65 @@
+name: organ-hepatic-safety
+description: "Hepatic (liver) safety assessment. Evaluates drug-induced liver injury (DILI) risk based on liver function tests."
+version: 0.1.0
+tree:
+  start: check_baseline_alt
+  nodes:
+    check_baseline_alt:
+      type: condition
+      variable: baseline_alt_iu_l
+      operator: gte
+      value: 200
+      true_next: elevated_alt_alert
+      false_next: check_cirrhosis
+    elevated_alt_alert:
+      type: return
+      value:
+        organ: liver
+        risk_level: high
+        monitoring: required
+        message: "Elevated baseline ALT; hepatotoxic drug contraindicated"
+    check_cirrhosis:
+      type: condition
+      variable: has_cirrhosis
+      operator: eq
+      value: true
+      true_next: cirrhosis_alert
+      false_next: check_hepatic_clearance
+    cirrhosis_alert:
+      type: return
+      value:
+        organ: liver
+        risk_level: critical
+        contraindication: true
+        message: "Cirrhosis present; hepatotoxic drugs contraindicated"
+    check_hepatic_clearance:
+      type: condition
+      variable: child_pugh_score
+      operator: gte
+      value: 7
+      true_next: hepatic_impairment_dosing
+      false_next: standard_dosing
+    hepatic_impairment_dosing:
+      type: return
+      value:
+        organ: liver
+        risk_level: moderate
+        dose_adjustment: required
+        message: "Hepatic impairment; reduce dose or extend interval"
+    standard_dosing:
+      type: return
+      value:
+        organ: liver
+        risk_level: low
+        monitoring: periodically
+tests:
+  - input: { baseline_alt_iu_l: 250, has_cirrhosis: false, child_pugh_score: 5 }
+    expect: { organ: liver, risk_level: high, monitoring: required }
+  - input: { baseline_alt_iu_l: 80, has_cirrhosis: true, child_pugh_score: 10 }
+    expect: { organ: liver, risk_level: critical, contraindication: true }
+  - input: { baseline_alt_iu_l: 80, has_cirrhosis: false, child_pugh_score: 8 }
+    expect: { organ: liver, risk_level: moderate, dose_adjustment: required }
+  - input: { baseline_alt_iu_l: 40, has_cirrhosis: false, child_pugh_score: 5 }
+    expect: { organ: liver, risk_level: low }
+  - input: {}
+    expect: {}

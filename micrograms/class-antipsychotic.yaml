@@ -1,0 +1,74 @@
+name: class-antipsychotic
+description: 'Antipsychotics class safety: Metabolic syndrome monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    alert:
+      type: return
+      value:
+        concern: Metabolic syndrome
+        alert: true
+        drug_class: Antipsychotics
+        action: class_effect_investigation
+    safe:
+      type: return
+      value:
+        concern: Metabolic syndrome
+        drug_class: Antipsychotics
+        action: continue
+        alert: false
+    check:
+      type: condition
+      variable: metabolic_syndrome_risk
+      operator: gte
+      value: 2
+      true_next: alert
+      false_next: safe
+tests:
+- input:
+    metabolic_syndrome_risk: 2
+  expect:
+    drug_class: Antipsychotics
+    alert: true
+- input: {}
+  expect:
+    drug_class: Antipsychotics
+    alert: false
+- input:
+    metabolic_syndrome_risk: 0
+  expect:
+    action: continue
+    alert: false
+    concern: Metabolic syndrome
+    drug_class: Antipsychotics
+- input:
+    metabolic_syndrome_risk: -1
+  expect:
+    alert: false
+    drug_class: Antipsychotics
+    concern: Metabolic syndrome
+    action: continue
+- input:
+    metabolic_syndrome_risk: 1
+  expect:
+    concern: Metabolic syndrome
+    action: continue
+    alert: false
+    drug_class: Antipsychotics
+- input:
+    metabolic_syndrome_risk: 3
+  expect:
+    concern: Metabolic syndrome
+    action: class_effect_investigation
+    drug_class: Antipsychotics
+    alert: true
+- input:
+    metabolic_syndrome_risk: 200
+  expect:
+    concern: Metabolic syndrome
+    action: class_effect_investigation
+    drug_class: Antipsychotics
+    alert: true
+interface: null
+primitive_signature: null

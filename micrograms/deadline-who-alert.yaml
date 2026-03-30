@@ -1,0 +1,84 @@
+name: deadline-who-alert
+description: "Calculate WHO urgent safety alert notification deadline"
+version: 0.1.0
+tree:
+  start: validate_event
+  nodes:
+    validate_event:
+      type: condition
+      variable: event_description
+      operator: is_not_null
+      value: null
+      true_next: check_public_health_impact
+      false_next: deadline_unknown
+    check_public_health_impact:
+      type: condition
+      variable: public_health_impact
+      operator: eq
+      value: "high"
+      true_next: urgent_alert
+      false_next: check_signal_strength
+    check_signal_strength:
+      type: condition
+      variable: signal_strength
+      operator: eq
+      value: "significant"
+      true_next: important_alert
+      false_next: routine_notification
+    urgent_alert:
+      type: return
+      value:
+        notification_deadline_hours: 24
+        notification_type: "urgent_safety_alert"
+        who_notification_required: true
+        public_communication_required: true
+        regulatory_compliant: true
+    important_alert:
+      type: return
+      value:
+        notification_deadline_hours: 72
+        notification_type: "important_safety_notification"
+        who_notification_required: true
+        public_communication_required: false
+        regulatory_compliant: true
+    routine_notification:
+      type: return
+      value:
+        notification_deadline_hours: 240
+        notification_type: "routine_safety_update"
+        who_notification_required: false
+        public_communication_required: false
+        regulatory_compliant: true
+    deadline_unknown:
+      type: return
+      value:
+        notification_deadline_hours: null
+        notification_type: null
+        who_notification_required: null
+        public_communication_required: null
+        regulatory_compliant: false
+tests:
+- input:
+    event_description: "serious drug contamination"
+    public_health_impact: "high"
+  expect:
+    notification_deadline_hours: 24
+    notification_type: "urgent_safety_alert"
+    who_notification_required: true
+- input:
+    event_description: "new safety signal"
+    public_health_impact: "low"
+    signal_strength: "significant"
+  expect:
+    notification_deadline_hours: 72
+    notification_type: "important_safety_notification"
+- input:
+    event_description: "minor update"
+    public_health_impact: "low"
+    signal_strength: "minor"
+  expect:
+    notification_deadline_hours: 240
+- input: {}
+  expect:
+    notification_deadline_hours: null
+    regulatory_compliant: false

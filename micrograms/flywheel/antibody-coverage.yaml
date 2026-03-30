@@ -1,0 +1,85 @@
+name: antibody-coverage
+description: 'Score antibody fleet coverage: LOW (<10), MODERATE (10-20), HIGH (21-30), SATURATED (>30)'
+version: 0.1.0
+interface:
+  inputs:
+    antibody_count:
+      type: int
+      required: false
+    critical_ratio_pct:
+      type: int
+      required: false
+  outputs:
+    coverage:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_saturated
+  nodes:
+    check_saturated:
+      type: condition
+      variable: antibody_count
+      operator: gte
+      value: 31
+      true_next: check_critical_saturated
+      false_next: check_high
+    check_critical_saturated:
+      type: condition
+      variable: critical_ratio_pct
+      operator: gte
+      value: 30
+      true_next: rebalance
+      false_next: saturated
+    check_high:
+      type: condition
+      variable: antibody_count
+      operator: gte
+      value: 21
+      true_next: high
+      false_next: check_moderate
+    check_moderate:
+      type: condition
+      variable: antibody_count
+      operator: gte
+      value: 10
+      true_next: moderate
+      false_next: low
+    saturated:
+      type: return
+      value:
+        coverage: SATURATED
+        action: maintain_quality
+    rebalance:
+      type: return
+      value:
+        coverage: SATURATED
+        action: reduce_critical_ratio
+    high:
+      type: return
+      value:
+        coverage: HIGH
+        action: fill_gaps
+    moderate:
+      type: return
+      value:
+        coverage: MODERATE
+        action: grow_fleet
+    low:
+      type: return
+      value:
+        coverage: LOW
+        action: urgent_growth
+tests:
+- input: {antibody_count: 5, critical_ratio_pct: 40}
+  expect: {coverage: LOW, action: urgent_growth}
+- input: {antibody_count: 15, critical_ratio_pct: 20}
+  expect: {coverage: MODERATE, action: grow_fleet}
+- input: {antibody_count: 25, critical_ratio_pct: 10}
+  expect: {coverage: HIGH, action: fill_gaps}
+- input: {antibody_count: 35, critical_ratio_pct: 10}
+  expect: {coverage: SATURATED, action: maintain_quality}
+- input: {antibody_count: 35, critical_ratio_pct: 40}
+  expect: {coverage: SATURATED, action: reduce_critical_ratio}
+- input: {}
+  expect: {coverage: LOW, action: urgent_growth}

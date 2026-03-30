@@ -1,0 +1,74 @@
+name: drug-class-glp1-safety
+description: "GLP-1 receptor agonist safety assessment. Evaluates pancreatitis risk, thyroid safety, retinopathy, and dehydration."
+version: 0.1.0
+tree:
+  start: check_pancreatitis_history
+  nodes:
+    check_pancreatitis_history:
+      type: condition
+      variable: prior_pancreatitis
+      operator: eq
+      value: true
+      true_next: pancreatitis_alert
+      false_next: check_thyroid_history
+    pancreatitis_alert:
+      type: return
+      value:
+        risk_level: high
+        relative_contraindication: true
+        message: "Prior pancreatitis; GLP-1 use requires careful risk-benefit assessment"
+    check_thyroid_history:
+      type: condition
+      variable: thyroid_cancer_history
+      operator: eq
+      value: true
+      true_next: thyroid_alert
+      false_next: check_retinopathy
+    thyroid_alert:
+      type: return
+      value:
+        risk_level: critical
+        contraindication: true
+        message: "Personal/family thyroid cancer history; GLP-1 contraindicated"
+    check_retinopathy:
+      type: condition
+      variable: diabetic_retinopathy
+      operator: eq
+      value: true
+      true_next: retinopathy_assessment
+      false_next: check_dehydration_risk
+    retinopathy_assessment:
+      type: return
+      value:
+        risk_level: moderate
+        ophthalmology_monitoring: required
+        message: "Diabetic retinopathy present; GLP-1 may worsen; monitor closely"
+    check_dehydration_risk:
+      type: condition
+      variable: severe_renal_impairment
+      operator: eq
+      value: true
+      true_next: renal_assessment
+      false_next: standard_dosing
+    renal_assessment:
+      type: return
+      value:
+        risk_level: moderate
+        hydration_monitoring: required
+        message: "Severe renal impairment; enhanced dehydration monitoring required"
+    standard_dosing:
+      type: return
+      value:
+        risk_level: low
+        message: "Standard GLP-1 dosing appropriate"
+tests:
+  - input: { prior_pancreatitis: true, thyroid_cancer_history: false, diabetic_retinopathy: false, severe_renal_impairment: false }
+    expect: { risk_level: high, relative_contraindication: true }
+  - input: { prior_pancreatitis: false, thyroid_cancer_history: true, diabetic_retinopathy: false, severe_renal_impairment: false }
+    expect: { risk_level: critical, contraindication: true }
+  - input: { prior_pancreatitis: false, thyroid_cancer_history: false, diabetic_retinopathy: true, severe_renal_impairment: false }
+    expect: { risk_level: moderate, ophthalmology_monitoring: required }
+  - input: { prior_pancreatitis: false, thyroid_cancer_history: false, diabetic_retinopathy: false, severe_renal_impairment: false }
+    expect: { risk_level: low }
+  - input: {}
+    expect: {}

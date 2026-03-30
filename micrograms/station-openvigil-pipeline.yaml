@@ -1,0 +1,356 @@
+name: station-openvigil-pipeline
+description: 'Routes OpenVigil disproportionality results through signal classification: evaluates PRR, ROR, IC metrics and case count to determine signal strength and recommended next steps'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    probable_prr_ror_ic:
+      type: return
+      value:
+        signal_status: probable_signal
+        evidence_strength: moderate
+        next_step: case_series_review
+        recommended_action: All three metrics elevated but insufficient case count — gather more cases
+    possible_prr_only:
+      type: return
+      value:
+        next_step: routine_monitoring
+        signal_status: possible_signal
+        recommended_action: Only PRR elevated — monitor and re-evaluate with additional data
+        evidence_strength: weak
+    probable_prr_ic:
+      type: return
+      value:
+        recommended_action: PRR and IC elevated — review additional data sources for ROR confirmation
+        evidence_strength: moderate
+        next_step: expanded_signal_review
+        signal_status: probable_signal
+    probable_ror_ic:
+      type: return
+      value:
+        recommended_action: ROR and IC elevated — review additional data sources for PRR confirmation
+        evidence_strength: moderate
+        next_step: expanded_signal_review
+        signal_status: probable_signal
+    check_ic_for_two_of_three_ror:
+      type: condition
+      variable: ic
+      operator: gte
+      value: 0.0
+      true_next: probable_ror_ic
+      false_next: possible_ror_only
+    confirmed_signal:
+      type: return
+      value:
+        recommended_action: Initiate full signal evaluation with causality assessment
+        evidence_strength: strong
+        next_step: causality_assessment
+        signal_status: confirmed_signal
+    check_ic_for_confirmed:
+      type: condition
+      variable: ic
+      operator: gte
+      value: 0.0
+      true_next: check_cases_confirmed
+      false_next: probable_prr_ror
+    check_ic_only:
+      type: condition
+      variable: ic
+      operator: gte
+      value: 0.0
+      true_next: possible_ic_only
+      false_next: no_signal
+    no_signal:
+      type: return
+      value:
+        evidence_strength: none
+        next_step: no_action
+        signal_status: no_signal
+        recommended_action: No disproportionality metrics exceed thresholds
+    check_cases_confirmed:
+      type: condition
+      variable: case_count
+      operator: gte
+      value: 3
+      true_next: confirmed_signal
+      false_next: probable_prr_ror_ic
+    check_prr_for_partial:
+      type: condition
+      variable: ror
+      operator: gte
+      value: 2.0
+      true_next: check_ic_for_two_of_three_ror
+      false_next: check_ic_only
+    check_ic_for_two_of_three_prr:
+      type: condition
+      variable: ic
+      operator: gte
+      value: 0.0
+      true_next: probable_prr_ic
+      false_next: possible_prr_only
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: check_ror_for_confirmed
+      false_next: check_prr_for_partial
+    possible_ror_only:
+      type: return
+      value:
+        evidence_strength: weak
+        next_step: routine_monitoring
+        signal_status: possible_signal
+        recommended_action: Only ROR elevated — monitor and re-evaluate with additional data
+    check_ror_for_confirmed:
+      type: condition
+      variable: ror
+      operator: gte
+      value: 2.0
+      true_next: check_ic_for_confirmed
+      false_next: check_ic_for_two_of_three_prr
+    possible_ic_only:
+      type: return
+      value:
+        signal_status: possible_signal
+        recommended_action: Only IC elevated — monitor and re-evaluate with additional data
+        next_step: routine_monitoring
+        evidence_strength: weak
+    probable_prr_ror:
+      type: return
+      value:
+        evidence_strength: moderate
+        next_step: expanded_signal_review
+        recommended_action: PRR and ROR elevated — review IC calculation and expand case search
+        signal_status: probable_signal
+tests:
+- input:
+    ic: 1.2
+    ror: 2.8
+    prr: 3.5
+    drug_name: metformin
+    case_count: 10
+  expect:
+    evidence_strength: strong
+    signal_status: confirmed_signal
+- input:
+    ror: 3.0
+    prr: 2.5
+    ic: 0.5
+    case_count: 2
+    drug_name: pioglitazone
+  expect:
+    evidence_strength: moderate
+    signal_status: probable_signal
+    next_step: case_series_review
+- input:
+    ic: -0.5
+    ror: 2.5
+    prr: 2.5
+  expect:
+    next_step: expanded_signal_review
+    signal_status: probable_signal
+- input:
+    ror: 1.0
+    prr: 3.0
+    ic: 0.5
+  expect:
+    next_step: expanded_signal_review
+    signal_status: probable_signal
+- input:
+    prr: 1.0
+    ror: 2.5
+    ic: 0.3
+  expect:
+    next_step: expanded_signal_review
+    signal_status: probable_signal
+- input:
+    prr: 2.5
+    ic: -1.0
+    ror: 1.0
+  expect:
+    next_step: routine_monitoring
+    signal_status: possible_signal
+- input:
+    ic: -1.0
+    ror: 2.5
+    prr: 1.0
+  expect:
+    signal_status: possible_signal
+    next_step: routine_monitoring
+- input:
+    ror: 1.0
+    ic: 0.5
+    prr: 1.0
+  expect:
+    signal_status: possible_signal
+    next_step: routine_monitoring
+- input:
+    ror: 0.8
+    prr: 0.5
+    ic: -0.3
+  expect:
+    signal_status: no_signal
+    evidence_strength: none
+- input: {}
+  expect:
+    next_step: no_action
+    signal_status: no_signal
+- input:
+    ic: -0.001
+  expect:
+    evidence_strength: none
+    signal_status: no_signal
+    next_step: no_action
+    recommended_action: No disproportionality metrics exceed thresholds
+- input:
+    ic: 0.001
+  expect:
+    next_step: routine_monitoring
+    signal_status: possible_signal
+    evidence_strength: weak
+    recommended_action: Only IC elevated — monitor and re-evaluate with additional data
+- input:
+    ic: -0.001
+  expect:
+    next_step: no_action
+    evidence_strength: none
+    signal_status: no_signal
+    recommended_action: No disproportionality metrics exceed thresholds
+- input:
+    ic: 0.001
+  expect:
+    evidence_strength: weak
+    signal_status: possible_signal
+    next_step: routine_monitoring
+    recommended_action: Only IC elevated — monitor and re-evaluate with additional data
+- input:
+    ic: -0.001
+  expect:
+    signal_status: no_signal
+    evidence_strength: none
+    recommended_action: No disproportionality metrics exceed thresholds
+    next_step: no_action
+- input:
+    ic: 0.001
+  expect:
+    signal_status: possible_signal
+    recommended_action: Only IC elevated — monitor and re-evaluate with additional data
+    evidence_strength: weak
+    next_step: routine_monitoring
+- input:
+    case_count: 0
+  expect:
+    next_step: no_action
+    signal_status: no_signal
+    evidence_strength: none
+    recommended_action: No disproportionality metrics exceed thresholds
+- input:
+    case_count: -1
+  expect:
+    next_step: no_action
+    recommended_action: No disproportionality metrics exceed thresholds
+    evidence_strength: none
+    signal_status: no_signal
+- input:
+    case_count: 4
+  expect:
+    signal_status: no_signal
+    next_step: no_action
+    evidence_strength: none
+    recommended_action: No disproportionality metrics exceed thresholds
+- input:
+    case_count: 300
+  expect:
+    recommended_action: No disproportionality metrics exceed thresholds
+    signal_status: no_signal
+    evidence_strength: none
+    next_step: no_action
+- input:
+    ror: 1.999
+  expect:
+    signal_status: no_signal
+    next_step: no_action
+    recommended_action: No disproportionality metrics exceed thresholds
+    evidence_strength: none
+- input:
+    ror: 2.001
+  expect:
+    next_step: routine_monitoring
+    signal_status: possible_signal
+    recommended_action: Only ROR elevated — monitor and re-evaluate with additional data
+    evidence_strength: weak
+- input:
+    ic: -0.001
+  expect:
+    evidence_strength: none
+    next_step: no_action
+    recommended_action: No disproportionality metrics exceed thresholds
+    signal_status: no_signal
+- input:
+    ic: 0.001
+  expect:
+    evidence_strength: weak
+    signal_status: possible_signal
+    next_step: routine_monitoring
+    recommended_action: Only IC elevated — monitor and re-evaluate with additional data
+- input:
+    prr: 1.999
+  expect:
+    recommended_action: No disproportionality metrics exceed thresholds
+    next_step: no_action
+    signal_status: no_signal
+    evidence_strength: none
+- input:
+    prr: 2.001
+  expect:
+    next_step: routine_monitoring
+    recommended_action: Only PRR elevated — monitor and re-evaluate with additional data
+    signal_status: possible_signal
+    evidence_strength: weak
+- input:
+    ror: 1.999
+  expect:
+    recommended_action: No disproportionality metrics exceed thresholds
+    evidence_strength: none
+    next_step: no_action
+    signal_status: no_signal
+- input:
+    ror: 2.001
+  expect:
+    signal_status: possible_signal
+    recommended_action: Only ROR elevated — monitor and re-evaluate with additional data
+    next_step: routine_monitoring
+    evidence_strength: weak
+interface:
+  inputs:
+    drug_name:
+      type: string
+      required: false
+    prr:
+      type: float
+      required: false
+    ror:
+      type: float
+      required: false
+    ic:
+      type: float
+      required: false
+    case_count:
+      type: int
+      required: false
+  outputs:
+    recommended_action:
+      type: string
+      required: false
+    signal_status:
+      type: string
+      required: false
+    evidence_strength:
+      type: string
+      required: false
+    next_step:
+      type: string
+      required: false
+  aliases: {}
+primitive_signature: null

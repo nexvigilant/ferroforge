@@ -1,0 +1,197 @@
+name: station-calculation-pipeline
+description: 'Triage PV computation results: classify signal strength from PRR/ROR/IC/EBGM and route to action'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: check_ror
+      false_next: no_signal
+    check_ic:
+      type: condition
+      variable: ic025
+      operator: gte
+      value: 0.0
+      true_next: check_ebgm
+      false_next: moderate_signal
+    strong_signal:
+      type: return
+      value:
+        priority: critical
+        reason: 'All 4 methods converge: PRR≥2, ROR CI>1, IC025≥0, EB05≥2 — confirmed signal'
+        route: causality_assessment
+        action: investigate
+    convergent_signal:
+      type: return
+      value:
+        action: investigate
+        priority: high
+        route: signal_investigation
+        reason: '3/4 methods converge: PRR+ROR+IC positive — strong signal, EBGM borderline'
+    weak_signal:
+      type: return
+      value:
+        priority: low
+        reason: PRR elevated but ROR CI includes 1.0 — signal not statistically robust
+        action: monitor
+        route: periodic_review
+    check_ebgm:
+      type: condition
+      variable: eb05
+      operator: gte
+      value: 2.0
+      true_next: strong_signal
+      false_next: convergent_signal
+    no_signal:
+      type: return
+      value:
+        priority: low
+        reason: PRR < 2.0 — no disproportionality signal detected
+        action: archive
+        route: no_action
+    moderate_signal:
+      type: return
+      value:
+        route: signal_validation
+        priority: moderate
+        action: validate
+        reason: PRR+ROR positive but IC025 < 0 — 2/3 methods agree, needs Bayesian confirmation
+    check_ror:
+      type: condition
+      variable: ror_lower_ci
+      operator: gte
+      value: 1.0
+      true_next: check_ic
+      false_next: weak_signal
+tests:
+- input:
+    prr: 1.2
+    eb05: 0.5
+    ic025: -0.5
+    ror_lower_ci: 0.8
+  expect:
+    action: archive
+    priority: low
+    route: no_action
+- input:
+    prr: 2.5
+    ic025: 0.3
+    ror_lower_ci: 0.9
+    eb05: 1.5
+  expect:
+    priority: low
+    route: periodic_review
+    action: monitor
+- input:
+    ror_lower_ci: 1.5
+    prr: 3.0
+    ic025: -0.2
+    eb05: 1.0
+  expect:
+    action: validate
+    route: signal_validation
+    priority: moderate
+- input:
+    ror_lower_ci: 2.0
+    prr: 4.0
+    ic025: 0.5
+    eb05: 1.5
+  expect:
+    priority: high
+    action: investigate
+    route: signal_investigation
+- input:
+    eb05: 3.5
+    ror_lower_ci: 3.0
+    ic025: 1.2
+    prr: 5.0
+  expect:
+    action: investigate
+    priority: critical
+    route: causality_assessment
+- input:
+    prr: 1.999
+  expect:
+    reason: PRR < 2.0 — no disproportionality signal detected
+    priority: low
+    action: archive
+    route: no_action
+- input:
+    prr: 2.001
+  expect:
+    route: periodic_review
+    priority: low
+    reason: PRR elevated but ROR CI includes 1.0 — signal not statistically robust
+    action: monitor
+- input: {}
+  expect:
+    priority: low
+    action: archive
+    route: no_action
+    reason: PRR < 2.0 — no disproportionality signal detected
+- input:
+    ic025: -0.001
+  expect:
+    route: no_action
+    priority: low
+    reason: PRR < 2.0 — no disproportionality signal detected
+    action: archive
+- input:
+    ic025: 0.001
+  expect:
+    reason: PRR < 2.0 — no disproportionality signal detected
+    action: archive
+    priority: low
+    route: no_action
+- input: {}
+  expect:
+    priority: low
+    route: no_action
+    action: archive
+    reason: PRR < 2.0 — no disproportionality signal detected
+- input:
+    eb05: 1.999
+  expect:
+    reason: PRR < 2.0 — no disproportionality signal detected
+    action: archive
+    priority: low
+    route: no_action
+- input:
+    eb05: 2.001
+  expect:
+    reason: PRR < 2.0 — no disproportionality signal detected
+    route: no_action
+    action: archive
+    priority: low
+- input: {}
+  expect:
+    reason: PRR < 2.0 — no disproportionality signal detected
+    priority: low
+    action: archive
+    route: no_action
+- input:
+    ror_lower_ci: 0.999
+  expect:
+    route: no_action
+    action: archive
+    priority: low
+    reason: PRR < 2.0 — no disproportionality signal detected
+- input:
+    ror_lower_ci: 1.001
+  expect:
+    route: no_action
+    reason: PRR < 2.0 — no disproportionality signal detected
+    priority: low
+    action: archive
+- input: {}
+  expect:
+    action: archive
+    route: no_action
+    priority: low
+    reason: PRR < 2.0 — no disproportionality signal detected
+interface: null
+primitive_signature: null

@@ -1,0 +1,67 @@
+name: convergence-class-effect
+description: Signal in drug class
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    divergent:
+      type: return
+      value:
+        action: investigate_discrepancy
+        convergence: class_effect
+        met: false
+    converged:
+      type: return
+      value:
+        convergence: class_effect
+        action: escalate
+        met: true
+    check:
+      type: condition
+      variable: class_drugs_positive
+      operator: gte
+      value: 2
+      true_next: converged
+      false_next: divergent
+tests:
+- input:
+    class_drugs_positive: 2
+  expect:
+    convergence: class_effect
+    met: true
+- input: {}
+  expect:
+    convergence: class_effect
+    met: false
+- input:
+    class_drugs_positive: 0
+  expect:
+    convergence: class_effect
+    met: false
+    action: investigate_discrepancy
+- input:
+    class_drugs_positive: -1
+  expect:
+    convergence: class_effect
+    met: false
+    action: investigate_discrepancy
+- input:
+    class_drugs_positive: 1
+  expect:
+    met: false
+    convergence: class_effect
+    action: investigate_discrepancy
+- input:
+    class_drugs_positive: 3
+  expect:
+    convergence: class_effect
+    action: escalate
+    met: true
+- input:
+    class_drugs_positive: 200
+  expect:
+    convergence: class_effect
+    met: true
+    action: escalate
+interface: null
+primitive_signature: null

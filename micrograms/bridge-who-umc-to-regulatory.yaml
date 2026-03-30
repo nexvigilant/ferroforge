@@ -1,0 +1,64 @@
+name: bridge-who-umc-to-regulatory
+description: 'Bridge: converts WHO-UMC causality verdict into FDA safety action type'
+version: 0.1.0
+tree:
+  start: check_action
+  nodes:
+    check_investigate:
+      type: condition
+      variable: action
+      operator: eq
+      value: investigate
+      true_next: medwatch
+      false_next: labeling
+    boxed:
+      type: return
+      value:
+        bridge: who-umc-to-regulatory
+        comm_type: boxed_warning
+    check_action:
+      type: condition
+      variable: action
+      operator: eq
+      value: confirm
+      true_next: boxed
+      false_next: check_investigate
+    medwatch:
+      type: return
+      value:
+        comm_type: medwatch
+        bridge: who-umc-to-regulatory
+    labeling:
+      type: return
+      value:
+        bridge: who-umc-to-regulatory
+        comm_type: labeling_change
+tests:
+- input:
+    action: confirm
+    priority: critical
+  expect:
+    bridge: who-umc-to-regulatory
+    comm_type: boxed_warning
+- input:
+    action: investigate
+    priority: high
+  expect:
+    bridge: who-umc-to-regulatory
+    comm_type: medwatch
+- input:
+    priority: moderate
+    action: validate
+  expect:
+    bridge: who-umc-to-regulatory
+    comm_type: labeling_change
+- input: {}
+  expect:
+    bridge: who-umc-to-regulatory
+    comm_type: labeling_change
+- input: {}
+  expect:
+    bridge: who-umc-to-regulatory
+    comm_type: labeling_change
+interface: null
+primitive_signature: null

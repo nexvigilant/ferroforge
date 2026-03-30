@@ -1,0 +1,74 @@
+name: class-opioid
+description: 'Opioids class safety: Respiratory depression monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    alert:
+      type: return
+      value:
+        alert: true
+        action: class_effect_investigation
+        concern: Respiratory depression
+        drug_class: Opioids
+    check:
+      type: condition
+      variable: respiratory_depression_risk
+      operator: gte
+      value: 3
+      true_next: alert
+      false_next: safe
+    safe:
+      type: return
+      value:
+        action: continue
+        alert: false
+        drug_class: Opioids
+        concern: Respiratory depression
+tests:
+- input:
+    respiratory_depression_risk: 3
+  expect:
+    alert: true
+    drug_class: Opioids
+- input: {}
+  expect:
+    drug_class: Opioids
+    alert: false
+- input:
+    respiratory_depression_risk: 0
+  expect:
+    action: continue
+    drug_class: Opioids
+    concern: Respiratory depression
+    alert: false
+- input:
+    respiratory_depression_risk: -1
+  expect:
+    alert: false
+    concern: Respiratory depression
+    drug_class: Opioids
+    action: continue
+- input:
+    respiratory_depression_risk: 2
+  expect:
+    drug_class: Opioids
+    action: continue
+    concern: Respiratory depression
+    alert: false
+- input:
+    respiratory_depression_risk: 4
+  expect:
+    alert: true
+    drug_class: Opioids
+    action: class_effect_investigation
+    concern: Respiratory depression
+- input:
+    respiratory_depression_risk: 300
+  expect:
+    alert: true
+    drug_class: Opioids
+    action: class_effect_investigation
+    concern: Respiratory depression
+interface: null
+primitive_signature: null

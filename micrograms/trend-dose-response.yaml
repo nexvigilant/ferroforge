@@ -1,0 +1,61 @@
+name: trend-dose-response
+description: Dose-response relationship
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    detected:
+      type: return
+      value:
+        action: investigate
+        pattern: dose_related
+        detected: true
+    not_detected:
+      type: return
+      value:
+        action: continue_monitoring
+        pattern: dose_related
+        detected: false
+    check:
+      type: condition
+      variable: dose_correlation
+      operator: gte
+      value: 0
+      true_next: detected
+      false_next: not_detected
+tests:
+- input:
+    dose_correlation: 0
+  expect:
+    pattern: dose_related
+    detected: true
+- input: {}
+  expect:
+    pattern: dose_related
+    detected: false
+- input:
+    dose_correlation: -1
+  expect:
+    detected: false
+    pattern: dose_related
+    action: continue_monitoring
+- input:
+    dose_correlation: -1
+  expect:
+    pattern: dose_related
+    detected: false
+    action: continue_monitoring
+- input:
+    dose_correlation: 1
+  expect:
+    action: investigate
+    pattern: dose_related
+    detected: true
+- input:
+    dose_correlation: 0
+  expect:
+    action: investigate
+    pattern: dose_related
+    detected: true
+interface: null
+primitive_signature: null

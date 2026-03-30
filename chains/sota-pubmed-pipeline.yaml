@@ -1,0 +1,61 @@
+name: sota-pubmed-pipeline
+description: 'PubMed → SOTA pipeline: triage article for frontier relevance → classify PV domain → check frontier movement → assess drift severity'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+
+steps:
+  - sota-pubmed-triage
+  - sota-domain-classifier
+  - sota-frontier-check
+  - drift-alert-classifier
+
+tests:
+  # New meta-analysis in signal detection cited in guidelines
+  - name: guideline-cited meta-analysis triggers paradigm evaluation
+    input:
+      article_type: meta_analysis
+      pub_year: 2026
+      citation_count: 0
+      is_guideline_cited: 1
+      domain: signal_detection
+      novelty_score: 80
+      prr_change_pct: 50
+      time_window_days: 7
+    expect:
+      evidence_level: 5
+      authority_weight: 4
+      frontier_movement: PARADIGM_SHIFT
+      severity: MODERATE_DRIFT
+      domain_label: Signal Detection
+
+  # Observational study in causality — low frontier relevance
+  - name: observational causality study gets monitored not evaluated
+    input:
+      article_type: observational
+      pub_year: 2025
+      citation_count: 2
+      is_guideline_cited: 0
+      domain: causality
+      novelty_score: 20
+      prr_change_pct: 5
+      time_window_days: 60
+    expect:
+      evidence_level: 3
+      frontier_movement: NONE
+      severity: STABLE
+
+  # Editorial — skipped before SOTA even runs
+  - name: editorial gets skipped at triage
+    input:
+      article_type: editorial
+      pub_year: 2026
+      is_guideline_cited: 0
+      domain: benefit_risk
+      novelty_score: 90
+      prr_change_pct: 0
+      time_window_days: 90
+    expect:
+      evidence_level: 1
+      frontier_movement: UNQUALIFIED
+      severity: STABLE

@@ -1,0 +1,493 @@
+name: ich-q1b-photostability
+description: >
+  ICH Q1B Photostability Testing of New Drug Substances and Products.
+  Encodes the Decision Flow Chart for drug product photostability testing
+  and the forced degradation / confirmatory logic for drug substances.
+  Light exposure: ≥1.2 million lux hours visible + ≥200 W·h/m² near UV.
+  Source: ICH Q1B Step 4, 6 November 1996.
+version: 0.1.0
+primitive_signature:
+  dominant: sequence
+  expression: "→(∂(ς))"
+  primes: [sequence, boundary, state]
+  arguments:
+    - "sequence: exposed → immediate_pack → marketing_pack → redesign"
+    - "boundary: packaging level determines protection boundary"
+    - "state: acceptable_change at each level gates progression"
+tree:
+  start: check_has_input
+  nodes:
+    # ── Null safety ──
+    check_has_input:
+      type: condition
+      variable: product_type
+      operator: is_not_null
+      value: true
+      true_next: check_product_type
+      false_next: default_missing
+
+    check_product_type:
+      type: condition
+      variable: product_type
+      operator: eq
+      value: drug_substance
+      true_next: ds_check_result
+      false_next: dp_check_impenetrable
+
+    # ══════════════════════════════════════
+    # DRUG SUBSTANCE (§2)
+    # ══════════════════════════════════════
+    ds_check_result:
+      type: condition
+      variable: confirmatory_result
+      operator: is_not_null
+      value: true
+      true_next: ds_check_photostable
+      false_next: ds_testing_required
+
+    ds_testing_required:
+      type: return
+      value:
+        guideline: "ICH Q1B §2"
+        product_type: drug_substance
+        test_phase: confirmatory_required
+        light_source: "Option 1 (D65/ID65 lamp) or Option 2 (cool white fluorescent + near UV lamp)"
+        exposure_visible: "≥1.2 million lux hours"
+        exposure_uv: "≥200 W·h/m² (near UV)"
+        dark_controls: "Protected samples (e.g. aluminum foil wrapped) alongside exposed"
+        sample_presentation: "Solid: ≤3 mm thickness in glass/plastic dish. Liquid: chemically inert transparent container."
+        batches_required: 1
+        action: "Perform forced degradation testing (method development) then confirmatory study on single batch. Report result as photostable, photolabile, or equivocal."
+
+    ds_check_photostable:
+      type: condition
+      variable: confirmatory_result
+      operator: eq
+      value: photostable
+      true_next: ds_photostable
+      false_next: ds_check_photolabile
+
+    ds_photostable:
+      type: return
+      value:
+        guideline: "ICH Q1B §2.C"
+        product_type: drug_substance
+        test_phase: complete
+        confirmatory_result: photostable
+        batches_tested: 1
+        additional_batches_needed: 0
+        light_protection_required: false
+        action: "Drug substance is photostable — no light protection needed for handling, packaging, or labeling. Single batch confirmation sufficient."
+
+    ds_check_photolabile:
+      type: condition
+      variable: confirmatory_result
+      operator: eq
+      value: photolabile
+      true_next: ds_photolabile
+      false_next: ds_equivocal
+
+    ds_photolabile:
+      type: return
+      value:
+        guideline: "ICH Q1B §2.C"
+        product_type: drug_substance
+        test_phase: complete
+        confirmatory_result: photolabile
+        batches_tested: 1
+        additional_batches_needed: 0
+        light_protection_required: true
+        action: "Drug substance is photolabile — identify precautionary measures for manufacturing, handling, packaging, and labeling. Single batch confirmation sufficient."
+
+    ds_equivocal:
+      type: return
+      value:
+        guideline: "ICH Q1B §2.C"
+        product_type: drug_substance
+        test_phase: additional_testing
+        confirmatory_result: equivocal
+        batches_tested: 1
+        additional_batches_needed: 2
+        action: "Equivocal result — test up to 2 additional batches to confirm photostability characteristics."
+
+    # ══════════════════════════════════════
+    # DRUG PRODUCT — Decision Flow Chart (§3)
+    # ══════════════════════════════════════
+
+    # Check if immediate pack is completely impenetrable to light
+    dp_check_impenetrable:
+      type: condition
+      variable: immediate_pack_impenetrable
+      operator: eq
+      value: true
+      true_next: dp_impenetrable_check_exposed
+      false_next: dp_check_exposed_acceptable
+
+    # Impenetrable pack — only need to test directly exposed
+    dp_impenetrable_check_exposed:
+      type: condition
+      variable: directly_exposed_acceptable
+      operator: is_not_null
+      value: true
+      true_next: dp_impenetrable_exposed_result
+      false_next: dp_impenetrable_test_needed
+
+    dp_impenetrable_test_needed:
+      type: return
+      value:
+        guideline: "ICH Q1B §3"
+        product_type: drug_product
+        test_phase: test_directly_exposed
+        immediate_pack_impenetrable: true
+        exposure_visible: "≥1.2 million lux hours"
+        exposure_uv: "≥200 W·h/m² (near UV)"
+        note: "Immediate pack is impenetrable to light (e.g. aluminum tubes, cans) — testing normally only on directly exposed drug product"
+        action: "Test directly exposed drug product. Since pack is light-impenetrable, only exposed product testing needed."
+
+    dp_impenetrable_exposed_result:
+      type: condition
+      variable: directly_exposed_acceptable
+      operator: eq
+      value: true
+      true_next: dp_pass_exposed
+      false_next: dp_impenetrable_protected
+
+    dp_impenetrable_protected:
+      type: return
+      value:
+        guideline: "ICH Q1B §3"
+        product_type: drug_product
+        test_phase: complete
+        immediate_pack_impenetrable: true
+        directly_exposed_acceptable: false
+        protection_level: immediate_pack
+        action: "Directly exposed product shows unacceptable change but immediate pack is light-impenetrable — product is adequately protected by packaging."
+
+    # Standard flow — not impenetrable
+    # Step 1: Directly exposed
+    dp_check_exposed_acceptable:
+      type: condition
+      variable: directly_exposed_acceptable
+      operator: is_not_null
+      value: true
+      true_next: dp_exposed_result
+      false_next: dp_test_exposed
+
+    dp_test_exposed:
+      type: return
+      value:
+        guideline: "ICH Q1B §3 (Flow Chart Step 1)"
+        product_type: drug_product
+        test_phase: test_directly_exposed
+        exposure_visible: "≥1.2 million lux hours"
+        exposure_uv: "≥200 W·h/m² (near UV)"
+        dark_controls: "Protected samples (e.g. aluminum foil wrapped) alongside exposed"
+        sample_presentation: "Tablets/capsules in single layer, maximum exposure area. Liquids in inert transparent container."
+        action: "Test drug product directly exposed (outside of pack). Assess for acceptable change."
+
+    dp_exposed_result:
+      type: condition
+      variable: directly_exposed_acceptable
+      operator: eq
+      value: true
+      true_next: dp_pass_exposed
+      false_next: dp_check_immediate_acceptable
+
+    dp_pass_exposed:
+      type: return
+      value:
+        guideline: "ICH Q1B §3 (Flow Chart)"
+        product_type: drug_product
+        test_phase: complete
+        directly_exposed_acceptable: true
+        protection_level: none_needed
+        light_protection_required: false
+        action: "Acceptable change when directly exposed — no light protection needed. TEST END."
+
+    # Step 2: Immediate pack
+    dp_check_immediate_acceptable:
+      type: condition
+      variable: immediate_pack_acceptable
+      operator: is_not_null
+      value: true
+      true_next: dp_immediate_result
+      false_next: dp_test_immediate
+
+    dp_test_immediate:
+      type: return
+      value:
+        guideline: "ICH Q1B §3 (Flow Chart Step 2)"
+        product_type: drug_product
+        test_phase: test_immediate_pack
+        directly_exposed_acceptable: false
+        action: "Unacceptable change when directly exposed — test drug product in immediate (primary) pack."
+
+    dp_immediate_result:
+      type: condition
+      variable: immediate_pack_acceptable
+      operator: eq
+      value: true
+      true_next: dp_pass_immediate
+      false_next: dp_check_marketing_acceptable
+
+    dp_pass_immediate:
+      type: return
+      value:
+        guideline: "ICH Q1B §3 (Flow Chart)"
+        product_type: drug_product
+        test_phase: complete
+        directly_exposed_acceptable: false
+        immediate_pack_acceptable: true
+        protection_level: immediate_pack
+        light_protection_required: false
+        action: "Acceptable change in immediate pack — immediate packaging provides adequate light protection. TEST END."
+
+    # Step 3: Marketing pack
+    dp_check_marketing_acceptable:
+      type: condition
+      variable: marketing_pack_acceptable
+      operator: is_not_null
+      value: true
+      true_next: dp_marketing_result
+      false_next: dp_test_marketing
+
+    dp_test_marketing:
+      type: return
+      value:
+        guideline: "ICH Q1B §3 (Flow Chart Step 3)"
+        product_type: drug_product
+        test_phase: test_marketing_pack
+        directly_exposed_acceptable: false
+        immediate_pack_acceptable: false
+        action: "Unacceptable change in immediate pack — test drug product in marketing (secondary) pack."
+
+    dp_marketing_result:
+      type: condition
+      variable: marketing_pack_acceptable
+      operator: eq
+      value: true
+      true_next: dp_pass_marketing
+      false_next: dp_redesign
+
+    dp_pass_marketing:
+      type: return
+      value:
+        guideline: "ICH Q1B §3 (Flow Chart)"
+        product_type: drug_product
+        test_phase: complete
+        directly_exposed_acceptable: false
+        immediate_pack_acceptable: false
+        marketing_pack_acceptable: true
+        protection_level: marketing_pack
+        light_protection_required: false
+        action: "Acceptable change in marketing pack — secondary packaging provides adequate light protection. TEST END."
+
+    dp_redesign:
+      type: return
+      value:
+        guideline: "ICH Q1B §3 (Flow Chart)"
+        product_type: drug_product
+        test_phase: redesign_required
+        directly_exposed_acceptable: false
+        immediate_pack_acceptable: false
+        marketing_pack_acceptable: false
+        protection_level: insufficient
+        light_protection_required: true
+        action: "Unacceptable change at all packaging levels — REDESIGN PACKAGE OR REFORMULATION required."
+
+    # ── Default ──
+    default_missing:
+      type: return
+      value:
+        guideline: ICH Q1B
+        action: "Insufficient input — provide product_type (drug_substance/drug_product)"
+        light_protection_required: false
+
+interface:
+  inputs:
+    product_type:
+      type: string
+      required: true
+      description: "drug_substance or drug_product"
+    confirmatory_result:
+      type: string
+      required: false
+      description: "DS only: photostable, photolabile, or equivocal"
+    immediate_pack_impenetrable:
+      type: bool
+      required: false
+      description: "DP only: true if pack is completely light-impenetrable (aluminum tubes, cans)"
+    directly_exposed_acceptable:
+      type: bool
+      required: false
+      description: "DP only: whether change is acceptable when product is directly exposed"
+    immediate_pack_acceptable:
+      type: bool
+      required: false
+      description: "DP only: whether change is acceptable in immediate pack"
+    marketing_pack_acceptable:
+      type: bool
+      required: false
+      description: "DP only: whether change is acceptable in marketing pack"
+  outputs:
+    guideline:
+      type: string
+    product_type:
+      type: string
+    test_phase:
+      type: string
+    confirmatory_result:
+      type: string
+    protection_level:
+      type: string
+    light_protection_required:
+      type: bool
+    action:
+      type: string
+  aliases: {}
+
+tests:
+  # DS: no result yet — need to test
+  - input:
+      product_type: drug_substance
+    expect:
+      guideline: "ICH Q1B §2"
+      test_phase: confirmatory_required
+      exposure_visible: "≥1.2 million lux hours"
+      batches_required: 1
+
+  # DS: photostable
+  - input:
+      product_type: drug_substance
+      confirmatory_result: photostable
+    expect:
+      guideline: "ICH Q1B §2.C"
+      confirmatory_result: photostable
+      light_protection_required: false
+      additional_batches_needed: 0
+
+  # DS: photolabile
+  - input:
+      product_type: drug_substance
+      confirmatory_result: photolabile
+    expect:
+      guideline: "ICH Q1B §2.C"
+      confirmatory_result: photolabile
+      light_protection_required: true
+      additional_batches_needed: 0
+
+  # DS: equivocal
+  - input:
+      product_type: drug_substance
+      confirmatory_result: equivocal
+    expect:
+      guideline: "ICH Q1B §2.C"
+      confirmatory_result: equivocal
+      additional_batches_needed: 2
+
+  # DP: no test results yet
+  - input:
+      product_type: drug_product
+      immediate_pack_impenetrable: false
+    expect:
+      guideline: "ICH Q1B §3 (Flow Chart Step 1)"
+      test_phase: test_directly_exposed
+
+  # DP: directly exposed acceptable — TEST END
+  - input:
+      product_type: drug_product
+      immediate_pack_impenetrable: false
+      directly_exposed_acceptable: true
+    expect:
+      guideline: "ICH Q1B §3 (Flow Chart)"
+      protection_level: none_needed
+      light_protection_required: false
+
+  # DP: exposed unacceptable, no immediate result yet
+  - input:
+      product_type: drug_product
+      immediate_pack_impenetrable: false
+      directly_exposed_acceptable: false
+    expect:
+      guideline: "ICH Q1B §3 (Flow Chart Step 2)"
+      test_phase: test_immediate_pack
+
+  # DP: exposed unacceptable, immediate acceptable — TEST END
+  - input:
+      product_type: drug_product
+      immediate_pack_impenetrable: false
+      directly_exposed_acceptable: false
+      immediate_pack_acceptable: true
+    expect:
+      guideline: "ICH Q1B §3 (Flow Chart)"
+      protection_level: immediate_pack
+      light_protection_required: false
+
+  # DP: exposed + immediate unacceptable, no marketing result
+  - input:
+      product_type: drug_product
+      immediate_pack_impenetrable: false
+      directly_exposed_acceptable: false
+      immediate_pack_acceptable: false
+    expect:
+      guideline: "ICH Q1B §3 (Flow Chart Step 3)"
+      test_phase: test_marketing_pack
+
+  # DP: exposed + immediate unacceptable, marketing acceptable
+  - input:
+      product_type: drug_product
+      immediate_pack_impenetrable: false
+      directly_exposed_acceptable: false
+      immediate_pack_acceptable: false
+      marketing_pack_acceptable: true
+    expect:
+      guideline: "ICH Q1B §3 (Flow Chart)"
+      protection_level: marketing_pack
+      light_protection_required: false
+
+  # DP: ALL unacceptable — REDESIGN
+  - input:
+      product_type: drug_product
+      immediate_pack_impenetrable: false
+      directly_exposed_acceptable: false
+      immediate_pack_acceptable: false
+      marketing_pack_acceptable: false
+    expect:
+      guideline: "ICH Q1B §3 (Flow Chart)"
+      test_phase: redesign_required
+      protection_level: insufficient
+      light_protection_required: true
+
+  # DP: impenetrable pack, no test yet
+  - input:
+      product_type: drug_product
+      immediate_pack_impenetrable: true
+    expect:
+      guideline: "ICH Q1B §3"
+      test_phase: test_directly_exposed
+      immediate_pack_impenetrable: true
+
+  # DP: impenetrable pack, exposed acceptable
+  - input:
+      product_type: drug_product
+      immediate_pack_impenetrable: true
+      directly_exposed_acceptable: true
+    expect:
+      guideline: "ICH Q1B §3 (Flow Chart)"
+      protection_level: none_needed
+
+  # DP: impenetrable pack, exposed not acceptable — pack protects
+  - input:
+      product_type: drug_product
+      immediate_pack_impenetrable: true
+      directly_exposed_acceptable: false
+    expect:
+      guideline: "ICH Q1B §3"
+      protection_level: immediate_pack
+      immediate_pack_impenetrable: true
+
+  # Null safety
+  - input: {}
+    expect:
+      guideline: ICH Q1B
+      light_protection_required: false

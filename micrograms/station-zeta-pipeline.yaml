@@ -1,0 +1,112 @@
+name: station-zeta-pipeline
+description: Route Riemann zeta function results for number-theoretic PV applications
+version: 0.1.0
+tree:
+  start: check_zeros
+  nodes:
+    low_zero:
+      type: return
+      value:
+        reason: Known low zero — verify against Odlyzko tables
+        action: verify
+        priority: low
+        route: archive
+    rh_consistent:
+      type: condition
+      variable: imaginary_part
+      operator: gte
+      value: 1000
+      true_next: high_zero
+      false_next: low_zero
+    check_zeros:
+      type: condition
+      variable: on_critical_line
+      operator: eq
+      value: true
+      true_next: rh_consistent
+      false_next: rh_violation
+    rh_violation:
+      type: return
+      value:
+        route: precision_verification
+        reason: Zero NOT on critical line — RH counterexample candidate (verify precision)
+        action: alert
+        priority: critical
+    high_zero:
+      type: return
+      value:
+        route: zero_catalog
+        reason: High zero on critical line — add to catalog for distribution analysis
+        action: catalog
+        priority: moderate
+tests:
+- input:
+    on_critical_line: false
+    imaginary_part: 14.13
+  expect:
+    action: alert
+    priority: critical
+    route: precision_verification
+- input:
+    on_critical_line: true
+    imaginary_part: 5000
+  expect:
+    route: zero_catalog
+    action: catalog
+    priority: moderate
+- input:
+    on_critical_line: true
+    imaginary_part: 14.13
+  expect:
+    route: archive
+    action: verify
+    priority: low
+- input:
+    imaginary_part: 0
+  expect:
+    route: precision_verification
+    action: alert
+    reason: Zero NOT on critical line — RH counterexample candidate (verify precision)
+    priority: critical
+- input:
+    imaginary_part: -1
+  expect:
+    reason: Zero NOT on critical line — RH counterexample candidate (verify precision)
+    action: alert
+    priority: critical
+    route: precision_verification
+- input:
+    imaginary_part: 999
+  expect:
+    action: alert
+    route: precision_verification
+    priority: critical
+    reason: Zero NOT on critical line — RH counterexample candidate (verify precision)
+- input:
+    imaginary_part: 1001
+  expect:
+    reason: Zero NOT on critical line — RH counterexample candidate (verify precision)
+    action: alert
+    priority: critical
+    route: precision_verification
+- input:
+    imaginary_part: 100000
+  expect:
+    reason: Zero NOT on critical line — RH counterexample candidate (verify precision)
+    priority: critical
+    action: alert
+    route: precision_verification
+- input: {}
+  expect:
+    reason: Zero NOT on critical line — RH counterexample candidate (verify precision)
+    priority: critical
+    route: precision_verification
+    action: alert
+- input: {}
+  expect:
+    action: alert
+    priority: critical
+    reason: Zero NOT on critical line — RH counterexample candidate (verify precision)
+    route: precision_verification
+interface: null
+primitive_signature: null

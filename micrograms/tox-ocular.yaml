@@ -1,0 +1,105 @@
+name: tox-ocular
+description: 'Ocular toxicity gate: vision_change_grade thresholds for eye'
+version: 0.1.0
+tree:
+  start: check_severe
+  nodes:
+    check_severe:
+      type: condition
+      variable: vision_change_grade
+      operator: gte
+      value: 3
+      true_next: severe
+      false_next: check_mild
+    severe:
+      type: return
+      value:
+        action: discontinue
+        organ: ocular
+        severity: severe
+        target: eye
+    normal:
+      type: return
+      value:
+        target: eye
+        organ: ocular
+        action: continue
+        severity: normal
+    mild:
+      type: return
+      value:
+        organ: ocular
+        severity: mild
+        target: eye
+        action: monitor_closely
+    check_mild:
+      type: condition
+      variable: vision_change_grade
+      operator: gte
+      value: 1
+      true_next: mild
+      false_next: normal
+tests:
+- input:
+    vision_change_grade: 4
+  expect:
+    severity: severe
+    organ: ocular
+- input:
+    vision_change_grade: 1
+  expect:
+    severity: mild
+    organ: ocular
+- input:
+    vision_change_grade: 0
+  expect:
+    organ: ocular
+    severity: normal
+- input: {}
+  expect:
+    severity: normal
+    organ: ocular
+- input:
+    vision_change_grade: -1
+  expect:
+    severity: normal
+    organ: ocular
+    action: continue
+    target: eye
+- input:
+    vision_change_grade: 2
+  expect:
+    organ: ocular
+    action: monitor_closely
+    severity: mild
+    target: eye
+- input:
+    vision_change_grade: 300
+  expect:
+    severity: severe
+    organ: ocular
+    target: eye
+    action: discontinue
+- input:
+    vision_change_grade: -1
+  expect:
+    organ: ocular
+    action: continue
+    target: eye
+    severity: normal
+- input:
+    vision_change_grade: 2
+  expect:
+    action: monitor_closely
+    target: eye
+    severity: mild
+    organ: ocular
+- input:
+    vision_change_grade: 100
+  expect:
+    target: eye
+    severity: severe
+    action: discontinue
+    organ: ocular
+interface: null
+primitive_signature: null

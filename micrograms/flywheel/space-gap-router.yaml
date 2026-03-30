@@ -1,0 +1,91 @@
+name: space-gap-router
+description: 'Route to the weakest space surface for growth: CONFIG, MCG, ROUTE, or CRATE'
+version: 0.1.0
+interface:
+  inputs:
+    config_pct:
+      type: int
+      required: false
+    mcg_pct:
+      type: int
+      required: false
+    route_pct:
+      type: int
+      required: false
+    crate_pct:
+      type: int
+      required: false
+  outputs:
+    weakest:
+      type: string
+    action:
+      type: string
+tree:
+  start: check_config_lowest
+  nodes:
+    check_config_lowest:
+      type: condition
+      variable: config_pct
+      operator: lte
+      value: 50
+      true_next: config_gap
+      false_next: check_mcg_lowest
+    check_mcg_lowest:
+      type: condition
+      variable: mcg_pct
+      operator: lte
+      value: 50
+      true_next: mcg_gap
+      false_next: check_route_lowest
+    check_route_lowest:
+      type: condition
+      variable: route_pct
+      operator: lte
+      value: 50
+      true_next: route_gap
+      false_next: check_crate_lowest
+    check_crate_lowest:
+      type: condition
+      variable: crate_pct
+      operator: lte
+      value: 80
+      true_next: crate_gap
+      false_next: all_covered
+    config_gap:
+      type: return
+      value:
+        weakest: CONFIG
+        action: add_station_configs
+    mcg_gap:
+      type: return
+      value:
+        weakest: MCG
+        action: create_micrograms
+    route_gap:
+      type: return
+      value:
+        weakest: ROUTE
+        action: add_nucleus_pages
+    crate_gap:
+      type: return
+      value:
+        weakest: CRATE
+        action: add_nexcore_crates
+    all_covered:
+      type: return
+      value:
+        weakest: NONE
+        action: raise_targets
+tests:
+- input: {config_pct: 30, mcg_pct: 60, route_pct: 70, crate_pct: 90}
+  expect: {weakest: CONFIG, action: add_station_configs}
+- input: {config_pct: 60, mcg_pct: 40, route_pct: 70, crate_pct: 90}
+  expect: {weakest: MCG, action: create_micrograms}
+- input: {config_pct: 60, mcg_pct: 60, route_pct: 40, crate_pct: 90}
+  expect: {weakest: ROUTE, action: add_nucleus_pages}
+- input: {config_pct: 60, mcg_pct: 60, route_pct: 70, crate_pct: 70}
+  expect: {weakest: CRATE, action: add_nexcore_crates}
+- input: {config_pct: 90, mcg_pct: 90, route_pct: 90, crate_pct: 90}
+  expect: {weakest: NONE, action: raise_targets}
+- input: {config_pct: 0, mcg_pct: 0, route_pct: 0, crate_pct: 0}
+  expect: {weakest: CONFIG, action: add_station_configs}

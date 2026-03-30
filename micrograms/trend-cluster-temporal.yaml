@@ -1,0 +1,67 @@
+name: trend-cluster-temporal
+description: Temporal case cluster
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    not_detected:
+      type: return
+      value:
+        pattern: cluster
+        action: continue_monitoring
+        detected: false
+    detected:
+      type: return
+      value:
+        pattern: cluster
+        detected: true
+        action: investigate
+    check:
+      type: condition
+      variable: cluster_cases
+      operator: gte
+      value: 5
+      true_next: detected
+      false_next: not_detected
+tests:
+- input:
+    cluster_cases: 5
+  expect:
+    pattern: cluster
+    detected: true
+- input: {}
+  expect:
+    pattern: cluster
+    detected: false
+- input:
+    cluster_cases: 0
+  expect:
+    detected: false
+    pattern: cluster
+    action: continue_monitoring
+- input:
+    cluster_cases: -1
+  expect:
+    action: continue_monitoring
+    detected: false
+    pattern: cluster
+- input:
+    cluster_cases: 4
+  expect:
+    action: continue_monitoring
+    detected: false
+    pattern: cluster
+- input:
+    cluster_cases: 6
+  expect:
+    detected: true
+    pattern: cluster
+    action: investigate
+- input:
+    cluster_cases: 500
+  expect:
+    action: investigate
+    pattern: cluster
+    detected: true
+interface: null
+primitive_signature: null

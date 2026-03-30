@@ -1,0 +1,67 @@
+name: convergence-3of4
+description: 3 of 4 methods agree
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: methods_positive
+      operator: gte
+      value: 3
+      true_next: converged
+      false_next: divergent
+    converged:
+      type: return
+      value:
+        met: true
+        action: escalate
+        convergence: moderate
+    divergent:
+      type: return
+      value:
+        met: false
+        convergence: moderate
+        action: investigate_discrepancy
+tests:
+- input:
+    methods_positive: 3
+  expect:
+    met: true
+    convergence: moderate
+- input: {}
+  expect:
+    convergence: moderate
+    met: false
+- input:
+    methods_positive: 0
+  expect:
+    convergence: moderate
+    met: false
+    action: investigate_discrepancy
+- input:
+    methods_positive: -1
+  expect:
+    convergence: moderate
+    action: investigate_discrepancy
+    met: false
+- input:
+    methods_positive: 2
+  expect:
+    met: false
+    convergence: moderate
+    action: investigate_discrepancy
+- input:
+    methods_positive: 4
+  expect:
+    met: true
+    action: escalate
+    convergence: moderate
+- input:
+    methods_positive: 300
+  expect:
+    convergence: moderate
+    action: escalate
+    met: true
+interface: null
+primitive_signature: null

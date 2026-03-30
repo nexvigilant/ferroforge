@@ -6,6 +6,10 @@
 # available in the Docker build context.
 FROM python:3.12-slim
 
+# Python deps for proxy scripts (pinned in requirements.txt)
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
 # Station binary (pre-built locally)
 COPY target/release/nexvigilant-station /usr/local/bin/nexvigilant-station
 

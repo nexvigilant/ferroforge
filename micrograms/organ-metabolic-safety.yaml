@@ -1,0 +1,66 @@
+name: organ-metabolic-safety
+description: "Metabolic safety assessment. Evaluates lactic acidosis, metabolic acidosis, and electrolyte imbalance risks."
+version: 0.1.0
+tree:
+  start: check_baseline_lactate
+  nodes:
+    check_baseline_lactate:
+      type: condition
+      variable: baseline_lactate_mmol_l
+      operator: gte
+      value: 4.0
+      true_next: elevated_lactate_alert
+      false_next: check_renal_function
+    elevated_lactate_alert:
+      type: return
+      value:
+        organ: metabolic
+        risk_level: high
+        lactic_acidosis_risk: true
+        monitoring: required
+        message: "Elevated baseline lactate; metformin/nucleosides contraindicated"
+    check_renal_function:
+      type: condition
+      variable: renal_clearance_ml_min
+      operator: lt
+      value: 30
+      true_next: renal_metabolic_risk
+      false_next: check_electrolytes
+    renal_metabolic_risk:
+      type: return
+      value:
+        organ: metabolic
+        risk_level: moderate
+        drug_accumulation_risk: true
+        message: "Severe renal impairment; metabolic acidosis risk from drug accumulation"
+    check_electrolytes:
+      type: condition
+      variable: has_electrolyte_abnormality
+      operator: eq
+      value: true
+      true_next: electrolyte_alert
+      false_next: standard_dosing
+    electrolyte_alert:
+      type: return
+      value:
+        organ: metabolic
+        risk_level: moderate
+        electrolyte_monitoring: required
+        message: "Baseline electrolyte abnormality; monitor closely"
+    standard_dosing:
+      type: return
+      value:
+        organ: metabolic
+        risk_level: low
+        baseline_metabolic_panel: recommended
+tests:
+  - input: { baseline_lactate_mmol_l: 5.0, renal_clearance_ml_min: 70, has_electrolyte_abnormality: false }
+    expect: { organ: metabolic, risk_level: high, lactic_acidosis_risk: true }
+  - input: { baseline_lactate_mmol_l: 2.0, renal_clearance_ml_min: 20, has_electrolyte_abnormality: false }
+    expect: { organ: metabolic, risk_level: moderate, drug_accumulation_risk: true }
+  - input: { baseline_lactate_mmol_l: 2.0, renal_clearance_ml_min: 70, has_electrolyte_abnormality: true }
+    expect: { organ: metabolic, risk_level: moderate, electrolyte_monitoring: required }
+  - input: { baseline_lactate_mmol_l: 2.0, renal_clearance_ml_min: 70, has_electrolyte_abnormality: false }
+    expect: { organ: metabolic, risk_level: low }
+  - input: {}
+    expect: {}

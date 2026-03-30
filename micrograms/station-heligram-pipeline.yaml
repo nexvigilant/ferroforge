@@ -1,0 +1,91 @@
+name: station-heligram-pipeline
+description: Route heligram execution results through conservation verification
+version: 0.1.0
+tree:
+  start: check_result
+  nodes:
+    weak:
+      type: return
+      value:
+        priority: moderate
+        action: strengthen
+        reason: Heligram passes but conservation weak — boundary leakage
+        route: conservation_repair
+    fail:
+      type: return
+      value:
+        reason: Heligram execution failed — check input encoding
+        action: retry
+        route: heligram_debug
+        priority: moderate
+    check_conservation:
+      type: condition
+      variable: conservation_score
+      operator: gte
+      value: 0.8
+      true_next: pass
+      false_next: weak
+    pass:
+      type: return
+      value:
+        priority: low
+        route: archive
+        action: certify
+        reason: Heligram passes with conservation ≥0.8
+    check_result:
+      type: condition
+      variable: heligram_pass
+      operator: eq
+      value: true
+      true_next: check_conservation
+      false_next: fail
+tests:
+- input:
+    heligram_pass: false
+    conservation_score: 0.0
+  expect:
+    route: heligram_debug
+    action: retry
+    priority: moderate
+- input:
+    heligram_pass: true
+    conservation_score: 0.9
+  expect:
+    priority: low
+    route: archive
+    action: certify
+- input:
+    conservation_score: 0.5
+    heligram_pass: true
+  expect:
+    route: conservation_repair
+    action: strengthen
+    priority: moderate
+- input:
+    conservation_score: 0.799
+  expect:
+    action: retry
+    priority: moderate
+    route: heligram_debug
+    reason: Heligram execution failed — check input encoding
+- input:
+    conservation_score: 0.801
+  expect:
+    action: retry
+    priority: moderate
+    route: heligram_debug
+    reason: Heligram execution failed — check input encoding
+- input: {}
+  expect:
+    action: retry
+    reason: Heligram execution failed — check input encoding
+    priority: moderate
+    route: heligram_debug
+- input: {}
+  expect:
+    reason: Heligram execution failed — check input encoding
+    route: heligram_debug
+    priority: moderate
+    action: retry
+interface: null
+primitive_signature: null

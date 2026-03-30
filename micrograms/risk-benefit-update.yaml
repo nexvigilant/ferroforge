@@ -1,0 +1,83 @@
+name: risk-benefit-update
+description: "Update benefit-risk assessment based on new safety data"
+version: 0.1.0
+tree:
+  start: validate_new_data
+  nodes:
+    validate_new_data:
+      type: condition
+      variable: new_safety_data_available
+      operator: eq
+      value: true
+      true_next: check_benefit_impact
+      false_next: update_not_needed
+    check_benefit_impact:
+      type: condition
+      variable: benefit_status
+      operator: eq
+      value: "maintained"
+      true_next: check_risk_increase
+      false_next: benefit_compromised
+    check_risk_increase:
+      type: condition
+      variable: risk_increase_percent
+      operator: gte
+      value: 30
+      true_next: significant_risk_increase
+      false_next: manageable_risk_increase
+    benefit_compromised:
+      type: return
+      value:
+        br_status: "benefit_risk_unfavorable"
+        recommendation: "restrict_use_or_contraindicate"
+        label_update_required: true
+        further_data_needed: false
+        br_assessment_compliant: true
+    significant_risk_increase:
+      type: return
+      value:
+        br_status: "benefit_risk_marginal"
+        recommendation: "restricted_population_use"
+        label_update_required: true
+        further_data_needed: true
+        br_assessment_compliant: true
+    manageable_risk_increase:
+      type: return
+      value:
+        br_status: "benefit_risk_favorable"
+        recommendation: "continue_with_risk_minimization"
+        label_update_required: true
+        further_data_needed: false
+        br_assessment_compliant: true
+    update_not_needed:
+      type: return
+      value:
+        br_status: "no_change"
+        recommendation: "continue_without_modification"
+        label_update_required: false
+        further_data_needed: false
+        br_assessment_compliant: true
+tests:
+- input:
+    new_safety_data_available: true
+    benefit_status: "compromised"
+  expect:
+    br_status: "benefit_risk_unfavorable"
+    recommendation: "restrict_use_or_contraindicate"
+- input:
+    new_safety_data_available: true
+    benefit_status: "maintained"
+    risk_increase_percent: 40
+  expect:
+    br_status: "benefit_risk_marginal"
+    recommendation: "restricted_population_use"
+- input:
+    new_safety_data_available: true
+    benefit_status: "maintained"
+    risk_increase_percent: 15
+  expect:
+    br_status: "benefit_risk_favorable"
+- input: {}
+  expect:
+    br_status: "no_change"
+    label_update_required: false

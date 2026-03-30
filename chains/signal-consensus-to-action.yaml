@@ -1,0 +1,89 @@
+name: signal-consensus-to-action
+description: 'End-to-end pipeline: 4-measure disproportionality consensus → signal-to-causality routing → Naranjo causality assessment → regulatory action with ICH E2B deadlines. Takes pre-computed disproportionality scores + Naranjo score + seriousness flag and returns consensus classification, causality level, and regulatory action with deadline.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - disproportionality-consensus
+  - signal-to-causality
+  - naranjo-quick
+  - causality-to-action
+tests:
+- name: strong signal + definite causality + serious — expedited 7-day report
+  input:
+    prr: 5.87
+    ror_ci_lower: 6.0
+    ic025: 2.48
+    eb05: 5.54
+    n_cases: 4615
+    naranjo_score: 9
+    is_serious: true
+  expect:
+    consensus: STRONG
+    signals_detected: 4
+    signal_detected: true
+    causality: DEFINITE
+    regulatory_action: expedited_report
+    deadline_days: 7
+- name: strong signal + probable causality + not serious — periodic 90-day report
+  input:
+    prr: 3.95
+    ror_ci_lower: 4.37
+    ic025: 1.94
+    eb05: 3.82
+    n_cases: 11511
+    naranjo_score: 6
+    is_serious: false
+  expect:
+    consensus: STRONG
+    signals_detected: 4
+    signal_detected: true
+    causality: PROBABLE
+    regulatory_action: periodic_report
+    deadline_days: 90
+- name: no signal + low naranjo — monitor only
+  input:
+    prr: 1.2
+    ror_ci_lower: 0.8
+    ic025: -0.5
+    eb05: 0.7
+    n_cases: 50
+    naranjo_score: 2
+    is_serious: false
+  expect:
+    consensus: NONE
+    signals_detected: 0
+    signal_detected: false
+    causality: POSSIBLE
+    next_step: continue_monitoring
+- name: marginal signal + possible causality + serious — periodic report
+  input:
+    prr: 2.5
+    ror_ci_lower: 0.9
+    ic025: -0.1
+    eb05: 0.8
+    n_cases: 10
+    naranjo_score: 4
+    is_serious: true
+  expect:
+    consensus: MARGINAL
+    signals_detected: 1
+    signal_detected: false
+    causality: POSSIBLE
+    next_step: continue_monitoring
+- name: moderate signal + definite causality + serious — expedited
+  input:
+    prr: 3.0
+    ror_ci_lower: 2.3
+    ic025: 0.8
+    eb05: 0.9
+    n_cases: 100
+    naranjo_score: 10
+    is_serious: true
+  expect:
+    consensus: MODERATE
+    signals_detected: 3
+    signal_detected: true
+    causality: DEFINITE
+    regulatory_action: expedited_report
+    deadline_days: 7

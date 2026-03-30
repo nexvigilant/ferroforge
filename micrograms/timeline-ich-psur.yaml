@@ -1,0 +1,74 @@
+name: timeline-ich-psur
+description: ICH PSUR interval
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    check:
+      type: condition
+      variable: months_since_psur
+      operator: gte
+      value: 6
+      true_next: due
+      false_next: not_due
+    due:
+      type: return
+      value:
+        action: submit
+        report_type: psur
+        jurisdiction: ICH
+        due: true
+    not_due:
+      type: return
+      value:
+        due: false
+        jurisdiction: ICH
+        action: schedule
+        report_type: psur
+tests:
+- input:
+    months_since_psur: 6
+  expect:
+    jurisdiction: ICH
+    due: true
+- input: {}
+  expect:
+    due: false
+    jurisdiction: ICH
+- input:
+    months_since_psur: 0
+  expect:
+    report_type: psur
+    action: schedule
+    due: false
+    jurisdiction: ICH
+- input:
+    months_since_psur: -1
+  expect:
+    report_type: psur
+    action: schedule
+    jurisdiction: ICH
+    due: false
+- input:
+    months_since_psur: 5
+  expect:
+    report_type: psur
+    action: schedule
+    jurisdiction: ICH
+    due: false
+- input:
+    months_since_psur: 7
+  expect:
+    report_type: psur
+    due: true
+    jurisdiction: ICH
+    action: submit
+- input:
+    months_since_psur: 600
+  expect:
+    report_type: psur
+    due: true
+    jurisdiction: ICH
+    action: submit
+interface: null
+primitive_signature: null

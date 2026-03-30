@@ -1,0 +1,32 @@
+name: convergence-prr-ror
+description: "PRR+ROR both positive"
+version: 0.1.0
+
+tree:
+  start: check
+  nodes:
+    check:
+      type: "condition"
+      variable: "prr_ror_agree"
+      operator: "eq"
+      value: true
+      true_next: "converged"
+      false_next: "divergent"
+    converged:
+      type: "return"
+      value:
+        convergence: "frequentist"
+        met: true
+        action: "escalate"
+    divergent:
+      type: "return"
+      value:
+        convergence: "frequentist"
+        met: false
+        action: "investigate_discrepancy"
+
+tests:
+  - input: {"prr_ror_agree": true}
+    expect: {"convergence": "frequentist", "met": true}
+  - input: {}
+    expect: {"convergence": "frequentist", "met": false}

@@ -1,0 +1,324 @@
+name: spanglish-primitives
+description: >
+  Classifies the 6 Spanglish primitives — boundary phenomena that exist ONLY
+  at the code-switch interface between Spanish and English. These are not
+  Spanish primitives or English primitives. They are interference-pattern
+  primitives that emerge when two linguistic systems collide.
+
+  The 6 Spanglish Primitives:
+
+  ∂_switch    — The boundary itself. WHERE the language changes. The switch
+                point carries information that neither language alone encodes.
+
+  μ_frame     — Frame-content split. WHICH language provides grammar (frame)
+                vs vocabulary (content). "Está feeling dizzy" = Spanish frame,
+                English content. The split IS the mapping.
+
+  →_direction — Switch direction. WHY the speaker crossed. es→en for symptoms
+                means English lacks the nuance. en→es means Spanish temporal
+                precision was invoked. Direction encodes intent.
+
+  κ_boost     — Confidence differential. HOW MUCH stronger is dual-encoding
+                vs single? The effort of switching amplifies the signal.
+                +20 estar, +15 tener, +10 sentirse, 0 ser, 0 pure-English.
+
+  ν_rate      — Switch frequency. HOW OFTEN boundaries appear in the text.
+                High = fully bilingual. Low = dominant language with borrowings.
+                Rate determines transducer bandwidth.
+
+  ∅_null      — The null switch. WHERE a switch COULD have happened but DIDN'T.
+                A bilingual speaker who says "is dizzy" when they could have
+                said "está dizzy" made an unconscious classification:
+                the symptom didn't warrant temporal precision. Absence = signal.
+
+version: 0.1.0
+primitive_signature:
+  dominant: '∂'
+  expression: '∂(μ(L1,L2) × →(direction) × κ(boost) × ν(rate) × ∅(null)) — all 6 primitives are boundary phenomena'
+  primes: ['∂', 'μ', '→', 'κ', 'ν', '∅']
+  arguments: ['text_fragment', 'speaker_bilingual']
+  chain_prediction: >
+    Decomposes any Spanglish clinical text into its 6 boundary primitives.
+    Feeds into spanglish-code-switch-detector for pattern classification,
+    then into ser-estar-temporal-classifier for temporal signal extraction.
+    The null switch (∅) is the most novel: detecting ABSENCE of code-switch
+    in a bilingual speaker is a negative temporal signal.
+interface:
+  inputs:
+    text_fragment:
+      type: string
+      required: true
+      description: "Clinical text fragment, possibly Spanglish"
+    speaker_bilingual:
+      type: bool
+      required: false
+      description: "Is the speaker known to be bilingual? Enables null-switch detection."
+  outputs:
+    d_switch:
+      type: bool
+      description: "∂: Code-switch boundary detected"
+    mu_frame:
+      type: string
+      description: "μ: Frame language — SPANISH_FRAME | ENGLISH_FRAME | NO_FRAME"
+    arrow_direction:
+      type: string
+      description: "→: Switch direction — ES_TO_EN | EN_TO_ES | NONE"
+    kappa_boost:
+      type: int
+      description: "κ: Confidence boost from dual-encoding (0-20)"
+    nu_rate:
+      type: string
+      description: "ν: Switch density — HIGH | LOW | ZERO"
+    null_switch:
+      type: bool
+      description: "∅: Null switch detected — bilingual speaker chose NOT to switch"
+    composite_signal:
+      type: string
+      description: "AMPLIFIED | NEUTRAL | ATTENUATED | ABSENT"
+    razon:
+      type: string
+tree:
+  start: check_text
+  nodes:
+    check_text:
+      type: condition
+      variable: text_fragment
+      operator: is_null
+      value: null
+      true_next: reject
+      false_next: detect_spanish_frame
+
+    reject:
+      type: return
+      value:
+        d_switch: false
+        mu_frame: NO_FRAME
+        arrow_direction: NONE
+        kappa_boost: 0
+        nu_rate: ZERO
+        null_switch: false
+        composite_signal: ABSENT
+        razon: "No text provided"
+
+    # Detect Spanish grammatical frame (estar/ser/sentir/tener + English content)
+    detect_spanish_frame:
+      type: condition
+      variable: text_fragment
+      operator: matches
+      value: "(?i)(est[áa]|estaba|estuvo|se siente|se sent|tiene|ten[ií]a|tuvo|\\bes\\b|\\bera\\b|\\bfue\\b)"
+      true_next: has_switch
+      false_next: check_english_frame
+
+    # Detect English grammatical frame with Spanish content
+    check_english_frame:
+      type: condition
+      variable: text_fragment
+      operator: matches
+      value: "(?i)(is|was|has|had|feels|feeling).*(mareado|confundido|dolor|fiebre|náusea|vómito|sangrado|hinchazón)"
+      true_next: english_frame_spanish_content
+      false_next: check_pure
+
+    # Pure text — no switch detected
+    check_pure:
+      type: condition
+      variable: speaker_bilingual
+      operator: eq
+      value: true
+      true_next: null_switch_detected
+      false_next: no_switch
+
+    # ∂=true: Spanish frame detected — now classify direction and boost
+    has_switch:
+      type: condition
+      variable: text_fragment
+      operator: matches
+      value: "(?i)(est[áa]|estaba|estuvo|estando|est[ée])"
+      true_next: estar_switch
+      false_next: check_ser_switch
+
+    estar_switch:
+      type: return
+      value:
+        d_switch: true
+        mu_frame: SPANISH_FRAME
+        arrow_direction: ES_TO_EN
+        kappa_boost: 20
+        nu_rate: LOW
+        null_switch: false
+        composite_signal: AMPLIFIED
+        razon: >
+          ∂ SWITCH at estar boundary. Speaker invoked Spanish temporal precision
+          (estar = transient state) then continued in English for clinical content.
+          The switch AMPLIFIES the temporal signal — the speaker chose the more
+          precise encoding. κ_boost=20: maximum amplification.
+
+    check_ser_switch:
+      type: condition
+      variable: text_fragment
+      operator: matches
+      value: "(?i)(\\bes\\b|\\bera\\b|\\bfue\\b|\\bson\\b)"
+      true_next: ser_switch
+      false_next: other_spanish_switch
+
+    ser_switch:
+      type: return
+      value:
+        d_switch: true
+        mu_frame: SPANISH_FRAME
+        arrow_direction: ES_TO_EN
+        kappa_boost: 0
+        nu_rate: LOW
+        null_switch: false
+        composite_signal: NEUTRAL
+        razon: >
+          ∂ SWITCH at ser boundary. Speaker used ser (identity/permanent) then
+          English content. No amplification — ser signals pre-existing condition,
+          not drug-induced state change. The switch is informative (permanent)
+          but does not boost causality confidence.
+
+    other_spanish_switch:
+      type: return
+      value:
+        d_switch: true
+        mu_frame: SPANISH_FRAME
+        arrow_direction: ES_TO_EN
+        kappa_boost: 12
+        nu_rate: LOW
+        null_switch: false
+        composite_signal: AMPLIFIED
+        razon: >
+          ∂ SWITCH at sentirse/tener boundary. Speaker invoked Spanish reflexive
+          or possessive frame for symptom description. Moderate amplification —
+          weaker temporal signal than estar but still indicates transient state.
+
+    english_frame_spanish_content:
+      type: return
+      value:
+        d_switch: true
+        mu_frame: ENGLISH_FRAME
+        arrow_direction: EN_TO_ES
+        kappa_boost: 15
+        nu_rate: LOW
+        null_switch: false
+        composite_signal: AMPLIFIED
+        razon: >
+          ∂ SWITCH with English frame, Spanish symptom content. The speaker
+          used English grammar but Spanish clinical vocabulary — the Spanish
+          term was more precise or natural for the symptom. EN→ES direction
+          means: the English clinical vocabulary was insufficient.
+
+    # ∅ NULL SWITCH: bilingual speaker chose NOT to code-switch
+    null_switch_detected:
+      type: return
+      value:
+        d_switch: false
+        mu_frame: NO_FRAME
+        arrow_direction: NONE
+        kappa_boost: 0
+        nu_rate: ZERO
+        null_switch: true
+        composite_signal: ATTENUATED
+        razon: >
+          ∅ NULL SWITCH detected. A bilingual speaker used pure English when
+          they COULD have invoked Spanish temporal precision. This is an
+          unconscious classification: the symptom did not warrant the effort
+          of switching. The ABSENCE of estar-frame is a negative temporal
+          signal — the speaker did not perceive the state as notably transient.
+          Attenuated: weaker evidence for drug-induced state change.
+
+    no_switch:
+      type: return
+      value:
+        d_switch: false
+        mu_frame: NO_FRAME
+        arrow_direction: NONE
+        kappa_boost: 0
+        nu_rate: ZERO
+        null_switch: false
+        composite_signal: NEUTRAL
+        razon: >
+          No code-switch detected and speaker bilingualism unknown.
+          Cannot determine if absence of switch is informative (null switch)
+          or uninformative (monolingual speaker). Neutral signal.
+
+tests:
+# estar switch — maximum amplification
+- input:
+    text_fragment: "Está feeling very dizzy since the medication"
+  expect:
+    d_switch: true
+    mu_frame: SPANISH_FRAME
+    arrow_direction: ES_TO_EN
+    kappa_boost: 20
+    composite_signal: AMPLIFIED
+
+# ser switch — identity, no boost
+- input:
+    text_fragment: "Patient es diabetic type 2"
+  expect:
+    d_switch: true
+    mu_frame: SPANISH_FRAME
+    arrow_direction: ES_TO_EN
+    kappa_boost: 0
+    composite_signal: NEUTRAL
+
+# sentirse/tener switch — moderate amplification
+- input:
+    text_fragment: "Se siente very nauseous and tired"
+  expect:
+    d_switch: true
+    mu_frame: SPANISH_FRAME
+    arrow_direction: ES_TO_EN
+    kappa_boost: 12
+    composite_signal: AMPLIFIED
+
+# English frame + Spanish symptoms
+- input:
+    text_fragment: "Patient is feeling mareado and has dolor de cabeza"
+  expect:
+    d_switch: true
+    mu_frame: ENGLISH_FRAME
+    arrow_direction: EN_TO_ES
+    kappa_boost: 15
+    composite_signal: AMPLIFIED
+
+# Null switch — bilingual speaker chose pure English
+- input:
+    text_fragment: "Patient reported dizziness and nausea"
+    speaker_bilingual: true
+  expect:
+    d_switch: false
+    null_switch: true
+    composite_signal: ATTENUATED
+    kappa_boost: 0
+
+# No switch, bilingualism unknown — neutral
+- input:
+    text_fragment: "Patient reported dizziness and nausea"
+    speaker_bilingual: false
+  expect:
+    d_switch: false
+    null_switch: false
+    composite_signal: NEUTRAL
+
+# Null input
+- input: {}
+  expect:
+    d_switch: false
+    composite_signal: ABSENT
+
+# Estaba — past transient
+- input:
+    text_fragment: "Estaba very confused after the infusion yesterday"
+  expect:
+    d_switch: true
+    kappa_boost: 20
+    composite_signal: AMPLIFIED
+
+# Tiene — possessive frame
+- input:
+    text_fragment: "Tiene severe headache and joint pain"
+  expect:
+    d_switch: true
+    kappa_boost: 12
+    composite_signal: AMPLIFIED

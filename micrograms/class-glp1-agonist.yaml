@@ -1,0 +1,74 @@
+name: class-glp1-agonist
+description: 'GLP-1 agonists class safety: Pancreatitis monitoring'
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    safe:
+      type: return
+      value:
+        concern: Pancreatitis
+        alert: false
+        action: continue
+        drug_class: GLP-1 agonists
+    check:
+      type: condition
+      variable: pancreatitis_risk
+      operator: gte
+      value: 2
+      true_next: alert
+      false_next: safe
+    alert:
+      type: return
+      value:
+        drug_class: GLP-1 agonists
+        concern: Pancreatitis
+        alert: true
+        action: class_effect_investigation
+tests:
+- input:
+    pancreatitis_risk: 2
+  expect:
+    drug_class: GLP-1 agonists
+    alert: true
+- input: {}
+  expect:
+    drug_class: GLP-1 agonists
+    alert: false
+- input:
+    pancreatitis_risk: 0
+  expect:
+    drug_class: GLP-1 agonists
+    alert: false
+    concern: Pancreatitis
+    action: continue
+- input:
+    pancreatitis_risk: -1
+  expect:
+    concern: Pancreatitis
+    drug_class: GLP-1 agonists
+    alert: false
+    action: continue
+- input:
+    pancreatitis_risk: 1
+  expect:
+    alert: false
+    drug_class: GLP-1 agonists
+    concern: Pancreatitis
+    action: continue
+- input:
+    pancreatitis_risk: 3
+  expect:
+    drug_class: GLP-1 agonists
+    concern: Pancreatitis
+    alert: true
+    action: class_effect_investigation
+- input:
+    pancreatitis_risk: 200
+  expect:
+    alert: true
+    action: class_effect_investigation
+    concern: Pancreatitis
+    drug_class: GLP-1 agonists
+interface: null
+primitive_signature: null

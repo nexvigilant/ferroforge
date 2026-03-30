@@ -1,0 +1,230 @@
+name: fda-biosimilar-safety-scope
+description: "FDA biosimilar safety study scope: determines comparative safety requirements by similarity level per FDA Guidance 'Biosimilar Comparative Analytical Assessment' (2025) and Interchangeability Guidance"
+version: 0.1.0
+interface:
+  inputs:
+    analytical_similarity:
+      type: string
+      required: true
+      description: "Analytical similarity to reference: highly_similar, similar, residual_uncertainty"
+    functional_similarity:
+      type: bool
+      required: true
+      description: "Whether functional assays show comparable biological activity"
+    seeking_interchangeability:
+      type: bool
+      required: false
+      description: "Whether applicant seeks interchangeability designation"
+    immunogenicity_risk_level:
+      type: string
+      required: false
+      description: "Immunogenicity risk: low, moderate, high"
+  outputs:
+    safety_study_scope:
+      type: string
+    clinical_trial_required:
+      type: bool
+    switching_study_required:
+      type: bool
+    immunogenicity_assessment:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_analytical
+  nodes:
+    check_analytical:
+      type: condition
+      variable: analytical_similarity
+      operator: eq
+      value: "highly_similar"
+      true_next: highly_similar_functional
+      false_next: check_similar
+
+    check_similar:
+      type: condition
+      variable: analytical_similarity
+      operator: eq
+      value: "similar"
+      true_next: similar_functional
+      false_next: residual_uncertainty_path
+
+    # HIGHLY SIMILAR analytically
+    highly_similar_functional:
+      type: condition
+      variable: functional_similarity
+      operator: eq
+      value: true
+      true_next: check_interchangeability_hs
+      false_next: reduced_clinical
+
+    check_interchangeability_hs:
+      type: condition
+      variable: seeking_interchangeability
+      operator: eq
+      value: true
+      true_next: interchangeable_path
+      false_next: check_immuno_hs
+
+    check_immuno_hs:
+      type: condition
+      variable: immunogenicity_risk_level
+      operator: eq
+      value: "high"
+      true_next: reduced_with_immuno
+      false_next: streamlined_path
+
+    streamlined_path:
+      type: return
+      value:
+        safety_study_scope: "STREAMLINED"
+        clinical_trial_required: false
+        switching_study_required: false
+        immunogenicity_assessment: "Comparative PK/PD study with immunogenicity endpoints sufficient"
+        regulatory_reference: "FDA Guidance: Biosimilar Comparative Analytical Assessment (2025), Section VI — Totality of Evidence"
+
+    reduced_with_immuno:
+      type: return
+      value:
+        safety_study_scope: "REDUCED_WITH_IMMUNOGENICITY"
+        clinical_trial_required: false
+        switching_study_required: false
+        immunogenicity_assessment: "Dedicated comparative immunogenicity study required due to high risk. 12-month duration with ADA testing."
+        regulatory_reference: "FDA Guidance: Biosimilar Comparative Analytical Assessment (2025); Immunogenicity Assessment (2014)"
+
+    interchangeable_path:
+      type: condition
+      variable: immunogenicity_risk_level
+      operator: eq
+      value: "low"
+      true_next: interchangeable_low_immuno
+      false_next: interchangeable_standard
+
+    interchangeable_low_immuno:
+      type: return
+      value:
+        safety_study_scope: "INTERCHANGEABLE_STREAMLINED"
+        clinical_trial_required: true
+        switching_study_required: true
+        immunogenicity_assessment: "Switching study with ADA endpoints. May use integrated PK/PD/immunogenicity design."
+        regulatory_reference: "FDA Guidance: Interchangeable Biosimilar Products (2019); Comparative Analytical Assessment (2025)"
+
+    interchangeable_standard:
+      type: return
+      value:
+        safety_study_scope: "INTERCHANGEABLE_FULL"
+        clinical_trial_required: true
+        switching_study_required: true
+        immunogenicity_assessment: "Dedicated switching study with comparative immunogenicity. Multiple switch design required."
+        regulatory_reference: "FDA Guidance: Interchangeable Biosimilar Products (2019), Section V"
+
+    # SIMILAR but not highly similar
+    similar_functional:
+      type: condition
+      variable: functional_similarity
+      operator: eq
+      value: true
+      true_next: reduced_clinical
+      false_next: full_clinical
+
+    reduced_clinical:
+      type: return
+      value:
+        safety_study_scope: "REDUCED_CLINICAL"
+        clinical_trial_required: true
+        switching_study_required: false
+        immunogenicity_assessment: "Comparative clinical study with safety and immunogenicity co-primary endpoints. Reduced sample size acceptable."
+        regulatory_reference: "FDA Guidance: Biosimilar Comparative Analytical Assessment (2025), Section V"
+
+    # RESIDUAL UNCERTAINTY
+    residual_uncertainty_path:
+      type: return
+      value:
+        safety_study_scope: "FULL_CLINICAL_PROGRAM"
+        clinical_trial_required: true
+        switching_study_required: false
+        immunogenicity_assessment: "Full comparative clinical program including efficacy, safety, and immunogenicity. Standard BLA-level evidence."
+        regulatory_reference: "FDA Guidance: Biosimilar Comparative Analytical Assessment (2025), Section IV"
+
+    full_clinical:
+      type: return
+      value:
+        safety_study_scope: "FULL_CLINICAL_PROGRAM"
+        clinical_trial_required: true
+        switching_study_required: false
+        immunogenicity_assessment: "Full comparative clinical program required. Functional dissimilarity necessitates clinical confirmation."
+        regulatory_reference: "FDA Guidance: Biosimilar Comparative Analytical Assessment (2025), Section IV"
+
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(κ, ∂) — biosimilar study scope routing by similarity classification and interchangeability boundary'
+  primes: ['σ', 'κ', '∂']
+  arguments: ['analytical_similarity', 'functional_similarity', 'seeking_interchangeability']
+
+tests:
+# Highly similar + functional + no interchangeability + low immuno -> streamlined
+- input:
+    analytical_similarity: "highly_similar"
+    functional_similarity: true
+    seeking_interchangeability: false
+    immunogenicity_risk_level: "low"
+  expect:
+    safety_study_scope: "STREAMLINED"
+    clinical_trial_required: false
+
+# Highly similar + high immuno risk -> reduced with immuno
+- input:
+    analytical_similarity: "highly_similar"
+    functional_similarity: true
+    seeking_interchangeability: false
+    immunogenicity_risk_level: "high"
+  expect:
+    safety_study_scope: "REDUCED_WITH_IMMUNOGENICITY"
+    clinical_trial_required: false
+
+# Interchangeable + low immuno
+- input:
+    analytical_similarity: "highly_similar"
+    functional_similarity: true
+    seeking_interchangeability: true
+    immunogenicity_risk_level: "low"
+  expect:
+    safety_study_scope: "INTERCHANGEABLE_STREAMLINED"
+    switching_study_required: true
+
+# Interchangeable + moderate immuno
+- input:
+    analytical_similarity: "highly_similar"
+    functional_similarity: true
+    seeking_interchangeability: true
+    immunogenicity_risk_level: "moderate"
+  expect:
+    safety_study_scope: "INTERCHANGEABLE_FULL"
+    switching_study_required: true
+
+# Similar + functional -> reduced clinical
+- input:
+    analytical_similarity: "similar"
+    functional_similarity: true
+  expect:
+    safety_study_scope: "REDUCED_CLINICAL"
+    clinical_trial_required: true
+
+# Similar + not functional -> full program
+- input:
+    analytical_similarity: "similar"
+    functional_similarity: false
+  expect:
+    safety_study_scope: "FULL_CLINICAL_PROGRAM"
+
+# Residual uncertainty -> full program
+- input:
+    analytical_similarity: "residual_uncertainty"
+    functional_similarity: true
+  expect:
+    safety_study_scope: "FULL_CLINICAL_PROGRAM"
+
+# Empty -> full program
+- input: {}
+  expect:
+    safety_study_scope: "FULL_CLINICAL_PROGRAM"

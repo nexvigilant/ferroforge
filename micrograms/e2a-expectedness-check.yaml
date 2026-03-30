@@ -1,0 +1,192 @@
+name: e2a-expectedness-check
+description: 'ICH E2A Section II.C: Determines expectedness of an adverse reaction — listed (expected) vs unlisted (unexpected) in the Reference Safety Information (RSI/IB/SmPC)'
+version: 1.0.0
+interface:
+  inputs:
+    listed_in_ib:
+      type: bool
+      required: false
+    listed_in_smpc:
+      type: bool
+      required: false
+    nature_matches:
+      type: bool
+      required: false
+    rsi_available:
+      type: bool
+      required: false
+    severity_exceeds_listed:
+      type: bool
+      required: false
+  outputs:
+    expectedness:
+      type: string
+    is_unexpected:
+      type: bool
+    rationale:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_rsi_available
+  nodes:
+    check_rsi_available:
+      type: condition
+      variable: rsi_available
+      operator: eq
+      value: true
+      true_next: check_listed_ib
+      false_next: no_rsi_unexpected
+    check_listed_ib:
+      type: condition
+      variable: listed_in_ib
+      operator: eq
+      value: true
+      true_next: check_nature_matches
+      false_next: check_listed_smpc
+    check_listed_smpc:
+      type: condition
+      variable: listed_in_smpc
+      operator: eq
+      value: true
+      true_next: check_nature_matches
+      false_next: not_listed_unexpected
+    check_nature_matches:
+      type: condition
+      variable: nature_matches
+      operator: eq
+      value: true
+      true_next: check_severity_exceeds
+      false_next: nature_mismatch_unexpected
+    check_severity_exceeds:
+      type: condition
+      variable: severity_exceeds_listed
+      operator: eq
+      value: true
+      true_next: severity_upgrade_unexpected
+      false_next: listed_expected
+    listed_expected:
+      type: return
+      value:
+        expectedness: EXPECTED
+        is_unexpected: false
+        rationale: Reaction is listed in RSI with matching nature and non-exceeding severity
+        regulatory_reference: ICH E2A Section II.C - Listed in RSI = expected
+    severity_upgrade_unexpected:
+      type: return
+      value:
+        expectedness: UNEXPECTED
+        is_unexpected: true
+        rationale: Reaction is listed but severity exceeds what is described in RSI — upgrade to unexpected per ICH E2A
+        regulatory_reference: ICH E2A Section II.C - Severity exceeding RSI description = unexpected
+    nature_mismatch_unexpected:
+      type: return
+      value:
+        expectedness: UNEXPECTED
+        is_unexpected: true
+        rationale: Reaction nature does not match RSI description — unexpected per ICH E2A
+        regulatory_reference: ICH E2A Section II.C - Nature inconsistent with RSI = unexpected
+    not_listed_unexpected:
+      type: return
+      value:
+        expectedness: UNEXPECTED
+        is_unexpected: true
+        rationale: Reaction not listed in IB or SmPC — unexpected per ICH E2A
+        regulatory_reference: ICH E2A Section II.C - Not listed in RSI = unexpected
+    no_rsi_unexpected:
+      type: return
+      value:
+        expectedness: UNEXPECTED
+        is_unexpected: true
+        rationale: No RSI available — reaction classified as unexpected by default
+        regulatory_reference: ICH E2A Section II.C - No RSI = unexpected by default
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ — expectedness classification via RSI listing check'
+  primes: ['κ', '∂']
+  arguments: ['listed_in_ib', 'listed_in_smpc', 'rsi_available', 'nature_matches', 'severity_exceeds_listed']
+  chain_prediction: 'Outputs is_unexpected feeds directly to e2a-reporting-timeline and seriousness-to-deadline. Core expectedness gate in the E2A pipeline.'
+tests:
+# Listed in IB, nature matches, severity normal = expected
+- input:
+    rsi_available: true
+    listed_in_ib: true
+    listed_in_smpc: false
+    nature_matches: true
+    severity_exceeds_listed: false
+  expect:
+    expectedness: EXPECTED
+    is_unexpected: false
+    regulatory_reference: ICH E2A Section II.C - Listed in RSI = expected
+# Listed in SmPC (not IB), nature matches = expected
+- input:
+    rsi_available: true
+    listed_in_ib: false
+    listed_in_smpc: true
+    nature_matches: true
+    severity_exceeds_listed: false
+  expect:
+    expectedness: EXPECTED
+    is_unexpected: false
+    regulatory_reference: ICH E2A Section II.C - Listed in RSI = expected
+# Listed but severity exceeds = unexpected
+- input:
+    rsi_available: true
+    listed_in_ib: true
+    listed_in_smpc: false
+    nature_matches: true
+    severity_exceeds_listed: true
+  expect:
+    expectedness: UNEXPECTED
+    is_unexpected: true
+    regulatory_reference: ICH E2A Section II.C - Severity exceeding RSI description = unexpected
+# Listed but nature mismatch = unexpected
+- input:
+    rsi_available: true
+    listed_in_ib: true
+    listed_in_smpc: false
+    nature_matches: false
+    severity_exceeds_listed: false
+  expect:
+    expectedness: UNEXPECTED
+    is_unexpected: true
+    regulatory_reference: ICH E2A Section II.C - Nature inconsistent with RSI = unexpected
+# Not listed in either IB or SmPC = unexpected
+- input:
+    rsi_available: true
+    listed_in_ib: false
+    listed_in_smpc: false
+    nature_matches: false
+    severity_exceeds_listed: false
+  expect:
+    expectedness: UNEXPECTED
+    is_unexpected: true
+    regulatory_reference: ICH E2A Section II.C - Not listed in RSI = unexpected
+# No RSI available = unexpected by default
+- input:
+    rsi_available: false
+    listed_in_ib: false
+    listed_in_smpc: false
+    nature_matches: false
+    severity_exceeds_listed: false
+  expect:
+    expectedness: UNEXPECTED
+    is_unexpected: true
+    regulatory_reference: ICH E2A Section II.C - No RSI = unexpected by default
+# Empty input = unexpected (no RSI)
+- input: {}
+  expect:
+    expectedness: UNEXPECTED
+    is_unexpected: true
+    regulatory_reference: ICH E2A Section II.C - No RSI = unexpected by default
+# Listed in both IB and SmPC, matches, no severity upgrade = expected
+- input:
+    rsi_available: true
+    listed_in_ib: true
+    listed_in_smpc: true
+    nature_matches: true
+    severity_exceeds_listed: false
+  expect:
+    expectedness: EXPECTED
+    is_unexpected: false
+    regulatory_reference: ICH E2A Section II.C - Listed in RSI = expected

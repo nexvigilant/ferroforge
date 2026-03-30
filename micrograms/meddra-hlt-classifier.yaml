@@ -1,0 +1,89 @@
+name: meddra-hlt-classifier
+description: "Classify adverse event to MedDRA High Level Term (HLT)"
+version: 0.1.0
+tree:
+  start: validate_hlgt
+  nodes:
+    validate_hlgt:
+      type: condition
+      variable: hlgt_code
+      operator: is_not_null
+      value: null
+      true_next: check_infections_hlt
+      false_next: hlt_unknown
+    check_infections_hlt:
+      type: condition
+      variable: hlgt_code
+      operator: eq
+      value: "10016825"
+      true_next: infections_hlt
+      false_next: check_cardiac_hlt
+    check_cardiac_hlt:
+      type: condition
+      variable: hlgt_code
+      operator: eq
+      value: "10007541"
+      true_next: cardiac_hlt
+      false_next: check_neuro_hlt
+    check_neuro_hlt:
+      type: condition
+      variable: hlgt_code
+      operator: eq
+      value: "10029094"
+      true_next: neuro_hlt
+      false_next: other_hlt
+    infections_hlt:
+      type: return
+      value:
+        hlt_code: "10033256"
+        hlt_name: "Bacterial infections"
+        hlgt_code: "10016825"
+        meddra_hierarchy_compliant: true
+    cardiac_hlt:
+      type: return
+      value:
+        hlt_code: "10007585"
+        hlt_name: "Ventricular arrhythmias"
+        hlgt_code: "10007541"
+        meddra_hierarchy_compliant: true
+    neuro_hlt:
+      type: return
+      value:
+        hlt_code: "10025424"
+        hlt_name: "Generalised seizures"
+        hlgt_code: "10029094"
+        meddra_hierarchy_compliant: true
+    other_hlt:
+      type: return
+      value:
+        hlt_code: "10017968"
+        hlt_name: "General symptoms and signs"
+        hlgt_code: null
+        meddra_hierarchy_compliant: true
+    hlt_unknown:
+      type: return
+      value:
+        hlt_code: null
+        hlt_name: null
+        hlgt_code: null
+        meddra_hierarchy_compliant: false
+tests:
+- input:
+    hlgt_code: "10016825"
+  expect:
+    hlt_code: "10033256"
+    hlt_name: "Bacterial infections"
+- input:
+    hlgt_code: "10007541"
+  expect:
+    hlt_code: "10007585"
+    hlt_name: "Ventricular arrhythmias"
+- input:
+    hlgt_code: "10029094"
+  expect:
+    hlt_code: "10025424"
+    hlt_name: "Generalised seizures"
+- input: {}
+  expect:
+    hlt_code: null
+    meddra_hierarchy_compliant: false

@@ -1,0 +1,58 @@
+name: epi-attributable-fraction
+description: "Calculate attributable fraction to estimate drug-attributable risk"
+version: 0.1.0
+tree:
+  start: validate_epidemiologic_data
+  nodes:
+    validate_epidemiologic_data:
+      type: condition
+      variable: relative_risk
+      operator: is_not_null
+      value: null
+      true_next: check_exposure_prevalence
+      false_next: fraction_unknown
+    check_exposure_prevalence:
+      type: condition
+      variable: exposed_population_percent
+      operator: is_not_null
+      value: null
+      true_next: calculate_fraction
+      false_next: fraction_unknown
+    calculate_fraction:
+      type: return
+      value:
+        attributable_fraction: "calculated_from_rr_and_prevalence"
+        interpretation: "proportion_of_disease_attributable_to_exposure"
+        epi_measure_type: "attributable_fraction"
+        population_impact: "estimated"
+        epi_compliant: true
+    fraction_unknown:
+      type: return
+      value:
+        attributable_fraction: null
+        interpretation: null
+        epi_measure_type: null
+        population_impact: null
+        epi_compliant: false
+tests:
+- input:
+    relative_risk: 2.5
+    exposed_population_percent: 40
+  expect:
+    attributable_fraction: "calculated_from_rr_and_prevalence"
+    epi_measure_type: "attributable_fraction"
+    epi_compliant: true
+- input:
+    relative_risk: 1.5
+    exposed_population_percent: 60
+  expect:
+    attributable_fraction: "calculated_from_rr_and_prevalence"
+- input:
+    relative_risk: null
+  expect:
+    attributable_fraction: null
+    epi_compliant: false
+- input: {}
+  expect:
+    attributable_fraction: null
+    epi_compliant: false

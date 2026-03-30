@@ -1,0 +1,82 @@
+name: risk-communicate
+description: "Plan risk communication strategy for healthcare providers and patients"
+version: 0.1.0
+tree:
+  start: validate_minimization
+  nodes:
+    validate_minimization:
+      type: condition
+      variable: minimization_plan
+      operator: is_not_null
+      value: null
+      true_next: check_communication_urgency
+      false_next: communication_unknown
+    check_communication_urgency:
+      type: condition
+      variable: urgency_level
+      operator: eq
+      value: "urgent"
+      true_next: urgent_communication
+      false_next: check_routine_urgency
+    check_routine_urgency:
+      type: condition
+      variable: urgency_level
+      operator: eq
+      value: "routine"
+      true_next: routine_communication
+      false_next: informational_communication
+    urgent_communication:
+      type: return
+      value:
+        communication_type: "dear_healthcare_provider"
+        target_audience: "prescribers,pharmacists,patients"
+        communication_timeline_days: 30
+        requires_signature: true
+        communication_compliant: true
+    routine_communication:
+      type: return
+      value:
+        communication_type: "product_information_update"
+        target_audience: "prescribers,pharmacists"
+        communication_timeline_days: 90
+        requires_signature: false
+        communication_compliant: true
+    informational_communication:
+      type: return
+      value:
+        communication_type: "information_letter"
+        target_audience: "prescribers"
+        communication_timeline_days: 180
+        requires_signature: false
+        communication_compliant: true
+    communication_unknown:
+      type: return
+      value:
+        communication_type: null
+        target_audience: null
+        communication_timeline_days: null
+        requires_signature: null
+        communication_compliant: false
+tests:
+- input:
+    minimization_plan: "risk_management"
+    urgency_level: "urgent"
+  expect:
+    communication_type: "dear_healthcare_provider"
+    communication_timeline_days: 30
+    requires_signature: true
+- input:
+    minimization_plan: "monitoring"
+    urgency_level: "routine"
+  expect:
+    communication_type: "product_information_update"
+    communication_timeline_days: 90
+- input:
+    minimization_plan: "routine"
+    urgency_level: "low"
+  expect:
+    communication_type: "information_letter"
+- input: {}
+  expect:
+    communication_type: null
+    communication_compliant: false

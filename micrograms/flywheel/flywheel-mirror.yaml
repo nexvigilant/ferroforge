@@ -1,0 +1,206 @@
+name: flywheel-mirror
+description: 'Self-observation gate for the brain flywheel. Takes brain health metrics and determines if the flywheel can see itself spinning. Checks implicit store health, verdict coverage (sigma), tracker integrity, and guardian responsiveness. GREEN = full self-observation, YELLOW = partial (degraded tools), RED = blind (cannot measure own state).'
+version: 0.1.0
+primitive_signature:
+  dominant: state
+  expression: 'state(comparison(frequency, boundary))'
+  primes: [state, comparison, frequency, boundary]
+  arguments: [implicit_healthy, verdict_pct, tracker_ok, guardian_ok]
+interface:
+  inputs:
+    implicit_healthy:
+      type: bool
+      required: false
+      description: 'Whether implicit_stats tool returns successfully'
+    verdict_pct:
+      type: int
+      required: false
+      description: 'Percentage of sessions with model-authored verdicts (0-100)'
+    tracker_ok:
+      type: bool
+      required: false
+      description: 'Whether brain tracker index parses without error'
+    guardian_ok:
+      type: bool
+      required: false
+      description: 'Whether guardian_homeostasis_tick completes'
+  outputs:
+    mirror_health:
+      type: string
+      description: 'GREEN, YELLOW, or RED'
+    blind_spots:
+      type: string
+      description: 'Comma-separated list of degraded observation channels'
+    self_aware:
+      type: bool
+      description: 'Whether the flywheel can observe its own state'
+tree:
+  start: check_implicit
+  nodes:
+    check_implicit:
+      type: condition
+      variable: implicit_healthy
+      operator: eq
+      value: true
+      true_next: check_verdict
+      false_next: count_blind_implicit
+    count_blind_implicit:
+      type: condition
+      variable: tracker_ok
+      operator: eq
+      value: true
+      true_next: check_verdict_partial
+      false_next: check_guardian_last
+    check_guardian_last:
+      type: condition
+      variable: guardian_ok
+      operator: eq
+      value: true
+      true_next: yellow_two_blind
+      false_next: red
+    yellow_two_blind:
+      type: return
+      value:
+        mirror_health: YELLOW
+        blind_spots: 'implicit_stats,tracker_index'
+        self_aware: true
+    check_verdict_partial:
+      type: condition
+      variable: verdict_pct
+      operator: gte
+      value: 50
+      true_next: yellow_implicit_only
+      false_next: yellow_implicit_sigma
+    yellow_implicit_only:
+      type: return
+      value:
+        mirror_health: YELLOW
+        blind_spots: 'implicit_stats'
+        self_aware: true
+    yellow_implicit_sigma:
+      type: return
+      value:
+        mirror_health: YELLOW
+        blind_spots: 'implicit_stats,low_sigma'
+        self_aware: true
+    check_verdict:
+      type: condition
+      variable: verdict_pct
+      operator: gte
+      value: 50
+      true_next: check_tracker
+      false_next: check_tracker_low_sigma
+    check_tracker:
+      type: condition
+      variable: tracker_ok
+      operator: eq
+      value: true
+      true_next: check_guardian
+      false_next: yellow_tracker
+    check_tracker_low_sigma:
+      type: condition
+      variable: tracker_ok
+      operator: eq
+      value: true
+      true_next: yellow_sigma_only
+      false_next: yellow_sigma_tracker
+    yellow_tracker:
+      type: return
+      value:
+        mirror_health: YELLOW
+        blind_spots: 'tracker_index'
+        self_aware: true
+    yellow_sigma_only:
+      type: return
+      value:
+        mirror_health: YELLOW
+        blind_spots: 'low_sigma'
+        self_aware: true
+    yellow_sigma_tracker:
+      type: return
+      value:
+        mirror_health: YELLOW
+        blind_spots: 'low_sigma,tracker_index'
+        self_aware: true
+    check_guardian:
+      type: condition
+      variable: guardian_ok
+      operator: eq
+      value: true
+      true_next: green
+      false_next: yellow_guardian
+    yellow_guardian:
+      type: return
+      value:
+        mirror_health: YELLOW
+        blind_spots: 'guardian'
+        self_aware: true
+    green:
+      type: return
+      value:
+        mirror_health: GREEN
+        blind_spots: 'none'
+        self_aware: true
+    red:
+      type: return
+      value:
+        mirror_health: RED
+        blind_spots: 'implicit_stats,tracker_index,guardian'
+        self_aware: false
+tests:
+# All healthy
+- input:
+    implicit_healthy: true
+    verdict_pct: 80
+    tracker_ok: true
+    guardian_ok: true
+  expect:
+    mirror_health: GREEN
+    blind_spots: 'none'
+    self_aware: true
+# Current brain state: implicit broken, tracker broken, guardian ok
+- input:
+    implicit_healthy: false
+    verdict_pct: 17
+    tracker_ok: false
+    guardian_ok: true
+  expect:
+    mirror_health: YELLOW
+    blind_spots: 'implicit_stats,tracker_index'
+    self_aware: true
+# Everything broken
+- input:
+    implicit_healthy: false
+    verdict_pct: 10
+    tracker_ok: false
+    guardian_ok: false
+  expect:
+    mirror_health: RED
+    blind_spots: 'implicit_stats,tracker_index,guardian'
+    self_aware: false
+# Only low sigma
+- input:
+    implicit_healthy: true
+    verdict_pct: 17
+    tracker_ok: true
+    guardian_ok: true
+  expect:
+    mirror_health: YELLOW
+    blind_spots: 'low_sigma'
+    self_aware: true
+# Implicit broken but high sigma and tracker ok
+- input:
+    implicit_healthy: false
+    verdict_pct: 80
+    tracker_ok: true
+    guardian_ok: true
+  expect:
+    mirror_health: YELLOW
+    blind_spots: 'implicit_stats'
+    self_aware: true
+# Null input = safe default
+- input: {}
+  expect:
+    mirror_health: RED
+    blind_spots: 'implicit_stats,tracker_index,guardian'
+    self_aware: false

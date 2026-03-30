@@ -1,0 +1,80 @@
+name: signal-validate
+description: "Validate pharmacovigilance signal strength and statistical significance"
+version: 0.1.0
+tree:
+  start: validate_signal_data
+  nodes:
+    validate_signal_data:
+      type: condition
+      variable: prr_value
+      operator: is_not_null
+      value: null
+      true_next: check_prr_threshold
+      false_next: validation_unknown
+    check_prr_threshold:
+      type: condition
+      variable: prr_value
+      operator: gte
+      value: 2
+      true_next: check_case_count
+      false_next: validation_failed
+    check_case_count:
+      type: condition
+      variable: case_count
+      operator: gte
+      value: 3
+      true_next: check_confidence
+      false_next: validation_failed
+    check_confidence:
+      type: condition
+      variable: lower_ci_95
+      operator: gte
+      value: 1
+      true_next: signal_validated
+      false_next: validation_failed
+    signal_validated:
+      type: return
+      value:
+        validation_status: "valid_signal"
+        signal_strength: "confirmed"
+        requires_further_investigation: true
+        validation_compliant: true
+    validation_failed:
+      type: return
+      value:
+        validation_status: "signal_not_validated"
+        signal_strength: "weak"
+        requires_further_investigation: false
+        validation_compliant: true
+    validation_unknown:
+      type: return
+      value:
+        validation_status: "validation_inconclusive"
+        signal_strength: null
+        requires_further_investigation: null
+        validation_compliant: false
+tests:
+- input:
+    prr_value: 3.5
+    case_count: 5
+    lower_ci_95: 1.2
+  expect:
+    validation_status: "valid_signal"
+    signal_strength: "confirmed"
+    requires_further_investigation: true
+- input:
+    prr_value: 1.5
+    case_count: 5
+    lower_ci_95: 1.2
+  expect:
+    validation_status: "signal_not_validated"
+    signal_strength: "weak"
+- input:
+    prr_value: 3.5
+    case_count: 2
+  expect:
+    validation_status: "signal_not_validated"
+- input: {}
+  expect:
+    validation_status: "validation_inconclusive"
+    validation_compliant: false

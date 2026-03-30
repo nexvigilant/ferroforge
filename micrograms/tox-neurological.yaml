@@ -1,0 +1,105 @@
+name: tox-neurological
+description: 'Neurological toxicity gate: neurotox_grade thresholds for brain'
+version: 0.1.0
+tree:
+  start: check_severe
+  nodes:
+    check_severe:
+      type: condition
+      variable: neurotox_grade
+      operator: gte
+      value: 3
+      true_next: severe
+      false_next: check_mild
+    check_mild:
+      type: condition
+      variable: neurotox_grade
+      operator: gte
+      value: 2
+      true_next: mild
+      false_next: normal
+    mild:
+      type: return
+      value:
+        severity: mild
+        action: monitor_closely
+        organ: neurological
+        target: brain
+    severe:
+      type: return
+      value:
+        target: brain
+        severity: severe
+        organ: neurological
+        action: discontinue
+    normal:
+      type: return
+      value:
+        severity: normal
+        action: continue
+        target: brain
+        organ: neurological
+tests:
+- input:
+    neurotox_grade: 4
+  expect:
+    organ: neurological
+    severity: severe
+- input:
+    neurotox_grade: 2
+  expect:
+    organ: neurological
+    severity: mild
+- input:
+    neurotox_grade: 0
+  expect:
+    organ: neurological
+    severity: normal
+- input: {}
+  expect:
+    organ: neurological
+    severity: normal
+- input:
+    neurotox_grade: -1
+  expect:
+    action: continue
+    severity: normal
+    organ: neurological
+    target: brain
+- input:
+    neurotox_grade: 300
+  expect:
+    severity: severe
+    organ: neurological
+    action: discontinue
+    target: brain
+- input:
+    neurotox_grade: -1
+  expect:
+    organ: neurological
+    target: brain
+    action: continue
+    severity: normal
+- input:
+    neurotox_grade: 1
+  expect:
+    severity: normal
+    organ: neurological
+    action: continue
+    target: brain
+- input:
+    neurotox_grade: 3
+  expect:
+    severity: severe
+    organ: neurological
+    target: brain
+    action: discontinue
+- input:
+    neurotox_grade: 200
+  expect:
+    severity: severe
+    organ: neurological
+    action: discontinue
+    target: brain
+interface: null
+primitive_signature: null

@@ -1,0 +1,47 @@
+name: workflow-drug-safety-profile
+description: "Build complete drug safety profile by selecting data source chain"
+version: 0.1.0
+
+tree:
+  start: check_marketed
+  nodes:
+    check_marketed:
+      type: "condition"
+      variable: "is_marketed"
+      operator: "eq"
+      value: true
+      true_next: "marketed_path"
+      false_next: "premarket_path"
+    marketed_path:
+      type: "return"
+      value:
+        profile: "post_market"
+        chain: "openfda \u2192 drugbank \u2192 dailymed \u2192 eudravigilance \u2192 vigiaccess \u2192 calculation"
+        sources: 6
+    premarket_path:
+      type: "condition"
+      variable: "has_trials"
+      operator: "eq"
+      value: true
+      true_next: "trial_path"
+      false_next: "preclinical_path"
+    trial_path:
+      type: "return"
+      value:
+        profile: "clinical_trial"
+        chain: "clinicaltrials \u2192 chemivigilance \u2192 molecular-weight \u2192 benefit-risk"
+        sources: 4
+    preclinical_path:
+      type: "return"
+      value:
+        profile: "preclinical"
+        chain: "chemivigilance \u2192 molecular-weight \u2192 bicone \u2192 drugbank"
+        sources: 4
+
+tests:
+  - input: {"is_marketed": true, "has_trials": true}
+    expect: {"profile": "post_market", "sources": 6}
+  - input: {"is_marketed": false, "has_trials": true}
+    expect: {"profile": "clinical_trial", "sources": 4}
+  - input: {"is_marketed": false, "has_trials": false}
+    expect: {"profile": "preclinical", "sources": 4}

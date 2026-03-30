@@ -1,0 +1,43 @@
+name: age-elderly
+description: "Elderly age classifier. Identifies subjects aged 65-79 years."
+version: 0.1.0
+tree:
+  start: check_lower_bound
+  nodes:
+    check_lower_bound:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 65
+      true_next: check_upper_bound
+      false_next: not_elderly
+    check_upper_bound:
+      type: condition
+      variable: age_years
+      operator: lte
+      value: 79
+      true_next: is_elderly
+      false_next: not_elderly
+    is_elderly:
+      type: return
+      value:
+        age_group: elderly
+        age_range: "65-79 years"
+        increased_sensitivity: true
+        dose_adjustment: often_required
+    not_elderly:
+      type: return
+      value:
+        age_group: other
+        is_elderly: false
+tests:
+  - input: { age_years: 70 }
+    expect: { age_group: elderly, increased_sensitivity: true }
+  - input: { age_years: 65 }
+    expect: { age_group: elderly }
+  - input: { age_years: 79 }
+    expect: { age_group: elderly }
+  - input: { age_years: 80 }
+    expect: { age_group: other, is_elderly: false }
+  - input: {}
+    expect: {}

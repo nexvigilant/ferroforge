@@ -1,0 +1,83 @@
+name: patient-overdose-classifier
+description: "Classify and assess severity of patient overdose cases"
+version: 0.1.0
+tree:
+  start: validate_overdose_report
+  nodes:
+    validate_overdose_report:
+      type: condition
+      variable: overdose_reported
+      operator: eq
+      value: true
+      true_next: check_outcome
+      false_next: no_overdose
+    check_outcome:
+      type: condition
+      variable: outcome_type
+      operator: eq
+      value: "fatal"
+      true_next: fatal_overdose
+      false_next: check_serious_outcome
+    check_serious_outcome:
+      type: condition
+      variable: outcome_type
+      operator: eq
+      value: "serious"
+      true_next: serious_overdose
+      false_next: mild_overdose
+    fatal_overdose:
+      type: return
+      value:
+        overdose_severity: "fatal"
+        medical_intervention: "resuscitation_attempted"
+        outcome: "death"
+        patient_safety_priority: 1
+        overdose_compliant: true
+    serious_overdose:
+      type: return
+      value:
+        overdose_severity: "serious"
+        medical_intervention: "intensive_care_required"
+        outcome: "recovery_with_sequelae"
+        patient_safety_priority: 2
+        overdose_compliant: true
+    mild_overdose:
+      type: return
+      value:
+        overdose_severity: "mild"
+        medical_intervention: "supportive_care"
+        outcome: "full_recovery"
+        patient_safety_priority: 3
+        overdose_compliant: true
+    no_overdose:
+      type: return
+      value:
+        overdose_severity: "no_overdose"
+        medical_intervention: null
+        outcome: "not_applicable"
+        patient_safety_priority: null
+        overdose_compliant: true
+tests:
+- input:
+    overdose_reported: true
+    outcome_type: "fatal"
+  expect:
+    overdose_severity: "fatal"
+    outcome: "death"
+    patient_safety_priority: 1
+- input:
+    overdose_reported: true
+    outcome_type: "serious"
+  expect:
+    overdose_severity: "serious"
+    patient_safety_priority: 2
+- input:
+    overdose_reported: true
+    outcome_type: "mild"
+  expect:
+    overdose_severity: "mild"
+    patient_safety_priority: 3
+- input: {}
+  expect:
+    overdose_severity: "no_overdose"
+    overdose_compliant: true

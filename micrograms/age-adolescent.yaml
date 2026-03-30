@@ -1,0 +1,43 @@
+name: age-adolescent
+description: "Adolescent age classifier. Identifies subjects aged 7-17 years."
+version: 0.1.0
+tree:
+  start: check_lower_bound
+  nodes:
+    check_lower_bound:
+      type: condition
+      variable: age_years
+      operator: gte
+      value: 7
+      true_next: check_upper_bound
+      false_next: not_adolescent
+    check_upper_bound:
+      type: condition
+      variable: age_years
+      operator: lte
+      value: 17
+      true_next: is_adolescent
+      false_next: not_adolescent
+    is_adolescent:
+      type: return
+      value:
+        age_group: adolescent
+        age_range: "7-17 years"
+        developmental_stage: puberty
+        special_monitoring: psychiatric_monitoring
+    not_adolescent:
+      type: return
+      value:
+        age_group: other
+        is_adolescent: false
+tests:
+  - input: { age_years: 12 }
+    expect: { age_group: adolescent, developmental_stage: puberty }
+  - input: { age_years: 7 }
+    expect: { age_group: adolescent }
+  - input: { age_years: 17 }
+    expect: { age_group: adolescent }
+  - input: { age_years: 18 }
+    expect: { age_group: other, is_adolescent: false }
+  - input: {}
+    expect: {}

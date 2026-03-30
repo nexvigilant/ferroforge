@@ -1,0 +1,223 @@
+name: fda-dili-hy-law
+description: "FDA drug-induced liver injury evaluation: Hy's Law and DILI severity classification per FDA Guidance 'Drug-Induced Liver Injury: Premarketing Clinical Evaluation' (2009)"
+version: 0.1.0
+interface:
+  inputs:
+    alt_elevation:
+      type: float
+      required: true
+      description: "ALT elevation as multiple of ULN (e.g., 3.0 = 3x ULN)"
+    bilirubin_elevation:
+      type: float
+      required: true
+      description: "Total bilirubin elevation as multiple of ULN"
+    alkaline_phosphatase_elevated:
+      type: bool
+      required: false
+      description: "Whether ALP is elevated above 2x ULN (rules out cholestasis)"
+    other_cause_excluded:
+      type: bool
+      required: false
+      description: "Whether other causes of liver injury have been excluded"
+  outputs:
+    dili_classification:
+      type: string
+    hy_law_case:
+      type: bool
+    action_required:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_alt
+  nodes:
+    check_alt:
+      type: condition
+      variable: alt_elevation
+      operator: gte
+      value: 3.0
+      true_next: alt_elevated_bili_check
+      false_next: check_mild_alt
+
+    check_mild_alt:
+      type: condition
+      variable: alt_elevation
+      operator: gte
+      value: 2.0
+      true_next: mild_elevation
+      false_next: normal_range
+
+    # ALT >= 3x ULN
+    alt_elevated_bili_check:
+      type: condition
+      variable: bilirubin_elevation
+      operator: gte
+      value: 2.0
+      true_next: check_alp_for_hy
+      false_next: check_high_alt
+
+    # ALT >= 3x + Bili >= 2x — check ALP to confirm hepatocellular
+    check_alp_for_hy:
+      type: condition
+      variable: alkaline_phosphatase_elevated
+      operator: eq
+      value: true
+      true_next: cholestatic_pattern
+      false_next: check_other_causes
+
+    # ALP not elevated — hepatocellular pattern, potential Hy's Law
+    check_other_causes:
+      type: condition
+      variable: other_cause_excluded
+      operator: eq
+      value: true
+      true_next: hy_law_confirmed
+      false_next: hy_law_possible
+
+    hy_law_confirmed:
+      type: return
+      value:
+        dili_classification: "HY_LAW_CASE"
+        hy_law_case: true
+        action_required: "CRITICAL: Hy's Law case confirmed. Fatality risk ~10-50% without intervention. Immediately discontinue suspect drug, report as SAE, assess for clinical trial hold."
+        regulatory_reference: "FDA Guidance: Drug-Induced Liver Injury: Premarketing Clinical Evaluation (2009), Section V.B — Hy's Law"
+
+    hy_law_possible:
+      type: return
+      value:
+        dili_classification: "POSSIBLE_HY_LAW"
+        hy_law_case: false
+        action_required: "Investigate and exclude other causes (viral hepatitis, alcohol, concomitant hepatotoxic drugs). If other causes excluded, reclassify as Hy's Law case."
+        regulatory_reference: "FDA Guidance: Drug-Induced Liver Injury (2009), Section V.B"
+
+    cholestatic_pattern:
+      type: return
+      value:
+        dili_classification: "CHOLESTATIC_DILI"
+        hy_law_case: false
+        action_required: "Cholestatic pattern (elevated ALP) — does not meet Hy's Law criteria but requires monitoring. Evaluate for biliary obstruction."
+        regulatory_reference: "FDA Guidance: Drug-Induced Liver Injury (2009), Section IV.C"
+
+    # ALT >= 3x but Bili < 2x
+    check_high_alt:
+      type: condition
+      variable: alt_elevation
+      operator: gte
+      value: 5.0
+      true_next: severe_alt_no_bili
+      false_next: moderate_alt_no_bili
+
+    severe_alt_no_bili:
+      type: return
+      value:
+        dili_classification: "SEVERE_ALT_ELEVATION"
+        hy_law_case: false
+        action_required: "ALT >= 5x ULN without bilirubin elevation. Discontinue suspect drug. Monitor for progression to Hy's Law. Report as SAE if >= 10x ULN."
+        regulatory_reference: "FDA Guidance: Drug-Induced Liver Injury (2009), Section V.A"
+
+    moderate_alt_no_bili:
+      type: return
+      value:
+        dili_classification: "MODERATE_ALT_ELEVATION"
+        hy_law_case: false
+        action_required: "ALT 3-5x ULN. Increase monitoring frequency. Consider dose reduction. Repeat LFTs within 48-72 hours."
+        regulatory_reference: "FDA Guidance: Drug-Induced Liver Injury (2009), Section V.A"
+
+    # ALT 2-3x ULN
+    mild_elevation:
+      type: return
+      value:
+        dili_classification: "MILD_ALT_ELEVATION"
+        hy_law_case: false
+        action_required: "Mild ALT elevation (2-3x ULN). Monitor LFTs at next scheduled visit. Document in case record."
+        regulatory_reference: "FDA Guidance: Drug-Induced Liver Injury (2009), Section IV.A"
+
+    # ALT < 2x ULN
+    normal_range:
+      type: return
+      value:
+        dili_classification: "WITHIN_ACCEPTABLE_RANGE"
+        hy_law_case: false
+        action_required: "No DILI concern at current levels. Continue routine monitoring per protocol."
+        regulatory_reference: "FDA Guidance: Drug-Induced Liver Injury (2009), Section IV.A"
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(ν, ∂) — liver injury classification by biomarker magnitude and Hy threshold boundary'
+  primes: ['κ', 'ν', '∂', '→']
+  arguments: ['alt_elevation', 'bilirubin_elevation', 'alkaline_phosphatase_elevated']
+
+tests:
+# Hy's Law confirmed: ALT 8x, Bili 3x, ALP normal, other causes excluded
+- input:
+    alt_elevation: 8.0
+    bilirubin_elevation: 3.0
+    alkaline_phosphatase_elevated: false
+    other_cause_excluded: true
+  expect:
+    dili_classification: "HY_LAW_CASE"
+    hy_law_case: true
+
+# Possible Hy's Law: ALT 5x, Bili 2.5x, ALP normal, causes not yet excluded
+- input:
+    alt_elevation: 5.0
+    bilirubin_elevation: 2.5
+    alkaline_phosphatase_elevated: false
+    other_cause_excluded: false
+  expect:
+    dili_classification: "POSSIBLE_HY_LAW"
+    hy_law_case: false
+
+# Cholestatic: ALT 4x, Bili 3x, ALP elevated
+- input:
+    alt_elevation: 4.0
+    bilirubin_elevation: 3.0
+    alkaline_phosphatase_elevated: true
+  expect:
+    dili_classification: "CHOLESTATIC_DILI"
+    hy_law_case: false
+
+# Severe ALT without bilirubin
+- input:
+    alt_elevation: 7.0
+    bilirubin_elevation: 1.2
+  expect:
+    dili_classification: "SEVERE_ALT_ELEVATION"
+    hy_law_case: false
+
+# Moderate ALT
+- input:
+    alt_elevation: 4.0
+    bilirubin_elevation: 1.0
+  expect:
+    dili_classification: "MODERATE_ALT_ELEVATION"
+
+# Mild elevation
+- input:
+    alt_elevation: 2.5
+    bilirubin_elevation: 1.0
+  expect:
+    dili_classification: "MILD_ALT_ELEVATION"
+
+# Normal range
+- input:
+    alt_elevation: 1.5
+    bilirubin_elevation: 0.8
+  expect:
+    dili_classification: "WITHIN_ACCEPTABLE_RANGE"
+
+# Boundary: exactly 3x ALT, exactly 2x Bili, ALP normal, causes excluded
+- input:
+    alt_elevation: 3.0
+    bilirubin_elevation: 2.0
+    alkaline_phosphatase_elevated: false
+    other_cause_excluded: true
+  expect:
+    dili_classification: "HY_LAW_CASE"
+    hy_law_case: true
+
+# Empty input -> normal
+- input: {}
+  expect:
+    dili_classification: "WITHIN_ACCEPTABLE_RANGE"
+    hy_law_case: false

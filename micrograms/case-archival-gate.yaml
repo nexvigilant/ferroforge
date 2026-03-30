@@ -1,0 +1,73 @@
+name: case-archival-gate
+description: "Determine case archival status and retention requirements"
+version: 0.1.0
+tree:
+  start: validate_case_closure
+  nodes:
+    validate_case_closure:
+      type: condition
+      variable: case_processing_complete
+      operator: eq
+      value: true
+      true_next: check_retention_period
+      false_next: not_ready_for_archival
+    check_retention_period:
+      type: condition
+      variable: years_since_report
+      operator: gte
+      value: 2
+      true_next: check_documentation
+      false_next: not_ready_for_archival
+    check_documentation:
+      type: condition
+      variable: complete_case_file
+      operator: eq
+      value: true
+      true_next: ready_for_archival
+      false_next: incomplete_documentation
+    ready_for_archival:
+      type: return
+      value:
+        archival_status: "approved_for_archival"
+        retention_years: 10
+        accessibility_level: "retrievable_upon_request"
+        archival_compliant: true
+    not_ready_for_archival:
+      type: return
+      value:
+        archival_status: "pending"
+        retention_years: null
+        accessibility_level: "active_file"
+        archival_compliant: true
+    incomplete_documentation:
+      type: return
+      value:
+        archival_status: "deferred"
+        retention_years: null
+        accessibility_level: "active_file"
+        archival_compliant: false
+tests:
+- input:
+    case_processing_complete: true
+    years_since_report: 3
+    complete_case_file: true
+  expect:
+    archival_status: "approved_for_archival"
+    retention_years: 10
+    accessibility_level: "retrievable_upon_request"
+- input:
+    case_processing_complete: false
+  expect:
+    archival_status: "pending"
+    accessibility_level: "active_file"
+- input:
+    case_processing_complete: true
+    years_since_report: 3
+    complete_case_file: false
+  expect:
+    archival_status: "deferred"
+    archival_compliant: false
+- input: {}
+  expect:
+    archival_status: "pending"
+    archival_compliant: true

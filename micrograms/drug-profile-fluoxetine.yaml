@@ -1,0 +1,62 @@
+name: drug-profile-fluoxetine
+description: 'Safety triage for fluoxetine: PRR-based signal routing (Type C)'
+version: 0.1.0
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: signal
+      false_next: no_signal
+    no_signal:
+      type: return
+      value:
+        action: monitor
+        expected_prr: 3.0
+        drug: fluoxetine
+        harm_type: C
+        signal: false
+    signal:
+      type: return
+      value:
+        drug: fluoxetine
+        harm_type: C
+        signal: true
+        expected_prr: 3.0
+        action: investigate
+tests:
+- input:
+    prr: 3.0
+  expect:
+    signal: true
+    drug: fluoxetine
+- input:
+    prr: 0.5
+  expect:
+    drug: fluoxetine
+    signal: false
+- input: {}
+  expect:
+    drug: fluoxetine
+    signal: false
+- input:
+    prr: 1.999
+  expect:
+    action: monitor
+    signal: false
+    drug: fluoxetine
+    harm_type: C
+    expected_prr: 3.0
+- input:
+    prr: 2.001
+  expect:
+    expected_prr: 3.0
+    signal: true
+    drug: fluoxetine
+    harm_type: C
+    action: investigate
+interface: null
+primitive_signature: null

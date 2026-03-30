@@ -1,0 +1,95 @@
+name: interaction-monitoring
+description: "Specify monitoring requirements and frequency for managed drug interactions"
+version: 0.1.0
+tree:
+  start: validate_management
+  nodes:
+    validate_management:
+      type: condition
+      variable: management_category
+      operator: is_not_null
+      value: null
+      true_next: check_management_type
+      false_next: monitoring_unknown
+    check_management_type:
+      type: condition
+      variable: management_category
+      operator: eq
+      value: "intensive"
+      true_next: intensive_monitoring
+      false_next: check_standard
+    check_standard:
+      type: condition
+      variable: management_category
+      operator: eq
+      value: "standard"
+      true_next: standard_monitoring
+      false_next: check_minimal
+    check_minimal:
+      type: condition
+      variable: management_category
+      operator: eq
+      value: "minimal"
+      true_next: minimal_monitoring
+      false_next: no_monitoring
+    intensive_monitoring:
+      type: return
+      value:
+        monitoring_frequency: "weekly"
+        monitoring_parameters: "drug_levels,renal_function,liver_function"
+        monitoring_duration_weeks: 8
+        follow_up_required: true
+        monitoring_compliant: true
+    standard_monitoring:
+      type: return
+      value:
+        monitoring_frequency: "monthly"
+        monitoring_parameters: "clinical_response,adverse_effects"
+        monitoring_duration_weeks: 12
+        follow_up_required: true
+        monitoring_compliant: true
+    minimal_monitoring:
+      type: return
+      value:
+        monitoring_frequency: "as_needed"
+        monitoring_parameters: "symptom_assessment"
+        monitoring_duration_weeks: 4
+        follow_up_required: false
+        monitoring_compliant: true
+    no_monitoring:
+      type: return
+      value:
+        monitoring_frequency: "none"
+        monitoring_parameters: null
+        monitoring_duration_weeks: 0
+        follow_up_required: false
+        monitoring_compliant: true
+    monitoring_unknown:
+      type: return
+      value:
+        monitoring_frequency: "unknown"
+        monitoring_parameters: null
+        monitoring_duration_weeks: null
+        follow_up_required: null
+        monitoring_compliant: false
+tests:
+- input:
+    management_category: "intensive"
+  expect:
+    monitoring_frequency: "weekly"
+    monitoring_duration_weeks: 8
+    follow_up_required: true
+- input:
+    management_category: "standard"
+  expect:
+    monitoring_frequency: "monthly"
+    monitoring_duration_weeks: 12
+- input:
+    management_category: "minimal"
+  expect:
+    monitoring_frequency: "as_needed"
+    monitoring_duration_weeks: 4
+- input: {}
+  expect:
+    monitoring_frequency: "unknown"
+    monitoring_compliant: false

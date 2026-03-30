@@ -1,0 +1,218 @@
+name: fda-rwd-source-fitness
+description: "FDA real-world data source fitness: evaluates EHR, claims, and registry data quality dimensions per FDA Guidance 'RWD: Assessing EHR and Medical Claims Data' (2024)"
+version: 0.1.0
+interface:
+  inputs:
+    data_source_type:
+      type: string
+      required: true
+      description: "RWD source: ehr, medical_claims, linked_ehr_claims, disease_registry, product_registry"
+    completeness:
+      type: string
+      required: true
+      description: "Data completeness assessment: high, moderate, low"
+    outcome_ascertainment:
+      type: string
+      required: false
+      description: "Ability to capture outcomes: validated_algorithm, icd_codes_only, chart_review_available, not_captured"
+    longitudinal_followup:
+      type: bool
+      required: false
+      description: "Whether data supports adequate longitudinal follow-up for the study question"
+  outputs:
+    source_fitness:
+      type: string
+    key_limitation:
+      type: string
+    validation_needed:
+      type: string
+    regulatory_reference:
+      type: string
+tree:
+  start: check_completeness
+  nodes:
+    check_completeness:
+      type: condition
+      variable: completeness
+      operator: eq
+      value: "low"
+      true_next: low_completeness
+      false_next: check_source_type
+
+    low_completeness:
+      type: return
+      value:
+        source_fitness: "NOT_FIT"
+        key_limitation: "Low data completeness — missing variables, fragmented records, or selective capture"
+        validation_needed: "Conduct data completeness audit. Quantify missing data patterns. Consider alternative data sources."
+        regulatory_reference: "FDA Guidance: RWD Assessing EHR and Claims (2024), Section IV.A — Data Completeness"
+
+    check_source_type:
+      type: condition
+      variable: data_source_type
+      operator: eq
+      value: "linked_ehr_claims"
+      true_next: linked_check
+      false_next: check_ehr
+
+    check_ehr:
+      type: condition
+      variable: data_source_type
+      operator: eq
+      value: "ehr"
+      true_next: ehr_outcome_check
+      false_next: check_claims
+
+    check_claims:
+      type: condition
+      variable: data_source_type
+      operator: eq
+      value: "medical_claims"
+      true_next: claims_outcome_check
+      false_next: check_registry
+
+    check_registry:
+      type: condition
+      variable: data_source_type
+      operator: eq
+      value: "disease_registry"
+      true_next: registry_path
+      false_next: product_registry_path
+
+    # LINKED EHR+CLAIMS — highest fitness
+    linked_check:
+      type: condition
+      variable: outcome_ascertainment
+      operator: eq
+      value: "validated_algorithm"
+      true_next: linked_high
+      false_next: linked_moderate
+
+    linked_high:
+      type: return
+      value:
+        source_fitness: "HIGH"
+        key_limitation: "Linked data provides broad capture but linkage quality must be validated"
+        validation_needed: "Validate linkage algorithm (PPV, sensitivity). Assess linkage bias."
+        regulatory_reference: "FDA Guidance: RWD Assessing EHR and Claims (2024), Section V — Data Linkage"
+
+    linked_moderate:
+      type: return
+      value:
+        source_fitness: "MODERATE_HIGH"
+        key_limitation: "Linked data without validated outcome algorithm — outcome misclassification risk"
+        validation_needed: "Develop and validate outcome algorithm. Chart review for PPV estimation."
+        regulatory_reference: "FDA Guidance: RWD Assessing EHR and Claims (2024), Sections IV-V"
+
+    # EHR
+    ehr_outcome_check:
+      type: condition
+      variable: outcome_ascertainment
+      operator: eq
+      value: "validated_algorithm"
+      true_next: ehr_validated
+      false_next: ehr_longitudinal_check
+
+    ehr_validated:
+      type: return
+      value:
+        source_fitness: "MODERATE_HIGH"
+        key_limitation: "EHR captures clinical detail but may miss out-of-network care"
+        validation_needed: "Assess care fragmentation. Validate that key outcomes are captured within the EHR network."
+        regulatory_reference: "FDA Guidance: RWD Assessing EHR and Claims (2024), Section III.A"
+
+    ehr_longitudinal_check:
+      type: condition
+      variable: longitudinal_followup
+      operator: eq
+      value: true
+      true_next: ehr_moderate
+      false_next: ehr_low
+
+    ehr_moderate:
+      type: return
+      value:
+        source_fitness: "MODERATE"
+        key_limitation: "EHR without validated outcome algorithm — needs outcome validation study"
+        validation_needed: "Chart review to validate outcome definitions. Quantify outcome misclassification."
+        regulatory_reference: "FDA Guidance: RWD Assessing EHR and Claims (2024), Section III.A"
+
+    ehr_low:
+      type: return
+      value:
+        source_fitness: "LOW_MODERATE"
+        key_limitation: "EHR without validated outcomes and inadequate follow-up"
+        validation_needed: "Assess follow-up duration. Consider claims linkage for completeness."
+        regulatory_reference: "FDA Guidance: RWD Assessing EHR and Claims (2024), Section III.A"
+
+    # CLAIMS
+    claims_outcome_check:
+      type: condition
+      variable: outcome_ascertainment
+      operator: eq
+      value: "validated_algorithm"
+      true_next: claims_validated
+      false_next: claims_icd_only
+
+    claims_validated:
+      type: return
+      value:
+        source_fitness: "MODERATE_HIGH"
+        key_limitation: "Claims capture broad population but lack clinical detail (labs, vitals, notes)"
+        validation_needed: "Validate claims algorithm against chart review. Assess confounding by unmeasured clinical variables."
+        regulatory_reference: "FDA Guidance: RWD Assessing EHR and Claims (2024), Section III.B"
+
+    claims_icd_only:
+      type: return
+      value:
+        source_fitness: "MODERATE"
+        key_limitation: "ICD codes alone have variable PPV — outcome misclassification is primary concern"
+        validation_needed: "Conduct validation study with chart review. Use multiple code algorithms with sensitivity analysis."
+        regulatory_reference: "FDA Guidance: RWD Assessing EHR and Claims (2024), Section III.B"
+
+    # REGISTRIES
+    registry_path:
+      type: return
+      value:
+        source_fitness: "HIGH"
+        key_limitation: "Disease registries have curated data but may have selection bias (voluntary enrollment)"
+        validation_needed: "Assess representativeness vs general population. Document enrollment criteria and completeness."
+        regulatory_reference: "FDA Guidance: RWD Assessing Registries (2023), Sections III-IV"
+
+    product_registry_path:
+      type: return
+      value:
+        source_fitness: "MODERATE_HIGH"
+        key_limitation: "Product registries track specific drug users but may lack comparator data"
+        validation_needed: "Assess availability of comparator group. Consider external control arm from claims/EHR."
+        regulatory_reference: "FDA Guidance: RWD Assessing Registries (2023), Section V"
+
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(∃, ∂) — RWD source fitness classification by data existence and quality boundary'
+  primes: ['κ', '∃', '∂']
+  arguments: ['data_source_type', 'completeness', 'outcome_ascertainment']
+
+tests:
+- input: { data_source_type: "linked_ehr_claims", completeness: "high", outcome_ascertainment: "validated_algorithm" }
+  expect: { source_fitness: "HIGH" }
+- input: { data_source_type: "linked_ehr_claims", completeness: "moderate", outcome_ascertainment: "icd_codes_only" }
+  expect: { source_fitness: "MODERATE_HIGH" }
+- input: { data_source_type: "ehr", completeness: "high", outcome_ascertainment: "validated_algorithm" }
+  expect: { source_fitness: "MODERATE_HIGH" }
+- input: { data_source_type: "ehr", completeness: "moderate", outcome_ascertainment: "icd_codes_only", longitudinal_followup: true }
+  expect: { source_fitness: "MODERATE" }
+- input: { data_source_type: "ehr", completeness: "moderate", longitudinal_followup: false }
+  expect: { source_fitness: "LOW_MODERATE" }
+- input: { data_source_type: "medical_claims", completeness: "high", outcome_ascertainment: "validated_algorithm" }
+  expect: { source_fitness: "MODERATE_HIGH" }
+- input: { data_source_type: "medical_claims", completeness: "high", outcome_ascertainment: "icd_codes_only" }
+  expect: { source_fitness: "MODERATE" }
+- input: { data_source_type: "disease_registry", completeness: "high" }
+  expect: { source_fitness: "HIGH" }
+- input: { data_source_type: "product_registry", completeness: "moderate" }
+  expect: { source_fitness: "MODERATE_HIGH" }
+- input: { data_source_type: "ehr", completeness: "low" }
+  expect: { source_fitness: "NOT_FIT" }
+- input: {}
+  expect: { source_fitness: "MODERATE_HIGH" }

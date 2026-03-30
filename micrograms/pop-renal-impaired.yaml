@@ -1,0 +1,71 @@
+name: pop-renal-impaired
+description: Severe renal impairment — dose adjustment
+version: 0.1.0
+tree:
+  start: check
+  nodes:
+    at_risk:
+      type: return
+      value:
+        action: special_monitoring
+        at_risk: true
+        reason: Severe renal impairment — dose adjustment
+        population: renal-impaired
+    standard:
+      type: return
+      value:
+        population: renal-impaired
+        action: standard_care
+        at_risk: false
+    check:
+      type: condition
+      variable: egfr
+      operator: lte
+      value: 30
+      true_next: at_risk
+      false_next: standard
+tests:
+- input:
+    egfr: 30
+  expect:
+    population: renal-impaired
+    at_risk: true
+- input: {}
+  expect:
+    population: renal-impaired
+    at_risk: false
+- input:
+    egfr: 0
+  expect:
+    reason: Severe renal impairment — dose adjustment
+    at_risk: true
+    action: special_monitoring
+    population: renal-impaired
+- input:
+    egfr: -1
+  expect:
+    at_risk: true
+    reason: Severe renal impairment — dose adjustment
+    population: renal-impaired
+    action: special_monitoring
+- input:
+    egfr: 29
+  expect:
+    action: special_monitoring
+    population: renal-impaired
+    at_risk: true
+    reason: Severe renal impairment — dose adjustment
+- input:
+    egfr: 31
+  expect:
+    population: renal-impaired
+    at_risk: false
+    action: standard_care
+- input:
+    egfr: 3000
+  expect:
+    action: standard_care
+    population: renal-impaired
+    at_risk: false
+interface: null
+primitive_signature: null

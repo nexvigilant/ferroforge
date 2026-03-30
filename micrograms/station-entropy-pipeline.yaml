@@ -1,0 +1,102 @@
+name: station-entropy-pipeline
+description: Route entropy computations to information-theoretic assessment paths
+version: 0.1.0
+tree:
+  start: check_entropy
+  nodes:
+    check_entropy:
+      type: condition
+      variable: entropy_bits
+      operator: gte
+      value: 3.0
+      true_next: high_entropy
+      false_next: check_low
+    high_entropy:
+      type: return
+      value:
+        action: investigate
+        priority: moderate
+        reason: High entropy (≥3 bits) — significant disorder/diversity in distribution
+        route: distribution_analysis
+    check_low:
+      type: condition
+      variable: entropy_bits
+      operator: lte
+      value: 0.5
+      true_next: low_entropy
+      false_next: normal
+    normal:
+      type: return
+      value:
+        route: archive
+        priority: low
+        reason: Normal entropy range — expected information content
+        action: pass
+    low_entropy:
+      type: return
+      value:
+        route: bias_check
+        action: flag
+        priority: high
+        reason: Very low entropy (≤0.5 bits) — near-deterministic, possible reporting bias
+tests:
+- input:
+    entropy_bits: 4.2
+  expect:
+    priority: moderate
+    route: distribution_analysis
+    action: investigate
+- input:
+    entropy_bits: 0.2
+  expect:
+    action: flag
+    priority: high
+    route: bias_check
+- input:
+    entropy_bits: 1.8
+  expect:
+    action: pass
+    route: archive
+    priority: low
+- input:
+    entropy_bits: 2.999
+  expect:
+    action: pass
+    route: archive
+    priority: low
+    reason: Normal entropy range — expected information content
+- input:
+    entropy_bits: 3.001
+  expect:
+    priority: moderate
+    reason: High entropy (≥3 bits) — significant disorder/diversity in distribution
+    action: investigate
+    route: distribution_analysis
+- input: {}
+  expect:
+    reason: Normal entropy range — expected information content
+    priority: low
+    action: pass
+    route: archive
+- input:
+    entropy_bits: 0.499
+  expect:
+    action: flag
+    priority: high
+    route: bias_check
+    reason: Very low entropy (≤0.5 bits) — near-deterministic, possible reporting bias
+- input:
+    entropy_bits: 0.501
+  expect:
+    reason: Normal entropy range — expected information content
+    action: pass
+    route: archive
+    priority: low
+- input: {}
+  expect:
+    route: archive
+    priority: low
+    reason: Normal entropy range — expected information content
+    action: pass
+interface: null
+primitive_signature: null

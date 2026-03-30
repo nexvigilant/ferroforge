@@ -1,0 +1,102 @@
+name: station-edit-distance-pipeline
+description: Route edit distance results for duplicate detection and fuzzy matching
+version: 0.1.0
+tree:
+  start: check_distance
+  nodes:
+    distinct:
+      type: return
+      value:
+        priority: low
+        action: pass
+        reason: Edit distance >30% — distinct entities
+        route: archive
+    duplicate:
+      type: return
+      value:
+        route: dedup_review
+        action: deduplicate
+        priority: high
+        reason: Edit distance ≤10% — near-duplicate detected
+    check_distance:
+      type: condition
+      variable: normalized_distance
+      operator: lte
+      value: 0.1
+      true_next: duplicate
+      false_next: check_similar
+    check_similar:
+      type: condition
+      variable: normalized_distance
+      operator: lte
+      value: 0.3
+      true_next: similar
+      false_next: distinct
+    similar:
+      type: return
+      value:
+        action: flag
+        priority: moderate
+        reason: Edit distance 10-30% — similar entities, potential merge candidate
+        route: similarity_review
+tests:
+- input:
+    normalized_distance: 0.05
+  expect:
+    action: deduplicate
+    route: dedup_review
+    priority: high
+- input:
+    normalized_distance: 0.2
+  expect:
+    priority: moderate
+    route: similarity_review
+    action: flag
+- input:
+    normalized_distance: 0.6
+  expect:
+    route: archive
+    action: pass
+    priority: low
+- input:
+    normalized_distance: 0.099
+  expect:
+    action: deduplicate
+    priority: high
+    route: dedup_review
+    reason: Edit distance ≤10% — near-duplicate detected
+- input:
+    normalized_distance: 0.101
+  expect:
+    reason: Edit distance 10-30% — similar entities, potential merge candidate
+    action: flag
+    priority: moderate
+    route: similarity_review
+- input: {}
+  expect:
+    route: archive
+    action: pass
+    reason: Edit distance >30% — distinct entities
+    priority: low
+- input:
+    normalized_distance: 0.299
+  expect:
+    reason: Edit distance 10-30% — similar entities, potential merge candidate
+    priority: moderate
+    route: similarity_review
+    action: flag
+- input:
+    normalized_distance: 0.301
+  expect:
+    reason: Edit distance >30% — distinct entities
+    route: archive
+    priority: low
+    action: pass
+- input: {}
+  expect:
+    action: pass
+    reason: Edit distance >30% — distinct entities
+    route: archive
+    priority: low
+interface: null
+primitive_signature: null

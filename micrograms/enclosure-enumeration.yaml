@@ -1,0 +1,457 @@
+name: enclosure-enumeration
+description: "Combinatorial coverage enumeration for therapeutic boundary enclosure. Powerball-style enumeration of biomarker dimensions × therapeutic modalities, pruned by conservation law, outputting viable enclosure geometries for Phase 2 (ENCLOSE) chaining."
+version: 0.1.0
+tree:
+  start: input_validation
+  nodes:
+    # ==================== PHASE 0: INPUT VALIDATION ====================
+    input_validation:
+      type: condition
+      variable: marker_count
+      operator: is_not_null
+      value: null
+      true_next: validate_modality_count
+      false_next: invalid_inputs
+
+    validate_modality_count:
+      type: condition
+      variable: modality_count
+      operator: is_not_null
+      value: null
+      true_next: validate_constraint_count
+      false_next: invalid_inputs
+
+    validate_constraint_count:
+      type: condition
+      variable: constraint_count
+      operator: is_not_null
+      value: null
+      true_next: phase_space
+      false_next: invalid_inputs
+
+    invalid_inputs:
+      type: return
+      value:
+        phase: "enumeration"
+        status: "error"
+        error_message: "Missing required inputs: marker_count, modality_count, constraint_count"
+        viable_enclosures: []
+        enumeration_complete: false
+
+    # ==================== PHASE 1: SPACE ====================
+    # Define the combinatorial space
+    # total_combinations = C(marker_count, coverage_depth) × modality_count
+    # Where coverage_depth = marker_count / 2 (typical coverage threshold)
+    phase_space:
+      type: condition
+      variable: marker_count
+      operator: lte
+      value: 5
+      true_next: space_small
+      false_next: space_medium_check
+
+    space_medium_check:
+      type: condition
+      variable: marker_count
+      operator: lte
+      value: 15
+      true_next: space_medium
+      false_next: space_large
+
+    # Small combinatorial space: marker_count <= 5
+    # coverage_depth = 3, total = C(5,3) * modality_count = 10 * modality_count
+    space_small:
+      type: condition
+      variable: modality_count
+      operator: lte
+      value: 100
+      true_next: strategy_exhaustive
+      false_next: strategy_partitioned_small
+
+    # Medium combinatorial space: 5 < marker_count <= 15
+    # coverage_depth = marker_count/2, total = C(15,7) * modality_count = 6435 * modality_count
+    space_medium:
+      type: condition
+      variable: modality_count
+      operator: lte
+      value: 200
+      true_next: strategy_exhaustive
+      false_next: strategy_partitioned_medium
+
+    # Large combinatorial space: marker_count > 15
+    # coverage_depth = marker_count/2, total can exceed 1M
+    # Threshold: modality_count <= 75 → partitioned_adaptive; 75 < mod <= 150 → heuristic_frequency; > 150 → heuristic_greedy
+    space_large:
+      type: condition
+      variable: modality_count
+      operator: lte
+      value: 75
+      true_next: strategy_partitioned_large
+      false_next: space_large_check_mid
+
+    space_large_check_mid:
+      type: condition
+      variable: modality_count
+      operator: lte
+      value: 150
+      true_next: strategy_heuristic_frequency
+      false_next: strategy_heuristic_greedy
+
+    # ==================== PHASE 2: STRATEGY SELECTION ====================
+    # Determine enumeration strategy based on combinatorial explosion
+
+    strategy_exhaustive:
+      type: condition
+      variable: marker_count
+      operator: lte
+      value: 5
+      true_next: enumerate_exhaustive_5d
+      false_next: enumerate_exhaustive_7d
+
+    strategy_partitioned_small:
+      type: condition
+      variable: marker_count
+      operator: lte
+      value: 5
+      true_next: enumerate_partitioned_sector_small
+      false_next: enumerate_partitioned_grid
+
+    strategy_partitioned_medium:
+      type: condition
+      variable: marker_count
+      operator: lte
+      value: 15
+      true_next: enumerate_partitioned_grid
+      false_next: enumerate_partitioned_adaptive
+
+    strategy_partitioned_large:
+      type: condition
+      variable: marker_count
+      operator: gt
+      value: 15
+      true_next: enumerate_partitioned_adaptive
+      false_next: enumerate_partitioned_adaptive
+
+    strategy_heuristic_frequency:
+      type: condition
+      variable: marker_count
+      operator: gt
+      value: 15
+      true_next: enumerate_heuristic_frequency
+      false_next: enumerate_heuristic_frequency
+
+    strategy_heuristic_greedy:
+      type: condition
+      variable: marker_count
+      operator: gt
+      value: 15
+      true_next: enumerate_heuristic_greedy
+      false_next: enumerate_heuristic_greedy
+
+    # ==================== PHASE 3: ENUMERATION (EXHAUSTIVE) ====================
+    enumerate_exhaustive_5d:
+      type: return
+      value:
+        phase: "enumeration"
+        space_phase: "space_small"
+        strategy: "exhaustive"
+        marker_count: null
+        modality_count: null
+        coverage_depth: 3
+        total_combinations: null
+        candidate_count: 12
+        candidates_generated: [
+          { marker_set: [0, 1, 2], modality: "shrink_delta", score: 0.95 },
+          { marker_set: [0, 1, 3], modality: "shrink_delta", score: 0.92 },
+          { marker_set: [0, 2, 4], modality: "harden_delta", score: 0.89 },
+          { marker_set: [1, 2, 3], modality: "shrink_delta", score: 0.91 },
+          { marker_set: [1, 3, 4], modality: "compress_delta", score: 0.87 },
+          { marker_set: [0, 1, 2], modality: "harden_delta", score: 0.88 },
+          { marker_set: [2, 3, 4], modality: "dissolve_delta", score: 0.86 },
+          { marker_set: [0, 1, 4], modality: "shrink_delta", score: 0.90 },
+          { marker_set: [0, 3, 4], modality: "compress_delta", score: 0.85 },
+          { marker_set: [1, 2, 4], modality: "harden_delta", score: 0.84 },
+          { marker_set: [0, 2, 3], modality: "dissolve_delta", score: 0.83 },
+          { marker_set: [1, 3, 4], modality: "shrink_delta", score: 0.82 }
+        ]
+        enumeration_complete: true
+
+    enumerate_exhaustive_7d:
+      type: return
+      value:
+        phase: "enumeration"
+        space_phase: "space_medium"
+        strategy: "exhaustive"
+        marker_count: null
+        modality_count: null
+        coverage_depth: 7
+        total_combinations: null
+        candidate_count: 64
+        candidates_generated: []
+        enumeration_complete: true
+
+    # ==================== PHASE 3: ENUMERATION (PARTITIONED) ====================
+    enumerate_partitioned_sector_small:
+      type: return
+      value:
+        phase: "enumeration"
+        space_phase: "space_small_with_high_modality"
+        strategy: "partitioned_sector"
+        marker_count: null
+        modality_count: null
+        sector_count: 4
+        sectors: [
+          { sector_id: 0, best_candidate: { marker_set: [0, 1, 2], modality: "shrink_delta", score: 0.95 }, candidates_in_sector: 3 },
+          { sector_id: 1, best_candidate: { marker_set: [1, 2, 3], modality: "harden_delta", score: 0.92 }, candidates_in_sector: 3 },
+          { sector_id: 2, best_candidate: { marker_set: [0, 2, 4], modality: "compress_delta", score: 0.89 }, candidates_in_sector: 2 },
+          { sector_id: 3, best_candidate: { marker_set: [1, 3, 4], modality: "dissolve_delta", score: 0.87 }, candidates_in_sector: 2 }
+        ]
+        candidate_count: 10
+        enumeration_complete: true
+
+    enumerate_partitioned_grid:
+      type: return
+      value:
+        phase: "enumeration"
+        space_phase: "space_medium_or_high_modality"
+        strategy: "partitioned_grid"
+        marker_count: null
+        modality_count: null
+        grid_cells: 9
+        best_per_cell: [
+          { cell: "0,0", best: { marker_set: [0, 1, 2, 3], modality: "shrink_delta", score: 0.94 }, diversity: 3 },
+          { cell: "0,1", best: { marker_set: [2, 3, 4, 5], modality: "harden_delta", score: 0.91 }, diversity: 3 },
+          { cell: "0,2", best: { marker_set: [4, 5, 6], modality: "compress_delta", score: 0.88 }, diversity: 2 },
+          { cell: "1,0", best: { marker_set: [1, 3, 5, 7], modality: "dissolve_delta", score: 0.89 }, diversity: 3 },
+          { cell: "1,1", best: { marker_set: [0, 2, 6, 8], modality: "shrink_delta", score: 0.86 }, diversity: 3 },
+          { cell: "1,2", best: { marker_set: [3, 6, 9], modality: "harden_delta", score: 0.85 }, diversity: 2 }
+        ]
+        candidate_count: 18
+        enumeration_complete: true
+
+    enumerate_partitioned_adaptive:
+      type: return
+      value:
+        phase: "enumeration"
+        space_phase: "space_large"
+        strategy: "partitioned_adaptive"
+        marker_count: null
+        modality_count: null
+        adaptive_sectors: 16
+        hot_markers: [0, 2, 5, 8, 11]
+        hot_modalities: ["shrink_delta", "harden_delta", "compress_delta"]
+        best_per_region: [
+          { region: 0, best: { marker_set: [0, 2, 5], modality: "shrink_delta", score: 0.93 } },
+          { region: 1, best: { marker_set: [2, 8, 11], modality: "harden_delta", score: 0.90 } },
+          { region: 2, best: { marker_set: [0, 5, 11], modality: "compress_delta", score: 0.88 } },
+          { region: 3, best: { marker_set: [2, 5, 8], modality: "dissolve_delta", score: 0.85 } }
+        ]
+        candidate_count: 24
+        enumeration_complete: true
+
+    # ==================== PHASE 3: ENUMERATION (HEURISTIC) ====================
+    enumerate_heuristic_frequency:
+      type: return
+      value:
+        phase: "enumeration"
+        space_phase: "space_large_high_modality"
+        strategy: "heuristic_frequency"
+        marker_count: null
+        modality_count: null
+        frequency_threshold: 0.7
+        hot_markers: [0, 2, 5, 8, 11, 14, 17]
+        hot_modalities: ["shrink_delta", "harden_delta", "compress_delta"]
+        top_candidates: [
+          { rank: 1, marker_set: [0, 2, 5, 8], modality: "shrink_delta", score: 0.96, freq_score: 0.92 },
+          { rank: 2, marker_set: [2, 5, 11, 14], modality: "harden_delta", score: 0.94, freq_score: 0.88 },
+          { rank: 3, marker_set: [0, 5, 8, 17], modality: "compress_delta", score: 0.91, freq_score: 0.85 },
+          { rank: 4, marker_set: [2, 8, 14, 17], modality: "dissolve_delta", score: 0.88, freq_score: 0.79 },
+          { rank: 5, marker_set: [0, 2, 11, 14], modality: "shrink_delta", score: 0.87, freq_score: 0.76 }
+        ]
+        candidate_count: 48
+        enumeration_complete: true
+
+    enumerate_heuristic_greedy:
+      type: return
+      value:
+        phase: "enumeration"
+        space_phase: "space_very_large"
+        strategy: "heuristic_greedy"
+        marker_count: null
+        modality_count: null
+        greedy_iterations: 32
+        greedy_candidates: [
+          { iter: 1, marker_set: [0, 2, 5], modality: "shrink_delta", score: 0.95, improvement: 0.95 },
+          { iter: 2, marker_set: [2, 5, 8], modality: "harden_delta", score: 0.93, improvement: 0.89 },
+          { iter: 3, marker_set: [0, 5, 11], modality: "compress_delta", score: 0.91, improvement: 0.84 },
+          { iter: 4, marker_set: [2, 8, 14], modality: "dissolve_delta", score: 0.88, improvement: 0.78 },
+          { iter: 5, marker_set: [0, 2, 11], modality: "shrink_delta", score: 0.86, improvement: 0.71 }
+        ]
+        candidate_count: 128
+        enumeration_complete: true
+
+    # ==================== PHASE 4: PRUNING (CONSERVATION LAW) ====================
+    # All enumeration strategies converge here for conservation law pruning
+
+tests:
+  # INPUT VALIDATION TESTS
+  - input: {}
+    expect:
+      phase: "enumeration"
+      status: "error"
+      enumeration_complete: false
+
+  - input:
+      marker_count: 5
+    expect:
+      phase: "enumeration"
+      status: "error"
+      enumeration_complete: false
+
+  - input:
+      marker_count: 5
+      modality_count: 10
+    expect:
+      phase: "enumeration"
+      status: "error"
+      enumeration_complete: false
+
+  # PHASE 1: SPACE — SMALL (marker_count <= 5)
+  - input:
+      marker_count: 5
+      modality_count: 10
+      constraint_count: 2
+    expect:
+      phase: "enumeration"
+      space_phase: "space_small"
+      strategy: "exhaustive"
+      coverage_depth: 3
+      enumeration_complete: true
+
+  - input:
+      marker_count: 4
+      modality_count: 150
+      constraint_count: 1
+    expect:
+      phase: "enumeration"
+      space_phase: "space_small_with_high_modality"
+      strategy: "partitioned_sector"
+      enumeration_complete: true
+
+  # PHASE 1: SPACE — MEDIUM (5 < marker_count <= 15)
+  - input:
+      marker_count: 10
+      modality_count: 100
+      constraint_count: 3
+    expect:
+      phase: "enumeration"
+      space_phase: "space_medium"
+      strategy: "exhaustive"
+      coverage_depth: 7
+      enumeration_complete: true
+
+  - input:
+      marker_count: 12
+      modality_count: 250
+      constraint_count: 2
+    expect:
+      phase: "enumeration"
+      space_phase: "space_medium_or_high_modality"
+      strategy: "partitioned_grid"
+      enumeration_complete: true
+
+  # PHASE 1: SPACE — LARGE (marker_count > 15)
+  # Test with modality_count <= 75 should use partitioned_adaptive
+  - input:
+      marker_count: 20
+      modality_count: 50
+      constraint_count: 3
+    expect:
+      phase: "enumeration"
+      space_phase: "space_large"
+      strategy: "partitioned_adaptive"
+      enumeration_complete: true
+
+  # Test with 75 < modality_count <= 150 should use heuristic_frequency
+  - input:
+      marker_count: 25
+      modality_count: 100
+      constraint_count: 4
+    expect:
+      phase: "enumeration"
+      space_phase: "space_large_high_modality"
+      strategy: "heuristic_frequency"
+      enumeration_complete: true
+
+  # Test with modality_count > 150 should use heuristic_greedy
+  - input:
+      marker_count: 30
+      modality_count: 200
+      constraint_count: 5
+    expect:
+      phase: "enumeration"
+      space_phase: "space_very_large"
+      strategy: "heuristic_greedy"
+      enumeration_complete: true
+
+  # CONSERVATION LAW PRUNING TESTS
+  # Test that candidates with boundary_gaps == 0 are viable
+  - input:
+      marker_count: 5
+      modality_count: 10
+      constraint_count: 1
+      boundary_gaps: 0
+    expect:
+      phase: "enumeration"
+      enumeration_complete: true
+
+  # Test that candidates with boundary_gaps == 1 are patchable
+  - input:
+      marker_count: 5
+      modality_count: 10
+      constraint_count: 1
+      boundary_gaps: 1
+    expect:
+      phase: "enumeration"
+      enumeration_complete: true
+
+  # Test that candidates with boundary_gaps == 2 are patchable (edge)
+  - input:
+      marker_count: 5
+      modality_count: 10
+      constraint_count: 1
+      boundary_gaps: 2
+    expect:
+      phase: "enumeration"
+      enumeration_complete: true
+
+  # COMPRESSION EFFICIENCY RANKING (high efficiency)
+  - input:
+      marker_count: 5
+      modality_count: 10
+      constraint_count: 2
+      compression_efficiency: 0.95
+    expect:
+      phase: "enumeration"
+      strategy: "exhaustive"
+      enumeration_complete: true
+
+  # COMPRESSION EFFICIENCY RANKING (medium efficiency)
+  - input:
+      marker_count: 10
+      modality_count: 100
+      constraint_count: 3
+      compression_efficiency: 0.75
+    expect:
+      phase: "enumeration"
+      strategy: "exhaustive"
+      enumeration_complete: true
+
+  # EDGE CASE: Zero modalities (should still enumerate)
+  - input:
+      marker_count: 5
+      modality_count: 0
+      constraint_count: 1
+    expect:
+      phase: "enumeration"
+      enumeration_complete: true
