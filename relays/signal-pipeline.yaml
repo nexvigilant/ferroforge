@@ -3,13 +3,26 @@ description: Drug name → FAERS search → Disproportionality → Verdict
 
 hops:
   - tool: rxnav_nlm_nih_gov_search_drugs
-    args: { query: "$drug" }
-    extract: { rxcui: "results[0].rxcui", drug_resolved: "results[0].name" }
+    args:
+      query: "$drug"
+    extract:
+      rxcui: "results[0].rxcui"
 
   - tool: api_fda_gov_search_adverse_events
-    args: { drug_name: "$drug", serious: true, limit: 5 }
-    extract: { total_reports: "total_matching", top_reaction: "results[0].reactions[0]" }
+    args:
+      drug_name: "$drug"
+      serious: true
+      limit: 5
+    extract:
+      total_reports: "total_matching"
+      top_reaction: "results[0].reactions[0]"
 
   - tool: open-vigil_fr_compute_disproportionality
-    args: { drug: "$drug", event: "$top_reaction" }
-    extract: { prr: "scores.PRR", ror: "scores.ROR", ic: "scores.IC", signal: "signal_assessment", cases: "contingency_table.a_drug_event" }
+    args:
+      drug: "$drug"
+      event: "$top_reaction"
+    extract:
+      prr: "scores.PRR"
+      ror: "scores.ROR"
+      signal: "signal_assessment"
+      cases: "contingency_table.a_drug_event"
