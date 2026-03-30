@@ -1,0 +1,24 @@
+name: pipe-prev
+description: FAERS drug events output piped to PRR calculation — minimal 2-hop relay
+
+hops:
+  - tool: api_fda_gov_search_adverse_events
+    args:
+      drug_name: "$drug"
+      serious: true
+      limit: 10
+    extract:
+      total_reports: "total_matching"
+      top_event: "results[0].reactions[0]"
+      case_count: "results[0].count"
+
+  - tool: calculate_nexvigilant_com_compute_prr
+    args:
+      a_drug_event: "$case_count"
+      b_drug_no_event: 100
+      c_no_drug_event: 50
+      d_no_drug_no_event: 10000
+    extract:
+      prr: "prr"
+      chi_square: "chi_square"
+      signal_detected: "signal"
