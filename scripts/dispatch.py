@@ -163,7 +163,8 @@ def _discover_routes() -> dict[str, str]:
             continue
 
         # Build prefix: "api.fda.gov" → "api_fda_gov_"
-        prefix = domain.replace(".", "_").replace("-", "-") + "_"
+        # Also normalize hyphens: "platform-api.opentargets.org" → "platform_api_opentargets_org_"
+        prefix = domain.replace(".", "_").replace("-", "_") + "_"
 
         # Find proxy: config-level first, then first tool-level
         proxy = config.get("proxy")
