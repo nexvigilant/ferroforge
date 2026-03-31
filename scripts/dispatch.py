@@ -87,11 +87,7 @@ PARAMETER_ALIGNMENT: dict[str, dict[str, str]] = {
     "cioms_proxy.py":            {**_query_alias_map("query")},
     "wikipedia_proxy.py":        {**_query_alias_map("query")},
     # --- Pharma proxy accepts query alias ---
-    "pharma_proxy.py":           {**_query_alias_map("query")},
-    # --- Lilly proxy expects "product" for drug queries ---
-    "lilly_proxy.py":            {**_drug_alias_map("product"), **_query_alias_map("product")},
-    # --- Novartis proxy expects "product_name" for drug queries ---
-    "novartis_proxy.py":         {**_drug_alias_map("product_name"), **_query_alias_map("query")},
+    "pharma_proxy.py":           {**_query_alias_map("query"), **_drug_alias_map("product")},
     # --- Global PV regulatory agencies (batch 2026-03-31) ---
     "recalls_rappels_canada_ca_proxy.py": {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
     "www_pmda_go_jp_proxy.py":   {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
@@ -447,7 +443,7 @@ SMOKE_TEST_CASES: list[dict] = [
     },
     {
         "label": "ClinicalTrials — registered proxy",
-        "envelope": {"tool": "clinicaltrials_gov_get_serious_adverse_events", "arguments": {"nct_id": "NCT00000001"}},
+        "envelope": {"tool": "clinicaltrials_gov_get_serious_adverse_events", "arguments": {"nct_id": "NCT00000102"}},
         "expect_domain": "clinicaltrials_gov_",
     },
     {
@@ -468,12 +464,12 @@ SMOKE_TEST_CASES: list[dict] = [
     {
         "label": "OpenVigil — registered proxy",
         "envelope": {"tool": "open-vigil_fr_compute_disproportionality", "arguments": {"drug": "metformin", "event": "lactic acidosis"}},
-        "expect_domain": "open-vigil_fr_",
+        "expect_domain": "open_vigil_fr_",
     },
     {
         "label": "WHO-UMC — config-discovered proxy",
         "envelope": {"tool": "who-umc_org_search_vigibase", "arguments": {"drug": "metformin"}},
-        "expect_domain": "who-umc_org_",
+        "expect_domain": "who_umc_org_",
     },
     {
         "label": "FDA Safety — config-discovered proxy",
@@ -515,7 +511,7 @@ SMOKE_TEST_CASES: list[dict] = [
     {
         "label": "Alignment — 'drug_name' alias resolves to 'drug' for OpenVigil",
         "envelope": {"tool": "open-vigil_fr_compute_disproportionality", "arguments": {"drug_name": "metformin", "event": "nausea"}},
-        "expect_domain": "open-vigil_fr_",
+        "expect_domain": "open_vigil_fr_",
         "expect_aligned_key": "drug",
     },
     {
@@ -567,7 +563,7 @@ def run_smoke_tests() -> None:
             outcome = f"proxy={'none (correct)' if ok else proxy_path}"
         else:
             expected_script = DOMAIN_ROUTES.get(expect_domain, "")
-            ok = proxy_path is not None and expected_script in proxy_path and has_key
+            ok = proxy_path is not None and expected_script == Path(proxy_path).name and has_key
             outcome = f"proxy={Path(proxy_path).name if proxy_path else 'none'}"
             if expect_aligned_key:
                 outcome += f"  |  aligned: {expect_aligned_key}={'present' if has_key else 'MISSING'}"
@@ -576,6 +572,14 @@ def run_smoke_tests() -> None:
         try:
             result = dispatch(envelope)
             status = result.get("status", "unknown")
+            # For most tools, status should be 'ok' or 'stub' (if implemented but returning stub)
+            # Some tools might return 'error' if external API is down, but for smoke test
+            # we generally want to see successful dispatch.
+            if expect_domain != "error" and status == "error":
+                # Only fail on 'error' if it's a critical dispatch failure,
+                # but many proxies return 'error' for missing NCT IDs etc.
+                # So we just report it for now.
+                pass
         except Exception as exc:  # noqa: BLE001
             ok = False
             status = f"EXCEPTION: {exc}"

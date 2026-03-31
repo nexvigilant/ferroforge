@@ -563,10 +563,13 @@ def get_recalls(company_key: str, args: dict) -> dict:
 def get_labeling_changes(company_key: str, args: dict) -> dict:
     """Fetch recent labeling changes from openFDA."""
     import datetime
-    since_year = get_int_param(args, "since_year", datetime.date.today().year - 2, 1990, 2027)
+    today = datetime.date.today()
+    since_year = get_int_param(args, "since_year", today.year - 2, 1990, today.year + 1)
     limit = get_int_param(args, "limit", 20, 1, 100)
     search = _manufacturer_search(company_key)
-    search = f"{search}+AND+effective_time:[{since_year}0101+TO+20271231]"
+    # Range from since_year to far future (end of next year) to catch all recent/pending
+    future_date = f"{today.year + 1}1231"
+    search = f"{search}+AND+effective_time:[{since_year}0101+TO+{future_date}]"
     url = f"{OPENFDA_LABEL}?search={search}&limit={limit}&sort=effective_time:desc"
 
     try:
@@ -600,7 +603,7 @@ def get_labeling_changes(company_key: str, args: dict) -> dict:
 
 def search_products(company_key: str, args: dict) -> dict:
     """Search company products by keyword."""
-    query = ensure_str(args.get("query") or args.get("search") or "").strip()
+    query = ensure_str(args.get("query") or args.get("search") or args.get("drug") or args.get("drug_name") or "").strip()
     if not query:
         return {"status": "error", "message": "query parameter is required", "company": company_key}
 
