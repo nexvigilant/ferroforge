@@ -92,6 +92,18 @@ PARAMETER_ALIGNMENT: dict[str, dict[str, str]] = {
     "lilly_proxy.py":            {**_drug_alias_map("product"), **_query_alias_map("product")},
     # --- Novartis proxy expects "product_name" for drug queries ---
     "novartis_proxy.py":         {**_drug_alias_map("product_name"), **_query_alias_map("query")},
+    # --- Global PV regulatory agencies (batch 2026-03-31) ---
+    "recalls_rappels_canada_ca_proxy.py": {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "www_pmda_go_jp_proxy.py":   {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "www_tga_gov_au_proxy.py":   {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "www_gov_uk_proxy.py":       {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "www_swissmedic_ch_proxy.py": {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "www_hsa_gov_sg_proxy.py":   {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "www_medsafe_govt_nz_proxy.py": {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "ctdbase_org_proxy.py":      {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    # --- Mesh linkage configs (2026-03-31) ---
+    "multiregional_nexvigilant_com_proxy.py": {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "regulatory_mesh_nexvigilant_com_proxy.py": {},
 }
 
 
