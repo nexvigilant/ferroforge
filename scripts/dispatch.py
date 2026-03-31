@@ -214,12 +214,26 @@ def resolve_route(tool_name: str) -> tuple[str | None, str]:
 
     If no domain prefix matches, proxy_script_path is None and the original
     tool name is returned unchanged.
+
+    The Rust binary preserves hyphens in domain prefixes (pv-engine_nexvigilant_com_)
+    while config discovery normalizes to underscores (pv_engine_nexvigilant_com_).
+    We try the original name first, then fall back to a hyphen→underscore normalized form.
     """
     for prefix, script_file in _SORTED_ROUTES:
         if tool_name.startswith(prefix):
             unprefixed = tool_name[len(prefix):].replace("_", "-")
             proxy_path = str(SCRIPTS_DIR / script_file)
             return proxy_path, unprefixed
+
+    # Fallback: normalize hyphens in the domain portion to underscores and retry
+    normalized = tool_name.replace("-", "_")
+    if normalized != tool_name:
+        for prefix, script_file in _SORTED_ROUTES:
+            if normalized.startswith(prefix):
+                unprefixed = normalized[len(prefix):].replace("_", "-")
+                proxy_path = str(SCRIPTS_DIR / script_file)
+                return proxy_path, unprefixed
+
     return None, tool_name
 
 

@@ -1,0 +1,143 @@
+{
+  "domain": "pv-engine.nexvigilant.com",
+  "private": false,
+  "copyright": "\u00a9 2026 NexVigilant, LLC. Guardian PV Engine is a proprietary pharmacovigilance processing system.",
+  "title": "Guardian PV Engine \u2014 Complete Pharmacovigilance Lifecycle",
+  "description": "Full pharmacovigilance processing engine: ICSR validation (CIOMS I/II 4-element rule), causality assessment (Naranjo 10-question scale, WHO-UMC 6-category, RUCAM hepatotoxicity), seriousness classification (ICH E2A 7-criterion), expedited reporting determination (ICH E2D 7/15/90-day), PSUR/PBRER/DSUR interval calculation (ICH E2C/E2F), and case completeness scoring. Implements ICH E2A, E2B(R3), E2C(R2), E2D(R1), E2F, CIOMS I-VIII, and FDA 21 CFR 312.32/314.80. No external API calls \u2014 pure computation from regulatory reference data.",
+  "proxy": "scripts/guardian_engine_proxy.py",
+  "tools": [
+    {
+      "name": "assess-naranjo",
+      "description": "Run the Naranjo Adverse Drug Reaction Probability Scale. Scores 10 questions about temporal relationship, dechallenge, rechallenge, alternative causes, dose-response, and objective evidence. Returns total score (range -4 to +13) and category: Definite (>=9), Probable (5-8), Possible (1-4), Doubtful (<=0). Reference: Naranjo et al. (1981) Clin Pharmacol Ther 30:239-245.",
+      "parameters": [
+        {"name": "drug", "type": "string", "description": "Suspected drug name", "required": false},
+        {"name": "event", "type": "string", "description": "Adverse event term", "required": false},
+        {"name": "q1_previous_reports", "type": "string", "description": "Previous conclusive reports on this reaction? (yes/no/unknown)", "required": true},
+        {"name": "q2_temporal_relationship", "type": "string", "description": "Event appeared after suspected drug was given? (yes/no/unknown)", "required": true},
+        {"name": "q3_dechallenge", "type": "string", "description": "ADR improved when drug was discontinued? (yes/no/unknown)", "required": true},
+        {"name": "q4_rechallenge", "type": "string", "description": "ADR reappeared when drug was readministered? (yes/no/unknown)", "required": true},
+        {"name": "q5_alternative_causes", "type": "string", "description": "Alternative causes could explain the reaction? (yes/no/unknown)", "required": true},
+        {"name": "q6_placebo_response", "type": "string", "description": "Reaction appeared when placebo was given? (yes/no/unknown)", "required": true},
+        {"name": "q7_drug_concentration", "type": "string", "description": "Drug detected in blood in toxic concentration? (yes/no/unknown)", "required": true},
+        {"name": "q8_dose_response", "type": "string", "description": "Reaction more severe with increased dose? (yes/no/unknown)", "required": true},
+        {"name": "q9_previous_experience", "type": "string", "description": "Patient had similar reaction to same or similar drugs? (yes/no/unknown)", "required": true},
+        {"name": "q10_objective_evidence", "type": "string", "description": "ADR confirmed by objective evidence? (yes/no/unknown)", "required": true}
+      ],
+      "outputSchema": {"type": "object", "properties": {"score": {"type": "integer"}, "category": {"type": "string"}, "is_adr": {"type": "boolean"}, "questions": {"type": "object"}}, "required": ["score", "category"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "assess-who-umc",
+      "description": "Assess causality using the WHO-UMC system. Evaluates temporal relationship, dechallenge/rechallenge, and alternative causes to classify into 6 categories: Certain, Probable/Likely, Possible, Unlikely, Conditional/Unclassified, Unassessable/Unclassifiable. Reference: WHO-UMC Causality Assessment Guidelines.",
+      "parameters": [
+        {"name": "drug", "type": "string", "description": "Suspected drug name", "required": false},
+        {"name": "event", "type": "string", "description": "Adverse event term", "required": false},
+        {"name": "time_relationship", "type": "boolean", "description": "Reasonable temporal relationship between drug and event?", "required": true},
+        {"name": "dechallenge", "type": "boolean", "description": "Event improved when drug stopped (positive dechallenge)?", "required": true},
+        {"name": "rechallenge", "type": "boolean", "description": "Event recurred when drug restarted (positive rechallenge)?", "required": true},
+        {"name": "alternative_causes", "type": "boolean", "description": "Can alternative causes be ruled out?", "required": true},
+        {"name": "known_response", "type": "boolean", "description": "Is this a known response pattern for the drug?", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"category": {"type": "string"}, "description": {"type": "string"}, "criteria_met": {"type": "array"}}, "required": ["category", "description"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "classify-seriousness",
+      "description": "Classify adverse event seriousness using ICH E2A criteria. Checks 7 regulatory criteria: death, life-threatening, hospitalization/prolonged, disability/incapacity, congenital anomaly/birth defect, medically significant, requires intervention. CRITICAL: serious != severe. A severe headache is NOT serious. A mild heart attack IS serious (hospitalization). Reference: ICH E2A (1994), CIOMS IV (1998).",
+      "parameters": [
+        {"name": "event_description", "type": "string", "description": "Description of the adverse event", "required": true},
+        {"name": "resulted_in_death", "type": "boolean", "description": "Event resulted in death?", "required": false},
+        {"name": "life_threatening", "type": "boolean", "description": "Life-threatening at time of event?", "required": false},
+        {"name": "hospitalization", "type": "boolean", "description": "Required inpatient hospitalization or prolonged existing?", "required": false},
+        {"name": "disability", "type": "boolean", "description": "Resulted in persistent or significant disability/incapacity?", "required": false},
+        {"name": "congenital_anomaly", "type": "boolean", "description": "Congenital anomaly/birth defect?", "required": false},
+        {"name": "medically_significant", "type": "boolean", "description": "Other medically important condition?", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"is_serious": {"type": "boolean"}, "criteria_met": {"type": "array"}, "highest_criterion": {"type": "string"}, "severity_note": {"type": "string"}}, "required": ["is_serious", "criteria_met"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "determine-expedited-reporting",
+      "description": "Determine expedited reporting type and deadline per ICH E2A/E2D and regional requirements. Evaluates seriousness, expectedness, fatality, DME status, and regulatory region to determine: 7-day (FDA IND fatal/life-threatening SUSAR), 15-day (serious unexpected), 90-day (serious expected), or non-expedited. Supports FDA, EMA, PMDA, Health Canada, TGA, MHRA, NMPA regions.",
+      "parameters": [
+        {"name": "is_serious", "type": "boolean", "description": "Meets ICH E2A seriousness criteria", "required": true},
+        {"name": "is_unexpected", "type": "boolean", "description": "Not in Reference Safety Information (Company Core Data Sheet)", "required": true},
+        {"name": "is_fatal", "type": "boolean", "description": "Event resulted in death", "required": false},
+        {"name": "is_life_threatening", "type": "boolean", "description": "Life-threatening at time of event", "required": false},
+        {"name": "is_dme", "type": "boolean", "description": "Designated Medical Event (CIOMS VIII)", "required": false},
+        {"name": "region", "type": "string", "description": "Regulatory region: fda, ema, pmda, hc, tga, mhra, nmpa, ich (default: ich)", "required": false},
+        {"name": "context", "type": "string", "description": "Report context: clinical_trial, post_marketing, literature, solicited (default: post_marketing)", "required": false},
+        {"name": "is_study_endpoint", "type": "boolean", "description": "Event is a study endpoint (exempt from expedited reporting)", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"report_type": {"type": "string"}, "deadline_days": {"type": "integer"}, "is_expedited": {"type": "boolean"}, "rationale": {"type": "string"}, "criteria_met": {"type": "array"}, "region": {"type": "string"}}, "required": ["report_type", "deadline_days", "is_expedited", "rationale"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "calculate-submission-deadline",
+      "description": "Calculate regulatory submission deadline from Day 0 (awareness date). Per ICH E2D(R1), Day 0 = date minimum information received (4 elements: identifiable reporter, identifiable patient, suspect product, suspect reaction). Returns calendar and business day calculations with overdue status.",
+      "parameters": [
+        {"name": "awareness_date", "type": "string", "description": "Day 0 date in ISO format (YYYY-MM-DD)", "required": true},
+        {"name": "report_type", "type": "string", "description": "Report type: 7_day, 15_day, 90_day, non_expedited", "required": true},
+        {"name": "region", "type": "string", "description": "Regulatory region (default: ich)", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"awareness_date": {"type": "string"}, "deadline_date": {"type": "string"}, "calendar_days": {"type": "integer"}, "is_overdue": {"type": "boolean"}, "days_remaining": {"type": "integer"}}, "required": ["awareness_date", "deadline_date", "calendar_days"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "calculate-psur-interval",
+      "description": "Calculate PSUR/PBRER reporting interval from International Birth Date (IBD). ICH E2C(R2) standard intervals: Years 1-2: every 6 months, Years 3-5: annually, Year 6+: every 3 years. Returns current period boundaries and 90-day submission deadline.",
+      "parameters": [
+        {"name": "international_birth_date", "type": "string", "description": "First marketing authorization date worldwide (YYYY-MM-DD)", "required": true},
+        {"name": "current_date", "type": "string", "description": "Reference date (default: today)", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"report_type": {"type": "string"}, "period_start": {"type": "string"}, "period_end": {"type": "string"}, "submission_deadline": {"type": "string"}, "interval_months": {"type": "integer"}, "period_number": {"type": "integer"}}, "required": ["report_type", "period_start", "period_end"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "calculate-dsur-cutoff",
+      "description": "Calculate DSUR (Development Safety Update Report) data lock point and submission deadline. ICH E2F: annual report during clinical development, data lock on DIBD anniversary, submission within 60 days.",
+      "parameters": [
+        {"name": "development_ibd", "type": "string", "description": "First CTA/IND approval date (YYYY-MM-DD)", "required": true},
+        {"name": "current_date", "type": "string", "description": "Reference date (default: today)", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"report_type": {"type": "string"}, "period_start": {"type": "string"}, "period_end": {"type": "string"}, "submission_deadline": {"type": "string"}, "interval_months": {"type": "integer"}, "period_number": {"type": "integer"}}, "required": ["report_type", "period_start", "period_end"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "validate-icsr-minimum",
+      "description": "Validate ICSR against ICH E2B(R3) minimum data requirements. The 4-element rule: (1) identifiable reporter, (2) identifiable patient, (3) suspect product, (4) suspect reaction. Returns validity status, missing elements, and completeness score.",
+      "parameters": [
+        {"name": "reporter_name", "type": "string", "description": "Reporter name, initials, or qualification", "required": false},
+        {"name": "reporter_country", "type": "string", "description": "Reporter country", "required": false},
+        {"name": "patient_initials", "type": "string", "description": "Patient initials or identifier", "required": false},
+        {"name": "patient_age", "type": "string", "description": "Patient age or date of birth", "required": false},
+        {"name": "patient_sex", "type": "string", "description": "Patient sex (M/F/Unknown)", "required": false},
+        {"name": "suspect_drug", "type": "string", "description": "Suspected drug name", "required": false},
+        {"name": "adverse_event", "type": "string", "description": "Suspected adverse reaction term", "required": false},
+        {"name": "event_date", "type": "string", "description": "Date of adverse event onset", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"status": {"type": "string"}, "is_valid": {"type": "boolean"}, "elements_present": {"type": "array"}, "elements_missing": {"type": "array"}, "completeness_score": {"type": "number"}}, "required": ["status", "is_valid"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "check-deadline-compliance",
+      "description": "Check if a case submission was within the regulatory deadline. Returns compliance status with days used, days over, and audit-ready details.",
+      "parameters": [
+        {"name": "awareness_date", "type": "string", "description": "Day 0 date (YYYY-MM-DD)", "required": true},
+        {"name": "submission_date", "type": "string", "description": "Date report was submitted (YYYY-MM-DD)", "required": true},
+        {"name": "report_type", "type": "string", "description": "Report type: 7_day, 15_day, 90_day", "required": true},
+        {"name": "region", "type": "string", "description": "Regulatory region (default: ich)", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"compliant": {"type": "boolean"}, "days_allowed": {"type": "integer"}, "days_used": {"type": "integer"}, "days_over": {"type": "integer"}}, "required": ["compliant", "days_allowed", "days_used"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "list-capabilities",
+      "description": "List all Guardian PV Engine capabilities with their namespaces, parameter signatures, and regulatory references. Use this to discover what the engine can do.",
+      "parameters": [],
+      "outputSchema": {"type": "object", "properties": {"namespaces": {"type": "object"}, "total_functions": {"type": "integer"}, "regulatory_references": {"type": "array"}}, "required": ["namespaces", "total_functions"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    }
+  ],
+  "url_pattern": "/*"
+}
