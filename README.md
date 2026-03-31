@@ -1,6 +1,6 @@
 # NexVigilant Station
 
-Pharmacovigilance intelligence for AI agents. **347 tools** across **50 domains** for drug safety data, signal detection, causality assessment, and regulatory intelligence. Open, no auth required.
+Pharmacovigilance intelligence for AI agents. **1,957 tools** across **229 domains** for drug safety data, signal detection, causality assessment, and regulatory intelligence. Open, no auth required.
 
 **Production:** [mcp.nexvigilant.com](https://mcp.nexvigilant.com)
 

@@ -203,6 +203,7 @@ pub async fn run_combined(
         // Health + Stats (excluded from rate limiting below via middleware ordering)
         .route("/", get(handle_root))
         .route("/.well-known/mcp.json", get(handle_well_known_mcp))
+        .route("/robots.txt", get(handle_robots_txt))
         .route("/health", get(handle_health))
         .route("/stats", get(handle_stats))
         .layer(axum::middleware::from_fn(response_headers_middleware))
@@ -473,6 +474,29 @@ async fn response_headers_middleware(
 // ═══════════════════════════════════════════════════════════════════
 // Root landing + well-known discovery
 // ═══════════════════════════════════════════════════════════════════
+
+/// robots.txt — prevent crawlers from hitting MCP endpoints and generating noise errors.
+async fn handle_robots_txt() -> (StatusCode, [(axum::http::HeaderName, &'static str); 1], &'static str) {
+    (
+        StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "text/plain")],
+        "User-agent: *\n\
+         Allow: /\n\
+         Allow: /health\n\
+         Allow: /.well-known/mcp.json\n\
+         Disallow: /mcp\n\
+         Disallow: /sse\n\
+         Disallow: /message\n\
+         Disallow: /rpc\n\
+         Disallow: /tools\n\
+         Disallow: /billing\n\
+         Disallow: /stats\n\
+         \n\
+         # NexVigilant Station — pharmacovigilance intelligence for AI agents\n\
+         # MCP endpoint: POST https://mcp.nexvigilant.com/mcp\n\
+         # Docs: https://nexvigilant.com\n",
+    )
+}
 
 /// Root landing page — helps clients that hit / instead of /mcp.
 async fn handle_root(

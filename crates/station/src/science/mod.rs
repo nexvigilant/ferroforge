@@ -18,72 +18,82 @@ use tracing::info;
 use crate::config::ConfigRegistry;
 use crate::protocol::{ContentBlock, ToolCallResult};
 
-/// Predefined research courses (multi-step workflows).
-const COURSES: &[(&str, &str, &[&str])] = &[
-    (
-        "drug-safety-profile",
-        "Full drug safety profile: resolve name → FAERS events → labeling ADRs → literature → EU signals → WHO global",
-        &[
-            "rxnav_nlm_nih_gov_get_rxcui",
-            "api_fda_gov_search_adverse_events",
-            "dailymed_nlm_nih_gov_get_adverse_reactions",
-            "pubmed_ncbi_nlm_nih_gov_search_signal_literature",
-            "eudravigilance_ema_europa_eu_get_signal_summary",
-            "vigiaccess_org_get_adverse_reactions",
+/// A single step in a research course, with tool name and example parameters.
+struct CourseStep {
+    tool: &'static str,
+    example_params: &'static str,
+}
+
+/// Predefined research courses (multi-step workflows) with example parameters.
+struct Course {
+    name: &'static str,
+    description: &'static str,
+    steps: &'static [CourseStep],
+}
+
+const COURSES: &[Course] = &[
+    Course {
+        name: "drug-safety-profile",
+        description: "Full drug safety profile: resolve name → FAERS events → labeling ADRs → literature → EU signals → WHO global",
+        steps: &[
+            CourseStep { tool: "rxnav_nlm_nih_gov_get_rxcui", example_params: r#"{"name": "metformin"}"# },
+            CourseStep { tool: "api_fda_gov_search_adverse_events", example_params: r#"{"drug_name": "metformin", "limit": 10}"# },
+            CourseStep { tool: "dailymed_nlm_nih_gov_get_adverse_reactions", example_params: r#"{"drug_name": "metformin"}"# },
+            CourseStep { tool: "pubmed_ncbi_nlm_nih_gov_search_signal_literature", example_params: r#"{"drug": "metformin", "max_results": 5}"# },
+            CourseStep { tool: "eudravigilance_ema_europa_eu_get_signal_summary", example_params: r#"{"substance": "metformin"}"# },
+            CourseStep { tool: "vigiaccess_org_get_adverse_reactions", example_params: r#"{"drug": "metformin"}"# },
         ],
-    ),
-    (
-        "signal-investigation",
-        "Investigate a safety signal: FAERS data → disproportionality → EU confirmation → case reports → trial SAEs → PRAC status",
-        &[
-            "api_fda_gov_search_adverse_events",
-            "open-vigil_fr_compute_disproportionality",
-            "eudravigilance_ema_europa_eu_get_signal_summary",
-            "pubmed_ncbi_nlm_nih_gov_search_case_reports",
-            "clinicaltrials_gov_get_serious_adverse_events",
-            "www_ema_europa_eu_get_safety_signals",
+    },
+    Course {
+        name: "signal-investigation",
+        description: "Investigate a safety signal: FAERS data → disproportionality → EU confirmation → case reports → trial SAEs → PRAC status",
+        steps: &[
+            CourseStep { tool: "api_fda_gov_search_adverse_events", example_params: r#"{"drug_name": "semaglutide", "reaction": "pancreatitis", "limit": 10}"# },
+            CourseStep { tool: "open-vigil_fr_compute_disproportionality", example_params: r#"{"drug": "semaglutide", "event": "pancreatitis"}"# },
+            CourseStep { tool: "eudravigilance_ema_europa_eu_get_signal_summary", example_params: r#"{"substance": "semaglutide"}"# },
+            CourseStep { tool: "pubmed_ncbi_nlm_nih_gov_search_case_reports", example_params: r#"{"drug": "semaglutide", "event": "pancreatitis"}"# },
+            CourseStep { tool: "clinicaltrials_gov_get_serious_adverse_events", example_params: r#"{"nct_id": "NCT03548935"}"# },
+            CourseStep { tool: "www_ema_europa_eu_get_safety_signals", example_params: r#"{"substance": "semaglutide"}"# },
         ],
-    ),
-    (
-        "causality-assessment",
-        "Assess drug-event causality: FAERS case counts → disproportionality → WHO-UMC framework → published case reports",
-        &[
-            "api_fda_gov_search_adverse_events",
-            "open-vigil_fr_compute_disproportionality",
-            "who-umc_org_get_causality_assessment",
-            "pubmed_ncbi_nlm_nih_gov_search_case_reports",
+    },
+    Course {
+        name: "causality-assessment",
+        description: "Assess drug-event causality: FAERS case counts → disproportionality → WHO-UMC framework → published case reports",
+        steps: &[
+            CourseStep { tool: "api_fda_gov_search_adverse_events", example_params: r#"{"drug_name": "metformin", "reaction": "lactic acidosis"}"# },
+            CourseStep { tool: "open-vigil_fr_compute_disproportionality", example_params: r#"{"drug": "metformin", "event": "lactic acidosis"}"# },
+            CourseStep { tool: "who-umc_org_get_causality_assessment", example_params: r#"{}"# },
+            CourseStep { tool: "pubmed_ncbi_nlm_nih_gov_search_case_reports", example_params: r#"{"drug": "metformin", "event": "lactic acidosis"}"# },
         ],
-    ),
-    (
-        "benefit-risk-assessment",
-        "Quantify benefit-risk: trial safety endpoints → FAERS outcome distribution → label ADRs → EU risk management plan",
-        &[
-            "clinicaltrials_gov_get_safety_endpoints",
-            "api_fda_gov_get_event_outcomes",
-            "dailymed_nlm_nih_gov_get_adverse_reactions",
-            "www_ema_europa_eu_get_rmp_summary",
+    },
+    Course {
+        name: "benefit-risk-assessment",
+        description: "Quantify benefit-risk: trial safety endpoints → FAERS outcome distribution → label ADRs → EU risk management plan",
+        steps: &[
+            CourseStep { tool: "clinicaltrials_gov_get_safety_endpoints", example_params: r#"{"nct_id": "NCT03548935"}"# },
+            CourseStep { tool: "api_fda_gov_get_event_outcomes", example_params: r#"{"drug_name": "semaglutide"}"# },
+            CourseStep { tool: "dailymed_nlm_nih_gov_get_adverse_reactions", example_params: r#"{"drug_name": "semaglutide"}"# },
+            CourseStep { tool: "www_ema_europa_eu_get_rmp_summary", example_params: r#"{"product": "semaglutide"}"# },
         ],
-    ),
-    (
-        "regulatory-intelligence",
-        "Trace regulatory lifecycle: ICH PV guidelines → EU assessment report → FDA approval history",
-        &[
-            "ich_org_get_pv_guidelines",
-            "www_ema_europa_eu_get_epar",
-            "accessdata_fda_gov_get_approval_history",
+    },
+    Course {
+        name: "regulatory-intelligence",
+        description: "Trace regulatory lifecycle: ICH PV guidelines → EU assessment report → FDA approval history",
+        steps: &[
+            CourseStep { tool: "ich_org_get_pv_guidelines", example_params: r#"{}"# },
+            CourseStep { tool: "www_ema_europa_eu_get_epar", example_params: r#"{"product": "ozempic"}"# },
+            CourseStep { tool: "accessdata_fda_gov_get_approval_history", example_params: r#"{"drug": "semaglutide"}"# },
         ],
-    ),
-    (
-        "competitive-landscape",
-        "Map competitive terrain: drug targets → head-to-head disproportionality → active clinical pipeline",
-        &[
-            "go_drugbank_com_get_targets",
-            "open-vigil_fr_compare_drugs",
-            "clinicaltrials_gov_search_trials",
+    },
+    Course {
+        name: "competitive-landscape",
+        description: "Map competitive terrain: drug targets → head-to-head disproportionality → active clinical pipeline",
+        steps: &[
+            CourseStep { tool: "go_drugbank_com_get_targets", example_params: r#"{"drug": "semaglutide"}"# },
+            CourseStep { tool: "open-vigil_fr_compare_drugs", example_params: r#"{"drug_a": "semaglutide", "drug_b": "tirzepatide"}"# },
+            CourseStep { tool: "clinicaltrials_gov_search_trials", example_params: r#"{"condition": "obesity", "intervention": "GLP-1"}"# },
         ],
-    ),
-    // NOTE: target-investigation and gene-profile courses removed — they reference
-    // private science.nexvigilant.com tools not available in public deployments.
+    },
 ];
 
 /// Number of predefined research courses.
@@ -93,7 +103,7 @@ pub fn course_count() -> usize {
 
 /// Course summaries for the directory meta-tool.
 pub fn course_summaries() -> Vec<(&'static str, &'static str, usize)> {
-    COURSES.iter().map(|(name, desc, tools)| (*name, *desc, tools.len())).collect()
+    COURSES.iter().map(|c| (c.name, c.description, c.steps.len())).collect()
 }
 
 /// Validate that all course tool references resolve to real tools in the registry.
@@ -112,10 +122,10 @@ pub fn validate_courses(registry: &ConfigRegistry) -> Vec<(String, String)> {
         .collect();
 
     let mut missing = Vec::new();
-    for (course_name, _, tools) in COURSES {
-        for tool_name in *tools {
-            if !registry_tools.contains(&tool_name.to_string()) {
-                missing.push((course_name.to_string(), tool_name.to_string()));
+    for course in COURSES {
+        for step in course.steps {
+            if !registry_tools.contains(&step.tool.to_string()) {
+                missing.push((course.name.to_string(), step.tool.to_string()));
             }
         }
     }
@@ -164,12 +174,12 @@ fn handle_chart_course(args: &Value, _registry: &ConfigRegistry) -> ToolCallResu
         // List all courses
         let courses: Vec<Value> = COURSES
             .iter()
-            .map(|(name, desc, steps)| {
+            .map(|c| {
                 json!({
-                    "course": name,
-                    "description": desc,
-                    "steps": steps.len(),
-                    "tools": steps,
+                    "course": c.name,
+                    "description": c.description,
+                    "steps": c.steps.len(),
+                    "tools": c.steps.iter().map(|s| s.tool).collect::<Vec<_>>(),
                 })
             })
             .collect();
@@ -191,22 +201,27 @@ fn handle_chart_course(args: &Value, _registry: &ConfigRegistry) -> ToolCallResu
     }
 
     // Find the specific course
-    let found = COURSES.iter().find(|(name, _, _)| *name == course_name);
+    let found = COURSES.iter().find(|c| c.name == course_name);
 
     match found {
-        Some((name, desc, steps)) => {
+        Some(course) => {
             let result = json!({
                 "status": "ok",
-                "course": name,
-                "description": desc,
-                "step_count": steps.len(),
-                "steps": steps.iter().enumerate().map(|(i, s)| {
-                    json!({"step": i + 1, "tool": s})
+                "course": course.name,
+                "description": course.description,
+                "step_count": course.steps.len(),
+                "steps": course.steps.iter().enumerate().map(|(i, s)| {
+                    json!({
+                        "step": i + 1,
+                        "tool": s.tool,
+                        "example_params": serde_json::from_str::<Value>(s.example_params).unwrap_or(json!({})),
+                    })
                 }).collect::<Vec<Value>>(),
                 "usage": format!(
                     "Execute each step in order. Pass the output of each step as context to the next. Start with: {}",
-                    steps.first().unwrap_or(&"")
+                    course.steps.first().map(|s| s.tool).unwrap_or("")
                 ),
+                "tip": "Replace 'metformin' or 'semaglutide' in example_params with your drug of interest. Each step's output feeds the next.",
             });
 
             ToolCallResult {
@@ -217,7 +232,7 @@ fn handle_chart_course(args: &Value, _registry: &ConfigRegistry) -> ToolCallResu
             }
         }
         None => {
-            let available: Vec<&str> = COURSES.iter().map(|(n, _, _)| *n).collect();
+            let available: Vec<&str> = COURSES.iter().map(|c| c.name).collect();
             let result = json!({
                 "status": "error",
                 "message": format!("Unknown course: '{course_name}'"),

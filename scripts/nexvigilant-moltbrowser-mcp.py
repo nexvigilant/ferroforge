@@ -135,7 +135,7 @@ def handle_browser_navigate(args: dict) -> dict:
             discovered_tool_list.append({
                 "name": tool_name,
                 "description": tool.get("description", ""),
-                "params": [p.get("name") for p in tool.get("inputSchema", {}).get("properties", {}).keys()]
+                "params": list(tool.get("inputSchema", {}).get("properties", {}).keys())
                     if isinstance(tool.get("inputSchema", {}).get("properties"), dict) else [],
             })
 

@@ -391,6 +391,34 @@ pub async fn handle_mcp_get(
     let session_id = match get_session_id(&headers) {
         Some(id) => id,
         None => {
+            // Detect browsers vs MCP agents: browsers send Accept: text/html
+            let is_browser = headers
+                .get(axum::http::header::ACCEPT)
+                .and_then(|v| v.to_str().ok())
+                .map(|v| v.contains("text/html"))
+                .unwrap_or(false);
+
+            if is_browser {
+                return axum::response::Html(
+                    "<html><head><title>NexVigilant Station</title></head><body>\
+                     <h1>NexVigilant Station</h1>\
+                     <p>This is an <strong>MCP (Model Context Protocol)</strong> endpoint for AI agents.</p>\
+                     <p>To connect, use an MCP client and POST JSON-RPC to <code>https://mcp.nexvigilant.com/mcp</code></p>\
+                     <p><strong>1,957 pharmacovigilance tools</strong> — drug safety, signal detection, regulatory intelligence, and more.</p>\
+                     <ul>\
+                     <li><a href='/health'>Health &amp; status</a></li>\
+                     <li><a href='/.well-known/mcp.json'>MCP discovery document</a></li>\
+                     <li><a href='/tools'>Browse all tools (JSON)</a></li>\
+                     <li><a href='https://nexvigilant.com'>NexVigilant website</a></li>\
+                     </ul>\
+                     <h2>Quick start for AI agents</h2>\
+                     <p>Add this to your MCP client config:</p>\
+                     <pre>{\"url\": \"https://mcp.nexvigilant.com/mcp\"}</pre>\
+                     <p>Then call <code>nexvigilant_chart_course</code> to get a guided workflow.</p>\
+                     </body></html>"
+                ).into_response();
+            }
+
             return (StatusCode::BAD_REQUEST, "Missing Mcp-Session-Id header").into_response();
         }
     };
