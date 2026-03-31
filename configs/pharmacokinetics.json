@@ -1,324 +1,66 @@
 {
   "domain": "pharmacokinetics.nexvigilant.com",
-  "url_pattern": "/*",
-  "title": "Pharmacokinetics",
-  "description": "PK modeling, drug clearance computation, ADME parameters, and drug interaction profiling",
+  "private": false,
+  "copyright": "\u00a9 2026 NexVigilant, LLC. Pharmacokinetic computation atoms from UACA L1 layer.",
+  "title": "Pharmacokinetics Engine \u2014 ADME Computation",
+  "description": "Pharmacokinetic computations: AUC (linear & log-linear trapezoidal), clearance, volume of distribution, steady-state concentration (Css = F\u00b7Dose/CL\u00b7\u03c4), time to steady state (4.5 half-lives), Michaelis-Menten saturation kinetics, half-life, bioavailability. Pure computation from UACA L1 atoms \u2014 no external API calls. Source: nv.shared.core.atoms.pk.",
+  "proxy": "scripts/pharmacokinetics_proxy.py",
   "tools": [
     {
-      "name": "clearance-config",
-      "description": "Clearance Config",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "clearance-evaluate",
-      "description": "Evaluate a gate operation (access, write, or external call) against classification policy.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "clearance-level-info",
-      "description": "Get metadata and predicates for a specific classification level.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "clearance-policy-for",
-      "description": "Get the enforcement policy for a specific classification level.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "clearance-validate-change",
-      "description": "Validate a classification change (upgrade or downgrade).",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "drug-class-members",
-      "description": "List all drugs in the catalog that belong to the given drug class.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "drug-compare",
-      "description": "Compare safety profiles of two drugs using per-event PRR comparison.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "drug-profile",
-      "description": "Get the complete drug profile including signals, indications, and label status.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "drug-signals",
-      "description": "Get all safety signals for a drug with PRR/ROR/IC values.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
       "name": "pk-auc",
-      "description": "the terminal elimination phase where concentrations decay exponentially.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
+      "description": "Calculate Area Under the Concentration-Time Curve using linear or log-linear trapezoidal method. AUC quantifies total drug exposure. Linear: \u03a3 (C1+C2)/2 \u00d7 \u0394t. Log-linear preferred for elimination phase.",
+      "parameters": [
+        {"name": "time_points", "type": "string", "description": "Comma-separated time values in hours (e.g., '0,1,2,4,8,12,24')", "required": true},
+        {"name": "concentrations", "type": "string", "description": "Comma-separated concentration values (e.g., '0,8.2,12.1,9.5,5.3,2.8,0.7')", "required": true},
+        {"name": "method", "type": "string", "description": "Calculation method: 'linear' or 'log_linear' (default: linear)", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"auc": {"type": "number"}, "method": {"type": "string"}, "n_intervals": {"type": "integer"}}, "required": ["auc"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
     },
     {
       "name": "pk-clearance",
-      "description": "For IV: F = 1.0. For oral: F < 1.0 reflects first-pass metabolism.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "pk-half-life",
-      "description": "Clinically: ~4\u20135 half-lives to reach steady state or eliminate drug.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "pk-ionization",
-      "description": "Critical for predicting absorption (stomach vs intestine) and renal excretion.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
-    },
-    {
-      "name": "pk-michaelis-menten",
-      "description": "When [S] >> Km: zero-order (rate \u2248 Vmax, capacity-limited).",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
+      "description": "Calculate systemic clearance from dose and AUC. CL = (F \u00d7 Dose) / AUC. For IV: F = 1.0. For oral: F < 1.0 reflects first-pass metabolism.",
+      "parameters": [
+        {"name": "dose", "type": "number", "description": "Administered dose (mg)", "required": true},
+        {"name": "auc", "type": "number", "description": "Area under curve (mg\u00b7h/L)", "required": true},
+        {"name": "bioavailability", "type": "number", "description": "Fraction absorbed F (0-1, default 1.0 for IV)", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"clearance_l_h": {"type": "number"}, "clearance_ml_min": {"type": "number"}}, "required": ["clearance_l_h"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
     },
     {
       "name": "pk-steady-state",
-      "description": "Reached after ~4\u20135 half-lives. Used to verify therapeutic window compliance.",
-      "parameters": [],
-      "outputSchema": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "ok | error"
-          }
-        },
-        "required": [
-          "status"
-        ]
-      },
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false
-      }
+      "description": "Calculate average steady-state concentration. Css = (F\u00b7Dose)/(CL\u00b7\u03c4). Reached after ~4\u20135 half-lives. Used to verify therapeutic window compliance.",
+      "parameters": [
+        {"name": "dose", "type": "number", "description": "Dose per interval (mg)", "required": true},
+        {"name": "clearance_l_h", "type": "number", "description": "Systemic clearance (L/h)", "required": true},
+        {"name": "dosing_interval_h", "type": "number", "description": "Dosing interval \u03c4 (hours)", "required": true},
+        {"name": "bioavailability", "type": "number", "description": "Fraction absorbed F (0-1, default 1.0)", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"css_avg": {"type": "number"}, "formula": {"type": "string"}}, "required": ["css_avg"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "pk-half-life",
+      "description": "Calculate elimination half-life from clearance and Vd. t\u00bd = (0.693 \u00d7 Vd) / CL. Clinically: ~4\u20135 half-lives to reach steady state or eliminate drug.",
+      "parameters": [
+        {"name": "clearance_l_h", "type": "number", "description": "Systemic clearance (L/h)", "required": true},
+        {"name": "volume_of_distribution_l", "type": "number", "description": "Volume of distribution Vd (L)", "required": true}
+      ],
+      "outputSchema": {"type": "object", "properties": {"half_life_h": {"type": "number"}, "time_to_steady_state_h": {"type": "number"}, "elimination_rate_constant": {"type": "number"}}, "required": ["half_life_h"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "pk-michaelis-menten",
+      "description": "Calculate Michaelis-Menten saturation kinetics. Rate = (Vmax \u00d7 [S]) / (Km + [S]). When [S] >> Km: zero-order (capacity-limited). Models nonlinear elimination (ethanol, phenytoin).",
+      "parameters": [
+        {"name": "vmax", "type": "number", "description": "Maximum elimination rate (mg/h)", "required": true},
+        {"name": "km", "type": "number", "description": "Michaelis constant (mg/L)", "required": true},
+        {"name": "concentration", "type": "number", "description": "Current drug concentration (mg/L)", "required": true}
+      ],
+      "outputSchema": {"type": "object", "properties": {"rate": {"type": "number"}, "fraction_of_vmax": {"type": "number"}, "is_saturated": {"type": "boolean"}}, "required": ["rate"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
     }
   ],
-  "proxy": "rust-native"
+  "url_pattern": "/*"
 }
