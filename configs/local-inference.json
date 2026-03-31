@@ -1,0 +1,58 @@
+{
+  "domain": "local.nexvigilant.com",
+  "private": true,
+  "copyright": "\u00a9 2026 NexVigilant, LLC. Local inference via Ollama.",
+  "title": "Local Inference Engine \u2014 On-Device AI",
+  "description": "Local AI inference via Ollama on the host machine. Qwen 2.5 3B for structured classification, nomic-embed-text for embeddings. CPU-only, zero API costs, zero network latency. Use for bulk classification, embedding generation, and tasks that don't require frontier reasoning.",
+  "proxy": "scripts/local_inference_proxy.py",
+  "tools": [
+    {
+      "name": "classify",
+      "description": "Classify text into categories using local Qwen 2.5 3B. Returns structured JSON. Use for seriousness classification, report type determination, event categorization, and other structured extraction tasks where frontier reasoning is not required. Zero API cost, ~2-5s latency on CPU.",
+      "parameters": [
+        {"name": "text", "type": "string", "description": "Text to classify", "required": true},
+        {"name": "categories", "type": "string", "description": "Comma-separated category labels (e.g., 'serious,non-serious' or 'expedited,periodic,non-reportable')", "required": true},
+        {"name": "context", "type": "string", "description": "Domain context for the classification (e.g., 'ICH E2A seriousness criteria')", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"category": {"type": "string"}, "confidence": {"type": "string"}, "reasoning": {"type": "string"}}, "required": ["category"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "embed",
+      "description": "Generate a 768-dimensional embedding vector for text using local nomic-embed-text. Use for semantic similarity, concept clustering, and enriching the primitive distance catalog. Zero API cost, ~100ms latency.",
+      "parameters": [
+        {"name": "text", "type": "string", "description": "Text to embed", "required": true}
+      ],
+      "outputSchema": {"type": "object", "properties": {"embedding": {"type": "array"}, "dimensions": {"type": "integer"}, "model": {"type": "string"}}, "required": ["embedding", "dimensions"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "summarize",
+      "description": "Summarize text using local Qwen 2.5 3B. Use for case narrative summarization, literature abstract compression, and report section generation. Zero API cost.",
+      "parameters": [
+        {"name": "text", "type": "string", "description": "Text to summarize", "required": true},
+        {"name": "max_sentences", "type": "integer", "description": "Maximum sentences in summary (default: 3)", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"summary": {"type": "string"}, "word_count": {"type": "integer"}}, "required": ["summary"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "extract-json",
+      "description": "Extract structured JSON from unstructured text using local Qwen 2.5 3B. Provide a JSON schema and the model extracts matching fields. Use for parsing adverse event narratives, extracting drug-event pairs from text, and structured data extraction.",
+      "parameters": [
+        {"name": "text", "type": "string", "description": "Unstructured text to extract from", "required": true},
+        {"name": "schema", "type": "string", "description": "JSON field names to extract (e.g., 'drug,event,outcome,date')", "required": true}
+      ],
+      "outputSchema": {"type": "object", "properties": {"extracted": {"type": "object"}, "model": {"type": "string"}}, "required": ["extracted"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "status",
+      "description": "Check local inference engine status — model availability, memory usage, and latency.",
+      "parameters": [],
+      "outputSchema": {"type": "object", "properties": {"status": {"type": "string"}, "models": {"type": "array"}, "memory_used_gb": {"type": "number"}}, "required": ["status"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    }
+  ],
+  "url_pattern": "/*"
+}
