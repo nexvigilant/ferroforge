@@ -203,6 +203,7 @@ pub async fn run_combined(
         // Health + Stats (excluded from rate limiting below via middleware ordering)
         .route("/", get(handle_root))
         .route("/.well-known/mcp.json", get(handle_well_known_mcp))
+        .route("/.well-known/mcp-registry-auth", get(handle_well_known_registry_auth))
         .route("/robots.txt", get(handle_robots_txt))
         .route("/health", get(handle_health))
         .route("/stats", get(handle_stats))
@@ -541,6 +542,12 @@ async fn handle_well_known_mcp() -> Json<Value> {
             "url": "https://nexvigilant.com"
         }
     }))
+}
+
+/// MCP Registry authentication at /.well-known/mcp-registry-auth
+/// Serves the Ed25519 public key for domain verification.
+async fn handle_well_known_registry_auth() -> &'static str {
+    "v=MCPv1; k=ed25519; p=WoxR+TpKge4Id472oVK/R2CXDbc93+gB0ldGQmVi90E="
 }
 
 // ═══════════════════════════════════════════════════════════════════
