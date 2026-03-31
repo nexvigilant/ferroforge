@@ -340,7 +340,7 @@ mod tests {
             free_tier: true,
         });
 
-        let buf = store.buffer.lock().unwrap();
+        let buf = store.buffer.lock().expect("Locking mutex failed in test");
         assert!(buf.is_empty(), "free tier records should not be buffered");
     }
 
@@ -359,7 +359,7 @@ mod tests {
             free_tier: false,
         });
 
-        let buf = store.buffer.lock().unwrap();
+        let buf = store.buffer.lock().expect("Locking mutex failed in test");
         assert_eq!(buf.len(), 1, "metered record should be buffered");
     }
 }

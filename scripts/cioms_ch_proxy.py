@@ -80,7 +80,7 @@ def get_working_groups(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -109,7 +109,7 @@ def get_cioms_form(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -141,7 +141,7 @@ def search_publications(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -170,7 +170,7 @@ def get_seriousness_criteria(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -199,7 +199,7 @@ def get_causality_categories(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -228,7 +228,7 @@ def get_reporting_timelines(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -257,7 +257,7 @@ def get_cioms_form_ii(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")

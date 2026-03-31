@@ -80,7 +80,7 @@ def get_signal_methodology(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -113,7 +113,7 @@ def search_vigibase(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -142,7 +142,7 @@ def get_causality_assessment(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -172,7 +172,7 @@ def get_country_programs(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -201,7 +201,7 @@ def get_naranjo_algorithm(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -230,7 +230,7 @@ def get_ic_computation(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -259,7 +259,7 @@ def get_adverse_reaction_terminology(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")

@@ -154,10 +154,10 @@ pub async fn run_combined(
         Err(_) => {
             // Safe defaults for NexVigilant ecosystem
             vec![
-                "https://mcp.nexvigilant.com".parse().unwrap(),
-                "https://nexvigilant.com".parse().unwrap(),
-                "http://localhost:3000".parse().unwrap(),
-                "http://localhost:9002".parse().unwrap(),
+                "https://mcp.nexvigilant.com".parse().expect("valid hardcoded URL"),
+                "https://nexvigilant.com".parse().expect("valid hardcoded URL"),
+                "http://localhost:3000".parse().expect("valid hardcoded URL"),
+                "http://localhost:9002".parse().expect("valid hardcoded URL"),
             ]
         }
     };

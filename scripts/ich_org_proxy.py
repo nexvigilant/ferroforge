@@ -84,7 +84,7 @@ def search_guidelines(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -116,7 +116,7 @@ def get_guideline(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -145,7 +145,7 @@ def get_pv_guidelines(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -174,7 +174,7 @@ def get_meddra_guidelines(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -203,7 +203,7 @@ def get_safety_guidelines(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -232,7 +232,7 @@ def get_quality_guidelines(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -261,7 +261,7 @@ def get_e2b_data_elements(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")

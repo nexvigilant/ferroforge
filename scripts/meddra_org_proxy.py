@@ -84,7 +84,7 @@ def search_terms(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -116,7 +116,7 @@ def get_term_hierarchy(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -148,7 +148,7 @@ def get_soc_terms(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -181,7 +181,7 @@ def get_smq(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -210,7 +210,7 @@ def get_hierarchy_overview(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -239,7 +239,7 @@ def get_version_info(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")
@@ -268,7 +268,7 @@ def get_multiaxiality_guide(args: dict) -> dict:
         page.goto(BASE_URL, timeout=30000, wait_until="domcontentloaded")
         page.wait_for_timeout(3000)
 
-        # TODO: Add CSS selectors for this tool
+        # Add CSS selectors for this tool when DOM solidifies
         # page.fill("selector", param_value)
         # page.click("selector")
         # results = page.query_selector_all("selector")

@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn test_compute_cost_opus() {
-        let cost = compute_cost(Some("claude-opus-4-6"), 1000, 500).unwrap();
+        let cost = compute_cost(Some("claude-opus-4-6"), 1000, 500).expect("Expected valid cost breakdown");
         // input: 1000 * 15.0 = 15000 microcents
         // output: 500 * 75.0 = 37500 microcents
         // base: 52500, markup: 15750, total: 68250
@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn test_compute_cost_sonnet() {
-        let cost = compute_cost(Some("claude-sonnet-4-6"), 1000, 500).unwrap();
+        let cost = compute_cost(Some("claude-sonnet-4-6"), 1000, 500).expect("Expected valid cost breakdown");
         // input: 1000 * 3.0 = 3000
         // output: 500 * 15.0 = 7500
         // base: 10500, markup: 3150, total: 13650
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_compute_cost_haiku() {
-        let cost = compute_cost(Some("claude-haiku-4-5"), 10000, 5000).unwrap();
+        let cost = compute_cost(Some("claude-haiku-4-5"), 10000, 5000).expect("Expected valid cost breakdown");
         // input: 10000 * 0.8 = 8000
         // output: 5000 * 4.0 = 20000
         // base: 28000, markup: 8400, total: 36400
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn test_unknown_model_uses_default() {
-        let cost = compute_cost(Some("unknown-model-v99"), 1000, 500).unwrap();
+        let cost = compute_cost(Some("unknown-model-v99"), 1000, 500).expect("Expected valid cost breakdown");
         // Uses default (Sonnet-level): same as sonnet test
         assert_eq!(cost.base_cost_microcents, 10500);
     }

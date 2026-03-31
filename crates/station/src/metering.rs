@@ -236,7 +236,7 @@ mod tests {
 
         let usage = meter.get_usage("nv_test1234_");
         assert!(usage.is_some());
-        let u = usage.unwrap();
+        let u = usage.expect("Expected usage summary");
         assert_eq!(u.total_input_tokens, 50);
         assert_eq!(u.total_output_tokens, 200);
         assert_eq!(u.total_tool_calls, 1);

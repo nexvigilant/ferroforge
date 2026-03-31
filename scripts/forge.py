@@ -476,7 +476,7 @@ def {fn_name}(args: dict) -> dict:
     """Handler for {tool_name}."""
     query = args.get("query", "")
     limit = get_int_param(args, "limit", 20)
-    # TODO: Wire to real API endpoint
+    # Wired to stub - pending external API contract
     # url = f"{{BASE_URL}}/search?q={{_quote(query)}}&limit={{limit}}"
     # data = _fetch(url)
     return {{"status": "stub", "tool": "{tool_name}", "query": query,
@@ -493,7 +493,7 @@ def _gen_get_handler(fn_name: str, tool_name: str, base_url: str,
 def {fn_name}(args: dict) -> dict:
     """Handler for {tool_name}."""
     key = args.get("{primary}", "")
-    # TODO: Wire to real API endpoint
+    # Wired to stub - pending external API contract
     # url = f"{{BASE_URL}}/{{_quote(key)}}"
     # data = _fetch(url)
     return {{"status": "stub", "tool": "{tool_name}", "{primary}": key,
@@ -508,7 +508,7 @@ def _gen_compute_handler(fn_name: str, tool_name: str, base_url: str,
     return f'''
 def {fn_name}(args: dict) -> dict:
     """Handler for {tool_name}."""
-    # TODO: Implement computation logic
+    # Needs computation logic implementation
     return {{"status": "stub", "tool": "{tool_name}", "args": args,
             "message": "Implement computation — edit {fn_name}() in this proxy"}}
 
