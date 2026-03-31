@@ -507,9 +507,19 @@ pub fn extract_domain(tool_name: &str) -> String {
         return "nexvigilant.meta".to_string();
     }
 
+    // Local compute tools — no upstream domain, classify by prefix
+    if tool_name.starts_with("microgram_") {
+        return "microgram.local".to_string();
+    }
+    if tool_name.starts_with("platform_api_opentargets_org_") {
+        return "platform-api.opentargets.org".to_string();
+    }
+    if tool_name.starts_with("en_wikipedia_org_") {
+        return "en.wikipedia.org".to_string();
+    }
+
     // Dynamic extraction: convert underscore-separated prefix to dotted domain.
     // "benefit-risk_nexvigilant_com_compute_qbr" → "benefit-risk.nexvigilant.com"
-    // "en_wikipedia_org_get_article_summary" → "en.wikipedia.org"
     // Heuristic: scan for known TLD segments (_com_, _org_, _gov_, _fr_, _eu_, _ch_)
     // and take everything up to and including the TLD.
     let tlds = ["_com_", "_org_", "_gov_", "_fr_", "_eu_", "_ch_"];

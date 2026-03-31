@@ -3,143 +3,355 @@
   "private": false,
   "url_pattern": "/microgram/*",
   "title": "PV Decision Trees",
-  "copyright": "© 2026 NexVigilant, LLC. Decision tree logic and chain topology are proprietary.",
+  "copyright": "\u00a9 2026 NexVigilant, LLC. Decision tree logic and chain topology are proprietary.",
   "description": "Atomic pharmacovigilance decision trees (micrograms): sub-microsecond PV logic for signal classification, causality routing, seriousness assessment, and regulatory action. Chains compose multiple micrograms into complete workflows.",
   "proxy": "scripts/microgram_proxy.py",
   "tools": [
     {
       "name": "run-pv-signal-to-action",
-      "description": "Run the core PV workflow chain: PRR signal detection → causality bridge → Naranjo assessment → regulatory action routing. Returns step-by-step decision trace with final regulatory recommendation.",
+      "description": "Run the core PV workflow chain: PRR signal detection \u2192 causality bridge \u2192 Naranjo assessment \u2192 regulatory action routing. Returns step-by-step decision trace with final regulatory recommendation.",
       "parameters": [
-        {"name": "prr", "type": "number", "description": "Proportional Reporting Ratio value", "required": true},
-        {"name": "naranjo_score", "type": "integer", "description": "Naranjo ADR probability score (0-13)", "required": true},
-        {"name": "is_serious", "type": "boolean", "description": "Whether the adverse event meets ICH E2A seriousness criteria", "required": true}
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "Proportional Reporting Ratio value",
+          "required": true
+        },
+        {
+          "name": "naranjo_score",
+          "type": "integer",
+          "description": "Naranjo ADR probability score (0-13)",
+          "required": true
+        },
+        {
+          "name": "is_serious",
+          "type": "boolean",
+          "description": "Whether the adverse event meets ICH E2A seriousness criteria",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
-          "final_output": {"type": "object", "description": "Accumulated chain output with regulatory_action, deadline_days, causality, priority"},
-          "steps": {"type": "array", "description": "Per-step decision trace"},
-          "total_duration_us": {"type": "integer", "description": "Total execution time in microseconds"}
+          "success": {
+            "type": "boolean"
+          },
+          "final_output": {
+            "type": "object",
+            "description": "Accumulated chain output with regulatory_action, deadline_days, causality, priority"
+          },
+          "steps": {
+            "type": "array",
+            "description": "Per-step decision trace"
+          },
+          "total_duration_us": {
+            "type": "integer",
+            "description": "Total execution time in microseconds"
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-case-assessment-pipeline",
-      "description": "Run the complete case assessment chain: case validity → seriousness classification → causality evidence → regulatory action.",
+      "description": "Run the complete case assessment chain: case validity \u2192 seriousness classification \u2192 causality evidence \u2192 regulatory action.",
       "parameters": [
-        {"name": "prr", "type": "number", "description": "PRR value for the drug-event pair", "required": true},
-        {"name": "naranjo_score", "type": "integer", "description": "Naranjo score (0-13)", "required": true},
-        {"name": "is_serious", "type": "boolean", "description": "ICH E2A seriousness criteria met", "required": true},
-        {"name": "reporter_type", "type": "string", "description": "Reporter type: healthcare_professional, consumer, literature", "required": false},
-        {"name": "has_rechallenge", "type": "boolean", "description": "Was rechallenge performed", "required": false}
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "PRR value for the drug-event pair",
+          "required": true
+        },
+        {
+          "name": "naranjo_score",
+          "type": "integer",
+          "description": "Naranjo score (0-13)",
+          "required": true
+        },
+        {
+          "name": "is_serious",
+          "type": "boolean",
+          "description": "ICH E2A seriousness criteria met",
+          "required": true
+        },
+        {
+          "name": "reporter_type",
+          "type": "string",
+          "description": "Reporter type: healthcare_professional, consumer, literature",
+          "required": false
+        },
+        {
+          "name": "has_rechallenge",
+          "type": "boolean",
+          "description": "Was rechallenge performed",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
-          "final_output": {"type": "object"},
-          "steps": {"type": "array"},
-          "total_duration_us": {"type": "integer"}
+          "success": {
+            "type": "boolean"
+          },
+          "final_output": {
+            "type": "object"
+          },
+          "steps": {
+            "type": "array"
+          },
+          "total_duration_us": {
+            "type": "integer"
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-benefit-risk-assessment",
       "description": "Run the benefit-risk assessment chain: weighs therapeutic benefit against safety risk using PRR, Naranjo, NNH, and therapeutic index.",
       "parameters": [
-        {"name": "prr", "type": "number", "description": "PRR value", "required": true},
-        {"name": "naranjo_score", "type": "integer", "description": "Naranjo score", "required": true},
-        {"name": "is_serious", "type": "boolean", "description": "Seriousness flag", "required": true},
-        {"name": "therapeutic_benefit", "type": "string", "description": "Benefit level: high, moderate, low", "required": false},
-        {"name": "nnh", "type": "number", "description": "Number needed to harm", "required": false}
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "PRR value",
+          "required": true
+        },
+        {
+          "name": "naranjo_score",
+          "type": "integer",
+          "description": "Naranjo score",
+          "required": true
+        },
+        {
+          "name": "is_serious",
+          "type": "boolean",
+          "description": "Seriousness flag",
+          "required": true
+        },
+        {
+          "name": "therapeutic_benefit",
+          "type": "string",
+          "description": "Benefit level: high, moderate, low",
+          "required": false
+        },
+        {
+          "name": "nnh",
+          "type": "number",
+          "description": "Number needed to harm",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
-          "final_output": {"type": "object"},
-          "steps": {"type": "array"},
-          "total_duration_us": {"type": "integer"}
+          "success": {
+            "type": "boolean"
+          },
+          "final_output": {
+            "type": "object"
+          },
+          "steps": {
+            "type": "array"
+          },
+          "total_duration_us": {
+            "type": "integer"
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-prr-signal",
       "description": "Classify a PRR value as signal/no-signal using Evans (2001) criteria. PRR >= 2.0 = signal.",
       "parameters": [
-        {"name": "prr", "type": "number", "description": "PRR value to classify", "required": true}
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "PRR value to classify",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
-          "output": {"type": "object", "properties": {"signal_detected": {"type": "boolean"}, "classification": {"type": "string"}}}
+          "success": {
+            "type": "boolean"
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "signal_detected": {
+                "type": "boolean"
+              },
+              "classification": {
+                "type": "string"
+              }
+            }
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-naranjo-quick",
       "description": "Quick Naranjo causality assessment from a score. Returns causality category (DEFINITE/PROBABLE/POSSIBLE/DOUBTFUL) with confidence and recommended action.",
       "parameters": [
-        {"name": "naranjo_score", "type": "integer", "description": "Naranjo score (0-13)", "required": true}
+        {
+          "name": "naranjo_score",
+          "type": "integer",
+          "description": "Naranjo score (0-13)",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
-          "output": {"type": "object", "properties": {"causality": {"type": "string"}, "confidence": {"type": "integer"}, "action": {"type": "string"}}}
+          "success": {
+            "type": "boolean"
+          },
+          "output": {
+            "type": "object",
+            "properties": {
+              "causality": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "integer"
+              },
+              "action": {
+                "type": "string"
+              }
+            }
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-case-seriousness",
       "description": "Classify case seriousness per ICH E2A criteria. Returns seriousness category, expedited reporting requirement, and deadline.",
       "parameters": [
-        {"name": "is_serious", "type": "boolean", "description": "Meets ICH E2A seriousness criteria", "required": true},
-        {"name": "is_fatal", "type": "boolean", "description": "Resulted in death", "required": false},
-        {"name": "is_life_threatening", "type": "boolean", "description": "Life-threatening event", "required": false},
-        {"name": "requires_hospitalization", "type": "boolean", "description": "Required or prolonged hospitalization", "required": false}
+        {
+          "name": "is_serious",
+          "type": "boolean",
+          "description": "Meets ICH E2A seriousness criteria",
+          "required": true
+        },
+        {
+          "name": "is_fatal",
+          "type": "boolean",
+          "description": "Resulted in death",
+          "required": false
+        },
+        {
+          "name": "is_life_threatening",
+          "type": "boolean",
+          "description": "Life-threatening event",
+          "required": false
+        },
+        {
+          "name": "requires_hospitalization",
+          "type": "boolean",
+          "description": "Required or prolonged hospitalization",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
-          "output": {"type": "object"}
+          "success": {
+            "type": "boolean"
+          },
+          "output": {
+            "type": "object"
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-workflow-router",
       "description": "Route a PV case to the appropriate workflow based on case characteristics. Returns workflow type, priority, and first action.",
       "parameters": [
-        {"name": "prr", "type": "number", "description": "PRR value", "required": false},
-        {"name": "naranjo_score", "type": "integer", "description": "Naranjo score", "required": false},
-        {"name": "is_serious", "type": "boolean", "description": "Seriousness flag", "required": true},
-        {"name": "signal_detected", "type": "boolean", "description": "Signal detection result", "required": false}
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "PRR value",
+          "required": false
+        },
+        {
+          "name": "naranjo_score",
+          "type": "integer",
+          "description": "Naranjo score",
+          "required": false
+        },
+        {
+          "name": "is_serious",
+          "type": "boolean",
+          "description": "Seriousness flag",
+          "required": true
+        },
+        {
+          "name": "signal_detected",
+          "type": "boolean",
+          "description": "Signal detection result",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
-          "output": {"type": "object"}
+          "success": {
+            "type": "boolean"
+          },
+          "output": {
+            "type": "object"
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "list-micrograms",
@@ -148,13 +360,24 @@
       "outputSchema": {
         "type": "object",
         "properties": {
-          "status": {"type": "string"},
-          "micrograms": {"type": "integer"},
-          "catalog": {"type": "array"}
+          "status": {
+            "type": "string"
+          },
+          "micrograms": {
+            "type": "integer"
+          },
+          "catalog": {
+            "type": "array"
+          }
         },
-        "required": ["status"]
+        "required": [
+          "status"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "list-chains",
@@ -163,744 +386,2312 @@
       "outputSchema": {
         "type": "object",
         "properties": {
-          "status": {"type": "string"},
-          "chains": {"type": "array"}
+          "status": {
+            "type": "string"
+          },
+          "chains": {
+            "type": "array"
+          }
         },
-        "required": ["status"]
+        "required": [
+          "status"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-station-dailymed-pipeline",
-      "description": "DailyMed ADR label data → risk tier → causality routing. Pipe get-adverse-reactions output fields directly into this chain to get a risk classification and monitoring decision.",
+      "description": "DailyMed ADR label data \u2192 risk tier \u2192 causality routing. Pipe get-adverse-reactions output fields directly into this chain to get a risk classification and monitoring decision.",
       "parameters": [
-        {"name": "has_boxed_warning", "type": "boolean", "description": "Drug has an FDA boxed warning", "required": true},
-        {"name": "has_rems", "type": "boolean", "description": "Drug is subject to a Risk Evaluation and Mitigation Strategy (REMS)", "required": true},
-        {"name": "serious_reactions_count", "type": "integer", "description": "Number of serious adverse reactions listed in the label", "required": true},
-        {"name": "total_reactions_count", "type": "integer", "description": "Total number of adverse reactions listed in the label", "required": true}
+        {
+          "name": "has_boxed_warning",
+          "type": "boolean",
+          "description": "Drug has an FDA boxed warning",
+          "required": true
+        },
+        {
+          "name": "has_rems",
+          "type": "boolean",
+          "description": "Drug is subject to a Risk Evaluation and Mitigation Strategy (REMS)",
+          "required": true
+        },
+        {
+          "name": "serious_reactions_count",
+          "type": "integer",
+          "description": "Number of serious adverse reactions listed in the label",
+          "required": true
+        },
+        {
+          "name": "total_reactions_count",
+          "type": "integer",
+          "description": "Total number of adverse reactions listed in the label",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "risk_tier": {"type": "string", "description": "critical | high | moderate | low"},
-          "signal_detected": {"type": "boolean"},
-          "priority": {"type": "string", "description": "URGENT | MONITOR | ROUTINE"}
+          "risk_tier": {
+            "type": "string",
+            "description": "critical | high | moderate | low"
+          },
+          "signal_detected": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "string",
+            "description": "URGENT | MONITOR | ROUTINE"
+          }
         },
-        "required": ["risk_tier"]
+        "required": [
+          "risk_tier"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-station-pubmed-pipeline",
-      "description": "PubMed signal literature → evidence strength → causality routing. Pipe search-signal-literature output into this chain to get an evidence-based signal classification.",
+      "description": "PubMed signal literature \u2192 evidence strength \u2192 causality routing. Pipe search-signal-literature output into this chain to get an evidence-based signal classification.",
       "parameters": [
-        {"name": "total_articles", "type": "integer", "description": "Total article count from literature search", "required": true},
-        {"name": "case_report_count", "type": "integer", "description": "Number of case reports in search results", "required": true},
-        {"name": "systematic_review_count", "type": "integer", "description": "Number of systematic reviews or meta-analyses", "required": true},
-        {"name": "recent_count", "type": "integer", "description": "Number of articles published in the last 3 years", "required": true},
-        {"name": "has_regulatory_citation", "type": "boolean", "description": "Any article cites a regulatory safety action (label change, withdrawal, REMS)", "required": true}
+        {
+          "name": "total_articles",
+          "type": "integer",
+          "description": "Total article count from literature search",
+          "required": true
+        },
+        {
+          "name": "case_report_count",
+          "type": "integer",
+          "description": "Number of case reports in search results",
+          "required": true
+        },
+        {
+          "name": "systematic_review_count",
+          "type": "integer",
+          "description": "Number of systematic reviews or meta-analyses",
+          "required": true
+        },
+        {
+          "name": "recent_count",
+          "type": "integer",
+          "description": "Number of articles published in the last 3 years",
+          "required": true
+        },
+        {
+          "name": "has_regulatory_citation",
+          "type": "boolean",
+          "description": "Any article cites a regulatory safety action (label change, withdrawal, REMS)",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "evidence_strength": {"type": "string", "description": "strong | moderate | weak | insufficient"},
-          "signal_detected": {"type": "boolean"},
-          "priority": {"type": "string"}
+          "evidence_strength": {
+            "type": "string",
+            "description": "strong | moderate | weak | insufficient"
+          },
+          "signal_detected": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "string"
+          }
         },
-        "required": ["evidence_strength"]
+        "required": [
+          "evidence_strength"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-station-openvigil-pipeline",
-      "description": "OpenVigil disproportionality → signal triage → causality routing. Pipe compute-disproportionality output fields into this chain to get a signal strength classification and causality decision.",
+      "description": "OpenVigil disproportionality \u2192 signal triage \u2192 causality routing. Pipe compute-disproportionality output fields into this chain to get a signal strength classification and causality decision.",
       "parameters": [
-        {"name": "prr", "type": "number", "description": "Proportional Reporting Ratio", "required": true},
-        {"name": "prr_ci_lower", "type": "number", "description": "Lower bound of 95% CI for PRR", "required": true},
-        {"name": "ror", "type": "number", "description": "Reporting Odds Ratio", "required": true},
-        {"name": "ror_ci_lower", "type": "number", "description": "Lower bound of 95% CI for ROR", "required": true},
-        {"name": "ic", "type": "number", "description": "Information Component value", "required": true},
-        {"name": "case_count", "type": "integer", "description": "Total drug-event pair report count", "required": true}
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "Proportional Reporting Ratio",
+          "required": true
+        },
+        {
+          "name": "prr_ci_lower",
+          "type": "number",
+          "description": "Lower bound of 95% CI for PRR",
+          "required": true
+        },
+        {
+          "name": "ror",
+          "type": "number",
+          "description": "Reporting Odds Ratio",
+          "required": true
+        },
+        {
+          "name": "ror_ci_lower",
+          "type": "number",
+          "description": "Lower bound of 95% CI for ROR",
+          "required": true
+        },
+        {
+          "name": "ic",
+          "type": "number",
+          "description": "Information Component value",
+          "required": true
+        },
+        {
+          "name": "case_count",
+          "type": "integer",
+          "description": "Total drug-event pair report count",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "signal_strength": {"type": "string", "description": "strong | moderate | weak | none"},
-          "signal_detected": {"type": "boolean"},
-          "priority": {"type": "string"}
+          "signal_strength": {
+            "type": "string",
+            "description": "strong | moderate | weak | none"
+          },
+          "signal_detected": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "string"
+          }
         },
-        "required": ["signal_strength"]
+        "required": [
+          "signal_strength"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-station-trial-pipeline",
-      "description": "Clinical trial SAE data → safety concern triage → causality routing. Pipe compare-trial-arms or get-serious-adverse-events output into this chain to get a DSMB-level safety decision.",
+      "description": "Clinical trial SAE data \u2192 safety concern triage \u2192 causality routing. Pipe compare-trial-arms or get-serious-adverse-events output into this chain to get a DSMB-level safety decision.",
       "parameters": [
-        {"name": "treatment_sae_rate", "type": "number", "description": "SAE rate per 100 patients in treatment arm", "required": true},
-        {"name": "control_sae_rate", "type": "number", "description": "SAE rate per 100 patients in control arm", "required": true},
-        {"name": "total_saes", "type": "integer", "description": "Total serious adverse event count in trial", "required": true},
-        {"name": "has_deaths", "type": "boolean", "description": "Any treatment-arm deaths reported", "required": true},
-        {"name": "phase", "type": "string", "description": "Trial phase: 1, 2, 3, or 4", "required": true}
+        {
+          "name": "treatment_sae_rate",
+          "type": "number",
+          "description": "SAE rate per 100 patients in treatment arm",
+          "required": true
+        },
+        {
+          "name": "control_sae_rate",
+          "type": "number",
+          "description": "SAE rate per 100 patients in control arm",
+          "required": true
+        },
+        {
+          "name": "total_saes",
+          "type": "integer",
+          "description": "Total serious adverse event count in trial",
+          "required": true
+        },
+        {
+          "name": "has_deaths",
+          "type": "boolean",
+          "description": "Any treatment-arm deaths reported",
+          "required": true
+        },
+        {
+          "name": "phase",
+          "type": "string",
+          "description": "Trial phase: 1, 2, 3, or 4",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "safety_concern": {"type": "string", "description": "critical | major | moderate | minor"},
-          "signal_detected": {"type": "boolean"},
-          "priority": {"type": "string"}
+          "safety_concern": {
+            "type": "string",
+            "description": "critical | major | moderate | minor"
+          },
+          "signal_detected": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "string"
+          }
         },
-        "required": ["safety_concern"]
+        "required": [
+          "safety_concern"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-station-drugbank-pipeline",
-      "description": "DrugBank DDI data → interaction severity → causality routing. Pipe get-interactions output into this chain to get a clinical decision for drug-drug interaction management.",
+      "description": "DrugBank DDI data \u2192 interaction severity \u2192 causality routing. Pipe get-interactions output into this chain to get a clinical decision for drug-drug interaction management.",
       "parameters": [
-        {"name": "interaction_count", "type": "integer", "description": "Total drug-drug interactions found", "required": true},
-        {"name": "cyp_inhibition", "type": "boolean", "description": "Any CYP enzyme inhibition interaction present", "required": true},
-        {"name": "narrow_ti_involved", "type": "boolean", "description": "Any narrow therapeutic index drug involved in an interaction", "required": true}
+        {
+          "name": "interaction_count",
+          "type": "integer",
+          "description": "Total drug-drug interactions found",
+          "required": true
+        },
+        {
+          "name": "cyp_inhibition",
+          "type": "boolean",
+          "description": "Any CYP enzyme inhibition interaction present",
+          "required": true
+        },
+        {
+          "name": "narrow_ti_involved",
+          "type": "boolean",
+          "description": "Any narrow therapeutic index drug involved in an interaction",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "interaction_severity": {"type": "string"},
-          "signal_detected": {"type": "boolean"},
-          "priority": {"type": "string"}
+          "interaction_severity": {
+            "type": "string"
+          },
+          "signal_detected": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "string"
+          }
         },
-        "required": ["interaction_severity"]
+        "required": [
+          "interaction_severity"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-station-rxnav-pipeline",
-      "description": "RxNav drug interaction data → interaction severity → signal routing. Pipe get-interactions output into this chain to classify the clinical significance of identified interactions.",
+      "description": "RxNav drug interaction data \u2192 interaction severity \u2192 signal routing. Pipe get-interactions output into this chain to classify the clinical significance of identified interactions.",
       "parameters": [
-        {"name": "interaction_count", "type": "integer", "description": "Total interactions found via RxNorm", "required": true},
-        {"name": "has_contraindication", "type": "boolean", "description": "Any contraindicated drug pair present", "required": true},
-        {"name": "has_serious", "type": "boolean", "description": "Any serious (non-contraindicated) interaction present", "required": true},
-        {"name": "has_moderate", "type": "boolean", "description": "Any moderate interaction present", "required": true}
+        {
+          "name": "interaction_count",
+          "type": "integer",
+          "description": "Total interactions found via RxNorm",
+          "required": true
+        },
+        {
+          "name": "has_contraindication",
+          "type": "boolean",
+          "description": "Any contraindicated drug pair present",
+          "required": true
+        },
+        {
+          "name": "has_serious",
+          "type": "boolean",
+          "description": "Any serious (non-contraindicated) interaction present",
+          "required": true
+        },
+        {
+          "name": "has_moderate",
+          "type": "boolean",
+          "description": "Any moderate interaction present",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "interaction_severity": {"type": "string"},
-          "signal_detected": {"type": "boolean"},
-          "priority": {"type": "string"}
+          "interaction_severity": {
+            "type": "string"
+          },
+          "signal_detected": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "string"
+          }
         },
-        "required": ["interaction_severity"]
+        "required": [
+          "interaction_severity"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-station-recall-pipeline",
-      "description": "FDA recall data → recall severity classification → regulatory action routing. Pipe search-recalls or get-recall-classification output into this chain to determine urgency of safety response.",
+      "description": "FDA recall data \u2192 recall severity classification \u2192 regulatory action routing. Pipe search-recalls or get-recall-classification output into this chain to determine urgency of safety response.",
       "parameters": [
-        {"name": "recall_class", "type": "string", "description": "FDA recall class: I (most serious), II, or III", "required": true},
-        {"name": "is_ongoing", "type": "boolean", "description": "Recall is currently active and ongoing", "required": true},
-        {"name": "distribution_scope", "type": "string", "description": "Recall distribution scope: nationwide, regional, or local", "required": true}
+        {
+          "name": "recall_class",
+          "type": "string",
+          "description": "FDA recall class: I (most serious), II, or III",
+          "required": true
+        },
+        {
+          "name": "is_ongoing",
+          "type": "boolean",
+          "description": "Recall is currently active and ongoing",
+          "required": true
+        },
+        {
+          "name": "distribution_scope",
+          "type": "string",
+          "description": "Recall distribution scope: nationwide, regional, or local",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "severity": {"type": "string"},
-          "signal_detected": {"type": "boolean"},
-          "priority": {"type": "string"}
+          "severity": {
+            "type": "string"
+          },
+          "signal_detected": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "string"
+          }
         },
-        "required": ["severity"]
+        "required": [
+          "severity"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-seriousness-to-deadline",
-      "description": "ICH E2A seriousness classification → boolean decomposition → deadline routing. Input the 6 ICH E2A seriousness criteria flags to get the case classification, deadline in days, and reporting obligation.",
+      "description": "ICH E2A seriousness classification \u2192 boolean decomposition \u2192 deadline routing. Input the 6 ICH E2A seriousness criteria flags to get the case classification, deadline in days, and reporting obligation.",
       "parameters": [
-        {"name": "death", "type": "boolean", "description": "Adverse event resulted in or contributed to death", "required": true},
-        {"name": "hospitalization", "type": "boolean", "description": "Required inpatient hospitalization or prolongation of existing hospitalization", "required": true},
-        {"name": "disability", "type": "boolean", "description": "Caused persistent or significant disability or incapacity", "required": true},
-        {"name": "life_threatening", "type": "boolean", "description": "Patient was at immediate risk of death at time of event", "required": true},
-        {"name": "congenital_anomaly", "type": "boolean", "description": "Congenital anomaly or birth defect in offspring", "required": true},
-        {"name": "medically_important", "type": "boolean", "description": "Medically important event per ICH E2A criteria", "required": true}
+        {
+          "name": "death",
+          "type": "boolean",
+          "description": "Adverse event resulted in or contributed to death",
+          "required": true
+        },
+        {
+          "name": "hospitalization",
+          "type": "boolean",
+          "description": "Required inpatient hospitalization or prolongation of existing hospitalization",
+          "required": true
+        },
+        {
+          "name": "disability",
+          "type": "boolean",
+          "description": "Caused persistent or significant disability or incapacity",
+          "required": true
+        },
+        {
+          "name": "life_threatening",
+          "type": "boolean",
+          "description": "Patient was at immediate risk of death at time of event",
+          "required": true
+        },
+        {
+          "name": "congenital_anomaly",
+          "type": "boolean",
+          "description": "Congenital anomaly or birth defect in offspring",
+          "required": true
+        },
+        {
+          "name": "medically_important",
+          "type": "boolean",
+          "description": "Medically important event per ICH E2A criteria",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "serious": {"type": "boolean"},
-          "seriousness": {"type": "string", "description": "SERIOUS | NON-SERIOUS"},
-          "fatal": {"type": "boolean"},
-          "life_threatening": {"type": "boolean"},
-          "deadline_days": {"type": "integer", "description": "Reporting deadline in days (7 for fatal/life-threatening, 15 for other serious, null for non-serious)"}
+          "serious": {
+            "type": "boolean"
+          },
+          "seriousness": {
+            "type": "string",
+            "description": "SERIOUS | NON-SERIOUS"
+          },
+          "fatal": {
+            "type": "boolean"
+          },
+          "life_threatening": {
+            "type": "boolean"
+          },
+          "deadline_days": {
+            "type": "integer",
+            "description": "Reporting deadline in days (7 for fatal/life-threatening, 15 for other serious, null for non-serious)"
+          }
         },
-        "required": ["serious", "seriousness"]
+        "required": [
+          "serious",
+          "seriousness"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-adr-severity-escalation",
-      "description": "ADR CTCAE grading → escalation routing. Classify adverse drug reaction severity using CTCAE-aligned criteria and get the appropriate escalation pathway.",
+      "description": "ADR CTCAE grading \u2192 escalation routing. Classify adverse drug reaction severity using CTCAE-aligned criteria and get the appropriate escalation pathway.",
       "parameters": [
-        {"name": "is_fatal", "type": "boolean", "description": "ADR was fatal (CTCAE Grade 5)", "required": true},
-        {"name": "is_life_threatening", "type": "boolean", "description": "ADR was life-threatening (CTCAE Grade 4)", "required": false},
-        {"name": "requires_hospitalization", "type": "boolean", "description": "ADR required hospitalization (CTCAE Grade 3)", "required": false},
-        {"name": "requires_medical_intervention", "type": "boolean", "description": "ADR required medical intervention (CTCAE Grade 2)", "required": false}
+        {
+          "name": "is_fatal",
+          "type": "boolean",
+          "description": "ADR was fatal (CTCAE Grade 5)",
+          "required": true
+        },
+        {
+          "name": "is_life_threatening",
+          "type": "boolean",
+          "description": "ADR was life-threatening (CTCAE Grade 4)",
+          "required": false
+        },
+        {
+          "name": "requires_hospitalization",
+          "type": "boolean",
+          "description": "ADR required hospitalization (CTCAE Grade 3)",
+          "required": false
+        },
+        {
+          "name": "requires_medical_intervention",
+          "type": "boolean",
+          "description": "ADR required medical intervention (CTCAE Grade 2)",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "grade": {"type": "integer", "description": "CTCAE grade 1-5"},
-          "severity": {"type": "string", "description": "FATAL | SEVERE | MODERATE | MILD"},
-          "escalation": {"type": "string", "description": "Recommended escalation pathway"}
+          "grade": {
+            "type": "integer",
+            "description": "CTCAE grade 1-5"
+          },
+          "severity": {
+            "type": "string",
+            "description": "FATAL | SEVERE | MODERATE | MILD"
+          },
+          "escalation": {
+            "type": "string",
+            "description": "Recommended escalation pathway"
+          }
         },
-        "required": ["grade", "severity"]
+        "required": [
+          "grade",
+          "severity"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-confidence-deadline",
-      "description": "Assessment confidence level → reporting urgency classification. Given an assessment confidence score and days until reporting deadline, routes to the appropriate urgency tier.",
+      "description": "Assessment confidence level \u2192 reporting urgency classification. Given an assessment confidence score and days until reporting deadline, routes to the appropriate urgency tier.",
       "parameters": [
-        {"name": "confidence", "type": "number", "description": "Assessment confidence as a percentage (0-100)", "required": true},
-        {"name": "deadline_days", "type": "integer", "description": "Days remaining until regulatory reporting deadline", "required": true}
+        {
+          "name": "confidence",
+          "type": "number",
+          "description": "Assessment confidence as a percentage (0-100)",
+          "required": true
+        },
+        {
+          "name": "deadline_days",
+          "type": "integer",
+          "description": "Days remaining until regulatory reporting deadline",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "actionable": {"type": "boolean"},
-          "urgency": {"type": "string", "description": "IMMEDIATE | HIGH | STANDARD | DEFER"},
-          "recommendation": {"type": "string"}
+          "actionable": {
+            "type": "boolean"
+          },
+          "urgency": {
+            "type": "string",
+            "description": "IMMEDIATE | HIGH | STANDARD | DEFER"
+          },
+          "recommendation": {
+            "type": "string"
+          }
         },
-        "required": ["actionable"]
+        "required": [
+          "actionable"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-investigation-prioritization",
-      "description": "Transbeyesian class propagation → EIG priority ranking. For a drug-event signal, determines whether to investigate directly or rely on propagated evidence from structurally similar drugs in the same class.",
+      "description": "Transbeyesian class propagation \u2192 EIG priority ranking. For a drug-event signal, determines whether to investigate directly or rely on propagated evidence from structurally similar drugs in the same class.",
       "parameters": [
-        {"name": "source_prr", "type": "number", "description": "PRR value for the source drug-event pair", "required": true},
-        {"name": "signal_threshold", "type": "number", "description": "PRR threshold for signal detection (typically 2.0)", "required": true},
-        {"name": "transfer_weight", "type": "string", "description": "Structural similarity class: same_class | high | moderate | low | none", "required": true},
-        {"name": "prior_strength", "type": "string", "description": "Prior evidence strength: strong | moderate | weak | unknown", "required": true},
-        {"name": "uncertainty_level", "type": "string", "description": "Current uncertainty: very_high | high | moderate | low", "required": true},
-        {"name": "extremity_level", "type": "string", "description": "Signal extremity: extreme | moderate | low", "required": true},
-        {"name": "propagation_count", "type": "integer", "description": "Number of adjacent drugs in the class network that would benefit from this investigation", "required": true}
+        {
+          "name": "source_prr",
+          "type": "number",
+          "description": "PRR value for the source drug-event pair",
+          "required": true
+        },
+        {
+          "name": "signal_threshold",
+          "type": "number",
+          "description": "PRR threshold for signal detection (typically 2.0)",
+          "required": true
+        },
+        {
+          "name": "transfer_weight",
+          "type": "string",
+          "description": "Structural similarity class: same_class | high | moderate | low | none",
+          "required": true
+        },
+        {
+          "name": "prior_strength",
+          "type": "string",
+          "description": "Prior evidence strength: strong | moderate | weak | unknown",
+          "required": true
+        },
+        {
+          "name": "uncertainty_level",
+          "type": "string",
+          "description": "Current uncertainty: very_high | high | moderate | low",
+          "required": true
+        },
+        {
+          "name": "extremity_level",
+          "type": "string",
+          "description": "Signal extremity: extreme | moderate | low",
+          "required": true
+        },
+        {
+          "name": "propagation_count",
+          "type": "integer",
+          "description": "Number of adjacent drugs in the class network that would benefit from this investigation",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "posterior_class": {"type": "string", "description": "STRONG_UPDATE | MODERATE_UPDATE | WEAK_UPDATE | NO_UPDATE"},
-          "propagation_confidence": {"type": "string"},
-          "priority": {"type": "string", "description": "INVESTIGATE_NOW | QUEUE | DEFER | PROPAGATE_ONLY"},
-          "eig_class": {"type": "string", "description": "CRITICAL | HIGH | MODERATE | LOW"}
+          "posterior_class": {
+            "type": "string",
+            "description": "STRONG_UPDATE | MODERATE_UPDATE | WEAK_UPDATE | NO_UPDATE"
+          },
+          "propagation_confidence": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "string",
+            "description": "INVESTIGATE_NOW | QUEUE | DEFER | PROPAGATE_ONLY"
+          },
+          "eig_class": {
+            "type": "string",
+            "description": "CRITICAL | HIGH | MODERATE | LOW"
+          }
         },
-        "required": ["priority", "eig_class"]
+        "required": [
+          "priority",
+          "eig_class"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-signal-deep-validation",
       "description": "Multi-dimensional signal quality assessment. Combines 4 disproportionality measures (PRR/ROR/IC/EBGM), validates criteria sufficiency, detects trend direction, and identifies recurrence patterns.",
       "parameters": [
-        {"name": "prr_signal", "type": "string", "description": "PRR signal classification: STRONG | MODERATE | WEAK | NONE", "required": true},
-        {"name": "ror_signal", "type": "string", "description": "ROR signal classification: STRONG | MODERATE | WEAK | NONE", "required": true},
-        {"name": "ic_signal", "type": "string", "description": "IC signal classification: STRONG | MODERATE | WEAK | NONE", "required": true},
-        {"name": "ebgm_signal", "type": "string", "description": "EBGM signal classification: STRONG | MODERATE | WEAK | NONE", "required": true},
-        {"name": "prr_above_threshold", "type": "boolean", "description": "PRR exceeds detection threshold (≥2.0)", "required": true},
-        {"name": "case_count_sufficient", "type": "boolean", "description": "Case count meets minimum threshold (≥3)", "required": true},
-        {"name": "geographic_spread", "type": "boolean", "description": "Reports come from ≥2 distinct geographic regions", "required": true},
-        {"name": "temporal_pattern", "type": "boolean", "description": "Reports show a consistent temporal pattern (not clustered in one period)", "required": true},
-        {"name": "prr_current", "type": "number", "description": "Current PRR value for trend detection", "required": true},
-        {"name": "pct_change", "type": "number", "description": "Percent change in PRR from prior period (negative = declining)", "required": true},
-        {"name": "occurrence_count", "type": "integer", "description": "Total historical occurrences of this signal", "required": true},
-        {"name": "prior_action_taken", "type": "boolean", "description": "A regulatory or clinical action was previously taken for this signal", "required": true}
+        {
+          "name": "prr_signal",
+          "type": "string",
+          "description": "PRR signal classification: STRONG | MODERATE | WEAK | NONE",
+          "required": true
+        },
+        {
+          "name": "ror_signal",
+          "type": "string",
+          "description": "ROR signal classification: STRONG | MODERATE | WEAK | NONE",
+          "required": true
+        },
+        {
+          "name": "ic_signal",
+          "type": "string",
+          "description": "IC signal classification: STRONG | MODERATE | WEAK | NONE",
+          "required": true
+        },
+        {
+          "name": "ebgm_signal",
+          "type": "string",
+          "description": "EBGM signal classification: STRONG | MODERATE | WEAK | NONE",
+          "required": true
+        },
+        {
+          "name": "prr_above_threshold",
+          "type": "boolean",
+          "description": "PRR exceeds detection threshold (\u22652.0)",
+          "required": true
+        },
+        {
+          "name": "case_count_sufficient",
+          "type": "boolean",
+          "description": "Case count meets minimum threshold (\u22653)",
+          "required": true
+        },
+        {
+          "name": "geographic_spread",
+          "type": "boolean",
+          "description": "Reports come from \u22652 distinct geographic regions",
+          "required": true
+        },
+        {
+          "name": "temporal_pattern",
+          "type": "boolean",
+          "description": "Reports show a consistent temporal pattern (not clustered in one period)",
+          "required": true
+        },
+        {
+          "name": "prr_current",
+          "type": "number",
+          "description": "Current PRR value for trend detection",
+          "required": true
+        },
+        {
+          "name": "pct_change",
+          "type": "number",
+          "description": "Percent change in PRR from prior period (negative = declining)",
+          "required": true
+        },
+        {
+          "name": "occurrence_count",
+          "type": "integer",
+          "description": "Total historical occurrences of this signal",
+          "required": true
+        },
+        {
+          "name": "prior_action_taken",
+          "type": "boolean",
+          "description": "A regulatory or clinical action was previously taken for this signal",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "overall_verdict": {"type": "string", "description": "CONFIRMED | PROBABLE | POSSIBLE | INSUFFICIENT"},
-          "criteria_confirmed": {"type": "integer"},
-          "trend": {"type": "string", "description": "RISING | STABLE | DECLINING"},
-          "recurrence": {"type": "string", "description": "NOVEL | RECURRING | SYSTEMIC"}
+          "overall_verdict": {
+            "type": "string",
+            "description": "CONFIRMED | PROBABLE | POSSIBLE | INSUFFICIENT"
+          },
+          "criteria_confirmed": {
+            "type": "integer"
+          },
+          "trend": {
+            "type": "string",
+            "description": "RISING | STABLE | DECLINING"
+          },
+          "recurrence": {
+            "type": "string",
+            "description": "NOVEL | RECURRING | SYSTEMIC"
+          }
         },
-        "required": ["overall_verdict"]
+        "required": [
+          "overall_verdict"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-bradford-hill-evidence",
-      "description": "Bradford Hill evidence assessment: signal comparison → dose-response classification → Naranjo causality. A 3-criterion causality chain using cross-variable comparison micrograms.",
+      "description": "Bradford Hill evidence assessment: signal comparison \u2192 dose-response classification \u2192 Naranjo causality. A 3-criterion causality chain using cross-variable comparison micrograms.",
       "parameters": [
-        {"name": "signal_a", "type": "number", "description": "PRR or signal strength for the drug of interest", "required": true},
-        {"name": "signal_b", "type": "number", "description": "PRR or signal strength for a comparator drug in the same class", "required": true},
-        {"name": "low_dose_rate", "type": "number", "description": "Adverse event rate per 100 patients at low dose", "required": true},
-        {"name": "mid_dose_rate", "type": "number", "description": "Adverse event rate per 100 patients at mid dose", "required": true},
-        {"name": "high_dose_rate", "type": "number", "description": "Adverse event rate per 100 patients at high dose", "required": true},
-        {"name": "naranjo_score", "type": "integer", "description": "Naranjo ADR probability score (0-13)", "required": true}
+        {
+          "name": "signal_a",
+          "type": "number",
+          "description": "PRR or signal strength for the drug of interest",
+          "required": true
+        },
+        {
+          "name": "signal_b",
+          "type": "number",
+          "description": "PRR or signal strength for a comparator drug in the same class",
+          "required": true
+        },
+        {
+          "name": "low_dose_rate",
+          "type": "number",
+          "description": "Adverse event rate per 100 patients at low dose",
+          "required": true
+        },
+        {
+          "name": "mid_dose_rate",
+          "type": "number",
+          "description": "Adverse event rate per 100 patients at mid dose",
+          "required": true
+        },
+        {
+          "name": "high_dose_rate",
+          "type": "number",
+          "description": "Adverse event rate per 100 patients at high dose",
+          "required": true
+        },
+        {
+          "name": "naranjo_score",
+          "type": "integer",
+          "description": "Naranjo ADR probability score (0-13)",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "causality": {"type": "string", "description": "DEFINITE | PROBABLE | POSSIBLE | DOUBTFUL"},
-          "dose_response": {"type": "string", "description": "MONOTONIC | PARTIAL | NONE"},
-          "signal_comparison": {"type": "string"}
+          "causality": {
+            "type": "string",
+            "description": "DEFINITE | PROBABLE | POSSIBLE | DOUBTFUL"
+          },
+          "dose_response": {
+            "type": "string",
+            "description": "MONOTONIC | PARTIAL | NONE"
+          },
+          "signal_comparison": {
+            "type": "string"
+          }
         },
-        "required": ["causality"]
+        "required": [
+          "causality"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-bradford-hill-multi-criterion",
-      "description": "Full 5-criterion Bradford Hill causality assessment: temporal association → signal comparison → dose-response → rechallenge → Naranjo. The most comprehensive single-call causality evaluation in the platform.",
+      "description": "Full 5-criterion Bradford Hill causality assessment: temporal association \u2192 signal comparison \u2192 dose-response \u2192 rechallenge \u2192 Naranjo. The most comprehensive single-call causality evaluation in the platform.",
       "parameters": [
-        {"name": "drug_start_to_event_days", "type": "integer", "description": "Days from drug initiation to adverse event onset", "required": true},
-        {"name": "event_before_drug", "type": "boolean", "description": "Event occurred before drug was started (dechallenge violation)", "required": true},
-        {"name": "signal_a", "type": "number", "description": "PRR or signal strength for the drug of interest", "required": true},
-        {"name": "signal_b", "type": "number", "description": "PRR or signal strength for comparator drug", "required": true},
-        {"name": "threshold", "type": "number", "description": "Signal detection threshold (typically 2.0)", "required": true},
-        {"name": "low_dose_rate", "type": "number", "description": "Adverse event rate per 100 patients at low dose", "required": true},
-        {"name": "mid_dose_rate", "type": "number", "description": "Adverse event rate per 100 patients at mid dose", "required": true},
-        {"name": "high_dose_rate", "type": "number", "description": "Adverse event rate per 100 patients at high dose", "required": true},
-        {"name": "baseline_rate", "type": "number", "description": "Background rate of this event in the general population per 100 patients", "required": true},
-        {"name": "first_exposure_rate", "type": "number", "description": "Event rate per 100 patients on first drug exposure", "required": true},
-        {"name": "rechallenge_rate", "type": "number", "description": "Event rate per 100 patients on re-exposure after dechallenge", "required": true},
-        {"name": "naranjo_score", "type": "integer", "description": "Naranjo ADR probability score (0-13)", "required": true}
+        {
+          "name": "drug_start_to_event_days",
+          "type": "integer",
+          "description": "Days from drug initiation to adverse event onset",
+          "required": true
+        },
+        {
+          "name": "event_before_drug",
+          "type": "boolean",
+          "description": "Event occurred before drug was started (dechallenge violation)",
+          "required": true
+        },
+        {
+          "name": "signal_a",
+          "type": "number",
+          "description": "PRR or signal strength for the drug of interest",
+          "required": true
+        },
+        {
+          "name": "signal_b",
+          "type": "number",
+          "description": "PRR or signal strength for comparator drug",
+          "required": true
+        },
+        {
+          "name": "threshold",
+          "type": "number",
+          "description": "Signal detection threshold (typically 2.0)",
+          "required": true
+        },
+        {
+          "name": "low_dose_rate",
+          "type": "number",
+          "description": "Adverse event rate per 100 patients at low dose",
+          "required": true
+        },
+        {
+          "name": "mid_dose_rate",
+          "type": "number",
+          "description": "Adverse event rate per 100 patients at mid dose",
+          "required": true
+        },
+        {
+          "name": "high_dose_rate",
+          "type": "number",
+          "description": "Adverse event rate per 100 patients at high dose",
+          "required": true
+        },
+        {
+          "name": "baseline_rate",
+          "type": "number",
+          "description": "Background rate of this event in the general population per 100 patients",
+          "required": true
+        },
+        {
+          "name": "first_exposure_rate",
+          "type": "number",
+          "description": "Event rate per 100 patients on first drug exposure",
+          "required": true
+        },
+        {
+          "name": "rechallenge_rate",
+          "type": "number",
+          "description": "Event rate per 100 patients on re-exposure after dechallenge",
+          "required": true
+        },
+        {
+          "name": "naranjo_score",
+          "type": "integer",
+          "description": "Naranjo ADR probability score (0-13)",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "causality": {"type": "string", "description": "DEFINITE | PROBABLE | POSSIBLE | DOUBTFUL"},
-          "criteria_met": {"type": "integer", "description": "Number of Bradford Hill criteria satisfied (0-5)"},
-          "temporal_association": {"type": "string"},
-          "dose_response": {"type": "string"},
-          "rechallenge": {"type": "string"}
+          "causality": {
+            "type": "string",
+            "description": "DEFINITE | PROBABLE | POSSIBLE | DOUBTFUL"
+          },
+          "criteria_met": {
+            "type": "integer",
+            "description": "Number of Bradford Hill criteria satisfied (0-5)"
+          },
+          "temporal_association": {
+            "type": "string"
+          },
+          "dose_response": {
+            "type": "string"
+          },
+          "rechallenge": {
+            "type": "string"
+          }
         },
-        "required": ["causality", "criteria_met"]
+        "required": [
+          "causality",
+          "criteria_met"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-crystalbook-4primitive",
-      "description": "Crystalbook 4-Primitive Conservation Check: assess whether a system conserves Existence (∃), Boundary (∂), State (ς), and Nothing (∅). Returns per-primitive status and overall conservation diagnosis (CONSERVING/STRESSED/LOSING_COHERENCE/NON_EXISTENT). Source: Crystalbook v2.0 by Matthew A. Campion, PharmD.",
+      "description": "Crystalbook 4-Primitive Conservation Check: assess whether a system conserves Existence (\u2203), Boundary (\u2202), State (\u03c2), and Nothing (\u2205). Returns per-primitive status and overall conservation diagnosis (CONSERVING/STRESSED/LOSING_COHERENCE/NON_EXISTENT). Source: Crystalbook v2.0 by Matthew A. Campion, PharmD.",
       "parameters": [
-        {"name": "existence_evidence", "type": "string", "description": "Evidence that the system exists — observable artifacts, running processes, measurements", "required": false},
-        {"name": "boundary_description", "type": "string", "description": "Description of the system's boundaries — where it begins and ends, what's inside vs outside", "required": false},
-        {"name": "state_observation", "type": "string", "description": "Observed current state — measured, not inferred from memory or assumption", "required": false},
-        {"name": "void_identification", "type": "string", "description": "What is absent or missing — named voids that should be explored or filled", "required": false}
+        {
+          "name": "existence_evidence",
+          "type": "string",
+          "description": "Evidence that the system exists \u2014 observable artifacts, running processes, measurements",
+          "required": false
+        },
+        {
+          "name": "boundary_description",
+          "type": "string",
+          "description": "Description of the system's boundaries \u2014 where it begins and ends, what's inside vs outside",
+          "required": false
+        },
+        {
+          "name": "state_observation",
+          "type": "string",
+          "description": "Observed current state \u2014 measured, not inferred from memory or assumption",
+          "required": false
+        },
+        {
+          "name": "void_identification",
+          "type": "string",
+          "description": "What is absent or missing \u2014 named voids that should be explored or filled",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "existence_status": {"type": "string", "description": "PRESENT | ABSENT | UNVERIFIED"},
-          "boundary_status": {"type": "string", "description": "CLEAR | AMBIGUOUS | DISSOLVED | CAPTURED"},
-          "state_status": {"type": "string", "description": "OBSERVED | INFERRED | STALE"},
-          "void_status": {"type": "string", "description": "NAMED | UNNAMED | IGNORED"},
-          "conservation_holds": {"type": "boolean", "description": "True if all 4 primitives are healthy"},
-          "degraded_count": {"type": "integer", "description": "Number of degraded primitives (0-4)"},
-          "diagnosis": {"type": "string", "description": "CONSERVING | STRESSED | LOSING_COHERENCE | NON_EXISTENT"}
+          "existence_status": {
+            "type": "string",
+            "description": "PRESENT | ABSENT | UNVERIFIED"
+          },
+          "boundary_status": {
+            "type": "string",
+            "description": "CLEAR | AMBIGUOUS | DISSOLVED | CAPTURED"
+          },
+          "state_status": {
+            "type": "string",
+            "description": "OBSERVED | INFERRED | STALE"
+          },
+          "void_status": {
+            "type": "string",
+            "description": "NAMED | UNNAMED | IGNORED"
+          },
+          "conservation_holds": {
+            "type": "boolean",
+            "description": "True if all 4 primitives are healthy"
+          },
+          "degraded_count": {
+            "type": "integer",
+            "description": "Number of degraded primitives (0-4)"
+          },
+          "diagnosis": {
+            "type": "string",
+            "description": "CONSERVING | STRESSED | LOSING_COHERENCE | NON_EXISTENT"
+          }
         },
-        "required": ["conservation_holds", "diagnosis"]
+        "required": [
+          "conservation_holds",
+          "diagnosis"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-crystalbook-8law",
       "description": "Crystalbook 8-Law Risk Matrix: assess virtue scores (0-10) for each of the 8 Laws of System Homeostasis. Scores 7+ = SATISFIED, 4-6 = AT_RISK, 0-3 = VIOLATED. Returns per-law status, violation count, and overall health (HEALTHY/GUARDED/DEGRADED/CRITICAL). Source: Crystalbook v2.0 by Matthew A. Campion, PharmD.",
       "parameters": [
-        {"name": "humility_score", "type": "integer", "description": "Law I (Pride→Humility) virtue score 0-10. Does the system calibrate against reality?", "required": false},
-        {"name": "charity_score", "type": "integer", "description": "Law II (Greed→Charity) virtue score 0-10. Does the system circulate what it holds?", "required": false},
-        {"name": "chastity_score", "type": "integer", "description": "Law III (Lust→Chastity) virtue score 0-10. Does the system honor its commitments?", "required": false},
-        {"name": "kindness_score", "type": "integer", "description": "Law IV (Envy→Kindness) virtue score 0-10. Does the system strengthen its neighbors?", "required": false},
-        {"name": "temperance_score", "type": "integer", "description": "Law V (Gluttony→Temperance) virtue score 0-10. Does the system ingest only what it can metabolize?", "required": false},
-        {"name": "patience_score", "type": "integer", "description": "Law VI (Wrath→Patience) virtue score 0-10. Does the system correct proportionally?", "required": false},
-        {"name": "diligence_score", "type": "integer", "description": "Law VII (Sloth→Diligence) virtue score 0-10. Does the system maintain its maintenance function?", "required": false},
-        {"name": "independence_score", "type": "integer", "description": "Law VIII (Corruption→Independence) virtue score 0-10. Are boundaries resourced independently?", "required": false}
+        {
+          "name": "humility_score",
+          "type": "integer",
+          "description": "Law I (Pride\u2192Humility) virtue score 0-10. Does the system calibrate against reality?",
+          "required": false
+        },
+        {
+          "name": "charity_score",
+          "type": "integer",
+          "description": "Law II (Greed\u2192Charity) virtue score 0-10. Does the system circulate what it holds?",
+          "required": false
+        },
+        {
+          "name": "chastity_score",
+          "type": "integer",
+          "description": "Law III (Lust\u2192Chastity) virtue score 0-10. Does the system honor its commitments?",
+          "required": false
+        },
+        {
+          "name": "kindness_score",
+          "type": "integer",
+          "description": "Law IV (Envy\u2192Kindness) virtue score 0-10. Does the system strengthen its neighbors?",
+          "required": false
+        },
+        {
+          "name": "temperance_score",
+          "type": "integer",
+          "description": "Law V (Gluttony\u2192Temperance) virtue score 0-10. Does the system ingest only what it can metabolize?",
+          "required": false
+        },
+        {
+          "name": "patience_score",
+          "type": "integer",
+          "description": "Law VI (Wrath\u2192Patience) virtue score 0-10. Does the system correct proportionally?",
+          "required": false
+        },
+        {
+          "name": "diligence_score",
+          "type": "integer",
+          "description": "Law VII (Sloth\u2192Diligence) virtue score 0-10. Does the system maintain its maintenance function?",
+          "required": false
+        },
+        {
+          "name": "independence_score",
+          "type": "integer",
+          "description": "Law VIII (Corruption\u2192Independence) virtue score 0-10. Are boundaries resourced independently?",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "law_i_status": {"type": "string", "description": "SATISFIED | AT_RISK | VIOLATED"},
-          "law_ii_status": {"type": "string"},
-          "violated_count": {"type": "integer"},
-          "at_risk_count": {"type": "integer"},
-          "satisfied_count": {"type": "integer"},
-          "primary_deviation": {"type": "string", "description": "The most critical deviation identified"},
-          "overall_health": {"type": "string", "description": "HEALTHY | GUARDED | DEGRADED | CRITICAL"}
+          "law_i_status": {
+            "type": "string",
+            "description": "SATISFIED | AT_RISK | VIOLATED"
+          },
+          "law_ii_status": {
+            "type": "string"
+          },
+          "violated_count": {
+            "type": "integer"
+          },
+          "at_risk_count": {
+            "type": "integer"
+          },
+          "satisfied_count": {
+            "type": "integer"
+          },
+          "primary_deviation": {
+            "type": "string",
+            "description": "The most critical deviation identified"
+          },
+          "overall_health": {
+            "type": "string",
+            "description": "HEALTHY | GUARDED | DEGRADED | CRITICAL"
+          }
         },
-        "required": ["overall_health", "violated_count"]
+        "required": [
+          "overall_health",
+          "violated_count"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-crystalbook-diagnostic",
       "description": "Crystalbook Full Diagnostic: combines 4-primitive conservation check + law triage into a single diagnostic. Returns conservation status, law assessment, overall verdict (HEALTHY/GUARDED/STRESSED/DEGRADED/CRITICAL/NON_EXISTENT), and a plain-English prescription. Source: Crystalbook v2.0 by Matthew A. Campion, PharmD.",
       "parameters": [
-        {"name": "existence_evidence", "type": "string", "description": "Evidence the system exists", "required": false},
-        {"name": "boundary_description", "type": "string", "description": "Boundary definition", "required": false},
-        {"name": "state_observation", "type": "string", "description": "Observed current state", "required": false},
-        {"name": "void_identification", "type": "string", "description": "Named absences", "required": false},
-        {"name": "humility_score", "type": "integer", "description": "Law I virtue score 0-10", "required": false},
-        {"name": "charity_score", "type": "integer", "description": "Law II virtue score 0-10", "required": false}
+        {
+          "name": "existence_evidence",
+          "type": "string",
+          "description": "Evidence the system exists",
+          "required": false
+        },
+        {
+          "name": "boundary_description",
+          "type": "string",
+          "description": "Boundary definition",
+          "required": false
+        },
+        {
+          "name": "state_observation",
+          "type": "string",
+          "description": "Observed current state",
+          "required": false
+        },
+        {
+          "name": "void_identification",
+          "type": "string",
+          "description": "Named absences",
+          "required": false
+        },
+        {
+          "name": "humility_score",
+          "type": "integer",
+          "description": "Law I virtue score 0-10",
+          "required": false
+        },
+        {
+          "name": "charity_score",
+          "type": "integer",
+          "description": "Law II virtue score 0-10",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "conservation_holds": {"type": "boolean"},
-          "degraded_count": {"type": "integer"},
-          "primitive_diagnosis": {"type": "string"},
-          "law_i_status": {"type": "string"},
-          "law_ii_status": {"type": "string"},
-          "overall_verdict": {"type": "string", "description": "HEALTHY | GUARDED | STRESSED | DEGRADED | CRITICAL | NON_EXISTENT"},
-          "prescription": {"type": "string", "description": "Plain-English recommendation for restoring system health"}
+          "conservation_holds": {
+            "type": "boolean"
+          },
+          "degraded_count": {
+            "type": "integer"
+          },
+          "primitive_diagnosis": {
+            "type": "string"
+          },
+          "law_i_status": {
+            "type": "string"
+          },
+          "law_ii_status": {
+            "type": "string"
+          },
+          "overall_verdict": {
+            "type": "string",
+            "description": "HEALTHY | GUARDED | STRESSED | DEGRADED | CRITICAL | NON_EXISTENT"
+          },
+          "prescription": {
+            "type": "string",
+            "description": "Plain-English recommendation for restoring system health"
+          }
         },
-        "required": ["overall_verdict", "prescription"]
+        "required": [
+          "overall_verdict",
+          "prescription"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-ich-q1a-stability-testing",
       "description": "ICH Q1A(R2) Stability Testing decision tree. Given product type, storage type, and accelerated study outcome, returns storage conditions, testing frequency, minimum study duration, and shelf life approach. Covers general case, refrigerator, freezer, semi-permeable, and impermeable containers.",
       "parameters": [
-        {"name": "product_type", "type": "string", "description": "drug_substance or drug_product", "required": true},
-        {"name": "storage_type", "type": "string", "description": "general, refrigerator, freezer, below_minus_20, semi_permeable, impermeable", "required": true},
-        {"name": "long_term_condition", "type": "string", "description": "For general: 25_60 or 30_65. For semi-permeable: 25_40 or 30_35.", "required": false},
-        {"name": "significant_change_accelerated", "type": "boolean", "description": "Whether significant change was observed at accelerated condition", "required": false},
-        {"name": "significant_change_timing", "type": "string", "description": "within_3_months or between_3_and_6_months", "required": false}
+        {
+          "name": "product_type",
+          "type": "string",
+          "description": "drug_substance or drug_product",
+          "required": true
+        },
+        {
+          "name": "storage_type",
+          "type": "string",
+          "description": "general, refrigerator, freezer, below_minus_20, semi_permeable, impermeable",
+          "required": true
+        },
+        {
+          "name": "long_term_condition",
+          "type": "string",
+          "description": "For general: 25_60 or 30_65. For semi-permeable: 25_40 or 30_35.",
+          "required": false
+        },
+        {
+          "name": "significant_change_accelerated",
+          "type": "boolean",
+          "description": "Whether significant change was observed at accelerated condition",
+          "required": false
+        },
+        {
+          "name": "significant_change_timing",
+          "type": "string",
+          "description": "within_3_months or between_3_and_6_months",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "guideline": {"type": "string"},
-          "long_term_conditions": {"type": "string"},
-          "accelerated_conditions": {"type": "string"},
-          "intermediate_required": {"type": "boolean"},
-          "shelf_life_approach": {"type": "string"},
-          "action": {"type": "string"}
+          "guideline": {
+            "type": "string"
+          },
+          "long_term_conditions": {
+            "type": "string"
+          },
+          "accelerated_conditions": {
+            "type": "string"
+          },
+          "intermediate_required": {
+            "type": "boolean"
+          },
+          "shelf_life_approach": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          }
         },
-        "required": ["guideline", "action"]
+        "required": [
+          "guideline",
+          "action"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-ich-q1b-photostability",
-      "description": "ICH Q1B Photostability Testing decision tree. Encodes the Decision Flow Chart: directly exposed → immediate pack → marketing pack → redesign. For drug substances, routes forced degradation/confirmatory results.",
+      "description": "ICH Q1B Photostability Testing decision tree. Encodes the Decision Flow Chart: directly exposed \u2192 immediate pack \u2192 marketing pack \u2192 redesign. For drug substances, routes forced degradation/confirmatory results.",
       "parameters": [
-        {"name": "product_type", "type": "string", "description": "drug_substance or drug_product", "required": true},
-        {"name": "confirmatory_result", "type": "string", "description": "DS only: photostable, photolabile, or equivocal", "required": false},
-        {"name": "immediate_pack_impenetrable", "type": "boolean", "description": "DP only: true if pack is light-impenetrable (aluminum tubes, cans)", "required": false},
-        {"name": "directly_exposed_acceptable", "type": "boolean", "description": "DP: whether change is acceptable when directly exposed", "required": false},
-        {"name": "immediate_pack_acceptable", "type": "boolean", "description": "DP: whether change is acceptable in immediate pack", "required": false},
-        {"name": "marketing_pack_acceptable", "type": "boolean", "description": "DP: whether change is acceptable in marketing pack", "required": false}
+        {
+          "name": "product_type",
+          "type": "string",
+          "description": "drug_substance or drug_product",
+          "required": true
+        },
+        {
+          "name": "confirmatory_result",
+          "type": "string",
+          "description": "DS only: photostable, photolabile, or equivocal",
+          "required": false
+        },
+        {
+          "name": "immediate_pack_impenetrable",
+          "type": "boolean",
+          "description": "DP only: true if pack is light-impenetrable (aluminum tubes, cans)",
+          "required": false
+        },
+        {
+          "name": "directly_exposed_acceptable",
+          "type": "boolean",
+          "description": "DP: whether change is acceptable when directly exposed",
+          "required": false
+        },
+        {
+          "name": "immediate_pack_acceptable",
+          "type": "boolean",
+          "description": "DP: whether change is acceptable in immediate pack",
+          "required": false
+        },
+        {
+          "name": "marketing_pack_acceptable",
+          "type": "boolean",
+          "description": "DP: whether change is acceptable in marketing pack",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "guideline": {"type": "string"},
-          "test_phase": {"type": "string"},
-          "protection_level": {"type": "string"},
-          "light_protection_required": {"type": "boolean"},
-          "action": {"type": "string"}
+          "guideline": {
+            "type": "string"
+          },
+          "test_phase": {
+            "type": "string"
+          },
+          "protection_level": {
+            "type": "string"
+          },
+          "light_protection_required": {
+            "type": "boolean"
+          },
+          "action": {
+            "type": "string"
+          }
         },
-        "required": ["guideline", "action"]
+        "required": [
+          "guideline",
+          "action"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-ich-e1-population-exposure",
       "description": "ICH E1 Population Exposure decision tree. Routes minimum safety database size for drugs intended for long-term treatment of non-life-threatening conditions. Standard: 1500 total, 300-600 at 6 months, 100 at 12 months. Handles 5 exception categories and regional variants (US priority, Japan).",
       "parameters": [
-        {"name": "treatment_duration", "type": "string", "description": "long_term (>6 months) or short_term", "required": true},
-        {"name": "condition_severity", "type": "string", "description": "non_life_threatening or life_threatening", "required": true},
-        {"name": "has_exception", "type": "boolean", "description": "Whether an exception condition applies", "required": false},
-        {"name": "exception_type", "type": "string", "description": "late_developing_ade, low_frequency_ade, small_benefit, background_morbidity, small_population", "required": false},
-        {"name": "region", "type": "string", "description": "us, eu, japan", "required": false},
-        {"name": "is_priority_drug", "type": "boolean", "description": "US priority drug designation", "required": false}
+        {
+          "name": "treatment_duration",
+          "type": "string",
+          "description": "long_term (>6 months) or short_term",
+          "required": true
+        },
+        {
+          "name": "condition_severity",
+          "type": "string",
+          "description": "non_life_threatening or life_threatening",
+          "required": true
+        },
+        {
+          "name": "has_exception",
+          "type": "boolean",
+          "description": "Whether an exception condition applies",
+          "required": false
+        },
+        {
+          "name": "exception_type",
+          "type": "string",
+          "description": "late_developing_ade, low_frequency_ade, small_benefit, background_morbidity, small_population",
+          "required": false
+        },
+        {
+          "name": "region",
+          "type": "string",
+          "description": "us, eu, japan",
+          "required": false
+        },
+        {
+          "name": "is_priority_drug",
+          "type": "boolean",
+          "description": "US priority drug designation",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "guideline": {"type": "string"},
-          "in_scope": {"type": "boolean"},
-          "standard_applies": {"type": "boolean"},
-          "min_patients_6_months": {"type": "string"},
-          "min_patients_12_months": {"type": "string"},
-          "min_patients_total": {"type": "string"},
-          "action": {"type": "string"}
+          "guideline": {
+            "type": "string"
+          },
+          "in_scope": {
+            "type": "boolean"
+          },
+          "standard_applies": {
+            "type": "boolean"
+          },
+          "min_patients_6_months": {
+            "type": "string"
+          },
+          "min_patients_12_months": {
+            "type": "string"
+          },
+          "min_patients_total": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          }
         },
-        "required": ["guideline", "action"]
+        "required": [
+          "guideline",
+          "action"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-heligram",
-      "description": "Helix Computing decision tree — encode any system through the conservation law ∃ = ∂(×(ς, ∅)). Given boundary sharpness (∂), state richness (ς), void clarity (∅), classifies existence strength, identifies weakest primitive, routes to Crystalbook laws, and gates helix advancement.",
+      "description": "Helix Computing decision tree \u2014 encode any system through the conservation law \u2203 = \u2202(\u00d7(\u03c2, \u2205)). Given boundary sharpness (\u2202), state richness (\u03c2), void clarity (\u2205), classifies existence strength, identifies weakest primitive, routes to Crystalbook laws, and gates helix advancement.",
       "parameters": [
-        {"name": "boundary", "type": "number", "description": "∂ — boundary sharpness [0,1]. How sharply defined is inside vs outside?", "required": true},
-        {"name": "state", "type": "number", "description": "ς — state richness [0,1]. How much observable state exists?", "required": true},
-        {"name": "void", "type": "number", "description": "∅ — void clarity [0,1]. How clearly defined is what the system is NOT?", "required": true}
+        {
+          "name": "boundary",
+          "type": "number",
+          "description": "\u2202 \u2014 boundary sharpness [0,1]. How sharply defined is inside vs outside?",
+          "required": true
+        },
+        {
+          "name": "state",
+          "type": "number",
+          "description": "\u03c2 \u2014 state richness [0,1]. How much observable state exists?",
+          "required": true
+        },
+        {
+          "name": "void",
+          "type": "number",
+          "description": "\u2205 \u2014 void clarity [0,1]. How clearly defined is what the system is NOT?",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "existence_class": {"type": "string", "description": "strong, moderate, weak, or collapsing"},
-          "weakest": {"type": "string", "description": "The weakest primitive: boundary, state, void, or none"},
-          "can_advance": {"type": "boolean", "description": "Whether the system can advance to the next helix turn"},
-          "vice_risk": {"type": "string", "description": "Capital vices that threaten this system"},
-          "binding_laws": {"type": "string", "description": "Which Crystalbook laws govern this system"},
-          "helix_verdict": {"type": "string", "description": "Recommendation for helix advancement"}
+          "existence_class": {
+            "type": "string",
+            "description": "strong, moderate, weak, or collapsing"
+          },
+          "weakest": {
+            "type": "string",
+            "description": "The weakest primitive: boundary, state, void, or none"
+          },
+          "can_advance": {
+            "type": "boolean",
+            "description": "Whether the system can advance to the next helix turn"
+          },
+          "vice_risk": {
+            "type": "string",
+            "description": "Capital vices that threaten this system"
+          },
+          "binding_laws": {
+            "type": "string",
+            "description": "Which Crystalbook laws govern this system"
+          },
+          "helix_verdict": {
+            "type": "string",
+            "description": "Recommendation for helix advancement"
+          }
         },
-        "required": ["existence_class", "weakest", "can_advance"]
+        "required": [
+          "existence_class",
+          "weakest",
+          "can_advance"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-sota-drift-detection",
-      "description": "Guardian SOTA Tracker — detect frontier movement in a pharmacovigilance domain. Classifies the PV domain (signal detection, causality, benefit-risk, case processing, regulatory), evaluates a finding against the current frontier using evidence level and authority weight, and reports drift severity with recommended action. Returns threshold authority (who defines SOTA), comparison method, drift velocity, and frontier movement classification (PARADIGM_SHIFT, SIGNIFICANT, INCREMENTAL, NONE, UNQUALIFIED).",
+      "description": "Guardian SOTA Tracker \u2014 detect frontier movement in a pharmacovigilance domain. Classifies the PV domain (signal detection, causality, benefit-risk, case processing, regulatory), evaluates a finding against the current frontier using evidence level and authority weight, and reports drift severity with recommended action. Returns threshold authority (who defines SOTA), comparison method, drift velocity, and frontier movement classification (PARADIGM_SHIFT, SIGNIFICANT, INCREMENTAL, NONE, UNQUALIFIED).",
       "parameters": [
-        {"name": "domain", "type": "string", "description": "PV domain: signal_detection, causality, benefit_risk, case_processing, regulatory", "required": true},
-        {"name": "evidence_level", "type": "integer", "description": "Strength of evidence: 1=opinion, 2=case series, 3=observational, 4=RCT, 5=systematic review/meta-analysis", "required": true},
-        {"name": "authority_weight", "type": "integer", "description": "Threshold authority recognition: 1=preprint, 2=peer-reviewed, 3=guideline-cited, 4=regulatory-adopted, 5=ICH/WHO standard", "required": true},
-        {"name": "novelty_score", "type": "integer", "description": "Novelty vs current frontier: 0=known, 25=incremental, 50=significant, 75=paradigm-adjacent, 100=paradigm-shift", "required": true},
-        {"name": "prr_change_pct", "type": "integer", "description": "Observed PRR change percentage for drift severity classification (0 if not applicable)", "required": false},
-        {"name": "time_window_days", "type": "integer", "description": "Time window in days over which the change was observed (90 if not applicable)", "required": false}
+        {
+          "name": "domain",
+          "type": "string",
+          "description": "PV domain: signal_detection, causality, benefit_risk, case_processing, regulatory",
+          "required": true
+        },
+        {
+          "name": "evidence_level",
+          "type": "integer",
+          "description": "Strength of evidence: 1=opinion, 2=case series, 3=observational, 4=RCT, 5=systematic review/meta-analysis",
+          "required": true
+        },
+        {
+          "name": "authority_weight",
+          "type": "integer",
+          "description": "Threshold authority recognition: 1=preprint, 2=peer-reviewed, 3=guideline-cited, 4=regulatory-adopted, 5=ICH/WHO standard",
+          "required": true
+        },
+        {
+          "name": "novelty_score",
+          "type": "integer",
+          "description": "Novelty vs current frontier: 0=known, 25=incremental, 50=significant, 75=paradigm-adjacent, 100=paradigm-shift",
+          "required": true
+        },
+        {
+          "name": "prr_change_pct",
+          "type": "integer",
+          "description": "Observed PRR change percentage for drift severity classification (0 if not applicable)",
+          "required": false
+        },
+        {
+          "name": "time_window_days",
+          "type": "integer",
+          "description": "Time window in days over which the change was observed (90 if not applicable)",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
+          "success": {
+            "type": "boolean"
+          },
           "final_output": {
             "type": "object",
             "properties": {
-              "domain_label": {"type": "string", "description": "Human-readable PV domain name"},
-              "threshold_authority": {"type": "string", "description": "Who adjudicates SOTA in this domain"},
-              "comparison_method": {"type": "string", "description": "How findings are ranked against the frontier"},
-              "current_frontier": {"type": "string", "description": "Description of current SOTA methods"},
-              "drift_velocity": {"type": "string", "description": "How fast the frontier typically moves"},
-              "frontier_movement": {"type": "string", "description": "PARADIGM_SHIFT, SIGNIFICANT, INCREMENTAL, NONE, or UNQUALIFIED"},
-              "combined_score": {"type": "integer", "description": "Composite frontier movement score (0-100)"},
-              "severity": {"type": "string", "description": "Drift severity from CRITICAL_DRIFT to STABLE"},
-              "alert_level": {"type": "string", "description": "P0/P1/P2/P3/NONE"},
-              "action": {"type": "string", "description": "Recommended response to the frontier finding"}
+              "domain_label": {
+                "type": "string",
+                "description": "Human-readable PV domain name"
+              },
+              "threshold_authority": {
+                "type": "string",
+                "description": "Who adjudicates SOTA in this domain"
+              },
+              "comparison_method": {
+                "type": "string",
+                "description": "How findings are ranked against the frontier"
+              },
+              "current_frontier": {
+                "type": "string",
+                "description": "Description of current SOTA methods"
+              },
+              "drift_velocity": {
+                "type": "string",
+                "description": "How fast the frontier typically moves"
+              },
+              "frontier_movement": {
+                "type": "string",
+                "description": "PARADIGM_SHIFT, SIGNIFICANT, INCREMENTAL, NONE, or UNQUALIFIED"
+              },
+              "combined_score": {
+                "type": "integer",
+                "description": "Composite frontier movement score (0-100)"
+              },
+              "severity": {
+                "type": "string",
+                "description": "Drift severity from CRITICAL_DRIFT to STABLE"
+              },
+              "alert_level": {
+                "type": "string",
+                "description": "P0/P1/P2/P3/NONE"
+              },
+              "action": {
+                "type": "string",
+                "description": "Recommended response to the frontier finding"
+              }
             }
           },
-          "steps": {"type": "array", "description": "Per-step decision trace through domain→frontier→drift"},
-          "total_duration_us": {"type": "integer", "description": "Total execution time in microseconds"}
+          "steps": {
+            "type": "array",
+            "description": "Per-step decision trace through domain\u2192frontier\u2192drift"
+          },
+          "total_duration_us": {
+            "type": "integer",
+            "description": "Total execution time in microseconds"
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-sota-authority-decompose",
-      "description": "Decompose threshold authority into primitives — consensus breadth, credential strength, evidence basis, institutional backing — and score defensibility. Detects Takeda-pattern authority assertions (claims without defensible criteria). Returns authority class (SOVEREIGN/ESTABLISHED/EMERGING/CONTESTED/LONE/UNGROUNDED/ASSERTION), defensibility rating, vulnerability analysis, and recommendation.",
+      "description": "Decompose threshold authority into primitives \u2014 consensus breadth, credential strength, evidence basis, institutional backing \u2014 and score defensibility. Detects Takeda-pattern authority assertions (claims without defensible criteria). Returns authority class (SOVEREIGN/ESTABLISHED/EMERGING/CONTESTED/LONE/UNGROUNDED/ASSERTION), defensibility rating, vulnerability analysis, and recommendation.",
       "parameters": [
-        {"name": "consensus_level", "type": "integer", "description": "Breadth of agreement: 1=single author, 2=research group, 3=professional society, 4=multi-society, 5=international harmonization (ICH/WHO)", "required": true},
-        {"name": "credential_strength", "type": "integer", "description": "Credentialing depth: 1=self-declared, 2=peer-recognized, 3=board-certified, 4=regulatory-designated, 5=statutory mandate", "required": true},
-        {"name": "evidence_basis", "type": "integer", "description": "Evidence grounding: 1=assertion only, 2=case-based, 3=empirical study, 4=validated framework, 5=replicated multi-site", "required": true},
-        {"name": "institutional_backing", "type": "integer", "description": "Institutional power: 1=individual, 2=academic dept, 3=professional body, 4=national regulator, 5=supranational (WHO/ICH/EMA)", "required": true}
+        {
+          "name": "consensus_level",
+          "type": "integer",
+          "description": "Breadth of agreement: 1=single author, 2=research group, 3=professional society, 4=multi-society, 5=international harmonization (ICH/WHO)",
+          "required": true
+        },
+        {
+          "name": "credential_strength",
+          "type": "integer",
+          "description": "Credentialing depth: 1=self-declared, 2=peer-recognized, 3=board-certified, 4=regulatory-designated, 5=statutory mandate",
+          "required": true
+        },
+        {
+          "name": "evidence_basis",
+          "type": "integer",
+          "description": "Evidence grounding: 1=assertion only, 2=case-based, 3=empirical study, 4=validated framework, 5=replicated multi-site",
+          "required": true
+        },
+        {
+          "name": "institutional_backing",
+          "type": "integer",
+          "description": "Institutional power: 1=individual, 2=academic dept, 3=professional body, 4=national regulator, 5=supranational (WHO/ICH/EMA)",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "authority_class": {"type": "string", "description": "SOVEREIGN, ESTABLISHED, EMERGING, CONTESTED, LONE, UNGROUNDED, or ASSERTION"},
-          "defensibility": {"type": "string", "description": "MAXIMUM, HIGH, MODERATE, LOW, MINIMAL, or NONE"},
-          "vulnerability": {"type": "string", "description": "Specific weakness of this authority type"},
-          "authority_score": {"type": "integer", "description": "Composite score 0-95"},
-          "recommendation": {"type": "string", "description": "How to handle this authority level"}
+          "authority_class": {
+            "type": "string",
+            "description": "SOVEREIGN, ESTABLISHED, EMERGING, CONTESTED, LONE, UNGROUNDED, or ASSERTION"
+          },
+          "defensibility": {
+            "type": "string",
+            "description": "MAXIMUM, HIGH, MODERATE, LOW, MINIMAL, or NONE"
+          },
+          "vulnerability": {
+            "type": "string",
+            "description": "Specific weakness of this authority type"
+          },
+          "authority_score": {
+            "type": "integer",
+            "description": "Composite score 0-95"
+          },
+          "recommendation": {
+            "type": "string",
+            "description": "How to handle this authority level"
+          }
         },
-        "required": ["authority_class", "defensibility", "authority_score"]
+        "required": [
+          "authority_class",
+          "defensibility",
+          "authority_score"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-sota-pubmed-pipeline",
-      "description": "PubMed → SOTA pipeline: triage a publication for frontier relevance, classify its PV domain, check frontier movement, and assess drift severity. Feed article metadata from a PubMed search and get back a full SOTA drift assessment including whether the finding warrants frontier review. Chain: pubmed-triage → domain-classifier → frontier-check → drift-alert.",
+      "description": "PubMed \u2192 SOTA pipeline: triage a publication for frontier relevance, classify its PV domain, check frontier movement, and assess drift severity. Feed article metadata from a PubMed search and get back a full SOTA drift assessment including whether the finding warrants frontier review. Chain: pubmed-triage \u2192 domain-classifier \u2192 frontier-check \u2192 drift-alert.",
       "parameters": [
-        {"name": "article_type", "type": "string", "description": "PubMed article type: meta_analysis, systematic_review, rct, observational, case_series, case_report, editorial, letter", "required": true},
-        {"name": "pub_year", "type": "integer", "description": "Publication year (e.g., 2026)", "required": true},
-        {"name": "domain", "type": "string", "description": "PV domain: signal_detection, causality, benefit_risk, case_processing, regulatory", "required": true},
-        {"name": "novelty_score", "type": "integer", "description": "Novelty vs current frontier: 0=known, 25=incremental, 50=significant, 75=paradigm-adjacent, 100=paradigm-shift", "required": true},
-        {"name": "citation_count", "type": "integer", "description": "Number of citations (0 if new)", "required": false},
-        {"name": "is_guideline_cited", "type": "integer", "description": "1 if cited in a guideline/regulatory document, 0 otherwise", "required": false},
-        {"name": "prr_change_pct", "type": "integer", "description": "Observed PRR change percentage (0 if not applicable)", "required": false},
-        {"name": "time_window_days", "type": "integer", "description": "Observation time window in days (90 if not applicable)", "required": false}
+        {
+          "name": "article_type",
+          "type": "string",
+          "description": "PubMed article type: meta_analysis, systematic_review, rct, observational, case_series, case_report, editorial, letter",
+          "required": true
+        },
+        {
+          "name": "pub_year",
+          "type": "integer",
+          "description": "Publication year (e.g., 2026)",
+          "required": true
+        },
+        {
+          "name": "domain",
+          "type": "string",
+          "description": "PV domain: signal_detection, causality, benefit_risk, case_processing, regulatory",
+          "required": true
+        },
+        {
+          "name": "novelty_score",
+          "type": "integer",
+          "description": "Novelty vs current frontier: 0=known, 25=incremental, 50=significant, 75=paradigm-adjacent, 100=paradigm-shift",
+          "required": true
+        },
+        {
+          "name": "citation_count",
+          "type": "integer",
+          "description": "Number of citations (0 if new)",
+          "required": false
+        },
+        {
+          "name": "is_guideline_cited",
+          "type": "integer",
+          "description": "1 if cited in a guideline/regulatory document, 0 otherwise",
+          "required": false
+        },
+        {
+          "name": "prr_change_pct",
+          "type": "integer",
+          "description": "Observed PRR change percentage (0 if not applicable)",
+          "required": false
+        },
+        {
+          "name": "time_window_days",
+          "type": "integer",
+          "description": "Observation time window in days (90 if not applicable)",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
+          "success": {
+            "type": "boolean"
+          },
           "final_output": {
             "type": "object",
             "properties": {
-              "triage_action": {"type": "string", "description": "EVALUATE, MONITOR, or SKIP"},
-              "domain_label": {"type": "string"},
-              "frontier_movement": {"type": "string"},
-              "severity": {"type": "string"},
-              "alert_level": {"type": "string"}
+              "triage_action": {
+                "type": "string",
+                "description": "EVALUATE, MONITOR, or SKIP"
+              },
+              "domain_label": {
+                "type": "string"
+              },
+              "frontier_movement": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string"
+              },
+              "alert_level": {
+                "type": "string"
+              }
             }
           },
-          "steps": {"type": "array"},
-          "total_duration_us": {"type": "integer"}
+          "steps": {
+            "type": "array"
+          },
+          "total_duration_us": {
+            "type": "integer"
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-caso-clinico-espanol",
-      "description": "Pipeline completo de evaluación de caso clínico en español. Grammar disambiguation (ser/estar + indicativo/subjuntivo) → temporal classification → epistemic weighting → ICH E2A seriousness → expectedness. 7-step chain preserving Spanish enrichment alongside standard ICSR outputs.",
+      "description": "Pipeline completo de evaluaci\u00f3n de caso cl\u00ednico en espa\u00f1ol. Grammar disambiguation (ser/estar + indicativo/subjuntivo) \u2192 temporal classification \u2192 epistemic weighting \u2192 ICH E2A seriousness \u2192 expectedness. 7-step chain preserving Spanish enrichment alongside standard ICSR outputs.",
       "parameters": [
-        {"name": "forma_verbal", "type": "string", "description": "Ambiguous verb form to disambiguate (e.g. 'presente', 'cause')", "required": true},
-        {"name": "verbo", "type": "string", "description": "Ser/estar form: es/está/era/estaba/fue/estuvo etc.", "required": true},
-        {"name": "sintoma", "type": "string", "description": "Síntoma clínico en español / Clinical symptom", "required": false},
-        {"name": "verbo_contexto", "type": "string", "description": "Governing verb (creer/dudar/negar/esperar) for presente disambiguation", "required": false},
-        {"name": "modo_verbal", "type": "string", "description": "Verb mood indicator: indicativo/subjuntivo or conjugated form (tiene/tenga)", "required": true},
-        {"name": "death", "type": "boolean", "description": "ICH E2A: death occurred", "required": true},
-        {"name": "hospitalization", "type": "boolean", "description": "ICH E2A: hospitalization required", "required": true},
-        {"name": "disability", "type": "boolean", "description": "ICH E2A: persistent disability", "required": true},
-        {"name": "life_threatening", "type": "boolean", "description": "ICH E2A: life-threatening", "required": true},
-        {"name": "congenital_anomaly", "type": "boolean", "description": "ICH E2A: congenital anomaly", "required": true},
-        {"name": "medically_important", "type": "boolean", "description": "ICH E2A: medically important event", "required": true},
-        {"name": "event_in_label", "type": "boolean", "description": "Is the event listed in the drug label?", "required": true},
-        {"name": "event_class_in_label", "type": "boolean", "description": "Is the event class listed in the label?", "required": false},
-        {"name": "severity_in_label", "type": "boolean", "description": "Is the observed severity listed in the label?", "required": false}
+        {
+          "name": "forma_verbal",
+          "type": "string",
+          "description": "Ambiguous verb form to disambiguate (e.g. 'presente', 'cause')",
+          "required": true
+        },
+        {
+          "name": "verbo",
+          "type": "string",
+          "description": "Ser/estar form: es/est\u00e1/era/estaba/fue/estuvo etc.",
+          "required": true
+        },
+        {
+          "name": "sintoma",
+          "type": "string",
+          "description": "S\u00edntoma cl\u00ednico en espa\u00f1ol / Clinical symptom",
+          "required": false
+        },
+        {
+          "name": "verbo_contexto",
+          "type": "string",
+          "description": "Governing verb (creer/dudar/negar/esperar) for presente disambiguation",
+          "required": false
+        },
+        {
+          "name": "modo_verbal",
+          "type": "string",
+          "description": "Verb mood indicator: indicativo/subjuntivo or conjugated form (tiene/tenga)",
+          "required": true
+        },
+        {
+          "name": "death",
+          "type": "boolean",
+          "description": "ICH E2A: death occurred",
+          "required": true
+        },
+        {
+          "name": "hospitalization",
+          "type": "boolean",
+          "description": "ICH E2A: hospitalization required",
+          "required": true
+        },
+        {
+          "name": "disability",
+          "type": "boolean",
+          "description": "ICH E2A: persistent disability",
+          "required": true
+        },
+        {
+          "name": "life_threatening",
+          "type": "boolean",
+          "description": "ICH E2A: life-threatening",
+          "required": true
+        },
+        {
+          "name": "congenital_anomaly",
+          "type": "boolean",
+          "description": "ICH E2A: congenital anomaly",
+          "required": true
+        },
+        {
+          "name": "medically_important",
+          "type": "boolean",
+          "description": "ICH E2A: medically important event",
+          "required": true
+        },
+        {
+          "name": "event_in_label",
+          "type": "boolean",
+          "description": "Is the event listed in the drug label?",
+          "required": true
+        },
+        {
+          "name": "event_class_in_label",
+          "type": "boolean",
+          "description": "Is the event class listed in the label?",
+          "required": false
+        },
+        {
+          "name": "severity_in_label",
+          "type": "boolean",
+          "description": "Is the observed severity listed in the label?",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
+          "success": {
+            "type": "boolean"
+          },
           "final_output": {
             "type": "object",
             "properties": {
-              "modo_resuelto": {"type": "string", "description": "INDICATIVO | SUBJUNTIVO | AMBIGUO"},
-              "clasificacion_temporal": {"type": "string", "description": "TRANSITORIO | PERMANENTE"},
-              "confianza_epistemica": {"type": "string", "description": "ALTA | BAJA"},
-              "serious": {"type": "boolean"},
-              "fatal": {"type": "boolean"},
-              "unexpected": {"type": "boolean"},
-              "expectedness": {"type": "string"},
-              "relevancia_causalidad": {"type": "integer"},
-              "peso_senal": {"type": "integer"}
+              "modo_resuelto": {
+                "type": "string",
+                "description": "INDICATIVO | SUBJUNTIVO | AMBIGUO"
+              },
+              "clasificacion_temporal": {
+                "type": "string",
+                "description": "TRANSITORIO | PERMANENTE"
+              },
+              "confianza_epistemica": {
+                "type": "string",
+                "description": "ALTA | BAJA"
+              },
+              "serious": {
+                "type": "boolean"
+              },
+              "fatal": {
+                "type": "boolean"
+              },
+              "unexpected": {
+                "type": "boolean"
+              },
+              "expectedness": {
+                "type": "string"
+              },
+              "relevancia_causalidad": {
+                "type": "integer"
+              },
+              "peso_senal": {
+                "type": "integer"
+              }
             }
           },
-          "steps": {"type": "array"},
-          "total_duration_us": {"type": "integer"}
+          "steps": {
+            "type": "array"
+          },
+          "total_duration_us": {
+            "type": "integer"
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-gramatica-causalidad-espanola",
-      "description": "Cadena de enriquecimiento de causalidad desde gramática española. Ser/estar temporal classification + indicativo/subjuntivo epistemic weighting. Returns temporality (TRANSITORIO/PERMANENTE) and confidence (ALTA/BAJA) for causality enrichment.",
+      "description": "Cadena de enriquecimiento de causalidad desde gram\u00e1tica espa\u00f1ola. Ser/estar temporal classification + indicativo/subjuntivo epistemic weighting. Returns temporality (TRANSITORIO/PERMANENTE) and confidence (ALTA/BAJA) for causality enrichment.",
       "parameters": [
-        {"name": "verbo", "type": "string", "description": "Ser/estar form: es/está/era/estaba etc.", "required": true},
-        {"name": "sintoma", "type": "string", "description": "Clinical symptom in Spanish", "required": false},
-        {"name": "modo_verbal", "type": "string", "description": "Verb mood: indicativo/subjuntivo or conjugated form", "required": true}
+        {
+          "name": "verbo",
+          "type": "string",
+          "description": "Ser/estar form: es/est\u00e1/era/estaba etc.",
+          "required": true
+        },
+        {
+          "name": "sintoma",
+          "type": "string",
+          "description": "Clinical symptom in Spanish",
+          "required": false
+        },
+        {
+          "name": "modo_verbal",
+          "type": "string",
+          "description": "Verb mood: indicativo/subjuntivo or conjugated form",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
+          "success": {
+            "type": "boolean"
+          },
           "final_output": {
             "type": "object",
             "properties": {
-              "clasificacion_temporal": {"type": "string"},
-              "temporalidad": {"type": "string"},
-              "relevancia_causalidad": {"type": "integer"},
-              "confianza_epistemica": {"type": "string"},
-              "confidence_level": {"type": "string"},
-              "peso_senal": {"type": "integer"}
+              "clasificacion_temporal": {
+                "type": "string"
+              },
+              "temporalidad": {
+                "type": "string"
+              },
+              "relevancia_causalidad": {
+                "type": "integer"
+              },
+              "confianza_epistemica": {
+                "type": "string"
+              },
+              "confidence_level": {
+                "type": "string"
+              },
+              "peso_senal": {
+                "type": "integer"
+              }
             }
           },
-          "steps": {"type": "array"},
-          "total_duration_us": {"type": "integer"}
+          "steps": {
+            "type": "array"
+          },
+          "total_duration_us": {
+            "type": "integer"
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-presente-desambiguacion",
-      "description": "Desambigua formas verbales españolas entre indicativo y subjuntivo usando el verbo rector como árbitro. Resolves the presente/presenta collision where identical surface forms map to different grammatical moods.",
+      "description": "Desambigua formas verbales espa\u00f1olas entre indicativo y subjuntivo usando el verbo rector como \u00e1rbitro. Resolves the presente/presenta collision where identical surface forms map to different grammatical moods.",
       "parameters": [
-        {"name": "forma_verbal", "type": "string", "description": "Ambiguous verb form (e.g. 'presente', 'cause', 'tenga')", "required": true},
-        {"name": "verbo_contexto", "type": "string", "description": "Governing verb: creer/dudar/negar/esperar/afirmar/saber etc.", "required": false}
+        {
+          "name": "forma_verbal",
+          "type": "string",
+          "description": "Ambiguous verb form (e.g. 'presente', 'cause', 'tenga')",
+          "required": true
+        },
+        {
+          "name": "verbo_contexto",
+          "type": "string",
+          "description": "Governing verb: creer/dudar/negar/esperar/afirmar/saber etc.",
+          "required": false
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "modo_resuelto": {"type": "string"},
-          "resolved_mood": {"type": "string"},
-          "confianza_resolucion": {"type": "integer"},
-          "modo_verbal": {"type": "string"},
-          "razon": {"type": "string"}
+          "modo_resuelto": {
+            "type": "string"
+          },
+          "resolved_mood": {
+            "type": "string"
+          },
+          "confianza_resolucion": {
+            "type": "integer"
+          },
+          "modo_verbal": {
+            "type": "string"
+          },
+          "razon": {
+            "type": "string"
+          }
         }
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-disproportionality-consensus",
       "description": "Consensus signal classifier across all 4 disproportionality measures (PRR, ROR, IC, EBGM). Counts how many methods detect a signal using standard thresholds and classifies as STRONG (4/4), MODERATE (3/4), WEAK (2/4), MARGINAL (1/4), or NONE (0/4). Feed pre-computed scores from compute_disproportionality_table or OpenVigil.",
       "parameters": [
-        {"name": "prr", "type": "number", "description": "PRR value (signal threshold: >= 2.0)", "required": true},
-        {"name": "ror_ci_lower", "type": "number", "description": "ROR lower 95% CI (signal threshold: > 1.0)", "required": true},
-        {"name": "ic025", "type": "number", "description": "IC lower 95% credibility interval (signal threshold: > 0)", "required": true},
-        {"name": "eb05", "type": "number", "description": "EBGM 5th percentile (signal threshold: > 1.0)", "required": true},
-        {"name": "n_cases", "type": "integer", "description": "Number of reported cases (minimum 3 required)", "required": true}
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "PRR value (signal threshold: >= 2.0)",
+          "required": true
+        },
+        {
+          "name": "ror_ci_lower",
+          "type": "number",
+          "description": "ROR lower 95% CI (signal threshold: > 1.0)",
+          "required": true
+        },
+        {
+          "name": "ic025",
+          "type": "number",
+          "description": "IC lower 95% credibility interval (signal threshold: > 0)",
+          "required": true
+        },
+        {
+          "name": "eb05",
+          "type": "number",
+          "description": "EBGM 5th percentile (signal threshold: > 1.0)",
+          "required": true
+        },
+        {
+          "name": "n_cases",
+          "type": "integer",
+          "description": "Number of reported cases (minimum 3 required)",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
+          "success": {
+            "type": "boolean"
+          },
           "output": {
             "type": "object",
             "properties": {
-              "consensus": {"type": "string", "description": "STRONG/MODERATE/WEAK/MARGINAL/NONE/INSUFFICIENT"},
-              "signals_detected": {"type": "integer", "description": "Count of methods detecting signal (0-4)"},
-              "methods_triggered": {"type": "string", "description": "Which methods triggered (e.g. PRR+ROR+IC+EBGM)"},
-              "action": {"type": "string", "description": "Recommended action: expedited_review/standard_review/monitor/investigate/no_action/need_more_cases"},
-              "signal_detected": {"type": "boolean"}
+              "consensus": {
+                "type": "string",
+                "description": "STRONG/MODERATE/WEAK/MARGINAL/NONE/INSUFFICIENT"
+              },
+              "signals_detected": {
+                "type": "integer",
+                "description": "Count of methods detecting signal (0-4)"
+              },
+              "methods_triggered": {
+                "type": "string",
+                "description": "Which methods triggered (e.g. PRR+ROR+IC+EBGM)"
+              },
+              "action": {
+                "type": "string",
+                "description": "Recommended action: expedited_review/standard_review/monitor/investigate/no_action/need_more_cases"
+              },
+              "signal_detected": {
+                "type": "boolean"
+              }
             }
           }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     },
     {
       "name": "run-signal-consensus-to-action",
-      "description": "End-to-end chain: 4-measure disproportionality consensus → signal-to-causality routing → Naranjo causality assessment → regulatory action with ICH E2B deadlines. Takes pre-computed disproportionality scores + Naranjo score + seriousness flag. Returns consensus classification, causality level, and regulatory action with deadline.",
+      "description": "End-to-end chain: 4-measure disproportionality consensus \u2192 signal-to-causality routing \u2192 Naranjo causality assessment \u2192 regulatory action with ICH E2B deadlines. Takes pre-computed disproportionality scores + Naranjo score + seriousness flag. Returns consensus classification, causality level, and regulatory action with deadline.",
       "parameters": [
-        {"name": "prr", "type": "number", "description": "PRR value (signal threshold: >= 2.0)", "required": true},
-        {"name": "ror_ci_lower", "type": "number", "description": "ROR lower 95% CI (signal threshold: > 1.0)", "required": true},
-        {"name": "ic025", "type": "number", "description": "IC lower 95% credibility interval (signal threshold: > 0)", "required": true},
-        {"name": "eb05", "type": "number", "description": "EBGM 5th percentile (signal threshold: > 1.0)", "required": true},
-        {"name": "n_cases", "type": "integer", "description": "Number of reported cases (minimum 3 required)", "required": true},
-        {"name": "naranjo_score", "type": "integer", "description": "Naranjo ADR probability score (0-13)", "required": true},
-        {"name": "is_serious", "type": "boolean", "description": "Whether the adverse event meets ICH E2A seriousness criteria", "required": true}
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "PRR value (signal threshold: >= 2.0)",
+          "required": true
+        },
+        {
+          "name": "ror_ci_lower",
+          "type": "number",
+          "description": "ROR lower 95% CI (signal threshold: > 1.0)",
+          "required": true
+        },
+        {
+          "name": "ic025",
+          "type": "number",
+          "description": "IC lower 95% credibility interval (signal threshold: > 0)",
+          "required": true
+        },
+        {
+          "name": "eb05",
+          "type": "number",
+          "description": "EBGM 5th percentile (signal threshold: > 1.0)",
+          "required": true
+        },
+        {
+          "name": "n_cases",
+          "type": "integer",
+          "description": "Number of reported cases (minimum 3 required)",
+          "required": true
+        },
+        {
+          "name": "naranjo_score",
+          "type": "integer",
+          "description": "Naranjo ADR probability score (0-13)",
+          "required": true
+        },
+        {
+          "name": "is_serious",
+          "type": "boolean",
+          "description": "Whether the adverse event meets ICH E2A seriousness criteria",
+          "required": true
+        }
       ],
       "outputSchema": {
         "type": "object",
         "properties": {
-          "success": {"type": "boolean"},
+          "success": {
+            "type": "boolean"
+          },
           "final_output": {
             "type": "object",
             "properties": {
-              "consensus": {"type": "string", "description": "STRONG/MODERATE/WEAK/MARGINAL/NONE"},
-              "signals_detected": {"type": "integer"},
-              "causality": {"type": "string", "description": "DEFINITE/PROBABLE/POSSIBLE/DOUBTFUL"},
-              "regulatory_action": {"type": "string"},
-              "deadline_days": {"type": "integer"},
-              "reporting_type": {"type": "string"}
+              "consensus": {
+                "type": "string",
+                "description": "STRONG/MODERATE/WEAK/MARGINAL/NONE"
+              },
+              "signals_detected": {
+                "type": "integer"
+              },
+              "causality": {
+                "type": "string",
+                "description": "DEFINITE/PROBABLE/POSSIBLE/DOUBTFUL"
+              },
+              "regulatory_action": {
+                "type": "string"
+              },
+              "deadline_days": {
+                "type": "integer"
+              },
+              "reporting_type": {
+                "type": "string"
+              }
             }
           },
-          "steps": {"type": "array", "description": "Per-step decision trace"},
-          "total_duration_us": {"type": "integer"}
+          "steps": {
+            "type": "array",
+            "description": "Per-step decision trace"
+          },
+          "total_duration_us": {
+            "type": "integer"
+          }
         },
-        "required": ["success"]
+        "required": [
+          "success"
+        ]
       },
-      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "run-anti-vector-pipeline",
+      "description": "Signal-to-prescription pipeline: PRR signal detection \u2192 anti-vector classification. Takes a PRR value and harm type, returns signal verdict plus the anti-vector strategy (primary class, measures, biases). Completes the sentence from 'there is a signal' to 'here is what to do about it.'",
+      "parameters": [
+        {
+          "name": "prr",
+          "type": "number",
+          "description": "PRR value for signal detection (threshold: >= 2.0)",
+          "required": true
+        },
+        {
+          "name": "harm_type",
+          "type": "string",
+          "description": "Harm type: A (Acute), B (Cumulative), C (Off-Target), D (Cascade), E (Idiosyncratic), F (Saturation), G (Interaction), H (Population)",
+          "required": false
+        },
+        {
+          "name": "signal_magnitude",
+          "type": "number",
+          "description": "Normalized signal magnitude 0.0-1.0 (optional, used for proportionality tier)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "final_output": {
+            "type": "object",
+            "properties": {
+              "signal_detected": {
+                "type": "boolean"
+              },
+              "primary_class": {
+                "type": "string",
+                "description": "mechanistic, epistemic, or architectural"
+              },
+              "secondary_class": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "first_measure": {
+                "type": "string"
+              },
+              "primary_bias": {
+                "type": "string"
+              },
+              "proportionality_tier": {
+                "type": "string"
+              }
+            }
+          },
+          "steps": {
+            "type": "array",
+            "description": "Per-step decision trace"
+          },
+          "total_duration_us": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "run-microgram",
+      "description": "Run any microgram by name with JSON input. Exposes the full 1,384-program fleet. Returns decision path, output variables, and execution time (sub-microsecond).",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "description": "Microgram name (e.g. prr-signal, naranjo-quick, case-seriousness)",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "output": {
+            "type": "object",
+            "description": "Decision output variables"
+          },
+          "path": {
+            "type": "array",
+            "description": "Decision path through the tree"
+          },
+          "duration_us": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "run-chain",
+      "description": "Run an ad-hoc microgram chain by expression. Each step output feeds the next. Example: \"prr-signal -> signal-to-causality -> naranjo-quick\".",
+      "parameters": [
+        {
+          "name": "chain",
+          "type": "string",
+          "description": "Chain expression: microgram names joined by \" -> \"",
+          "required": true
+        },
+        {
+          "name": "accumulate",
+          "type": "boolean",
+          "description": "If true, preserve all upstream outputs (default: true)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "final_output": {
+            "type": "object"
+          },
+          "steps": {
+            "type": "array"
+          },
+          "total_duration_us": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "run-helix-system-health",
+      "description": "Run the helix system health chain: heligram verification \u2192 crystalbook 4-primitive check \u2192 crystalbook 8-law validation. Returns layered health assessment.",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "final_output": {
+            "type": "object"
+          },
+          "steps": {
+            "type": "array"
+          },
+          "total_duration_us": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "success"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     }
   ]
 }

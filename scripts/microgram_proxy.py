@@ -113,7 +113,12 @@ SINGLE_TOOLS = {
     "run-heligram": "heligram",
     "run-sota-authority-decompose": "sota-authority-decompose",
     "run-disproportionality-consensus": "disproportionality-consensus",
+    "run-anti-vector-pipeline": "anti-vector-pipeline",
 }
+
+# Single-run aliases added for V1 void closure (2026-03-31):
+# "run-microgram" and "run-chain" are handled directly in dispatch() below,
+# not via SINGLE_TOOLS, because they accept a dynamic `name`/`chain` param.
 
 
 def list_chains() -> dict:
@@ -143,6 +148,16 @@ def dispatch(tool: str, args: dict) -> dict:
         return run_chain(spec["chain"], args, accumulate=True)
     elif tool in SINGLE_TOOLS:
         return run_single(SINGLE_TOOLS[tool], args)
+    elif tool == "run-microgram":
+        name = args.get("name", "")
+        if not name:
+            return {"status": "error", "message": "Missing required parameter: name"}
+        return run_single(name, args)
+    elif tool == "run-chain":
+        chain_expr = args.get("chain", "")
+        if not chain_expr:
+            return {"status": "error", "message": "Missing required parameter: chain"}
+        return run_chain(chain_expr, args, accumulate=args.get("accumulate", True))
     elif tool == "list-micrograms":
         return catalog()
     elif tool == "list-chains":
