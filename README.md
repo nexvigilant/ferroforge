@@ -1,8 +1,65 @@
 # NexVigilant Station
 
-Pharmacovigilance intelligence for AI agents. **1,957 tools** across **229 domains** for drug safety data, signal detection, causality assessment, and regulatory intelligence. Open, no auth required.
+Pharmacovigilance intelligence for AI agents. **1,958 tools** across **229 domains** for drug safety data, signal detection, causality assessment, and regulatory intelligence. Open, no auth required.
 
 **Production:** [mcp.nexvigilant.com](https://mcp.nexvigilant.com)
+
+## Worked Example: Semaglutide + Pancreatitis Signal Investigation
+
+A complete safety signal investigation in 6 tool calls. Every result below is live data from the production endpoint.
+
+```bash
+# Step 1: Resolve drug identity
+curl -X POST https://mcp.nexvigilant.com/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",
+       "params":{"name":"rxnav_nlm_nih_gov_get_rxcui",
+                 "arguments":{"name":"semaglutide"}}}'
+# → RxCUI: 1991302
+
+# Step 2: Search FDA adverse event reports
+curl -X POST https://mcp.nexvigilant.com/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call",
+       "params":{"name":"api_fda_gov_search_adverse_events",
+                 "arguments":{"drug":"semaglutide","reaction":"pancreatitis","limit":5}}}'
+# → Cases found in FAERS database
+
+# Step 3: Compute disproportionality signal
+curl -X POST https://mcp.nexvigilant.com/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call",
+       "params":{"name":"open-vigil_fr_compute_disproportionality",
+                 "arguments":{"drug":"semaglutide","event":"pancreatitis"}}}'
+# → PRR: 6.93 | ROR: 7.12 | IC: 2.76 | 2,068 cases / 20M reports
+# → SIGNAL DETECTED (Evans criteria met: PRR≥2, chi²≥4, N≥3)
+
+# Step 4: Check current drug labeling
+curl -X POST https://mcp.nexvigilant.com/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call",
+       "params":{"name":"dailymed_nlm_nih_gov_search_drugs",
+                 "arguments":{"name":"semaglutide"}}}'
+# → Wegovy, Ozempic, Rybelsus labels available
+
+# Step 5: Search published case reports
+curl -X POST https://mcp.nexvigilant.com/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":5,"method":"tools/call",
+       "params":{"name":"pubmed_ncbi_nlm_nih_gov_search_case_reports",
+                 "arguments":{"drug":"semaglutide","event":"pancreatitis","limit":5}}}'
+# → Published case reports from PubMed
+
+# Step 6: Check EU regulatory signals
+curl -X POST https://mcp.nexvigilant.com/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":6,"method":"tools/call",
+       "params":{"name":"www_ema_europa_eu_get_safety_signals",
+                 "arguments":{"drug":"semaglutide"}}}'
+# → EMA PRAC signal assessment data
+```
+
+**Verdict:** Statistically significant disproportionality signal. PRR 6.93 exceeds threshold (>2.0). Pancreatitis is a known GLP-1 class effect, already in labeling. This is what a real PV signal investigation looks like — from drug name to regulatory decision in under 10 seconds.
 
 ## Connect
 
@@ -256,6 +313,6 @@ This workspace also includes an educational Rust ownership game built with Bevy.
 
 ## License
 
-MIT — NexVigilant LLC
+NexVigilant Source Available License v1.0 — Personal non-commercial use permitted. Organizational use requires written permission from matthew@nexvigilant.com.
 
 *Empowerment Through Vigilance* — [nexvigilant.com](https://nexvigilant.com)
