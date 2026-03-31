@@ -1,0 +1,42 @@
+{
+  "domain": "academy.nexvigilant.com",
+  "private": false,
+  "copyright": "\u00a9 2026 NexVigilant, LLC. KSB competency decomposition is a proprietary methodology.",
+  "title": "Academy Course Builder \u2014 AI-Powered PV Education",
+  "description": "Generate pharmacovigilance training courses from topics. 5-stage pipeline: KSB decomposition (Knowledge-Skills-Behaviors), research enrichment, content generation, quality validation, and SCORM packaging. Produces structured learning modules aligned with NexVigilant PDC v4.1 competency framework.",
+  "proxy": "scripts/academy_proxy.py",
+  "tools": [
+    {
+      "name": "decompose-ksb",
+      "description": "Decompose a learning topic into the KSB framework: Knowledge (facts, concepts, theories), Skills (practical abilities, techniques), Behaviors (attitudes, professional conduct). Returns 2-4 components per category with learning objectives, key points, examples, and assessment criteria. Foundation step for course generation.",
+      "parameters": [
+        {"name": "topic", "type": "string", "description": "Learning topic to decompose (e.g., 'Signal Detection in Pharmacovigilance')", "required": true},
+        {"name": "domain", "type": "string", "description": "Domain area (e.g., 'Pharmacovigilance', 'Regulatory Affairs')", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"topic": {"type": "string"}, "knowledge": {"type": "array"}, "skills": {"type": "array"}, "behaviors": {"type": "array"}}, "required": ["topic", "knowledge", "skills", "behaviors"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "generate-learning-objectives",
+      "description": "Generate specific, measurable learning objectives for a PV competency area using Bloom's Taxonomy action verbs. Each objective follows the ABCD format: Audience, Behavior, Condition, Degree.",
+      "parameters": [
+        {"name": "competency", "type": "string", "description": "Competency area (e.g., 'Naranjo causality assessment')", "required": true},
+        {"name": "level", "type": "string", "description": "Bloom's level: remember, understand, apply, analyze, evaluate, create", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"competency": {"type": "string"}, "objectives": {"type": "array"}, "bloom_level": {"type": "string"}}, "required": ["competency", "objectives"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "assess-pv-readiness",
+      "description": "Assess an individual's pharmacovigilance readiness across PDC v4.1 domains. Maps self-reported experience to EPA competency levels (1-5) and recommends learning pathways.",
+      "parameters": [
+        {"name": "experience_years", "type": "number", "description": "Years of PV experience", "required": true},
+        {"name": "current_role", "type": "string", "description": "Current job title/role", "required": false},
+        {"name": "domains_familiar", "type": "string", "description": "Comma-separated PV domains familiar with (e.g., 'signal detection, case processing')", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"readiness_level": {"type": "string"}, "epa_coverage": {"type": "object"}, "recommended_track": {"type": "string"}, "priority_gaps": {"type": "array"}}, "required": ["readiness_level", "recommended_track"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    }
+  ],
+  "url_pattern": "/*"
+}

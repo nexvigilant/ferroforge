@@ -1,0 +1,45 @@
+{
+  "domain": "orchestrator.nexvigilant.com",
+  "private": false,
+  "copyright": "\u00a9 2026 NexVigilant, LLC.",
+  "title": "PV Orchestrator \u2014 Multi-Agent Workflow Engine",
+  "description": "Orchestrate pharmacovigilance workflows by decomposing complex PV tasks into agent-executable steps. Routes to appropriate tools for signal detection, causality assessment, regulatory reporting, and case processing. Acts as the intelligent dispatcher for the complete PV lifecycle.",
+  "proxy": "scripts/pv_orchestrator_proxy.py",
+  "tools": [
+    {
+      "name": "route-pv-workflow",
+      "description": "Given a pharmacovigilance objective, decompose it into ordered steps and identify which Station tools to call at each step. Returns a workflow plan with tool names, parameters, and expected outputs. Use this to plan a multi-step PV investigation before executing individual tools.",
+      "parameters": [
+        {"name": "objective", "type": "string", "description": "PV objective (e.g., 'Investigate safety signal for semaglutide and pancreatitis')", "required": true},
+        {"name": "drug", "type": "string", "description": "Drug name if applicable", "required": false},
+        {"name": "event", "type": "string", "description": "Adverse event if applicable", "required": false},
+        {"name": "context", "type": "string", "description": "Context: clinical_trial, post_marketing, literature", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"objective": {"type": "string"}, "workflow_type": {"type": "string"}, "steps": {"type": "array"}, "estimated_tools": {"type": "integer"}}, "required": ["objective", "steps"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "classify-pv-intent",
+      "description": "Classify a natural language PV query into a workflow category: signal_detection, causality_assessment, regulatory_reporting, case_processing, benefit_risk, literature_review, competitive_analysis. Returns the category and recommended tools.",
+      "parameters": [
+        {"name": "query", "type": "string", "description": "Natural language PV question or request", "required": true}
+      ],
+      "outputSchema": {"type": "object", "properties": {"category": {"type": "string"}, "confidence": {"type": "number"}, "recommended_tools": {"type": "array"}, "workflow_template": {"type": "string"}}, "required": ["category", "recommended_tools"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "summarize-pv-findings",
+      "description": "Take raw PV data (signal scores, causality results, regulatory determinations) and produce a structured safety narrative suitable for a PSUR, DSUR, or internal safety review. Combines quantitative findings with regulatory context.",
+      "parameters": [
+        {"name": "drug", "type": "string", "description": "Drug name", "required": true},
+        {"name": "signal_data", "type": "object", "description": "Signal detection results (PRR, ROR, IC, EBGM scores)", "required": false},
+        {"name": "causality_data", "type": "object", "description": "Causality assessment results (Naranjo score, WHO-UMC category)", "required": false},
+        {"name": "regulatory_data", "type": "object", "description": "Regulatory determination (report type, deadline)", "required": false},
+        {"name": "format", "type": "string", "description": "Output format: narrative, bullet_points, table", "required": false}
+      ],
+      "outputSchema": {"type": "object", "properties": {"drug": {"type": "string"}, "summary": {"type": "string"}, "signal_status": {"type": "string"}, "regulatory_action": {"type": "string"}, "recommendation": {"type": "string"}}, "required": ["drug", "summary"]},
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    }
+  ],
+  "url_pattern": "/*"
+}
