@@ -1,14 +1,16 @@
 name: autopilot-pharma-sweep
 description: >
   Autopilot decision gate for pharmaceutical company monitoring sweep.
-  Takes company FAERS metrics and determines: should we alert, what changed,
-  and what action to take. Feeds into the autopilot scheduling loop.
-version: "1.0"
+  Takes company FAERS metrics and determines: alert level and action.
+  Uses absolute thresholds (microgram trees cannot compute ratios between
+  two variables). For delta-based detection, compute ratios upstream in
+  the sweep script and pass as pre-computed inputs (death_ratio, report_delta_pct).
+version: "2.0"
 primitive_signature:
   dominant: 'ν'
   expression: 'ν(×(κ, ∂)) — frequency of comparison across boundaries'
   primes: ['ν', 'κ', '∂', 'ς', '→']
-  arguments: ['total_reports', 'prior_reports', 'death_count', 'prior_deaths', 'new_signals']
+  arguments: ['total_reports', 'death_count', 'new_signals', 'death_ratio', 'report_delta_pct']
   chain_prediction: >
     Feeds into pharma-safety-signal for tier classification, then into
     autopilot-alert-router for notification dispatch.
@@ -18,99 +20,134 @@ interface:
     total_reports:
       type: int
       required: true
-    prior_reports:
-      type: int
-      required: false
     death_count:
-      type: int
-      required: false
-    prior_deaths:
       type: int
       required: false
     new_signals:
       type: int
       required: false
-    company:
-      type: string
+      description: "Count of reactions with PRR > 2 AND chi2 > 4 from upstream analysis"
+    death_ratio:
+      type: float
       required: false
+      description: "Pre-computed death_count/prior_deaths ratio from sweep script. >1.2 = spike."
+    report_delta_pct:
+      type: float
+      required: false
+      description: "Pre-computed (total - prior) / prior * 100 from sweep script. >10 = surge."
   outputs:
     alert_level:
       type: string
     action:
       type: string
-    delta_reports:
-      type: int
     reason:
       type: string
 
 tree:
-  start: check_deaths_spike
+  start: check_death_ratio_spike
   nodes:
-    # Priority 1: Death count spike (>20% increase)
-    check_deaths_spike:
+    # Priority 1: Death ratio spike (pre-computed upstream, >1.2 = 20% increase)
+    check_death_ratio_spike:
       type: condition
-      variable: death_count
+      variable: death_ratio
       operator: gt
-      value: 0
-      true_next: check_death_delta
-      false_next: check_report_surge
+      value: 1.2
+      true_next: death_spike_alert
+      false_next: check_high_death_count
 
-    check_death_delta:
-      type: condition
-      variable: prior_deaths
-      operator: gt
-      value: 0
-      true_next: compute_death_ratio
-      false_next: check_report_surge
-
-    compute_death_ratio:
-      type: condition
-      variable: death_count
-      operator: gt
-      value: 1000
-      true_next: death_alert
-      false_next: check_report_surge
-
-    death_alert:
+    death_spike_alert:
       type: return
       value:
         alert_level: CRITICAL
         action: immediate_review
-        reason: "Death reports exceed 1000 — immediate pharmacovigilance review required"
+        reason: "Death ratio spike >20% vs prior period — immediate pharmacovigilance review required"
 
-    # Priority 2: Report count surge (>10% increase)
-    check_report_surge:
+    # Priority 2: Absolute death count tiers
+    check_high_death_count:
       type: condition
-      variable: total_reports
+      variable: death_count
       operator: gt
-      value: 0
-      true_next: check_new_signals
-      false_next: no_data
+      value: 5000
+      true_next: critical_death_count
+      false_next: check_moderate_death_count
 
-    # Priority 3: New signals detected
+    critical_death_count:
+      type: return
+      value:
+        alert_level: CRITICAL
+        action: immediate_review
+        reason: "Death reports exceed 5000 — immediate pharmacovigilance review required"
+
+    check_moderate_death_count:
+      type: condition
+      variable: death_count
+      operator: gt
+      value: 1000
+      true_next: high_death_count
+      false_next: check_new_signals
+
+    high_death_count:
+      type: return
+      value:
+        alert_level: HIGH
+        action: signal_investigation
+        reason: "Death reports exceed 1000 — signal investigation recommended"
+
+    # Priority 3: New signals detected (from upstream disproportionality)
     check_new_signals:
       type: condition
       variable: new_signals
       operator: gt
       value: 0
-      true_next: signal_alert
-      false_next: check_volume
+      true_next: check_signal_severity
+      false_next: check_report_surge
 
-    signal_alert:
+    check_signal_severity:
+      type: condition
+      variable: new_signals
+      operator: gte
+      value: 5
+      true_next: many_signals_alert
+      false_next: few_signals_alert
+
+    many_signals_alert:
       type: return
       value:
         alert_level: HIGH
         action: signal_investigation
-        reason: "New disproportionality signals detected — initiate signal investigation"
+        reason: "5+ new disproportionality signals detected — initiate signal investigation"
 
-    # Priority 4: Volume-based monitoring
+    few_signals_alert:
+      type: return
+      value:
+        alert_level: WATCH
+        action: signal_review
+        reason: "New disproportionality signals detected — review in next cycle"
+
+    # Priority 4: Report volume surge (pre-computed upstream)
+    check_report_surge:
+      type: condition
+      variable: report_delta_pct
+      operator: gt
+      value: 10
+      true_next: report_surge_alert
+      false_next: check_volume
+
+    report_surge_alert:
+      type: return
+      value:
+        alert_level: WATCH
+        action: trend_analysis
+        reason: "Report volume increased >10% vs prior period — trend analysis warranted"
+
+    # Priority 5: Volume-based monitoring tier
     check_volume:
       type: condition
       variable: total_reports
       operator: gte
       value: 1000000
       true_next: high_volume_watch
-      false_next: routine_monitor
+      false_next: check_mid_volume
 
     high_volume_watch:
       type: return
@@ -119,48 +156,94 @@ tree:
         action: continuous_monitor
         reason: "High-volume company (>1M reports) — continuous monitoring active"
 
-    routine_monitor:
+    check_mid_volume:
+      type: condition
+      variable: total_reports
+      operator: gte
+      value: 100000
+      true_next: mid_volume_routine
+      false_next: low_volume_routine
+
+    mid_volume_routine:
       type: return
       value:
         alert_level: ROUTINE
         action: periodic_check
-        reason: "Standard monitoring — next sweep per scheduled frequency"
+        reason: "Mid-volume company (100K-1M reports) — standard monitoring"
 
-    no_data:
+    low_volume_routine:
       type: return
       value:
-        alert_level: UNKNOWN
-        action: data_collection
-        reason: "No FAERS data available — initiate baseline data collection"
+        alert_level: ROUTINE
+        action: periodic_check
+        reason: "Low-volume company (<100K reports) — standard monitoring"
 
 tests:
-  - name: critical — high death count
+  - name: critical — death ratio spike
     input:
       total_reports: 2000000
-      death_count: 5000
-      prior_deaths: 3000
+      death_count: 3600
+      death_ratio: 1.5
       new_signals: 0
       company: "test-pharma"
     expect:
       alert_level: CRITICAL
       action: immediate_review
 
-  - name: high — new signals detected
+  - name: critical — high absolute death count
+    input:
+      total_reports: 2000000
+      death_count: 6000
+      death_ratio: 1.0
+      new_signals: 0
+    expect:
+      alert_level: CRITICAL
+      action: immediate_review
+
+  - name: high — moderate death count
     input:
       total_reports: 500000
-      death_count: 200
-      new_signals: 3
-      company: "test-pharma"
+      death_count: 1500
+      death_ratio: 1.0
+      new_signals: 0
     expect:
       alert_level: HIGH
       action: signal_investigation
+
+  - name: high — many new signals
+    input:
+      total_reports: 500000
+      death_count: 200
+      death_ratio: 0.9
+      new_signals: 7
+    expect:
+      alert_level: HIGH
+      action: signal_investigation
+
+  - name: watch — few new signals
+    input:
+      total_reports: 500000
+      death_count: 200
+      new_signals: 2
+    expect:
+      alert_level: WATCH
+      action: signal_review
+
+  - name: watch — report volume surge
+    input:
+      total_reports: 800000
+      death_count: 100
+      new_signals: 0
+      report_delta_pct: 15.0
+    expect:
+      alert_level: WATCH
+      action: trend_analysis
 
   - name: watch — high volume no signals
     input:
       total_reports: 1500000
       death_count: 100
       new_signals: 0
-      company: "test-pharma"
     expect:
       alert_level: WATCH
       action: continuous_monitor
@@ -174,8 +257,17 @@ tests:
       alert_level: ROUTINE
       action: periodic_check
 
+  - name: routine — low volume
+    input:
+      total_reports: 5000
+      death_count: 2
+      new_signals: 0
+    expect:
+      alert_level: ROUTINE
+      action: periodic_check
+
   - name: null safety — empty input
     input: {}
     expect:
-      alert_level: UNKNOWN
-      action: data_collection
+      alert_level: ROUTINE
+      action: periodic_check

@@ -22,6 +22,43 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely. Prevents 'AttributeError: strip'."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        import json
+        try:
+            return json.dumps(val)
+        except:
+            return str(val)
+    return str(val)
+
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
 BASE_URL = "https://api.fda.gov/drug/event.json"
 REQUEST_TIMEOUT_SECONDS = 15
 DEFAULT_TOP_LIMIT = 10
@@ -211,7 +248,7 @@ def compute_disproportionality(args: dict) -> dict:
     Builds a 2x2 contingency table from openFDA counts.
     """
     drug = _resolve_drug(args)
-    event = args.get("event", "").strip()
+    event = ensure_str(args.get("event")).strip()
 
     if not drug or not event:
         return {"status": "error", "message": "Both 'drug' and 'event' are required"}
@@ -259,7 +296,7 @@ def get_top_reactions(args: dict) -> dict:
     if not drug:
         return {"status": "error", "message": "'drug' is required"}
 
-    limit = int(args.get("limit", DEFAULT_TOP_LIMIT))
+    limit = get_int_param(args, "limit", DEFAULT_TOP_LIMIT)
     limit = max(1, min(limit, 25))
 
     drug_q = f'patient.drug.openfda.generic_name:"{_quote(drug)}"'
@@ -304,11 +341,11 @@ def get_top_drugs(args: dict) -> dict:
 
     Get top drugs associated with a specific adverse event.
     """
-    event = args.get("event", "").strip()
+    event = ensure_str(args.get("event")).strip()
     if not event:
         return {"status": "error", "message": "'event' is required"}
 
-    limit = int(args.get("limit", DEFAULT_TOP_LIMIT))
+    limit = get_int_param(args, "limit", DEFAULT_TOP_LIMIT)
     limit = max(1, min(limit, 25))
 
     event_q = f'patient.reaction.reactionmeddrapt:"{_quote(event)}"'
@@ -350,7 +387,7 @@ def get_case_demographics(args: dict) -> dict:
     if not drug:
         return {"status": "error", "message": "'drug' is required"}
 
-    event = args.get("event", "").strip()
+    event = ensure_str(args.get("event")).strip()
 
     drug_q = f'patient.drug.openfda.generic_name:"{_quote(drug)}"'
     search_expr = drug_q
@@ -378,7 +415,7 @@ def get_case_demographics(args: dict) -> dict:
         # Bucket into decades (filter ages > 120 — FAERS data quality artifacts)
         decade_counts = {}
         for item in data.get("results", []):
-            age = int(item.get("term", 0))
+            age = get_int_param(item, "term", 0)
             count = item.get("count", 0)
             if age < 0 or age > 120:
                 continue
@@ -418,9 +455,9 @@ def compare_drugs(args: dict) -> dict:
     Compare disproportionality scores between two drugs for the same adverse event.
     Useful for benefit-risk assessment and competitive safety profiling.
     """
-    drug_a = args.get("drug_a", "").strip()
-    drug_b = args.get("drug_b", "").strip()
-    event = args.get("event", "").strip()
+    drug_a = ensure_str(args.get("drug_a")).strip()
+    drug_b = ensure_str(args.get("drug_b")).strip()
+    event = ensure_str(args.get("event")).strip()
 
     if not drug_a or not drug_b or not event:
         return {"status": "error", "message": "'drug_a', 'drug_b', and 'event' are all required"}
@@ -467,7 +504,7 @@ def get_reporting_trends(args: dict) -> dict:
     Shows how reporting frequency has changed, useful for detecting emerging signals.
     """
     drug = _resolve_drug(args)
-    event = args.get("event", "").strip()
+    event = ensure_str(args.get("event")).strip()
 
     if not drug:
         return {"status": "error", "message": "'drug' is required"}
@@ -522,7 +559,7 @@ def get_outcome_distribution(args: dict) -> dict:
     life-threatening, disability, etc. Critical for seriousness assessment.
     """
     drug = _resolve_drug(args)
-    event = args.get("event", "").strip()
+    event = ensure_str(args.get("event")).strip()
 
     if not drug:
         return {"status": "error", "message": "'drug' is required"}
@@ -597,7 +634,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     # Read Rust-side cached FAERS total from envelope (injected by station router)

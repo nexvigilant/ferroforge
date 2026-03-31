@@ -23,6 +23,43 @@ import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely. Prevents 'AttributeError: strip'."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        import json
+        try:
+            return json.dumps(val)
+        except:
+            return str(val)
+    return str(val)
+
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -199,10 +236,10 @@ def search_articles(params: dict) -> dict:
     if not query:
         return {"error": "query parameter is required (also accepts: drug_name, drug, search_query)"}
 
-    mesh_terms = params.get("mesh_terms", "").strip()
-    date_range = params.get("date_range", "").strip()
-    article_type = params.get("article_type", "").strip()
-    limit = min(int(params.get("limit", DEFAULT_LIMIT)), MAX_LIMIT)
+    mesh_terms = ensure_str(params.get("mesh_terms")).strip()
+    date_range = ensure_str(params.get("date_range")).strip()
+    article_type = ensure_str(params.get("article_type")).strip()
+    limit = min(get_int_param(params, "limit", DEFAULT_LIMIT), MAX_LIMIT)
 
     # Build query string
     full_query = query
@@ -228,7 +265,7 @@ def search_articles(params: dict) -> dict:
     esearch_data = _get_json(esearch_url)
     result_info = esearch_data.get("esearchresult", {})
     id_list = result_info.get("idlist", [])
-    total = int(result_info.get("count", 0))
+    total = get_int_param(result_info, "count", 0)
 
     if not id_list:
         return {
@@ -263,7 +300,7 @@ def get_abstract(params: dict) -> dict:
     """
     Fetch structured metadata and abstract for a single PMID.
     """
-    pmid = str(params.get("pmid", "")).strip()
+    pmid = ensure_str(params.get("pmid")).strip()
     if not pmid:
         return {"error": "pmid parameter is required"}
 
@@ -297,7 +334,7 @@ def get_citations(params: dict) -> dict:
     Use elink to find articles that cite the given PMID.
     Returns citing PMIDs plus brief metadata for each.
     """
-    pmid = str(params.get("pmid", "")).strip()
+    pmid = ensure_str(params.get("pmid")).strip()
     if not pmid:
         return {"error": "pmid parameter is required"}
 
@@ -370,7 +407,7 @@ def search_case_reports(params: dict) -> dict:
     if not drug_name:
         return {"error": "drug_name parameter is required (also accepts: drug, name, substance, query)"}
 
-    adverse_event = params.get("adverse_event", "").strip()
+    adverse_event = ensure_str(params.get("adverse_event")).strip()
 
     # Build structured PubMed query — case report pub type is sufficient filter
     drug_clause = f"{drug_name}[Title/Abstract]"
@@ -419,7 +456,7 @@ def get_mesh_terms(params: dict) -> dict:
     Returns descriptor names with qualifier names and major topic flags.
     Useful for MedDRA concept mapping in PV signal detection workflows.
     """
-    pmid = str(params.get("pmid", "")).strip()
+    pmid = ensure_str(params.get("pmid")).strip()
     if not pmid:
         return {"error": "pmid parameter is required"}
 
@@ -477,11 +514,11 @@ def get_related_articles(params: dict) -> dict:
     Find articles related to a given PMID using PubMed's elink similarity algorithm.
     Returns the top related articles with metadata.
     """
-    pmid = str(params.get("pmid", "")).strip()
+    pmid = ensure_str(params.get("pmid")).strip()
     if not pmid:
         return {"error": "pmid parameter is required"}
 
-    limit = min(int(params.get("limit", DEFAULT_LIMIT)), MAX_LIMIT)
+    limit = min(get_int_param(params, "limit", DEFAULT_LIMIT), MAX_LIMIT)
 
     # elink with linkname=pubmed_pubmed to get related articles
     elink_url = (

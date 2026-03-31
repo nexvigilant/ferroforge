@@ -15,6 +15,43 @@ writes a structured JSON response to stdout. No external dependencies — stdlib
 
 from __future__ import annotations
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely. Prevents 'AttributeError: strip'."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        import json
+        try:
+            return json.dumps(val)
+        except:
+            return str(val)
+    return str(val)
+
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
 import json
 import re
 import struct
@@ -632,7 +669,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

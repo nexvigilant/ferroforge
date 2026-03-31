@@ -18,6 +18,39 @@ import urllib.parse
 import urllib.error
 from typing import Any
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 NCBI_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 CHEMBL_BASE = "https://www.ebi.ac.uk/chembl/api/data"
 UNIPROT_BASE = "https://rest.uniprot.org/uniprotkb"
@@ -427,7 +460,7 @@ def route(tool_name: str, args: dict) -> dict:
         return search_pdb(query)
 
     if tool_name == "search-clinical-candidates":
-        target = args.get("target_chembl_id", "").strip()
+        target = ensure_str(args.get("target_chembl_id", "")).strip()
         gene = args.get("target", args.get("gene", "")).strip()
         if not target and not gene:
             return {"status": "error", "message": "Provide target (gene name) or target_chembl_id parameter"}
@@ -439,7 +472,7 @@ def route(tool_name: str, args: dict) -> dict:
                 target = targets[0].get("chembl_id", "")
             if not target:
                 return {"status": "ok", "message": f"No ChEMBL target found for '{gene}'", "activities": []}
-        return search_chembl_compounds(target, limit=int(args.get("limit", 10)))
+        return search_chembl_compounds(target, limit=get_int_param(args, "limit", 10))
 
     if tool_name == "get-target-safety":
         gene = args.get("gene", args.get("target", ""))

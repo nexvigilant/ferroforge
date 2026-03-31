@@ -40,6 +40,39 @@ import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -306,7 +339,7 @@ def _get_person_urn(token: str) -> str | None:
 
 def handle_get_my_posts(token: str, args: dict) -> dict:
     """List the authenticated user's recent posts."""
-    limit = min(int(args.get("limit", DEFAULT_POST_LIMIT)), MAX_POST_LIMIT)
+    limit = get_int_param(args, "limit", DEFAULT_POST_LIMIT, max_val=MAX_POST_LIMIT)
 
     person_urn = _get_person_urn(token)
     if not person_urn:
@@ -423,7 +456,7 @@ def handle_get_comments(token: str, args: dict) -> dict:
     if not post_id:
         return {"status": "error", "error": "post_id is required"}
 
-    limit = min(int(args.get("limit", DEFAULT_COMMENT_LIMIT)), 100)
+    limit = get_int_param(args, "limit", DEFAULT_COMMENT_LIMIT, max_val=100)
     post_urn = _extract_post_urn_from_url(post_id)
     encoded_urn = urllib.parse.quote(post_urn, safe="")
 

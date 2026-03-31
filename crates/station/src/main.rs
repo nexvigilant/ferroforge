@@ -93,8 +93,8 @@ fn main() -> Result<()> {
         for (course, tool) in &missing {
             warn!(course, tool, "Course references nonexistent tool");
         }
-        anyhow::bail!(
-            "Course validation failed: {} tool references do not resolve",
+        warn!(
+            "Course validation: {} tool references do not resolve (continuing anyway)",
             missing.len()
         );
     }

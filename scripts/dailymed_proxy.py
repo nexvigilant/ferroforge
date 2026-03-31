@@ -19,6 +19,43 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely. Prevents 'AttributeError: strip'."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        import json
+        try:
+            return json.dumps(val)
+        except:
+            return str(val)
+    return str(val)
+
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
 BASE_URL = "https://dailymed.nlm.nih.gov/dailymed/services"
 OPENFDA_LABEL_URL = "https://api.fda.gov/drug/label.json"
 REQUEST_TIMEOUT_SECONDS = 20
@@ -92,7 +129,7 @@ def search_drugs(args: dict) -> dict:
     if not query:
         return {"status": "error", "message": "query is required (also accepts: drug_name, name, drug)", "count": 0, "results": []}
 
-    limit = int(args.get("limit", DEFAULT_LIMIT))
+    limit = get_int_param(args, "limit", DEFAULT_LIMIT)
     limit = max(1, min(limit, 100))
 
     encoded = urllib.parse.quote(query, safe="")
@@ -138,7 +175,7 @@ def get_drug_label(args: dict) -> dict:
     This two-source approach gives the most complete structured label data
     available without requiring HTML parsing.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -236,7 +273,7 @@ def get_adverse_reactions(args: dict) -> dict:
     Returns adverse_reactions text, boxed_warning if present, and the
     DailyMed setId for cross-reference.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -318,7 +355,7 @@ def get_drug_interactions(args: dict) -> dict:
     drug label API. Returns known drug-drug interactions, clinical significance,
     and management recommendations.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -365,7 +402,7 @@ def get_contraindications(args: dict) -> dict:
     Extracts the Contraindications section from a drug SPL. Returns conditions
     and situations where the drug should NOT be used.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -413,7 +450,7 @@ def get_boxed_warning(args: dict) -> dict:
     serious FDA safety communication on a drug label. Returns the warning text
     and whether one exists.
     """
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -475,7 +512,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

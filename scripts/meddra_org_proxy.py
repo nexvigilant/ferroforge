@@ -19,6 +19,39 @@ import urllib.parse
 import urllib.request
 
 
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
+
 def _launch_browser():
     """Launch Playwright headless browser."""
     try:
@@ -38,7 +71,7 @@ TIMEOUT = 15
 
 def search_terms(args: dict) -> dict:
     """Search MedDRA terms across all hierarchy levels (SOC, HLGT, HLT, PT, LLT)"""
-    query = args.get("query", "").strip()
+    query = ensure_str(args.get("query", "")).strip()
     if not query:
         return {"status": "error", "message": "query is required"}
     level = args.get("level", "")
@@ -71,7 +104,7 @@ def search_terms(args: dict) -> dict:
 
 def get_term_hierarchy(args: dict) -> dict:
     """Get the full MedDRA hierarchy path for a preferred term"""
-    preferred_term = args.get("preferred_term", "").strip()
+    preferred_term = ensure_str(args.get("preferred_term", "")).strip()
     if not preferred_term:
         return {"status": "error", "message": "preferred_term is required"}
 
@@ -103,7 +136,7 @@ def get_term_hierarchy(args: dict) -> dict:
 
 def get_soc_terms(args: dict) -> dict:
     """List all Preferred Terms under a System Organ Class"""
-    soc = args.get("soc", "").strip()
+    soc = ensure_str(args.get("soc", "")).strip()
     if not soc:
         return {"status": "error", "message": "soc is required"}
 
@@ -135,7 +168,7 @@ def get_soc_terms(args: dict) -> dict:
 
 def get_smq(args: dict) -> dict:
     """Get Standardised MedDRA Query terms for a safety topic"""
-    smq_name = args.get("smq_name", "").strip()
+    smq_name = ensure_str(args.get("smq_name", "")).strip()
     if not smq_name:
         return {"status": "error", "message": "smq_name is required"}
     scope = args.get("scope", "")
@@ -276,7 +309,7 @@ def main() -> None:
         print(json.dumps({"status": "error", "message": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

@@ -16,6 +16,39 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 BASE_URL = "https://api.pharmgkb.org/v1/data"
 REQUEST_TIMEOUT = 20
 _RETRY_CODES = {429, 503}
@@ -99,7 +132,7 @@ def _resolve_drug(args: dict) -> str:
 def search_drugs(args: dict) -> dict:
     """Handler for search-drugs."""
     query = args.get("query", "")
-    limit = min(int(args.get("limit", 10)), 100)
+    limit = get_int_param(args, "limit", 10, max_val=100)
     url = f"{BASE_URL}/chemical?view=min&name={_quote(query)}"
     data = _fetch(url)
     items = data.get("data", []) if isinstance(data, dict) else data if isinstance(data, list) else []
@@ -154,8 +187,8 @@ def get_drug_genes(args: dict) -> dict:
 
 def get_clinical_annotations(args: dict) -> dict:
     """Handler for get-clinical-annotations."""
-    gene = args.get("gene", "").strip()
-    drug_name = args.get("drug_name", "").strip()
+    gene = ensure_str(args.get("gene", "")).strip()
+    drug_name = ensure_str(args.get("drug_name", "")).strip()
     url = f"{BASE_URL}/clinicalAnnotation?view=min&relatedGenes.symbol={_quote(gene)}"
     if drug_name:
         url += f"&relatedChemicals.name={_quote(drug_name)}"
@@ -195,7 +228,7 @@ def get_dosing_guidelines(args: dict) -> dict:
 def search_variants(args: dict) -> dict:
     """Handler for search-variants."""
     query = args.get("query", "")
-    limit = min(int(args.get("limit", 10)), 100)
+    limit = get_int_param(args, "limit", 10, max_val=100)
     url = f"{BASE_URL}/variant?view=min&symbol={_quote(query)}"
     data = _fetch(url)
     items = data.get("data", []) if isinstance(data, dict) else data if isinstance(data, list) else []
@@ -212,7 +245,7 @@ def search_variants(args: dict) -> dict:
 
 def get_variant_annotations(args: dict) -> dict:
     """Handler for get-variant-annotations."""
-    variant_id = args.get("variant_id", "").strip()
+    variant_id = ensure_str(args.get("variant_id", "")).strip()
     url = f"{BASE_URL}/clinicalAnnotation?view=min&location.variantId={_quote(variant_id)}"
     data = _fetch(url)
     items = data.get("data", []) if isinstance(data, dict) else data if isinstance(data, list) else []

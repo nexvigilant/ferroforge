@@ -22,6 +22,39 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 OPENFDA_LABEL_URL = "https://api.fda.gov/drug/label.json"
 OPENFDA_EVENT_URL = "https://api.fda.gov/drug/event.json"
 DAILYMED_BASE = "https://dailymed.nlm.nih.gov/dailymed/services"
@@ -535,7 +568,7 @@ def get_products(args: dict) -> dict:
     Return Pfizer product portfolio, optionally filtered by therapeutic area
     or search query. Curated reference data covering key marketed products.
     """
-    therapeutic_area = (args.get("therapeutic_area") or "").strip().lower()
+    therapeutic_area = ensure_str(args.get("therapeutic_area") or "").strip().lower()
     query = (args.get("query") or args.get("search_query") or "").strip().lower()
 
     products = PFIZER_PRODUCTS
@@ -571,8 +604,8 @@ def get_pipeline(args: dict) -> dict:
     Return Pfizer development pipeline candidates, optionally filtered by
     phase or therapeutic area. Curated from public pipeline disclosures.
     """
-    phase_filter = (args.get("phase") or "").strip().lower()
-    ta_filter = (args.get("therapeutic_area") or "").strip().lower()
+    phase_filter = ensure_str(args.get("phase") or "").strip().lower()
+    ta_filter = ensure_str(args.get("therapeutic_area") or "").strip().lower()
 
     pipeline = PFIZER_PIPELINE
 
@@ -687,7 +720,7 @@ def get_medical_letters(args: dict) -> dict:
     """
     product_name = (args.get("product_name") or args.get("drug_name") or args.get("drug")
                     or args.get("query") or "").strip().lower()
-    limit = int(args.get("limit", 10))
+    limit = get_int_param(args, "limit", 10)
     limit = max(1, min(limit, 50))
 
     letters = PFIZER_MEDICAL_LETTERS
@@ -817,7 +850,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

@@ -145,11 +145,25 @@ pub async fn run_combined(
     ));
     StreamableState::spawn_reaper(Arc::clone(&streamable_state));
 
+    let allowed_origins = match std::env::var("ALLOWED_ORIGINS") {
+        Ok(origins) => origins
+            .split(',')
+            .map(|s| s.trim().parse::<HeaderValue>())
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| anyhow::anyhow!("invalid ALLOWED_ORIGINS value: {e}"))?,
+        Err(_) => {
+            // Safe defaults for NexVigilant ecosystem
+            vec![
+                "https://mcp.nexvigilant.com".parse().unwrap(),
+                "https://nexvigilant.com".parse().unwrap(),
+                "http://localhost:3000".parse().unwrap(),
+                "http://localhost:9002".parse().unwrap(),
+            ]
+        }
+    };
+
     let cors = CorsLayer::new()
-        .allow_origin(
-            "*".parse::<HeaderValue>()
-                .map_err(|e| anyhow::anyhow!("invalid CORS origin header value: {e}"))?,
-        )
+        .allow_origin(allowed_origins)
         .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
         .allow_headers([
             axum::http::header::CONTENT_TYPE,
@@ -448,11 +462,7 @@ async fn handle_tool_call(
 // Response header middleware
 // ═══════════════════════════════════════════════════════════════════
 
-/// Inject standard response headers for debugging and client-side correlation.
-///
-/// Every HTTP response gets:
-///   - `X-Station-Version`: binary version + git SHA (e.g., "0.1.0+abc1234")
-///   - `X-Request-Id`: unique UUID per request for log correlation
+/// Inject standard response headers for security hardening and debugging.
 async fn response_headers_middleware(
     request: axum::extract::Request,
     next: axum::middleware::Next,
@@ -461,12 +471,38 @@ async fn response_headers_middleware(
     let mut response = next.run(request).await;
 
     let headers = response.headers_mut();
-    let version = format!("{}+{}", env!("CARGO_PKG_VERSION"), env!("GIT_SHA"));
+
+    // 1. Version Info (Redact Git SHA in production per security report)
+    let version = if std::env::var("STATION_DEBUG_HEADERS").map(|v| v == "true").unwrap_or(false) {
+        format!("{}+{}", env!("CARGO_PKG_VERSION"), env!("GIT_SHA"))
+    } else {
+        env!("CARGO_PKG_VERSION").to_string()
+    };
     if let Ok(v) = HeaderValue::from_str(&version) {
         headers.insert("x-station-version", v);
     }
+
+    // 2. Request Correlation
     if let Ok(v) = HeaderValue::from_str(&request_id) {
         headers.insert("x-request-id", v);
+    }
+
+    // 3. Security Hardening Headers (fixes security report issue #6)
+    headers.insert("x-content-type-options", HeaderValue::from_static("nosniff"));
+    headers.insert("x-frame-options", HeaderValue::from_static("DENY"));
+    headers.insert(
+        "strict-transport-security",
+        HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+    );
+    headers.insert(
+        "content-security-policy",
+        HeaderValue::from_static("default-src 'none'; frame-ancestors 'none';"),
+    );
+    headers.insert("referrer-policy", HeaderValue::from_static("no-referrer"));
+
+    // 4. Cache Control for API responses
+    if !headers.contains_key("cache-control") {
+        headers.insert("cache-control", HeaderValue::from_static("no-store, max-age=0"));
     }
 
     response

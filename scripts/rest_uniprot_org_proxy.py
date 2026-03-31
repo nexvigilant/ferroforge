@@ -16,6 +16,39 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 BASE_URL = "https://rest.uniprot.org"
 REQUEST_TIMEOUT = 20
 _RETRY_CODES = {429, 503}
@@ -99,7 +132,7 @@ def _resolve_drug(args: dict) -> str:
 def search_proteins(args: dict) -> dict:
     """Handler for search-proteins."""
     query = args.get("query", "")
-    limit = min(int(args.get("limit", 10)), 100)
+    limit = get_int_param(args, "limit", 10, max_val=100)
     url = f"{BASE_URL}/uniprotkb/search?query={_quote(query)}&format=json&size={limit}&fields=accession,id,protein_name,gene_names,organism_name,length"
     data = _fetch(url)
     results = []
@@ -123,7 +156,7 @@ def search_proteins(args: dict) -> dict:
 
 def get_protein(args: dict) -> dict:
     """Handler for get-protein."""
-    accession = args.get("accession", "").strip()
+    accession = ensure_str(args.get("accession", "")).strip()
     url = f"{BASE_URL}/uniprotkb/{_quote(accession)}.json"
     data = _fetch(url)
     protein_name = ""
@@ -164,7 +197,7 @@ def get_protein(args: dict) -> dict:
 
 def get_protein_variants(args: dict) -> dict:
     """Handler for get-protein-variants."""
-    accession = args.get("accession", "").strip()
+    accession = ensure_str(args.get("accession", "")).strip()
     url = f"{BASE_URL}/uniprotkb/{_quote(accession)}.json"
     data = _fetch(url)
     variants = []
@@ -185,7 +218,7 @@ def get_protein_variants(args: dict) -> dict:
 
 def get_protein_interactions(args: dict) -> dict:
     """Handler for get-protein-interactions."""
-    accession = args.get("accession", "").strip()
+    accession = ensure_str(args.get("accession", "")).strip()
     url = f"{BASE_URL}/uniprotkb/{_quote(accession)}.json"
     data = _fetch(url)
     interactions = []
@@ -203,7 +236,7 @@ def get_protein_interactions(args: dict) -> dict:
 
 def get_protein_disease(args: dict) -> dict:
     """Handler for get-protein-disease."""
-    accession = args.get("accession", "").strip()
+    accession = ensure_str(args.get("accession", "")).strip()
     url = f"{BASE_URL}/uniprotkb/{_quote(accession)}.json"
     data = _fetch(url)
     diseases = []
@@ -221,7 +254,7 @@ def get_protein_disease(args: dict) -> dict:
 
 def get_protein_pharmacology(args: dict) -> dict:
     """Handler for get-protein-pharmacology."""
-    accession = args.get("accession", "").strip()
+    accession = ensure_str(args.get("accession", "")).strip()
     url = f"{BASE_URL}/uniprotkb/{_quote(accession)}.json"
     data = _fetch(url)
     pharma = []

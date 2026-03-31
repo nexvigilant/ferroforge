@@ -17,6 +17,43 @@ import sys
 import urllib.request
 import urllib.error
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely. Prevents 'AttributeError: strip'."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        import json
+        try:
+            return json.dumps(val)
+        except:
+            return str(val)
+    return str(val)
+
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
 # EMA public JSON data file URLs
 MEDICINES_URL = "https://www.ema.europa.eu/en/documents/report/medicines-output-medicines_json-report_en.json"
 REFERRALS_URL = "https://www.ema.europa.eu/en/documents/report/referrals-output-json-report_en.json"
@@ -127,7 +164,7 @@ def search_medicines(args: dict) -> dict:
     query = (args.get("query") or args.get("product") or args.get("drug_name") or "").strip()
     therapeutic_area = (args.get("therapeutic_area") or "").strip()
     auth_status = (args.get("authorisation_status") or "").strip()
-    limit = int(args.get("limit", DEFAULT_LIMIT))
+    limit = get_int_param(args, "limit", DEFAULT_LIMIT)
     limit = max(1, min(limit, 100))
 
     if not query and not therapeutic_area:
@@ -460,7 +497,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

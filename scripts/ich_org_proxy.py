@@ -19,6 +19,39 @@ import urllib.parse
 import urllib.request
 
 
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
+
 def _launch_browser():
     """Launch Playwright headless browser."""
     try:
@@ -38,7 +71,7 @@ TIMEOUT = 15
 
 def search_guidelines(args: dict) -> dict:
     """Search ICH guidelines by topic, code, or keyword"""
-    query = args.get("query", "").strip()
+    query = ensure_str(args.get("query", "")).strip()
     if not query:
         return {"status": "error", "message": "query is required"}
     category = args.get("category", "")
@@ -71,7 +104,7 @@ def search_guidelines(args: dict) -> dict:
 
 def get_guideline(args: dict) -> dict:
     """Get ICH guideline summary and current step by code"""
-    code = args.get("code", "").strip()
+    code = ensure_str(args.get("code", "")).strip()
     if not code:
         return {"status": "error", "message": "code is required"}
 
@@ -269,7 +302,7 @@ def main() -> None:
         print(json.dumps({"status": "error", "message": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

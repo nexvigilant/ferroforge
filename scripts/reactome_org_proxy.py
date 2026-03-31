@@ -16,6 +16,39 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 BASE_URL = "https://reactome.org/ContentService"
 REQUEST_TIMEOUT = 20
 _RETRY_CODES = {429, 503}
@@ -99,7 +132,7 @@ def _resolve_drug(args: dict) -> str:
 def search_pathways(args: dict) -> dict:
     """Handler for search-pathways."""
     query = args.get("query", "")
-    limit = min(int(args.get("limit", 10)), 100)
+    limit = get_int_param(args, "limit", 10, max_val=100)
     url = f"{BASE_URL}/search/query?query={_quote(query)}&species=Homo%20sapiens&types=Pathway&cluster=true"
     data = _fetch(url)
     results_list = data.get("results", [])
@@ -121,7 +154,7 @@ def search_pathways(args: dict) -> dict:
 
 def get_pathway(args: dict) -> dict:
     """Handler for get-pathway."""
-    pathway_id = args.get("pathway_id", "").strip()
+    pathway_id = ensure_str(args.get("pathway_id", "")).strip()
     url = f"{BASE_URL}/data/query/{_quote(pathway_id)}"
     data = _fetch(url)
     return {
@@ -138,7 +171,7 @@ def get_pathway(args: dict) -> dict:
 
 def get_pathway_participants(args: dict) -> dict:
     """Handler for get-pathway-participants."""
-    pathway_id = args.get("pathway_id", "").strip()
+    pathway_id = ensure_str(args.get("pathway_id", "")).strip()
     url = f"{BASE_URL}/data/participants/{_quote(pathway_id)}"
     data = _fetch(url)
     results = []
@@ -154,7 +187,7 @@ def get_pathway_participants(args: dict) -> dict:
 
 def get_disease_pathways(args: dict) -> dict:
     """Handler for get-disease-pathways."""
-    disease = args.get("disease", "").strip()
+    disease = ensure_str(args.get("disease", "")).strip()
     url = f"{BASE_URL}/search/query?query={_quote(disease)}&species=Homo%20sapiens&types=Pathway&cluster=true"
     data = _fetch(url)
     results_list = data.get("results", [])
@@ -172,7 +205,7 @@ def get_disease_pathways(args: dict) -> dict:
 def search_reactions(args: dict) -> dict:
     """Handler for search-reactions."""
     query = args.get("query", "")
-    limit = min(int(args.get("limit", 10)), 100)
+    limit = get_int_param(args, "limit", 10, max_val=100)
     url = f"{BASE_URL}/search/query?query={_quote(query)}&species=Homo%20sapiens&types=Reaction&cluster=true"
     data = _fetch(url)
     results_list = data.get("results", [])
@@ -194,7 +227,7 @@ def search_reactions(args: dict) -> dict:
 
 def get_drug_pathway_targets(args: dict) -> dict:
     """Handler for get-drug-pathway-targets."""
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name", "")).strip()
     url = f"{BASE_URL}/search/query?query={_quote(drug_name)}&species=Homo%20sapiens&cluster=true"
     data = _fetch(url)
     results_list = data.get("results", [])

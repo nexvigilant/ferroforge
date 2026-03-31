@@ -16,6 +16,39 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 BASE_URL = "https://www.ebi.ac.uk/chembl/api/data"
 REQUEST_TIMEOUT = 20
 _RETRY_CODES = {429, 503}
@@ -99,7 +132,7 @@ def _resolve_drug(args: dict) -> str:
 def search_compounds(args: dict) -> dict:
     """Handler for search-compounds."""
     query = args.get("query", "")
-    limit = min(int(args.get("limit", 10)), 100)
+    limit = get_int_param(args, "limit", 10, max_val=100)
     url = f"{BASE_URL}/molecule/search.json?q={_quote(query)}&limit={limit}"
     data = _fetch(url)
     molecules = data.get("molecules", [])
@@ -120,7 +153,7 @@ def search_compounds(args: dict) -> dict:
 
 def get_compound(args: dict) -> dict:
     """Handler for get-compound."""
-    chembl_id = args.get("chembl_id", "").strip().upper()
+    chembl_id = ensure_str(args.get("chembl_id", "")).strip().upper()
     url = f"{BASE_URL}/molecule/{_quote(chembl_id)}.json"
     mol = _fetch(url)
     props = mol.get("molecule_properties") or {}
@@ -149,8 +182,8 @@ def get_compound(args: dict) -> dict:
 
 def get_compound_bioactivities(args: dict) -> dict:
     """Handler for get-compound-bioactivities."""
-    chembl_id = args.get("chembl_id", "").strip().upper()
-    limit = min(int(args.get("limit", 25)), 100)
+    chembl_id = ensure_str(args.get("chembl_id", "")).strip().upper()
+    limit = get_int_param(args, "limit", 25, max_val=100)
     url = f"{BASE_URL}/activity.json?molecule_chembl_id={_quote(chembl_id)}&limit={limit}"
     data = _fetch(url)
     activities = data.get("activities", [])
@@ -173,7 +206,7 @@ def get_compound_bioactivities(args: dict) -> dict:
 
 def get_drug_mechanisms(args: dict) -> dict:
     """Handler for get-drug-mechanisms."""
-    chembl_id = args.get("chembl_id", "").strip().upper()
+    chembl_id = ensure_str(args.get("chembl_id", "")).strip().upper()
     url = f"{BASE_URL}/mechanism.json?molecule_chembl_id={_quote(chembl_id)}"
     data = _fetch(url)
     mechanisms = data.get("mechanisms", [])
@@ -193,7 +226,7 @@ def get_drug_mechanisms(args: dict) -> dict:
 def search_targets(args: dict) -> dict:
     """Handler for search-targets."""
     query = args.get("query", "")
-    limit = min(int(args.get("limit", 10)), 100)
+    limit = get_int_param(args, "limit", 10, max_val=100)
     url = f"{BASE_URL}/target/search.json?q={_quote(query)}&limit={limit}"
     data = _fetch(url)
     targets = data.get("targets", [])
@@ -211,7 +244,7 @@ def search_targets(args: dict) -> dict:
 
 def get_target(args: dict) -> dict:
     """Handler for get-target."""
-    chembl_id = args.get("chembl_id", "").strip().upper()
+    chembl_id = ensure_str(args.get("chembl_id", "")).strip().upper()
     url = f"{BASE_URL}/target/{_quote(chembl_id)}.json"
     tgt = _fetch(url)
     components = []
@@ -233,7 +266,7 @@ def get_target(args: dict) -> dict:
 
 def get_drug_indications(args: dict) -> dict:
     """Handler for get-drug-indications."""
-    chembl_id = args.get("chembl_id", "").strip().upper()
+    chembl_id = ensure_str(args.get("chembl_id", "")).strip().upper()
     url = f"{BASE_URL}/drug_indication.json?molecule_chembl_id={_quote(chembl_id)}"
     data = _fetch(url)
     indications = data.get("drug_indications", [])

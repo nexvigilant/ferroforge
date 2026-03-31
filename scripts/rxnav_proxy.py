@@ -22,6 +22,43 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely. Prevents 'AttributeError: strip'."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        import json
+        try:
+            return json.dumps(val)
+        except:
+            return str(val)
+    return str(val)
+
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
 BASE_URL = "https://rxnav.nlm.nih.gov/REST"
 REQUEST_TIMEOUT_SECONDS = 20
 DEFAULT_MAX_ENTRIES = 10
@@ -146,7 +183,7 @@ def search_drugs(args: dict) -> dict:
     if not query:
         return {"status": "error", "message": "query is required (also accepts: drug_name, drug, search_query)", "count": 0, "results": []}
 
-    max_entries = int(args.get("max_entries", DEFAULT_MAX_ENTRIES))
+    max_entries = get_int_param(args, "max_entries", DEFAULT_MAX_ENTRIES)
     max_entries = max(1, min(max_entries, 100))
 
     encoded = urllib.parse.quote(query, safe="")
@@ -187,7 +224,7 @@ def get_interactions(args: dict) -> dict:
     /interaction/list.json. Returns interaction pairs with severity,
     description, and source references (NDF-RT, ONCHigh, DrugBank, etc.).
     """
-    rxcuis_raw = args.get("rxcuis", "").strip()
+    rxcuis_raw = ensure_str(args.get("rxcuis")).strip()
     if not rxcuis_raw:
         return {"status": "error", "message": "rxcuis is required (plus-separated or comma-separated RxCUI list)"}
 
@@ -252,7 +289,7 @@ def get_ingredients(args: dict) -> dict:
     Queries /rxcui/{rxcui}/related.json?tty=IN to navigate the RxNorm
     concept graph to ingredient-level terms (tty=IN).
     """
-    rxcui = args.get("rxcui", "").strip()
+    rxcui = ensure_str(args.get("rxcui")).strip()
     if not rxcui:
         return {"status": "error", "message": "rxcui is required"}
 
@@ -301,7 +338,7 @@ def get_ndc(args: dict) -> dict:
     Queries /rxcui/{rxcui}/ndcs.json. NDCs identify specific marketed
     products (labeler + product + package).
     """
-    rxcui = args.get("rxcui", "").strip()
+    rxcui = ensure_str(args.get("rxcui")).strip()
     if not rxcui:
         return {"status": "error", "message": "rxcui is required"}
 
@@ -414,7 +451,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

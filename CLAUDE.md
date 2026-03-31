@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## FerroForge — NexVigilant Station
 
-Rust MCP server + 208 domain configs (1,810 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio, SSE, and Streamable HTTP. Forge pipeline: `forge.py` (YAML→config), `forge_from_crates.py` (nexcore→config), `forge_nucleus.py` (config→page). Nexcore bridge proxy covers 115 rust-native gap configs via `nexcore_proxy.py`. (measured 2026-03-29)
+Rust MCP server + 243 domain configs (2,018 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio, SSE, and Streamable HTTP. Forge pipeline: `forge.py` (YAML→config), `forge_from_crates.py` (nexcore→config), `forge_nucleus.py` (config→page). Nexcore bridge proxy covers 119 rust-native gap configs via `nexcore_proxy.py`. 55 proxy scripts total. (measured 2026-03-31)
 
 ## Build & Test
 
@@ -42,7 +42,7 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 | `scripts/nexcore_proxy.py` | Bridge proxy: routes rust-native gaps to nexcore-mcp binary |
 | `scripts/config_forge.py` | Config generator + hub deployer (self-hosted or Cloud Run) |
 
-## Config Inventory (208 configs, 1,810 tools — source: measured 2026-03-29)
+## Config Inventory (243 configs, 2,018 tools — source: measured 2026-03-31)
 
 **Live API proxies (10):** openfda, clinicaltrials, pubmed, dailymed, rxnav, openvigilfrance, fda-accessdata, eudravigilance, fda-safety, science
 
@@ -52,7 +52,7 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 
 **Reference configs:** ich, cioms, who-umc, meddra, drugbank, vigiaccess, ema, fda-safety, wikipedia, compliance, algovigilance, chemivigilance, cccp, harm-taxonomy, tov, pvdsl, dtree, dataframe, edit-distance, energy, zeta, dna, benefit-risk, vigilance
 
-**All 208 configs have proxy scripts or Rust-native handlers** — 0 stubs remaining. 39 proxy files serve 208 configs. 115 rust-native gap configs routed through nexcore bridge proxy (`nexcore_proxy.py` → `nexcore-mcp` binary via stdio JSON-RPC).
+**All 243 configs have proxy scripts or Rust-native handlers** — 0 stubs remaining. 55 proxy files serve 243 configs. 119 rust-native gap configs routed through nexcore bridge proxy (`nexcore_proxy.py` → `nexcore-mcp` binary via stdio JSON-RPC).
 
 **Metering:** Live toll billing at 1.30x harness premium. `/billing/usage`, `/billing/rates`, `/billing/balance` endpoints. Per-key usage tracking with token estimation and cost computation.
 

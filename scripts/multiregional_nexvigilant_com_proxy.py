@@ -12,6 +12,39 @@ import os
 import sys
 import urllib.parse
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 AGENCIES = {
@@ -162,7 +195,7 @@ def main():
     except json.JSONDecodeError as e:
         print(json.dumps({"status": "error", "message": str(e)}))
         return
-    tool = p.get("tool", "").strip()
+    tool = ensure_str(p.get("tool", "")).strip()
     args = p.get("arguments", p.get("args", {}))
     h = DISPATCH.get(tool)
     if not h:

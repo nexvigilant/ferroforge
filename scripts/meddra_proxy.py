@@ -15,6 +15,39 @@ response to stdout. No external dependencies — stdlib only.
 import json
 import sys
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 # MedDRA hierarchy levels per MedDRA Introductory Guide
 # (source: https://www.meddra.org/how-to-use/basics/hierarchy)
 HIERARCHY_NOTE = (
@@ -104,7 +137,7 @@ def get_soc_terms(args: dict) -> dict:
     Stub for MedDRA SOC listing. When live, returns all Preferred Terms
     within a given System Organ Class.
     """
-    soc = args.get("soc", "").strip()
+    soc = ensure_str(args.get("soc", "")).strip()
     if not soc:
         return {"status": "error", "message": "soc is required"}
 
@@ -130,7 +163,7 @@ def get_smq(args: dict) -> dict:
     Stub for MedDRA Standardised MedDRA Query lookup. When live, returns
     the component terms of an SMQ.
     """
-    smq_name = args.get("smq_name", "").strip()
+    smq_name = ensure_str(args.get("smq_name", "")).strip()
     smq_code = args.get("smq_code", "")
     if not smq_name and not smq_code:
         return {"status": "error", "message": "smq_name or smq_code is required"}
@@ -370,7 +403,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

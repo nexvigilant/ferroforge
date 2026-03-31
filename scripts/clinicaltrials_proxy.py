@@ -44,6 +44,39 @@ SAFETY_KEYWORDS = {
 }
 
 
+# Helpers
+# ---------------------------------------------------------------------------
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely. Prevents 'AttributeError: strip'."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
 # ---------------------------------------------------------------------------
 # HTTP helpers
 # ---------------------------------------------------------------------------
@@ -105,16 +138,16 @@ def search_trials(args: dict) -> dict:
 
     Maps to: GET /studies?query.term=...&filter.overallStatus=...&...
     """
-    query = (args.get("query") or args.get("drug_name") or args.get("drug")
-             or args.get("name") or args.get("search_query") or "").strip()
+    raw_query = (args.get("query") or args.get("drug_name") or args.get("drug")
+             or args.get("name") or args.get("search_query") or "")
+    query = ensure_str(raw_query).strip()
     if not query:
         return _error("'query' is required for search-trials (also accepts: drug_name, drug, name)")
 
+    limit_val = get_int_param(args, "limit", DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE)
     params: dict[str, str] = {
         "query.term": query,
-        "pageSize": str(
-            min(int(args.get("limit", DEFAULT_PAGE_SIZE)), MAX_PAGE_SIZE)
-        ),
+        "pageSize": str(limit_val),
         "format": "json",
         "fields": (
             "NCTId,BriefTitle,OfficialTitle,OverallStatus,Phase,"
@@ -123,20 +156,20 @@ def search_trials(args: dict) -> dict:
         ),
     }
 
-    condition = args.get("condition", "").strip()
+    condition = ensure_str(args.get("condition")).strip()
     if condition:
         params["query.cond"] = condition
 
-    intervention = args.get("intervention", "").strip()
+    intervention = ensure_str(args.get("intervention")).strip()
     if intervention:
         params["query.intr"] = intervention
 
-    status = args.get("status", "").strip()
+    status = ensure_str(args.get("status")).strip()
     if status:
         # API accepts comma-separated uppercase status values.
         params["filter.overallStatus"] = status.upper().replace(" ", "_")
 
-    phase = args.get("phase", "").strip()
+    phase = ensure_str(args.get("phase")).strip()
     if phase:
         # API expects PHASE1, PHASE2, etc.
         phase_clean = phase.replace(" ", "").upper()
@@ -199,7 +232,7 @@ def get_trial(args: dict) -> dict:
 
     Maps to: GET /studies/{nct_id}
     """
-    nct_id = args.get("nct_id", "").strip()
+    nct_id = ensure_str(args.get("nct_id")).strip()
     if not nct_id:
         return _error("'nct_id' is required for get-trial")
 
@@ -284,7 +317,7 @@ def get_safety_endpoints(args: dict) -> dict:
     Filters outcomesModule entries whose measure or description contains
     safety-related keywords.
     """
-    nct_id = args.get("nct_id", "").strip()
+    nct_id = ensure_str(args.get("nct_id")).strip()
     if not nct_id:
         return _error("'nct_id' is required for get-safety-endpoints")
 
@@ -332,10 +365,13 @@ def get_serious_adverse_events(args: dict) -> dict:
     Extract serious adverse events from the resultsSection of a completed trial.
 
     Pulls adverseEventsModule which contains SAE tables by organ class and term.
+    Optional filter_event narrows results to matching terms (case-insensitive substring).
     """
-    nct_id = args.get("nct_id", "").strip()
+    nct_id = ensure_str(args.get("nct_id")).strip()
     if not nct_id:
         return _error("'nct_id' is required for get-serious-adverse-events")
+
+    filter_event = ensure_str(args.get("filter_event") or args.get("event")).strip().lower()
 
     raw = _fetch_study(nct_id)
     ps = raw.get("protocolSection", {})
@@ -383,6 +419,12 @@ def get_serious_adverse_events(args: dict) -> dict:
 
     # Serious adverse event term-level data
     serious_events = ae_mod.get("seriousEvents", [])
+    if filter_event:
+        serious_events = [
+            e for e in serious_events
+            if filter_event in (e.get("term") or "").lower()
+            or filter_event in (e.get("organSystem") or "").lower()
+        ]
     sae_records = []
     for event in serious_events:
         stats_by_group = {
@@ -407,7 +449,7 @@ def get_serious_adverse_events(args: dict) -> dict:
     # Also pull deaths separately
     death_events = [e for e in serious_events if "death" in (e.get("term") or "").lower()]
 
-    return {
+    result = {
         "nct_id": id_mod.get("nctId"),
         "title": id_mod.get("briefTitle"),
         "has_results": True,
@@ -419,6 +461,12 @@ def get_serious_adverse_events(args: dict) -> dict:
         "total_sae_terms": len(sae_records),
         "death_related_events": death_events,
     }
+    if filter_event:
+        total_unfiltered = len(ae_mod.get("seriousEvents", []))
+        result["filter_applied"] = filter_event
+        result["total_unfiltered_sae_terms"] = total_unfiltered
+        result["filtered_to"] = len(sae_records)
+    return result
 
 
 def compare_trial_arms(args: dict) -> dict:
@@ -428,7 +476,7 @@ def compare_trial_arms(args: dict) -> dict:
     Pulls armGroups, adverseEventsModule, and baselineCharacteristicsModule
     to produce a side-by-side comparison.
     """
-    nct_id = args.get("nct_id", "").strip()
+    nct_id = ensure_str(args.get("nct_id")).strip()
     if not nct_id:
         return _error("'nct_id' is required for compare-trial-arms")
 
@@ -564,7 +612,7 @@ def get_eligibility_criteria(args: dict) -> dict:
 
     Maps to: GET /studies/{nctId} -> eligibilityModule
     """
-    nct_id = args.get("nct_id", "").strip().upper()
+    nct_id = ensure_str(args.get("nct_id")).strip().upper()
     if not nct_id:
         return _error("nct_id is required")
 
@@ -622,7 +670,7 @@ def get_study_design(args: dict) -> dict:
 
     Maps to: GET /studies/{nctId} -> designModule
     """
-    nct_id = args.get("nct_id", "").strip().upper()
+    nct_id = ensure_str(args.get("nct_id")).strip().upper()
     if not nct_id:
         return _error("nct_id is required")
 
@@ -666,11 +714,132 @@ def get_study_design(args: dict) -> dict:
     }
 
 
+def get_results_summary(args: dict) -> dict:
+    """
+    Get a high-level results summary for a completed trial: participant flow,
+    baseline demographics, primary/secondary outcome measures, and adverse event
+    overview. Requires posted results.
+
+    Maps to: GET /studies/{nctId} -> resultsSection (all modules)
+    """
+    nct_id = ensure_str(args.get("nct_id")).strip().upper()
+    if not nct_id:
+        return _error("'nct_id' is required for get-results-summary")
+
+    try:
+        raw = _fetch_study(nct_id)
+    except RuntimeError as exc:
+        return _error(str(exc))
+
+    ps = raw.get("protocolSection", {})
+    rs = raw.get("resultsSection", {})
+    id_mod = ps.get("identificationModule", {})
+
+    if not rs:
+        return {
+            "status": "ok",
+            "nct_id": id_mod.get("nctId", nct_id),
+            "title": id_mod.get("briefTitle"),
+            "has_results": False,
+            "message": (
+                "No results posted for this trial. Results are only available "
+                "after the sponsor submits them to ClinicalTrials.gov."
+            ),
+        }
+
+    # Participant flow
+    flow_mod = rs.get("participantFlowModule", {})
+    flow_groups = [
+        {
+            "title": g.get("title"),
+            "description": g.get("description", "")[:200],
+        }
+        for g in flow_mod.get("groups", [])
+    ]
+    flow_periods = []
+    for period in flow_mod.get("periods", []):
+        milestones = []
+        for ms in period.get("milestones", []):
+            achievements = {
+                a.get("groupId"): a.get("numSubjects")
+                for a in ms.get("achievements", [])
+            }
+            milestones.append({"title": ms.get("type"), "counts": achievements})
+        flow_periods.append({"title": period.get("title"), "milestones": milestones})
+
+    # Baseline characteristics (summary only)
+    baseline_mod = rs.get("baselineCharacteristicsModule", {})
+    baseline_population = baseline_mod.get("populationDescription", "")
+
+    # Outcome measures (top 10)
+    outcome_mod = rs.get("outcomeMeasuresModule", {})
+    outcomes = []
+    for om in (outcome_mod.get("outcomeMeasures", []) if outcome_mod else [])[:10]:
+        groups = []
+        for cls in om.get("classes", [])[:3]:
+            for cat in cls.get("categories", [])[:3]:
+                for meas in cat.get("measurements", []):
+                    groups.append({
+                        "group_id": meas.get("groupId"),
+                        "value": meas.get("value"),
+                        "spread": meas.get("spread"),
+                    })
+        outcomes.append({
+            "title": om.get("title"),
+            "type": om.get("type"),
+            "description": om.get("description", "")[:300],
+            "time_frame": om.get("timeFrame"),
+            "param_type": om.get("paramType"),
+            "unit_of_measure": om.get("unitOfMeasure"),
+            "results": groups[:6],
+        })
+
+    # Adverse event overview
+    ae_mod = rs.get("adverseEventsModule", {})
+    ae_overview = {}
+    if ae_mod:
+        event_groups = ae_mod.get("eventGroups", [])
+        ae_overview = {
+            "time_frame": ae_mod.get("timeFrame"),
+            "frequency_threshold": ae_mod.get("frequencyThreshold"),
+            "groups": [
+                {
+                    "title": g.get("title"),
+                    "serious_affected": g.get("seriousNumAffected"),
+                    "serious_at_risk": g.get("seriousNumAtRisk"),
+                    "other_affected": g.get("otherNumAffected"),
+                    "other_at_risk": g.get("otherNumAtRisk"),
+                    "deaths_affected": g.get("deathsNumAffected"),
+                    "deaths_at_risk": g.get("deathsNumAtRisk"),
+                }
+                for g in event_groups
+            ],
+            "total_sae_terms": len(ae_mod.get("seriousEvents", [])),
+            "total_other_ae_terms": len(ae_mod.get("otherEvents", [])),
+        }
+
+    return {
+        "status": "ok",
+        "nct_id": id_mod.get("nctId", nct_id),
+        "title": id_mod.get("briefTitle"),
+        "has_results": True,
+        "participant_flow": {
+            "groups": flow_groups,
+            "periods": flow_periods,
+        },
+        "baseline_population": baseline_population[:500],
+        "outcome_measures": outcomes,
+        "adverse_events_overview": ae_overview,
+        "data_source": "clinicaltrials.gov",
+    }
+
+
 TOOLS: dict[str, Any] = {
     "search-trials": search_trials,
     "get-trial": get_trial,
     "get-safety-endpoints": get_safety_endpoints,
     "get-serious-adverse-events": get_serious_adverse_events,
+    "get-results-summary": get_results_summary,
     "compare-trial-arms": compare_trial_arms,
     "get-eligibility-criteria": get_eligibility_criteria,
     "get-study-design": get_study_design,

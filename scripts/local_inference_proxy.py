@@ -14,6 +14,39 @@ import sys
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 OLLAMA_URL = "http://localhost:11434"
 GEN_MODEL = "qwen2.5:3b"
 EMBED_MODEL = "nomic-embed-text"
@@ -104,7 +137,7 @@ def embed(args: dict) -> dict:
 
 def summarize(args: dict) -> dict:
     text = str(args.get("text", ""))
-    max_sentences = int(args.get("max_sentences", 3))
+    max_sentences = get_int_param(args, "max_sentences", 3)
 
     if not text:
         return {"error": "text required"}

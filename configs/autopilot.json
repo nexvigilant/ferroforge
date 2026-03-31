@@ -2,11 +2,11 @@
   "domain": "autopilot.nexvigilant.com",
   "url_pattern": "/*",
   "title": "PV Autopilot \u2014 Autonomous Drug Safety Intelligence",
-  "description": "One tool call, complete PV intelligence. Give a drug name and mission, get a full execution plan chaining Station tools into autonomous workflows. Also includes infrastructure gap scanning.",
+  "description": "One tool call, complete PV intelligence. Give a drug name and mission, get a full execution plan chaining Station tools into autonomous workflows. Includes infrastructure gap scanning and Claude Code terminal integration.",
   "tools": [
     {
       "name": "run",
-      "description": "Run PV Autopilot for a drug. Returns execution plan chaining 6-30 Station tools. Missions: signal-scan, launch-readiness, competitive-intel, label-audit, full-profile.",
+      "description": "Run PV Autopilot for a drug. Returns execution plan chaining 6-30 Station tools. Missions: signal-scan, launch-readiness, competitive-intel, label-audit, full-profile, claude-terminal.",
       "parameters": [
         {
           "name": "drug",
@@ -37,7 +37,13 @@
             "type": "string"
           },
           "plan": {
-            "type": "object"
+            "type": "object",
+            "properties": {
+              "mission": { "type": "string" },
+              "steps": { "type": "array", "items": { "type": "object" } },
+              "estimated_tool_calls": { "type": "integer" },
+              "estimated_duration_s": { "type": "integer" }
+            }
           }
         },
         "required": [
@@ -96,8 +102,59 @@
       }
     },
     {
+      "name": "claude-terminal",
+      "description": "Launch Claude Code in NexVigilant Terminal with Station MCP pre-configured. Returns a 4-step execution plan: verify binary → check Station health → load tool catalog → report readiness.",
+      "parameters": [
+        {
+          "name": "working_dir",
+          "type": "string",
+          "description": "Working directory for Claude Code session (default: home)",
+          "required": false
+        },
+        {
+          "name": "args",
+          "type": "array",
+          "description": "Extra CLI arguments for Claude Code (e.g. ['--verbose'])",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "plan": {
+            "type": "object",
+            "properties": {
+              "mission": { "type": "string", "enum": ["claude-terminal"] },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "step": { "type": "integer" },
+                    "action": { "type": "string" },
+                    "tool": { "type": "string" },
+                    "status": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "station_health": { "type": "object" },
+          "tool_count": { "type": "integer" },
+          "claude_ready": { "type": "boolean" }
+        },
+        "required": ["status"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
       "name": "fix-all-gaps",
-      "description": "Attempt to fix all detected wiring gaps.",
+      "description": "Attempt to fix all detected wiring gaps. Requires authentication.",
+      "private": true,
       "parameters": [
         {
           "name": "dry_run",
@@ -114,6 +171,10 @@
           },
           "fixed_count": {
             "type": "integer"
+          },
+          "fixes": {
+            "type": "array",
+            "items": { "type": "object" }
           }
         },
         "required": [

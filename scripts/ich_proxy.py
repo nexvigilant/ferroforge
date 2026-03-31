@@ -16,6 +16,39 @@ No external dependencies — stdlib only.
 import json
 import sys
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 # Hardcoded index of ICH PV guidelines (source: https://ich.org/page/efficacy-guidelines)
 # URLs verified against ich.org guideline registry.
 ICH_PV_GUIDELINES = [
@@ -188,7 +221,7 @@ def get_guideline(args: dict) -> dict:
     Stub for full guideline retrieval. The hardcoded index can resolve
     known codes to URLs; full-text extraction would require PDF parsing.
     """
-    code = args.get("code", "").strip().upper()
+    code = ensure_str(args.get("code", "")).strip().upper()
     if not code:
         return {"status": "error", "message": "code is required (e.g. 'E2A', 'E2B', 'E6')"}
 
@@ -530,7 +563,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

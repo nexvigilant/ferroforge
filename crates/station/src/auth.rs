@@ -58,8 +58,11 @@ impl ApiKeyGate {
     }
 
     /// Load API keys from `NEXVIGILANT_API_KEYS` env var.
-    /// If not set, returns a gate that allows everything (dev mode).
+    /// If not set, returns a gate that allows everything (dev mode)
+    /// UNLESS `STRICT_AUTH=true` is set.
     pub fn from_env() -> Self {
+        let strict = std::env::var("STRICT_AUTH").map(|v| v == "true").unwrap_or(false);
+
         match std::env::var("NEXVIGILANT_API_KEYS") {
             Ok(keys_str) if !keys_str.is_empty() => {
                 let keys: Vec<String> = keys_str
@@ -74,8 +77,13 @@ impl ApiKeyGate {
                 }
             }
             _ => {
-                info!("API key gate disabled (NEXVIGILANT_API_KEYS not set — dev mode)");
-                Self { key_hashes: None }
+                if strict {
+                    info!("API key gate enabled (STRICT_AUTH mode — requiring keys even though none configured)");
+                    Self { key_hashes: Some(vec![]) } // Empty list = all non-free calls fail
+                } else {
+                    info!("API key gate disabled (NEXVIGILANT_API_KEYS not set — dev mode)");
+                    Self { key_hashes: None }
+                }
             }
         }
     }

@@ -122,6 +122,15 @@ fn handle_request_core(
 ) -> Option<JsonRpcResponse> {
     let id = req.id.clone();
 
+    // Validate JSON-RPC version (fixes Issue #10)
+    if req.jsonrpc != "2.0" {
+        return Some(JsonRpcResponse::error(
+            id,
+            INVALID_REQUEST,
+            format!("Unsupported JSON-RPC version: {}. Expected '2.0'", req.jsonrpc),
+        ));
+    }
+
     match req.method.as_str() {
         "initialize" => {
             let result = InitializeResult {

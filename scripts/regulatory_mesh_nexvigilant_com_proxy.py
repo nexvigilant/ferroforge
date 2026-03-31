@@ -9,6 +9,39 @@ Lateral linkages: maps equivalent actions, terminology, and systems across 11 PV
 import json
 import sys
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 # Regulatory action equivalence map — lateral linkages
 ACTION_EQUIVALENCE = {
     "boxed_warning": {
@@ -120,8 +153,8 @@ def _drug(a: dict) -> str:
 
 
 def map_equivalent_actions(args: dict) -> dict:
-    action_type = args.get("action_type", "").strip().lower().replace(" ", "_")
-    source = args.get("source_agency", "").strip()
+    action_type = ensure_str(args.get("action_type", "")).strip().lower().replace(" ", "_")
+    source = ensure_str(args.get("source_agency", "")).strip()
     if not action_type:
         return {"status": "ok", "source": "Regulatory Action Equivalence Map", "available_types": list(ACTION_EQUIVALENCE.keys())}
     mapping = ACTION_EQUIVALENCE.get(action_type)
@@ -137,9 +170,9 @@ def map_equivalent_actions(args: dict) -> dict:
 
 
 def translate_terminology(args: dict) -> dict:
-    term = args.get("term", "").strip()
-    from_ag = args.get("from_agency", "").strip()
-    to_ag = args.get("to_agency", "").strip()
+    term = ensure_str(args.get("term", "")).strip()
+    from_ag = ensure_str(args.get("from_agency", "")).strip()
+    to_ag = ensure_str(args.get("to_agency", "")).strip()
     if not term:
         return {"status": "error", "message": "term is required"}
     term_lower = term.lower()
@@ -160,7 +193,7 @@ def translate_terminology(args: dict) -> dict:
 
 def get_reporting_requirements(args: dict) -> dict:
     drug = _drug(args)
-    event_type = args.get("event_type", "fatal_life_threatening").strip().lower().replace(" ", "_")
+    event_type = ensure_str(args.get("event_type", "fatal_life_threatening")).strip().lower().replace(" ", "_")
     timeline = REPORTING_TIMELINES.get(event_type)
     if not timeline:
         return {"status": "ok", "source": "Reporting Timelines", "available_types": list(REPORTING_TIMELINES.keys())}
@@ -174,7 +207,7 @@ def get_reporting_requirements(args: dict) -> dict:
 
 
 def compare_classification_systems(args: dict) -> dict:
-    system = args.get("system", "causality").strip().lower()
+    system = ensure_str(args.get("system", "causality")).strip().lower()
     if system == "causality":
         return {"status": "ok", "source": "Causality Assessment Systems", "systems": CAUSALITY_METHODS}
     elif system in ("reporting", "timelines"):
@@ -232,7 +265,7 @@ def main():
     except json.JSONDecodeError as e:
         print(json.dumps({"status": "error", "message": str(e)}))
         return
-    tool = p.get("tool", "").strip()
+    tool = ensure_str(p.get("tool", "")).strip()
     args = p.get("arguments", p.get("args", {}))
     h = DISPATCH.get(tool)
     if not h:

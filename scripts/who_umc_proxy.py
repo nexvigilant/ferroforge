@@ -19,6 +19,43 @@ writes a structured JSON response to stdout. No external dependencies — stdlib
 import json
 import sys
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely. Prevents 'AttributeError: strip'."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        import json
+        try:
+            return json.dumps(val)
+        except:
+            return str(val)
+    return str(val)
+
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
 
 def get_signal_methodology(args: dict) -> dict:
     """
@@ -202,7 +239,7 @@ def search_vigibase(args: dict) -> dict:
     """
     drug = (args.get("drug") or args.get("drug_name") or args.get("name")
             or args.get("substance") or args.get("query") or "").strip()
-    reaction = args.get("reaction", "").strip()
+    reaction = ensure_str(args.get("reaction")).strip()
 
     return {
         "status": "stub",
@@ -226,7 +263,7 @@ def get_country_programs(args: dict) -> dict:
     Returns information about WHO Programme for International Drug Monitoring
     member countries. STUB — requires WHO-UMC data access.
     """
-    country = args.get("country", "").strip()
+    country = ensure_str(args.get("country")).strip()
 
     return {
         "status": "stub",
@@ -453,7 +490,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

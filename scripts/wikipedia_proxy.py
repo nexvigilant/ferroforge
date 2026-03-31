@@ -20,6 +20,39 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 MEDIAWIKI_API = "https://en.wikipedia.org/w/api.php"
 REST_API = "https://en.wikipedia.org/api/rest_v1"
 REQUEST_TIMEOUT_SECONDS = 15
@@ -83,11 +116,11 @@ def search_articles(args: dict) -> dict:
     Full-text search across Wikipedia articles via the MediaWiki opensearch/query API.
     Returns titles, snippets, page IDs, and word counts.
     """
-    query = args.get("query", "").strip()
+    query = ensure_str(args.get("query", "")).strip()
     if not query:
         return {"status": "error", "message": "query is required", "count": 0, "results": []}
 
-    limit = int(args.get("limit", 10))
+    limit = get_int_param(args, "limit", 10)
     limit = max(1, min(limit, 50))
 
     data = _mediawiki({
@@ -126,7 +159,7 @@ def get_article_summary(args: dict) -> dict:
     Get a structured summary via the Wikipedia REST API /page/summary endpoint.
     Returns title, description, extract, thumbnail, and content URLs.
     """
-    title = args.get("title", "").strip()
+    title = ensure_str(args.get("title", "")).strip()
     if not title:
         return {"status": "error", "message": "title is required"}
 
@@ -175,7 +208,7 @@ def get_article_sections(args: dict) -> dict:
     Get the section structure and plain-text content of a Wikipedia article.
     Uses MediaWiki parse API to extract sections with their text.
     """
-    title = args.get("title", "").strip()
+    title = ensure_str(args.get("title", "")).strip()
     if not title:
         return {"status": "error", "message": "title is required", "count": 0, "sections": []}
 
@@ -254,7 +287,7 @@ def get_references(args: dict) -> dict:
     Extract external references from a Wikipedia article.
     Uses the MediaWiki parse API to get external links.
     """
-    title = args.get("title", "").strip()
+    title = ensure_str(args.get("title", "")).strip()
     if not title:
         return {"status": "error", "message": "title is required", "count": 0, "references": []}
 
@@ -295,7 +328,7 @@ def get_categories(args: dict) -> dict:
 
     Get all categories for a Wikipedia article via the MediaWiki query API.
     """
-    title = args.get("title", "").strip()
+    title = ensure_str(args.get("title", "")).strip()
     if not title:
         return {"status": "error", "message": "title is required", "count": 0, "categories": []}
 
@@ -333,11 +366,11 @@ def get_links(args: dict) -> dict:
     Get internal Wikipedia article links from a page.
     Useful for knowledge graph traversal and related article discovery.
     """
-    title = args.get("title", "").strip()
+    title = ensure_str(args.get("title", "")).strip()
     if not title:
         return {"status": "error", "message": "title is required", "count": 0, "links": []}
 
-    limit = int(args.get("limit", 50))
+    limit = get_int_param(args, "limit", 50)
     limit = max(1, min(limit, 500))
 
     data = _mediawiki({
@@ -396,7 +429,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

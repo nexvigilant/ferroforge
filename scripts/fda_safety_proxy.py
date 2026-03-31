@@ -16,6 +16,39 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 ENFORCEMENT_URL = "https://api.fda.gov/drug/enforcement.json"
 EVENT_URL = "https://api.fda.gov/drug/event.json"
 LABEL_URL = "https://api.fda.gov/drug/label.json"
@@ -84,7 +117,7 @@ def search_safety_communications(args: dict) -> dict:
         return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "count": 0, "results": []}
 
     year = args.get("year", None)
-    limit = int(args.get("limit", DEFAULT_LIMIT))
+    limit = get_int_param(args, "limit", DEFAULT_LIMIT)
     limit = max(1, min(limit, 100))
 
     search_parts = [f'openfda.generic_name:"{_quote(drug_name)}"+openfda.brand_name:"{_quote(drug_name)}"']
@@ -140,7 +173,7 @@ def get_medwatch_alerts(args: dict) -> dict:
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "data": {}}
 
-    limit = int(args.get("limit", DEFAULT_LIMIT))
+    limit = get_int_param(args, "limit", DEFAULT_LIMIT)
     limit = max(1, min(limit, 100))
 
     search_expr = f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"+AND+serious:1'
@@ -256,8 +289,8 @@ def get_safety_labeling_changes(args: dict) -> dict:
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "data": {}}
 
-    section = args.get("section", "").strip().lower()
-    limit = int(args.get("limit", DEFAULT_LIMIT))
+    section = ensure_str(args.get("section", "")).strip().lower()
+    limit = get_int_param(args, "limit", DEFAULT_LIMIT)
     limit = max(1, min(limit, 100))
 
     search_expr = f'openfda.generic_name:"{_quote(drug_name)}"+openfda.brand_name:"{_quote(drug_name)}"'
@@ -348,7 +381,7 @@ def get_recall_classification(args: dict) -> dict:
     if not drug_name:
         return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "data": {}}
 
-    limit = int(args.get("limit", 25))
+    limit = get_int_param(args, "limit", 25)
     limit = max(1, min(limit, 100))
 
     search_expr = f'openfda.generic_name:"{_quote(drug_name)}"+openfda.brand_name:"{_quote(drug_name)}"'
@@ -559,7 +592,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

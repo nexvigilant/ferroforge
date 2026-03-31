@@ -16,6 +16,39 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 DRUGSFDA_URL = "https://api.fda.gov/drug/drugsfda.json"
 LABEL_URL = "https://api.fda.gov/drug/label.json"
 ENFORCEMENT_URL = "https://api.fda.gov/drug/enforcement.json"
@@ -83,8 +116,8 @@ def search_approvals(args: dict) -> dict:
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
 
-    application_type = args.get("application_type", "").strip()
-    limit = int(args.get("limit", DEFAULT_LIMIT))
+    application_type = ensure_str(args.get("application_type", "")).strip()
+    limit = get_int_param(args, "limit", DEFAULT_LIMIT)
     limit = max(1, min(limit, 100))
 
     search_parts = [f'openfda.generic_name:"{_quote(drug_name)}"+openfda.brand_name:"{_quote(drug_name)}"']
@@ -143,7 +176,7 @@ def get_approval_history(args: dict) -> dict:
     Get full approval timeline for a drug including supplements.
     Accepts application_number (e.g. "NDA021202") or drug_name for lookup.
     """
-    application_number = args.get("application_number", "").strip()
+    application_number = ensure_str(args.get("application_number", "")).strip()
     drug_name = _resolve_drug(args)
 
     if not application_number and not drug_name:
@@ -204,7 +237,7 @@ def get_labeling_changes(args: dict) -> dict:
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "data": {}}
 
-    limit = int(args.get("limit", DEFAULT_LIMIT))
+    limit = get_int_param(args, "limit", DEFAULT_LIMIT)
     limit = max(1, min(limit, 100))
 
     search_expr = f'openfda.generic_name:"{_quote(drug_name)}"+openfda.brand_name:"{_quote(drug_name)}"'
@@ -386,9 +419,9 @@ def search_recalls(args: dict) -> dict:
     if not drug_name:
         return {"status": "error", "message": "drug_name is required", "count": 0, "results": []}
 
-    classification = args.get("classification", "").strip()
-    reason = args.get("reason", "").strip()
-    limit = int(args.get("limit", DEFAULT_LIMIT))
+    classification = ensure_str(args.get("classification", "")).strip()
+    reason = ensure_str(args.get("reason", "")).strip()
+    limit = get_int_param(args, "limit", DEFAULT_LIMIT)
     limit = max(1, min(limit, 100))
 
     search_parts = [f'openfda.generic_name:"{_quote(drug_name)}"+openfda.brand_name:"{_quote(drug_name)}"']
@@ -472,7 +505,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

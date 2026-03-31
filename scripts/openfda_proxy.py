@@ -22,11 +22,48 @@ _FAERS_DATE_MIN = "19000101"
 _FAERS_DATE_MAX = "20991231"
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely. Prevents 'AttributeError: strip'."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except:
+            return str(val)
+    return str(val)
+
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
 def _resolve_drug(args: dict) -> str:
     """Resolve drug name from any known alias. Agents use varied parameter names."""
-    return (args.get("drug_name") or args.get("drug") or args.get("name")
-            or args.get("substance") or args.get("product")
-            or args.get("query") or "").strip()
+    raw = (args.get("drug_name") or args.get("drug") or args.get("name")
+           or args.get("substance") or args.get("product")
+           or args.get("query") or "")
+    return ensure_str(raw).strip()
 REQUEST_TIMEOUT_SECONDS = 15
 _RETRY_CODES = {429, 503}
 _MAX_RETRIES = 3
@@ -84,10 +121,9 @@ def search_adverse_events(args: dict) -> dict:
     if not drug_name:
         return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "count": 0, "results": []}
 
-    reaction = args.get("reaction", "").strip()
+    reaction = ensure_str(args.get("reaction")).strip()
     serious = args.get("serious", None)
-    limit = int(args.get("limit", DEFAULT_LIMIT))
-    limit = max(1, min(limit, 100))  # clamp to openFDA bounds
+    limit = get_int_param(args, "limit", DEFAULT_LIMIT, 1, 100)
 
     # Build search expression
     search_parts = [f'patient.drug.openfda.generic_name:"{_quote(drug_name)}"']
@@ -367,7 +403,7 @@ def get_drug_counts(args: dict) -> dict:
     if not drug_name:
         return {"status": "error", "message": "drug_name is required (also accepts: drug, name, substance, query)", "count": 0, "results": []}
 
-    count_field = args.get("count_field", DEFAULT_COUNT_FIELD).strip()
+    count_field = ensure_str(args.get("count_field", DEFAULT_COUNT_FIELD)).strip()
     if not count_field:
         count_field = DEFAULT_COUNT_FIELD
 
@@ -400,11 +436,12 @@ def get_top_drugs(args: dict) -> dict:
     Answers "which drugs had the most adverse event reports last quarter?"
     without requiring a specific drug name.
     """
-    limit = int(args.get("limit", 10))
-    if limit < 1 or limit > 100:
-        limit = 10
-    date_start = _quote(args.get("date_start", "").strip()) if args.get("date_start", "").strip() else ""
-    date_end = _quote(args.get("date_end", "").strip()) if args.get("date_end", "").strip() else ""
+    limit = get_int_param(args, "limit", 10, 1, 100)
+    
+    date_start_str = ensure_str(args.get("date_start")).strip()
+    date_end_str = ensure_str(args.get("date_end")).strip()
+    date_start = _quote(date_start_str) if date_start_str else ""
+    date_end = _quote(date_end_str) if date_end_str else ""
 
     # Build search expression
     search_parts = []
@@ -466,7 +503,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

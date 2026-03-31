@@ -7,12 +7,12 @@
   "tools": [
     {
       "name": "search-trials",
-      "description": "Search clinical trials by drug, condition, sponsor, or status",
+      "description": "Search clinical trials by drug, condition, sponsor, or status. The 'query' parameter is always required as the primary search term (e.g. drug name). Use condition, intervention, status, and phase as optional filters to narrow results.",
       "parameters": [
         {
           "name": "query",
           "type": "string",
-          "description": "Free-text search query",
+          "description": "Required free-text search term (e.g. 'semaglutide', 'breast cancer checkpoint inhibitor'). This is the primary search — condition/intervention/status are optional filters applied on top.",
           "required": true
         },
         {
@@ -220,13 +220,19 @@
     },
     {
       "name": "get-serious-adverse-events",
-      "description": "Get reported serious adverse events from trial results (requires posted results)",
+      "description": "Get reported serious adverse events from trial results (requires posted results). Use filter_event to narrow large result sets to specific events or organ systems.",
       "parameters": [
         {
           "name": "nct_id",
           "type": "string",
           "description": "NCT identifier",
           "required": true
+        },
+        {
+          "name": "filter_event",
+          "type": "string",
+          "description": "Optional case-insensitive filter — only return SAEs whose term or organ system contains this substring (e.g. 'pancreatitis', 'cardiac', 'neoplasm'). Omit to return all SAEs.",
+          "required": false
         }
       ],
       "outputSchema": {
@@ -263,6 +269,60 @@
           "frequency_threshold": {
             "type": "string",
             "description": "Reporting frequency threshold"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "get-results-summary",
+      "description": "Get a high-level results summary for a completed trial: participant flow, baseline demographics, primary/secondary outcome measures, and adverse event overview. Requires posted results.",
+      "parameters": [
+        {
+          "name": "nct_id",
+          "type": "string",
+          "description": "NCT identifier (e.g., NCT03548935)",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "ok | error"
+          },
+          "nct_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "has_results": {
+            "type": "boolean",
+            "description": "Whether trial has posted results"
+          },
+          "participant_flow": {
+            "type": "object",
+            "description": "Groups and period milestones with participant counts"
+          },
+          "baseline_population": {
+            "type": "string",
+            "description": "Baseline population description"
+          },
+          "outcome_measures": {
+            "type": "array",
+            "description": "Primary and secondary outcome measures with results (top 10)"
+          },
+          "adverse_events_overview": {
+            "type": "object",
+            "description": "High-level AE summary: group counts for serious, other, and death events"
           }
         },
         "required": [

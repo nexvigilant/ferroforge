@@ -22,6 +22,39 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 OPENFDA_LABEL_URL = "https://api.fda.gov/drug/label.json"
 OPENFDA_EVENT_URL = "https://api.fda.gov/drug/event.json"
 REQUEST_TIMEOUT_SECONDS = 20
@@ -359,7 +392,7 @@ def get_products(args: dict) -> dict:
     Return Novartis product portfolio. Optionally filter by therapeutic area
     or search by brand/generic name.
     """
-    ta_filter = (args.get("therapeutic_area") or "").strip().lower()
+    ta_filter = ensure_str(args.get("therapeutic_area") or "").strip().lower()
     query = (args.get("query") or args.get("drug_name") or args.get("drug")
              or args.get("name") or "").strip().lower()
 
@@ -395,8 +428,8 @@ def get_pipeline(args: dict) -> dict:
     Return Novartis development pipeline. Optionally filter by phase or
     therapeutic area.
     """
-    phase_filter = (args.get("phase") or "").strip().lower()
-    ta_filter = (args.get("therapeutic_area") or "").strip().lower()
+    phase_filter = ensure_str(args.get("phase") or "").strip().lower()
+    ta_filter = ensure_str(args.get("therapeutic_area") or "").strip().lower()
 
     results = []
     for candidate in NOVARTIS_PIPELINE:
@@ -504,7 +537,7 @@ def get_medical_letters(args: dict) -> dict:
     """
     product_filter = (args.get("product_name") or args.get("drug_name")
                       or args.get("drug") or "").strip().lower()
-    query = (args.get("query") or "").strip().lower()
+    query = ensure_str(args.get("query") or "").strip().lower()
 
     results = []
     for comm in NOVARTIS_SAFETY_COMMUNICATIONS:
@@ -599,7 +632,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

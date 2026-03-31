@@ -341,7 +341,10 @@ impl ConfigRegistry {
         if authenticated {
             return self.tool_infos(); // all tools
         }
-        // Unauthenticated: meta-tools + public config tools only
+
+        // Unauthenticated: hide internal meta-tools + private config tools
+        const INTERNAL_META_TOOLS: &[&str] = &["nexvigilant_forge_diagnose", "nexvigilant_hop"];
+
         let all = self.tool_infos();
         let private_prefixes: Vec<String> = self.configs
             .iter()
@@ -351,7 +354,11 @@ impl ConfigRegistry {
 
         all.into_iter()
             .filter(|tool| {
-                // Keep meta-tools (they don't have a domain prefix from configs)
+                // Hide internal tools
+                if INTERNAL_META_TOOLS.contains(&tool.name.as_str()) {
+                    return false;
+                }
+                // Keep other meta-tools (they don't have a domain prefix from configs)
                 !private_prefixes.iter().any(|prefix| tool.name.starts_with(prefix))
             })
             .collect()

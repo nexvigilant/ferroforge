@@ -21,6 +21,39 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 USER_AGENT = "NexVigilant-Station/1.0 (station@nexvigilant.com)"
 GOVUK_SEARCH_API = "https://www.gov.uk/api/search.json"
 REQUEST_TIMEOUT = 15
@@ -112,7 +145,7 @@ def get_drug_safety_updates(args: dict) -> dict:
     drug = _drug(args)
     if not drug:
         return {"status": "error", "message": "Missing required parameter: drug_name"}
-    limit = min(int(args.get("limit", 10)), 100)
+    limit = get_int_param(args, "limit", 10, max_val=100)
     # GOV.UK Search API — filter to drug safety updates
     url = (f"{GOVUK_SEARCH_API}?q={_quote(drug)}"
            f"&filter_format=drug_safety_update&count={limit}")
@@ -152,7 +185,7 @@ def get_safety_alerts(args: dict) -> dict:
     drug = _drug(args)
     if not drug:
         return {"status": "error", "message": "Missing required parameter: drug_name"}
-    limit = min(int(args.get("limit", 10)), 100)
+    limit = get_int_param(args, "limit", 10, max_val=100)
     url = (f"{GOVUK_SEARCH_API}?q={_quote(drug)}"
            f"&filter_format=medical_safety_alert&count={limit}")
     try:
@@ -322,7 +355,7 @@ def main():
     except json.JSONDecodeError as exc:
         print(json.dumps({"status": "error", "message": f"Invalid JSON: {exc}"}))
         sys.exit(1)
-    tool = payload.get("tool", "").strip()
+    tool = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
     if tool not in DISPATCH:
         print(json.dumps({"status": "error", "message": f"Unknown tool '{tool}'. Available: {', '.join(sorted(DISPATCH))}"}))

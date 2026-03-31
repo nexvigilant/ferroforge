@@ -1,8 +1,11 @@
 name: autopilot-pharma-monitor
 description: >
   Autopilot monitoring chain: classify company tier, then determine sweep action.
-  Input: raw FAERS metrics. Output: alert level + action + monitoring frequency.
-version: 0.1.0
+  Input: raw FAERS metrics + pre-computed deltas. Output: alert level + action + monitoring frequency.
+  Step 1 (pharma-safety-signal) classifies signal_tier + monitoring_frequency.
+  Step 2 (autopilot-pharma-sweep) determines alert_level + action using absolute thresholds
+  and pre-computed ratios (death_ratio, report_delta_pct) from the sweep script.
+version: 0.2.0
 micrograms_dir: ../micrograms
 accumulate: true
 steps:
@@ -10,25 +13,27 @@ steps:
   - autopilot-pharma-sweep
 
 tests:
-  - name: high-volume critical company
+  - name: high-volume critical company — death spike
     input:
       total_faers_reports: 2400000
       top_reaction_count: 200000
       total_reports: 2400000
-      death_count: 80000
+      death_count: 6000
+      death_ratio: 1.5
       new_signals: 0
     expect:
       signal_tier: high_signal_volume
       monitoring_frequency: continuous
-      alert_level: WATCH
-      action: continuous_monitor
+      alert_level: CRITICAL
+      action: immediate_review
 
-  - name: moderate company routine
+  - name: moderate company routine — no alerts
     input:
       total_faers_reports: 300000
       top_reaction_count: 20000
       total_reports: 300000
       death_count: 100
+      death_ratio: 1.0
       new_signals: 0
     expect:
       signal_tier: moderate_signal_volume
@@ -36,13 +41,26 @@ tests:
       alert_level: ROUTINE
       action: periodic_check
 
-  - name: new signals on mid-tier
+  - name: new signals on mid-tier — many signals
     input:
       total_faers_reports: 700000
       top_reaction_count: 50000
       total_reports: 700000
       death_count: 200
+      death_ratio: 0.9
       new_signals: 5
     expect:
       alert_level: HIGH
       action: signal_investigation
+
+  - name: report volume surge
+    input:
+      total_faers_reports: 500000
+      top_reaction_count: 30000
+      total_reports: 500000
+      death_count: 50
+      new_signals: 0
+      report_delta_pct: 15.0
+    expect:
+      alert_level: WATCH
+      action: trend_analysis

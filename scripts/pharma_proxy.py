@@ -253,6 +253,42 @@ COMPANY_REGISTRY = {
 # HTTP helpers
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely. Prevents 'AttributeError: strip'."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except:
+            return str(val)
+    return str(val)
+
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
 def _fetch(url: str) -> dict:
     """Execute HTTP GET, return parsed JSON. Retries on 429/503."""
     req = urllib.request.Request(
@@ -315,7 +351,7 @@ def _manufacturer_search(company_key: str, prefix: str = "openfda") -> str:
 
 def get_portfolio(company_key: str, args: dict) -> dict:
     """Fetch approved product portfolio from openFDA labels."""
-    limit = min(int(args.get("limit", 25)), 100)
+    limit = get_int_param(args, "limit", 25, 1, 100)
     search = _manufacturer_search(company_key)
     url = f"{OPENFDA_LABEL}?search={search}&limit={limit}&sort=effective_time:desc"
 
@@ -485,7 +521,7 @@ def get_recalls(company_key: str, args: dict) -> dict:
     """Fetch product recalls from openFDA enforcement."""
     info = COMPANY_REGISTRY.get(company_key, {})
     names = info.get("openfda_manufacturer", [company_key])
-    limit = min(int(args.get("limit", 20)), 100)
+    limit = get_int_param(args, "limit", 20, 1, 100)
 
     # Enforcement API uses recalling_firm, not openfda.manufacturer_name
     clauses = [f'recalling_firm:"{_quote(n)}"' for n in names]
@@ -527,8 +563,8 @@ def get_recalls(company_key: str, args: dict) -> dict:
 def get_labeling_changes(company_key: str, args: dict) -> dict:
     """Fetch recent labeling changes from openFDA."""
     import datetime
-    since_year = int(args.get("since_year", datetime.date.today().year - 2))
-    limit = min(int(args.get("limit", 20)), 100)
+    since_year = get_int_param(args, "since_year", datetime.date.today().year - 2, 1990, 2027)
+    limit = get_int_param(args, "limit", 20, 1, 100)
     search = _manufacturer_search(company_key)
     search = f"{search}+AND+effective_time:[{since_year}0101+TO+20271231]"
     url = f"{OPENFDA_LABEL}?search={search}&limit={limit}&sort=effective_time:desc"
@@ -564,11 +600,11 @@ def get_labeling_changes(company_key: str, args: dict) -> dict:
 
 def search_products(company_key: str, args: dict) -> dict:
     """Search company products by keyword."""
-    query = (args.get("query") or args.get("search") or "").strip()
+    query = ensure_str(args.get("query") or args.get("search") or "").strip()
     if not query:
         return {"status": "error", "message": "query parameter is required", "company": company_key}
 
-    limit = min(int(args.get("limit", 10)), 50)
+    limit = get_int_param(args, "limit", 10, 1, 50)
     mfr = _manufacturer_search(company_key)
     q = _quote(query)
     search = f"{mfr}+AND+({q})"
@@ -619,8 +655,8 @@ def get_head_to_head(company_key: str, args: dict) -> dict:
     Computes PRR (Proportional Reporting Ratio) for a specific event for each
     company's products, enabling head-to-head safety signal comparison.
     """
-    competitor = (args.get("competitor") or "").strip().lower()
-    event = (args.get("event") or "").strip()
+    competitor = ensure_str(args.get("competitor") or "").strip().lower()
+    event = ensure_str(args.get("event") or "").strip()
     if not competitor:
         return {"status": "error", "message": "competitor parameter required (e.g. 'novartis')", "company": company_key}
     if not event:
@@ -735,7 +771,7 @@ def main() -> None:
         print(json.dumps({"status": "error", "message": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 
-    raw_tool = payload.get("tool", "").strip()
+    raw_tool = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
     company_key = args.pop("company_key", None)
 

@@ -22,6 +22,39 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 OPENFDA_LABEL_URL = "https://api.fda.gov/drug/label.json"
 REQUEST_TIMEOUT_SECONDS = 20
 _RETRY_CODES = {429, 503}
@@ -334,7 +367,7 @@ def get_products(args: dict) -> dict:
 
     Return Eli Lilly product portfolio. Optionally filter by therapeutic area.
     """
-    area_filter = (args.get("therapeutic_area") or "").strip().lower()
+    area_filter = ensure_str(args.get("therapeutic_area") or "").strip().lower()
 
     products = LILLY_PRODUCTS
     if area_filter:
@@ -370,8 +403,8 @@ def get_pipeline(args: dict) -> dict:
     Return Eli Lilly development pipeline. Optionally filter by phase or
     therapeutic area.
     """
-    phase_filter = (args.get("phase") or "").strip()
-    area_filter = (args.get("therapeutic_area") or "").strip().lower()
+    phase_filter = ensure_str(args.get("phase") or "").strip()
+    area_filter = ensure_str(args.get("therapeutic_area") or "").strip().lower()
 
     candidates = LILLY_PIPELINE
     if phase_filter:
@@ -568,7 +601,7 @@ def main() -> None:
         print(json.dumps(result))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

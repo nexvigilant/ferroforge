@@ -16,6 +16,39 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
 BASE_URL = "https://api.platform.opentargets.org/api/v4"
 GRAPHQL_URL = f"{BASE_URL}/graphql"
 REQUEST_TIMEOUT = 20
@@ -105,7 +138,7 @@ def _graphql(query: str, variables: dict) -> dict:
 def search_targets(args: dict) -> dict:
     """Handler for search-targets."""
     query = args.get("query", "")
-    limit = min(int(args.get("limit", 10)), 100)
+    limit = get_int_param(args, "limit", 10, max_val=100)
     gql = """
     query SearchTargets($q: String!, $size: Int!) {
       search(queryString: $q, entityNames: ["target"], page: {size: $size, index: 0}) {
@@ -129,7 +162,7 @@ def search_targets(args: dict) -> dict:
 def search_diseases(args: dict) -> dict:
     """Handler for search-diseases."""
     query = args.get("query", "")
-    limit = min(int(args.get("limit", 10)), 100)
+    limit = get_int_param(args, "limit", 10, max_val=100)
     gql = """
     query SearchDiseases($q: String!, $size: Int!) {
       search(queryString: $q, entityNames: ["disease"], page: {size: $size, index: 0}) {
@@ -152,8 +185,8 @@ def search_diseases(args: dict) -> dict:
 
 def get_associations(args: dict) -> dict:
     """Handler for get-associations."""
-    target_id = args.get("target_id", "").strip()
-    limit = min(int(args.get("limit", 25)), 100)
+    target_id = ensure_str(args.get("target_id", "")).strip()
+    limit = get_int_param(args, "limit", 25, max_val=100)
     gql = """
     query GetAssociations($id: String!, $size: Int!) {
       target(ensemblId: $id) {
@@ -191,8 +224,8 @@ def get_associations(args: dict) -> dict:
 
 def get_drug_evidence(args: dict) -> dict:
     """Handler for get-drug-evidence."""
-    target_id = args.get("target_id", "").strip()
-    disease_id = args.get("disease_id", "").strip()
+    target_id = ensure_str(args.get("target_id", "")).strip()
+    disease_id = ensure_str(args.get("disease_id", "")).strip()
     gql = """
     query GetDrugEvidence($ensemblId: String!, $efoId: String!) {
       target(ensemblId: $ensemblId) {
@@ -224,7 +257,7 @@ def get_drug_evidence(args: dict) -> dict:
 
 def get_target_safety(args: dict) -> dict:
     """Handler for get-target-safety."""
-    target_id = args.get("target_id", "").strip()
+    target_id = ensure_str(args.get("target_id", "")).strip()
     gql = """
     query GetTargetSafety($id: String!) {
       target(ensemblId: $id) {
@@ -259,7 +292,7 @@ def get_target_safety(args: dict) -> dict:
 
 def get_pharmacogenomics(args: dict) -> dict:
     """Handler for get-pharmacogenomics."""
-    target_id = args.get("target_id", "").strip()
+    target_id = ensure_str(args.get("target_id", "")).strip()
     gql = """
     query GetPharmacogenomics($id: String!) {
       target(ensemblId: $id) {

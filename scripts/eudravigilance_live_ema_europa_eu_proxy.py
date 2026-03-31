@@ -19,6 +19,39 @@ import urllib.parse
 import urllib.request
 
 
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
+
 def _launch_browser():
     """Launch Playwright headless browser."""
     try:
@@ -38,7 +71,7 @@ TIMEOUT = 15
 
 def extract_case_counts(args: dict) -> dict:
     """Extract actual ICSR case counts from the EudraVigilance OBIEE dashboard via headless browser. Returns total cases, serious/non-serious split, and raw table data."""
-    drug = args.get("drug", "").strip()
+    drug = ensure_str(args.get("drug", "")).strip()
     if not drug:
         return {"status": "error", "message": "drug is required"}
 
@@ -70,7 +103,7 @@ def extract_case_counts(args: dict) -> dict:
 
 def extract_soc_breakdown(args: dict) -> dict:
     """Extract System Organ Class breakdown with actual case counts from EudraVigilance dashboard. Returns per-SOC serious/non-serious counts."""
-    drug = args.get("drug", "").strip()
+    drug = ensure_str(args.get("drug", "")).strip()
     if not drug:
         return {"status": "error", "message": "drug is required"}
 
@@ -102,7 +135,7 @@ def extract_soc_breakdown(args: dict) -> dict:
 
 def extract_demographics(args: dict) -> dict:
     """Extract age group and sex distribution from EudraVigilance dashboard. Returns actual demographic case counts."""
-    drug = args.get("drug", "").strip()
+    drug = ensure_str(args.get("drug", "")).strip()
     if not drug:
         return {"status": "error", "message": "drug is required"}
 
@@ -151,7 +184,7 @@ def main() -> None:
         print(json.dumps({"status": "error", "message": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

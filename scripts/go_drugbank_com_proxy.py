@@ -19,6 +19,39 @@ import urllib.parse
 import urllib.request
 
 
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
+
 def _launch_browser():
     """Launch Playwright headless browser."""
     try:
@@ -38,7 +71,7 @@ TIMEOUT = 15
 
 def get_drug_info(args: dict) -> dict:
     """Get comprehensive drug profile including pharmacology and mechanism"""
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name", "")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -70,7 +103,7 @@ def get_drug_info(args: dict) -> dict:
 
 def get_interactions(args: dict) -> dict:
     """Get drug-drug interactions with mechanism descriptions"""
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name", "")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -102,7 +135,7 @@ def get_interactions(args: dict) -> dict:
 
 def get_pharmacology(args: dict) -> dict:
     """Get pharmacokinetics and pharmacodynamics data"""
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name", "")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -134,7 +167,7 @@ def get_pharmacology(args: dict) -> dict:
 
 def get_targets(args: dict) -> dict:
     """Get drug targets (enzymes, transporters, carriers)"""
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name", "")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -166,7 +199,7 @@ def get_targets(args: dict) -> dict:
 
 def get_adverse_effects(args: dict) -> dict:
     """Get known adverse effects with frequency data"""
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name", "")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -198,7 +231,7 @@ def get_adverse_effects(args: dict) -> dict:
 
 def get_classification(args: dict) -> dict:
     """Get drug classification — pharmacologic class, mechanism of action, ATC codes, product type, route, and dosage form"""
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name", "")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -230,7 +263,7 @@ def get_classification(args: dict) -> dict:
 
 def get_contraindications(args: dict) -> dict:
     """Get contraindications, boxed warnings, warnings/precautions, pregnancy, pediatric, and geriatric use information"""
-    drug_name = args.get("drug_name", "").strip()
+    drug_name = ensure_str(args.get("drug_name", "")).strip()
     if not drug_name:
         return {"status": "error", "message": "drug_name is required"}
 
@@ -283,7 +316,7 @@ def main() -> None:
         print(json.dumps({"status": "error", "message": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 
-    tool_name = payload.get("tool", "").strip()
+    tool_name = ensure_str(payload.get("tool", "")).strip()
     args = payload.get("arguments", payload.get("args", {}))
 
     if tool_name not in TOOL_DISPATCH:

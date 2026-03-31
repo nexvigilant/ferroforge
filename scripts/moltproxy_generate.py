@@ -25,6 +25,39 @@ from pathlib import Path
 from textwrap import dedent
 
 
+import json
+
+def ensure_str(val) -> str:
+    """Coerce any input to string safely to prevent AttributeError."""
+    if val is None:
+        return ""
+    if isinstance(val, (int, float, bool)):
+        return str(val)
+    if isinstance(val, (list, dict)):
+        try:
+            return json.dumps(val)
+        except Exception:
+            return str(val)
+    return str(val)
+
+def get_int_param(args: dict, key: str, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely parse integer parameter with optional clamping."""
+    val = args.get(key)
+    if val is None:
+        return default
+    try:
+        res = int(val)
+    except (ValueError, TypeError):
+        return default
+    if min_val is not None:
+        res = max(res, min_val)
+    if max_val is not None:
+        res = min(res, max_val)
+    return res
+
+
+
+
 def slugify(domain: str) -> str:
     """Convert domain to Python-safe filename slug."""
     return re.sub(r"[^a-z0-9]+", "_", domain.lower()).strip("_")
@@ -102,7 +135,7 @@ def generate_proxy(config: dict, use_browser: bool = False) -> str:
 
         for p in required_params:
             pname = p["name"]
-            lines.append(f'    {pname} = args.get("{pname}", "").strip()')
+            lines.append(f'    {pname} = ensure_str(args.get("{pname}", "")).strip()')
             lines.append(f'    if not {pname}:')
             lines.append(f'        return {{"status": "error", "message": "{pname} is required"}}')
 
@@ -185,7 +218,7 @@ def generate_proxy(config: dict, use_browser: bool = False) -> str:
         '        print(json.dumps({"status": "error", "message": f"Invalid JSON: {exc}"}))',
         '        sys.exit(1)',
         '',
-        '    tool_name = payload.get("tool", "").strip()',
+        '    tool_name = ensure_str(payload.get("tool", "")).strip()',
         '    args = payload.get("arguments", payload.get("args", {}))',
         '',
         '    if tool_name not in TOOL_DISPATCH:',
