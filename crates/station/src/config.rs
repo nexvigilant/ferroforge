@@ -286,7 +286,7 @@ impl ConfigRegistry {
             .iter()
             .flat_map(|config| {
                 config.tools.iter().map(move |tool| {
-                    let prefixed_name = format!("{}_{}", config.domain.replace('.', "_"), tool.name.replace('-', "_"));
+                    let prefixed_name = format!("{}_{}", config.domain.replace('.', "_").replace('-', "_"), tool.name.replace('-', "_"));
 
                     // Build JSON Schema for input parameters
                     let mut properties = serde_json::Map::new();
@@ -361,7 +361,7 @@ impl ConfigRegistry {
     pub fn is_tool_private(&self, mcp_name: &str) -> bool {
         for config in &self.configs {
             if config.private {
-                let domain_prefix = format!("{}_", config.domain.replace('.', "_"));
+                let domain_prefix = format!("{}_", config.domain.replace('.', "_").replace('-', "_"));
                 if mcp_name.starts_with(&domain_prefix) {
                     return true;
                 }
@@ -373,7 +373,7 @@ impl ConfigRegistry {
     /// Find a tool definition by its prefixed MCP name.
     pub fn find_tool(&self, mcp_name: &str) -> Option<(&HubConfig, &ToolDef)> {
         for config in &self.configs {
-            let domain_prefix = format!("{}_", config.domain.replace('.', "_"));
+            let domain_prefix = format!("{}_", config.domain.replace('.', "_").replace('-', "_"));
             if let Some(tool_name) = mcp_name.strip_prefix(&domain_prefix) {
                 let tool_name_dashed = tool_name.replace('_', "-");
                 if let Some(tool) = config.tools.iter().find(|t| {

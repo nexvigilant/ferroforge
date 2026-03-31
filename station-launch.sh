@@ -17,5 +17,7 @@ fi
 exec "$STATION_BIN" \
     --config-dir "$CONFIG_DIR" \
     --telemetry-log "$TELEMETRY_LOG" \
-    --transport http \
-    --port "$PORT"
+    --transport combined \
+    --host 0.0.0.0 \
+    --port "$PORT" \
+    --exclude-private

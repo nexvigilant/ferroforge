@@ -46,7 +46,7 @@ const COURSES: &[Course] = &[
     },
     Course {
         name: "signal-investigation",
-        description: "Investigate a safety signal: FAERS data → disproportionality → EU confirmation → case reports → trial SAEs → PRAC status",
+        description: "Investigate a safety signal: FAERS data → disproportionality → EU confirmation → case reports → trial SAEs → PRAC status → multi-regional assessment",
         steps: &[
             CourseStep { tool: "api_fda_gov_search_adverse_events", example_params: r#"{"drug_name": "semaglutide", "reaction": "pancreatitis", "limit": 10}"# },
             CourseStep { tool: "open-vigil_fr_compute_disproportionality", example_params: r#"{"drug": "semaglutide", "event": "pancreatitis"}"# },
@@ -54,6 +54,7 @@ const COURSES: &[Course] = &[
             CourseStep { tool: "pubmed_ncbi_nlm_nih_gov_search_case_reports", example_params: r#"{"drug": "semaglutide", "event": "pancreatitis"}"# },
             CourseStep { tool: "clinicaltrials_gov_get_serious_adverse_events", example_params: r#"{"nct_id": "NCT03548935"}"# },
             CourseStep { tool: "www_ema_europa_eu_get_safety_signals", example_params: r#"{"substance": "semaglutide"}"# },
+            CourseStep { tool: "multiregional_nexvigilant_com_assess_global_safety", example_params: r#"{"drug_name": "semaglutide", "event": "pancreatitis"}"# },
         ],
     },
     Course {
@@ -78,20 +79,23 @@ const COURSES: &[Course] = &[
     },
     Course {
         name: "regulatory-intelligence",
-        description: "Trace regulatory lifecycle: ICH PV guidelines → EU assessment report → FDA approval history",
+        description: "Trace regulatory lifecycle: ICH PV guidelines → EU assessment report → FDA approval history → cross-jurisdictional comparison",
         steps: &[
             CourseStep { tool: "ich_org_get_pv_guidelines", example_params: r#"{}"# },
             CourseStep { tool: "www_ema_europa_eu_get_epar", example_params: r#"{"product": "ozempic"}"# },
             CourseStep { tool: "accessdata_fda_gov_get_approval_history", example_params: r#"{"drug": "semaglutide"}"# },
+            CourseStep { tool: "regulatory_mesh_nexvigilant_com_get_reporting_requirements", example_params: r#"{"drug_name": "semaglutide", "event_type": "fatal_life_threatening"}"# },
+            CourseStep { tool: "multiregional_nexvigilant_com_compare_regulatory_actions", example_params: r#"{"drug_name": "semaglutide"}"# },
         ],
     },
     Course {
         name: "competitive-landscape",
-        description: "Map competitive terrain: drug targets → head-to-head disproportionality → active clinical pipeline",
+        description: "Map competitive terrain: drug targets → head-to-head disproportionality → clinical pipeline → global regulatory comparison",
         steps: &[
             CourseStep { tool: "go_drugbank_com_get_targets", example_params: r#"{"drug": "semaglutide"}"# },
             CourseStep { tool: "open-vigil_fr_compare_drugs", example_params: r#"{"drug_a": "semaglutide", "drug_b": "tirzepatide"}"# },
             CourseStep { tool: "clinicaltrials_gov_search_trials", example_params: r#"{"condition": "obesity", "intervention": "GLP-1"}"# },
+            CourseStep { tool: "regulatory_mesh_nexvigilant_com_map_equivalent_actions", example_params: r#"{"action_type": "boxed_warning"}"# },
         ],
     },
 ];
@@ -189,6 +193,11 @@ fn handle_chart_course(args: &Value, _registry: &ConfigRegistry) -> ToolCallResu
             "station": "NexVigilant Station",
             "message": "Pick a course below and call this tool again with the 'course' parameter. Most users start with 'drug-safety-profile'. Each course returns the exact tool names and parameters to execute in order.",
             "tip": "Example: nexvigilant_chart_course({\"course\": \"drug-safety-profile\"})",
+            "endpoints": {
+                "primary": "https://station.nexvigilant.com/mcp",
+                "fallback": "https://mcp.nexvigilant.com/mcp",
+                "note": "Primary endpoint has zero cold-start. Fallback on Cloud Run if primary is unavailable."
+            },
             "courses": courses,
         });
 
