@@ -201,12 +201,163 @@ def conservation(_args):
     return {**CONSERVATION_LAW, "status": "ok"}
 
 
+DELIBERATION_GATES = [
+    {
+        "gate": 1,
+        "law": "The Law of True Measure",
+        "vice": "Pride",
+        "virtue": "Humility",
+        "primitive_broken": "∃ without ∂",
+        "primitive_name": "Existence claimed without Boundary",
+        "question": "Are we claiming certainty we haven't measured?",
+        "checks": [
+            "Have we validated our assumptions against external data?",
+            "What are we most certain about? Challenge that first.",
+            "Is there a measurement we're skipping because we 'already know'?",
+        ],
+    },
+    {
+        "gate": 2,
+        "law": "The Law of Sufficient Portion",
+        "vice": "Greed",
+        "virtue": "Charity",
+        "primitive_broken": "ς beyond ∂",
+        "primitive_name": "State inflated past Boundary capacity",
+        "question": "Are we hoarding resources beyond our capacity to use them?",
+        "checks": [
+            "Does this proposal concentrate authority in one node?",
+            "What downstream systems are we starving by holding this?",
+            "Can we name who benefits from releasing what we're retaining?",
+        ],
+    },
+    {
+        "gate": 3,
+        "law": "The Law of Bounded Pursuit",
+        "vice": "Lust",
+        "virtue": "Chastity",
+        "primitive_broken": "∂ dissolves",
+        "primitive_name": "Boundary of commitment dissolved",
+        "question": "Can we finish what we're starting?",
+        "checks": [
+            "Is the scope bounded? Can we complete it within one cycle?",
+            "Are we chasing this because it's shiny or because it's committed?",
+            "What are we abandoning to pursue this?",
+        ],
+    },
+    {
+        "gate": 4,
+        "law": "The Law of Generous Witness",
+        "vice": "Envy",
+        "virtue": "Kindness",
+        "primitive_broken": "∂ imported without κ",
+        "primitive_name": "Foreign Boundary adopted without Comparison",
+        "question": "Are we competing when we should be cooperating?",
+        "checks": [
+            "Does this decision weaken a neighboring system?",
+            "Are we treating peer success as threat or as information?",
+            "Would sharing our approach strengthen the ecosystem?",
+        ],
+    },
+    {
+        "gate": 5,
+        "law": "The Law of Measured Intake",
+        "vice": "Gluttony",
+        "virtue": "Temperance",
+        "primitive_broken": "ς > transform capacity",
+        "primitive_name": "State ingested exceeds metabolic capacity",
+        "question": "Can we metabolize what we're ingesting?",
+        "checks": [
+            "Will this create more data/work than we can process in one cycle?",
+            "Are we ingesting to transform, or just to possess?",
+            "What is our actual throughput, measured — not estimated?",
+        ],
+    },
+    {
+        "gate": 6,
+        "law": "The Law of Measured Response",
+        "vice": "Wrath",
+        "virtue": "Patience",
+        "primitive_broken": "∝ without →",
+        "primitive_name": "Irreversible action without Causal understanding",
+        "question": "Is our response proportional to the deviation?",
+        "checks": [
+            "Are we overcorrecting? Will the fix create a bigger problem?",
+            "Have we absorbed the perturbation before acting?",
+            "What is the minimum effective correction?",
+        ],
+    },
+    {
+        "gate": 7,
+        "law": "The Law of Active Maintenance",
+        "vice": "Sloth",
+        "virtue": "Diligence",
+        "primitive_broken": "∃ assumed without ν",
+        "primitive_name": "Existence assumed without Frequency of verification",
+        "question": "Are we maintaining our ability to detect degradation?",
+        "checks": [
+            "Does this proposal include its own monitoring?",
+            "Are we assuming persistence without checking?",
+            "When was the last time we verified this still works?",
+        ],
+    },
+    {
+        "gate": 8,
+        "law": "The Law of Sovereign Boundary",
+        "vice": "Corruption",
+        "virtue": "Independence",
+        "primitive_broken": "∂ fed by bounded entity",
+        "primitive_name": "Boundary resourced by what it constrains",
+        "question": "Is the oversight independent of what it oversees?",
+        "checks": [
+            "Who funds the oversight? Do they have interests in the outcome?",
+            "Can a single capture point collapse the entire protection?",
+            "Does the boundary's survival depend on the goodwill of the bounded?",
+        ],
+    },
+]
+
+VERDICT_BANDS = {
+    "8/8": "Proceed with confidence — all eight governors are intact.",
+    "6-7": "Proceed with mitigation — address failed gates before execution.",
+    "4-5": "Redesign — the proposal has systemic governance gaps.",
+    "0-3": "Do not proceed — the conservation law is breaking in multiple places.",
+}
+
+
+def deliberate(args):
+    """Run the 8-gate deliberation walkthrough for any decision."""
+    proposal = args.get("proposal", "")
+    return {
+        "deliberation": {
+            "title": "Eight-Gate Governance Deliberation",
+            "instructions": (
+                "Walk through each gate in order. For each gate, read the question aloud, "
+                "discuss the checks as a counsel, and record PASS or FAIL. The gates are "
+                "the eight ways the conservation law (∃ = ∂(×(ς, ∅))) can break. Each "
+                "gate protects a different term of the equation."
+            ),
+            "proposal": proposal if proposal else "(apply to any decision under deliberation)",
+            "conservation_law": "∃ = ∂(×(ς, ∅)) — Existence = Boundary(Product(State, Void))",
+            "gates": DELIBERATION_GATES,
+            "verdict": VERDICT_BANDS,
+            "closing": (
+                "The eight laws are restoring forces — the physics of systems that endure. "
+                "A counsel that walks all eight gates before acting is not slow. It is "
+                "governing. The vices are poison. The virtues are correction. To ponder "
+                "these laws is to practice correction before deviation compounds."
+            ),
+        },
+        "status": "ok",
+    }
+
+
 TOOLS = {
     "read": read,
     "laws": laws,
     "law": law,
     "glossary": glossary,
     "conservation": conservation,
+    "deliberate": deliberate,
 }
 
 
