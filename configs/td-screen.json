@@ -1,0 +1,79 @@
+{
+  "domain": "td-screen.nexvigilant.com",
+  "url_pattern": "/*",
+  "title": "Tardive Dyskinesia Pre-Screening",
+  "description": "Pre-screen patients for tardive dyskinesia risk using the two-curve irreversibility model: recovery decay × receptor supersensitivity",
+  "tools": [
+    {
+      "name": "screen",
+      "description": "Pre-screen a patient for tardive dyskinesia risk. Returns irreversibility score (0-1), risk category, recovery capacity, and clinical recommendation based on drug class, exposure duration, age, dose, and prior episodes.",
+      "parameters": [
+        {"name": "duration_months", "type": "number", "description": "Duration of antipsychotic/dopaminergic exposure in months", "required": true},
+        {"name": "drug_class", "type": "string", "description": "Drug class: typical_high_potency, typical_low_potency, atypical, dopaminergic, antiemetic, other", "required": true},
+        {"name": "age", "type": "number", "description": "Patient age in years", "required": true},
+        {"name": "dose_ratio", "type": "number", "description": "Dose relative to standard (1.0 = standard dose, 2.0 = double)", "required": false},
+        {"name": "prior_episodes", "type": "number", "description": "Number of prior reversible dyskinesia episodes", "required": false}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "irreversibility_score": {"type": "number", "description": "∝(t) score from 0.0 (reversible) to 1.0 (irreversible)"},
+          "risk_category": {"type": "string", "description": "LOW | MODERATE | HIGH | VERY_HIGH | CRITICAL"},
+          "recovery_capacity": {"type": "number", "description": "R(t) — remaining recovery capacity (1.0 = full, 0.0 = none)"},
+          "receptor_supersensitivity": {"type": "number", "description": "H(t) — receptor supersensitivity level (0.0 = none, 1.0 = saturated)"},
+          "recovery_window": {"type": "string", "description": "OPEN or CLOSING — whether recovery is still possible"},
+          "recommendation": {"type": "string", "description": "Clinical recommendation based on risk level"},
+          "status": {"type": "string", "description": "ok | error"}
+        },
+        "required": ["irreversibility_score", "risk_category", "recovery_capacity", "recommendation", "status"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "trajectory",
+      "description": "Project tardive dyskinesia risk trajectory over time for a patient profile. Shows how irreversibility score, recovery capacity, and supersensitivity evolve month by month, and when the critical boundary is crossed.",
+      "parameters": [
+        {"name": "drug_class", "type": "string", "description": "Drug class: typical_high_potency, typical_low_potency, atypical, dopaminergic, antiemetic, other", "required": true},
+        {"name": "age", "type": "number", "description": "Patient age in years", "required": true},
+        {"name": "dose_ratio", "type": "number", "description": "Dose relative to standard (1.0 = standard)", "required": false},
+        {"name": "prior_episodes", "type": "number", "description": "Number of prior dyskinesia episodes", "required": false},
+        {"name": "max_months", "type": "number", "description": "Maximum projection window in months (default 60)", "required": false}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "trajectory": {"type": "array", "description": "Monthly risk data points"},
+          "boundary_crossing_month": {"type": "number", "description": "Month when recovery drops below critical threshold (null if not crossed)"},
+          "boundary_meaning": {"type": "string", "description": "Clinical interpretation of boundary crossing"},
+          "status": {"type": "string", "description": "ok | error"}
+        },
+        "required": ["trajectory", "boundary_meaning", "status"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "drug-classes",
+      "description": "List all drug classes with their tardive dyskinesia risk modifiers and example medications",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "drug_classes": {"type": "array", "description": "Drug classes sorted by risk (highest first)"},
+          "status": {"type": "string", "description": "ok | error"}
+        },
+        "required": ["drug_classes", "status"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    }
+  ],
+  "proxy": "scripts/td_screen_proxy.py"
+}
