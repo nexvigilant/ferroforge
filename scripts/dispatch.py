@@ -20,6 +20,7 @@ Usage:
     python3 dispatch.py --test
 """
 
+import datetime
 import json
 import os
 import subprocess
@@ -353,6 +354,140 @@ def stub_response(tool_name: str, arguments: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# ∂ Entry Boundary — Bounded pattern from nexcore-processor
+# ---------------------------------------------------------------------------
+# Validates required parameters BEFORE spawning a proxy subprocess.
+# Each rule: (proxy_script, tool_pattern, check_fn, rejection_message).
+# Saves ~200ms per rejected call (no subprocess spawn).
+
+def _nonempty_str(args: dict, key: str) -> bool:
+    """Check that args[key] is a non-empty string."""
+    val = args.get(key)
+    return isinstance(val, str) and len(val.strip()) > 0
+
+
+def _positive_int(args: dict, key: str) -> bool:
+    """Check that args[key] is a positive integer (if present)."""
+    val = args.get(key)
+    if val is None:
+        return True  # optional params pass
+    try:
+        return int(val) > 0
+    except (ValueError, TypeError):
+        return False
+
+
+# Top 5 highest-traffic proxies — entry boundaries per proxy.
+# Format: proxy_script_name → list of (tool_glob, param, check_fn, message)
+# tool_glob "*" matches all tools for that proxy.
+ENTRY_BOUNDARIES: dict[str, list[tuple[str, str, callable, str]]] = {
+    "openfda_proxy.py": [
+        ("*", "drug_name", _nonempty_str, "drug_name is required (non-empty string)"),
+        ("*", "limit", _positive_int, "limit must be a positive integer"),
+    ],
+    "dailymed_proxy.py": [
+        ("search-drugs", "drug_name", _nonempty_str, "drug_name is required for search"),
+        ("get-drug-label", "drug_name", _nonempty_str, "drug_name is required for label lookup"),
+        ("*", "limit", _positive_int, "limit must be a positive integer"),
+    ],
+    "pubmed_proxy.py": [
+        ("search-articles", "query", _nonempty_str, "query is required for PubMed search"),
+        ("search-signal-literature", "query", _nonempty_str, "query is required for signal literature search"),
+        ("search-case-reports", "query", _nonempty_str, "query is required for case report search"),
+        ("*", "max_results", _positive_int, "max_results must be a positive integer"),
+    ],
+    "rxnav_proxy.py": [
+        ("get-rxcui", "drug_name", _nonempty_str, "drug_name is required for RxCUI lookup"),
+        ("search-drugs", "drug_name", _nonempty_str, "drug_name is required for drug search"),
+        ("get-interactions", "drug_name", _nonempty_str, "drug_name is required for interaction check"),
+    ],
+    "clinicaltrials_proxy.py": [
+        ("search-trials", "query", _nonempty_str, "query (condition or drug) is required for trial search"),
+        ("*", "limit", _positive_int, "limit must be a positive integer"),
+    ],
+    # --- Auto-generated from PARAMETER_ALIGNMENT canonical params ---
+    "accessdata_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+    "cioms_proxy.py": [("*", "query", _nonempty_str, "query is required")],
+    "ctdbase_org_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+    "drugbank_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+    "ema_proxy.py": [("*", "query", _nonempty_str, "query is required")],
+    "eudravigilance_proxy.py": [("*", "drug", _nonempty_str, "drug is required")],
+    "fda_safety_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+    "ich_proxy.py": [("*", "query", _nonempty_str, "query is required")],
+    "meddra_proxy.py": [("*", "query", _nonempty_str, "query is required")],
+    "multiregional_nexvigilant_com_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+    "openvigil_proxy.py": [("*", "drug", _nonempty_str, "drug is required")],
+    "pharma_proxy.py": [("*", "query", _nonempty_str, "query or product is required")],
+    "recalls_rappels_canada_ca_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+    "triangulate_proxy.py": [("*", "drug", _nonempty_str, "drug is required")],
+    "vigiaccess_proxy.py": [("*", "medicine", _nonempty_str, "medicine is required")],
+    "who_umc_proxy.py": [("*", "drug", _nonempty_str, "drug is required")],
+    "wikipedia_proxy.py": [("*", "query", _nonempty_str, "query is required")],
+    "www_gov_uk_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+    "www_hsa_gov_sg_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+    "www_medsafe_govt_nz_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+    "www_pmda_go_jp_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+    "www_swissmedic_ch_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+    "www_tga_gov_au_proxy.py": [("*", "drug_name", _nonempty_str, "drug_name is required")],
+}
+
+
+def _tool_matches(tool_name: str, pattern: str) -> bool:
+    """Check if tool_name matches a glob pattern (* = all)."""
+    if pattern == "*":
+        return True
+    return tool_name == pattern
+
+
+_TELEMETRY_LOG = Path(__file__).parent.parent / "station-telemetry.jsonl"
+
+
+def _log_boundary_rejection(tool_name: str, proxy: str, param: str, message: str) -> None:
+    """Append a boundary rejection event to station-telemetry.jsonl."""
+    entry = {
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "event": "boundary_rejection",
+        "tool": tool_name,
+        "proxy": proxy,
+        "param": param,
+        "message": message,
+        "duration_ms": 0,
+    }
+    try:
+        with open(_TELEMETRY_LOG, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError:
+        pass  # telemetry is best-effort, never block dispatch
+
+
+def check_entry_boundary(proxy_path: str, tool_name: str, args: dict) -> dict | None:
+    """
+    Apply entry boundary validation for the top 5 proxies.
+
+    Returns None if all checks pass (proceed to proxy).
+    Returns a rejection dict if any check fails (skip proxy, return error).
+    """
+    script_name = Path(proxy_path).name
+    boundaries = ENTRY_BOUNDARIES.get(script_name)
+    if not boundaries:
+        return None  # no boundaries defined for this proxy — pass through
+
+    for pattern, param, check_fn, message in boundaries:
+        if _tool_matches(tool_name, pattern):
+            if not check_fn(args, param):
+                _log_boundary_rejection(tool_name, script_name, param, message)
+                return {
+                    "status": "error",
+                    "error": f"Entry boundary rejected: {message}",
+                    "boundary": f"∂({script_name}:{pattern}:{param})",
+                    "tool": tool_name,
+                    "hint": f"Provide a valid '{param}' parameter",
+                }
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Main dispatch entry point
 # ---------------------------------------------------------------------------
 
@@ -412,6 +547,13 @@ def dispatch(envelope: dict) -> dict:
             if tool_name.startswith(prefix):
                 aligned_args["company_key"] = company_key
                 break
+
+    # ∂ Entry Boundary — validate required parameters before proxy dispatch.
+    # Catches invalid/missing args at the dispatch boundary (fast, no subprocess).
+    # Pattern: processor framework ∂(σ(μ)) — boundary before mapping.
+    rejection = check_entry_boundary(proxy_path, unprefixed, aligned_args)
+    if rejection is not None:
+        return rejection
 
     return call_proxy(proxy_path, unprefixed, aligned_args, request_id)
 
