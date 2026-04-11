@@ -257,3 +257,28 @@ fn handle_chart_course(args: &Value, _registry: &ConfigRegistry) -> ToolCallResu
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn course_tool_names_contain_no_hyphens() {
+        let mut violations = Vec::new();
+        for course in COURSES {
+            for step in course.steps {
+                if step.tool.contains('-') {
+                    violations.push(format!(
+                        "course '{}' step tool '{}' contains a hyphen",
+                        course.name, step.tool
+                    ));
+                }
+            }
+        }
+        assert!(
+            violations.is_empty(),
+            "Tool names must use underscores, not hyphens. Registry normalizes all names to underscores.\n{}",
+            violations.join("\n")
+        );
+    }
+}

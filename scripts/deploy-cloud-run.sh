@@ -49,6 +49,19 @@ cd "$(dirname "$0")/.."
 cargo build -p nexvigilant-station --release
 echo "Binary built: $(ls -lh target/release/nexvigilant-station | awk '{print $5}')"
 
+# Freshness gate: binary must be newer than newest .rs source file
+BINARY="target/release/nexvigilant-station"
+NEWEST_SRC=$(find crates/station/src -name '*.rs' -printf '%T@\n' | sort -rn | head -1)
+BINARY_TS=$(stat -c '%Y' "$BINARY" 2>/dev/null || echo 0)
+if [ "$(echo "$BINARY_TS < $NEWEST_SRC" | bc)" -eq 1 ]; then
+    echo "ERROR: Binary is older than source. Cargo build may have been a no-op (cached)."
+    echo "  Binary: $(date -d @"$BINARY_TS" '+%Y-%m-%d %H:%M:%S')"
+    echo "  Source: $(date -d @"${NEWEST_SRC%.*}" '+%Y-%m-%d %H:%M:%S')"
+    echo "  Try: cargo clean -p nexvigilant-station && cargo build -p nexvigilant-station --release"
+    exit 1
+fi
+echo "Freshness gate: PASS (binary newer than source)"
+
 # Build container image
 echo "--- Building container image ---"
 gcloud builds submit \
