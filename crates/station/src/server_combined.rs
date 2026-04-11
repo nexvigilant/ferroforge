@@ -218,6 +218,8 @@ pub async fn run_combined(
         .route("/", get(handle_root))
         .route("/.well-known/mcp.json", get(handle_well_known_mcp))
         .route("/.well-known/mcp-registry-auth", get(handle_well_known_registry_auth))
+        .route("/.well-known/agent-card.json", get(handle_agent_card))
+        .route("/favicon.ico", get(handle_favicon))
         .route("/robots.txt", get(handle_robots_txt))
         .route("/health", get(handle_health))
         .route("/stats", get(handle_stats))
@@ -584,6 +586,24 @@ async fn handle_well_known_mcp() -> Json<Value> {
 /// Serves the Ed25519 public key for domain verification.
 async fn handle_well_known_registry_auth() -> &'static str {
     "v=MCPv1; k=ed25519; p=WoxR+TpKge4Id472oVK/R2CXDbc93+gB0ldGQmVi90E="
+}
+
+/// Agent card discovery (draft spec — eliminates 404 noise from agent probes)
+async fn handle_agent_card() -> Json<Value> {
+    Json(serde_json::json!({
+        "name": "NexVigilant Station",
+        "description": "Pharmacovigilance intelligence MCP server — 2,958 tools across 245 domains",
+        "url": "https://mcp.nexvigilant.com",
+        "mcp_endpoint": "https://mcp.nexvigilant.com/mcp",
+        "vendor": "NexVigilant, LLC",
+        "capabilities": ["tools"],
+        "auth": "none"
+    }))
+}
+
+/// Empty favicon — returns 204 No Content to stop browser 404 noise
+async fn handle_favicon() -> axum::http::StatusCode {
+    axum::http::StatusCode::NO_CONTENT
 }
 
 // ═══════════════════════════════════════════════════════════════════
