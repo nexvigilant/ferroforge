@@ -1,0 +1,145 @@
+{
+  "domain": "ml-pipeline.nexvigilant.com",
+  "url_pattern": "/*",
+  "proxy": "rust-native",
+  "title": "ML Signal Detection Pipeline",
+  "description": "Autonomous machine learning for PV signal detection — feature extraction, random forest training, evaluation, and prediction on FAERS disproportionality data",
+  "tools": [
+    {
+      "name": "ml-feature-extract",
+      "description": "Extract 12-element PV feature vector from FAERS 2x2 contingency table: PRR, ROR, IC, EBGM, log(cases), HCP ratio, consumer ratio, serious ratio, death ratio, hospitalization ratio, median time-to-onset, reporting velocity",
+      "parameters": [
+        {"name": "drug", "type": "string", "required": true, "description": "Drug name (generic)"},
+        {"name": "event", "type": "string", "required": true, "description": "Event name (MedDRA preferred term)"},
+        {"name": "a", "type": "integer", "required": true, "description": "Cases with both drug and event"},
+        {"name": "b", "type": "integer", "required": true, "description": "Cases with drug but not event"},
+        {"name": "c", "type": "integer", "required": true, "description": "Cases with event but not drug"},
+        {"name": "d", "type": "integer", "required": true, "description": "Cases with neither drug nor event"},
+        {"name": "hcp_reports", "type": "integer", "required": false, "description": "Healthcare professional report count"},
+        {"name": "consumer_reports", "type": "integer", "required": false, "description": "Consumer report count"},
+        {"name": "serious_count", "type": "integer", "required": false, "description": "Serious outcome count"},
+        {"name": "death_count", "type": "integer", "required": false, "description": "Death outcome count"},
+        {"name": "hospitalization_count", "type": "integer", "required": false, "description": "Hospitalization count"},
+        {"name": "median_tto_days", "type": "number", "required": false, "description": "Median time-to-onset in days"},
+        {"name": "velocity", "type": "number", "required": false, "description": "Reporting velocity (cases per quarter)"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "drug": {"type": "string"},
+          "event": {"type": "string"},
+          "features": {"type": "object"},
+          "feature_vector": {"type": "array", "items": {"type": "number"}}
+        },
+        "required": ["success"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "ml-train",
+      "description": "Train a random forest model on labeled PV feature data. Returns model_id, training accuracy, AUC, F1 score, and feature importance rankings. Uses bagged decision trees with bootstrap sampling.",
+      "parameters": [
+        {"name": "samples", "type": "array", "required": true, "description": "Training samples: [{drug, event, features: [12 floats], label: 'signal'|'noise'}]"},
+        {"name": "n_trees", "type": "integer", "required": false, "description": "Number of trees (default: 100)"},
+        {"name": "max_depth", "type": "integer", "required": false, "description": "Maximum tree depth (default: 10)"},
+        {"name": "seed", "type": "integer", "required": false, "description": "Random seed for reproducibility"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "model_id": {"type": "string"},
+          "n_trees": {"type": "integer"},
+          "train_accuracy": {"type": "number"},
+          "train_auc": {"type": "number"},
+          "train_f1": {"type": "number"},
+          "feature_importance": {"type": "array"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "ml-predict",
+      "description": "Predict signal probability for drug-event pairs using a trained ML model. Returns 'signal' or 'noise' classification with probability score (0.0-1.0) for each pair.",
+      "parameters": [
+        {"name": "model_id", "type": "string", "required": true, "description": "Model ID from ml-pipeline-train"},
+        {"name": "samples", "type": "array", "required": true, "description": "Samples to predict: [{drug, event, features: [12 floats]}]"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "model_id": {"type": "string"},
+          "predictions": {"type": "array"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "ml-evaluate",
+      "description": "Evaluate a trained ML model on held-out test data. Returns AUC-ROC, precision, recall, F1 score, accuracy, and confusion matrix (TN/FP/FN/TP).",
+      "parameters": [
+        {"name": "model_id", "type": "string", "required": true, "description": "Model ID from ml-pipeline-train"},
+        {"name": "test_samples", "type": "array", "required": true, "description": "Test samples with labels: [{drug, event, features, label}]"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "auc": {"type": "number"},
+          "precision": {"type": "number"},
+          "recall": {"type": "number"},
+          "f1": {"type": "number"},
+          "accuracy": {"type": "number"},
+          "confusion_matrix": {"type": "object"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "ml-pipeline-run",
+      "description": "Run the full autonomous ML pipeline end-to-end: ingest raw FAERS contingency data, extract 12 PV features, train random forest, evaluate on holdout set, and return predictions with metrics. One-shot signal detection with machine learning.",
+      "parameters": [
+        {"name": "data", "type": "array", "required": true, "description": "Raw FAERS entries: [{drug, event, a, b, c, d, ...optional fields}]"},
+        {"name": "labels", "type": "array", "required": true, "description": "Labels: [{drug, event, label: 'signal'|'noise'}]"},
+        {"name": "n_trees", "type": "integer", "required": false, "description": "Number of trees (default: 100)"},
+        {"name": "max_depth", "type": "integer", "required": false, "description": "Maximum tree depth (default: 10)"},
+        {"name": "train_ratio", "type": "number", "required": false, "description": "Train/test split ratio (default: 0.8)"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "model_version": {"type": "string"},
+          "n_trees": {"type": "integer"},
+          "n_train_samples": {"type": "integer"},
+          "n_test_samples": {"type": "integer"},
+          "train_metrics": {"type": "object"},
+          "test_metrics": {"type": "object"},
+          "test_predictions": {"type": "array"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    }
+  ]
+}
