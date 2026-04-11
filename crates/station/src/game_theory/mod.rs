@@ -11,7 +11,7 @@ const EPS: f64 = 1.0e-9;
 
 pub fn try_handle(tool_name: &str, args: &Value) -> Option<ToolCallResult> {
     let bare = tool_name
-        .strip_prefix("game-theory_nexvigilant_com_")?
+        .strip_prefix("game_theory_nexvigilant_com_")?
         .replace('_', "-");
 
     let result = match bare.as_str() {

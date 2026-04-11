@@ -193,7 +193,7 @@ pub fn default_pv_extremis() -> ExtremisChain {
         fallbacks: vec![
             // If OpenVigil fails, try computing PRR from FAERS data directly
             Fallback {
-                primary: "open-vigil_fr_compute_disproportionality".to_string(),
+                primary: "open_vigil_fr_compute_disproportionality".to_string(),
                 alternatives: vec![
                     "calculate_nexvigilant_com_compute_prr".to_string(),
                 ],

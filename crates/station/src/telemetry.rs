@@ -489,8 +489,8 @@ pub fn extract_domain(tool_name: &str) -> String {
         ("go_drugbank_com_", "go.drugbank.com"),
         ("vigiaccess_org_", "vigiaccess.org"),
         ("api_fda_gov_", "api.fda.gov"),
-        ("open-vigil_fr_", "open-vigil.fr"),
-        ("who-umc_org_", "who-umc.org"),
+        ("open_vigil_fr_", "open-vigil.fr"),
+        ("who_umc_org_", "who-umc.org"),
         ("www_fda_gov_", "www.fda.gov"),
         ("meddra_org_", "meddra.org"),
         ("cioms_ch_", "cioms.ch"),
@@ -519,7 +519,7 @@ pub fn extract_domain(tool_name: &str) -> String {
     }
 
     // Dynamic extraction: convert underscore-separated prefix to dotted domain.
-    // "benefit-risk_nexvigilant_com_compute_qbr" → "benefit-risk.nexvigilant.com"
+    // "benefit_risk_nexvigilant_com_compute_qbr" → "benefit-risk.nexvigilant.com"
     // Heuristic: scan for known TLD segments (_com_, _org_, _gov_, _fr_, _eu_, _ch_)
     // and take everything up to and including the TLD.
     let tlds = ["_com_", "_org_", "_gov_", "_fr_", "_eu_", "_ch_"];

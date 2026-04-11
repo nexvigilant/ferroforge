@@ -11,7 +11,7 @@ use tracing::info;
 use crate::protocol::{ContentBlock, ToolCallResult};
 
 pub fn try_handle(tool_name: &str, args: &Value) -> Option<ToolCallResult> {
-    let bare = tool_name.strip_prefix("harm-taxonomy_nexvigilant_com_")?.replace('_', "-");
+    let bare = tool_name.strip_prefix("harm_taxonomy_nexvigilant_com_")?.replace('_', "-");
     let result = match bare.as_str() {
         "classify" => handle_classify(args),
         "catalog" => handle_catalog(),

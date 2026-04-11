@@ -11,14 +11,14 @@ use crate::protocol::{ContentBlock, ToolCallResult};
 /// Try to handle an academy tool call.
 pub fn try_handle(tool_name: &str, args: &Value) -> Option<ToolCallResult> {
     // 1. Check for academy-forge prefix
-    if let Some(bare) = tool_name.strip_prefix("academy-forge_nexvigilant_com_") {
+    if let Some(bare) = tool_name.strip_prefix("academy_forge_nexvigilant_com_") {
         let bare = bare.replace('_', "-");
         let result = handle_forge(&bare, args);
         return Some(render_result(tool_name, result));
     }
 
     // 2. Check for nexcore-academy prefix
-    if let Some(bare) = tool_name.strip_prefix("nexcore-academy_nexvigilant_com_") {
+    if let Some(bare) = tool_name.strip_prefix("nexcore_academy_nexvigilant_com_") {
         let bare = bare.replace('_', "-");
         let result = handle_academy(&bare, args);
         return Some(render_result(tool_name, result));

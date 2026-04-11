@@ -11,7 +11,7 @@ use crate::protocol::{ContentBlock, ToolCallResult};
 
 pub fn try_handle(tool_name: &str, args: &Value) -> Option<ToolCallResult> {
     let bare = tool_name
-        .strip_prefix("fda-guidance_nexvigilant_com_")?
+        .strip_prefix("fda_guidance_nexvigilant_com_")?
         .replace('_', "-");
 
     let result = match bare.as_str() {

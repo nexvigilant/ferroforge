@@ -11,7 +11,7 @@ use crate::protocol::{ContentBlock, ToolCallResult};
 /// Try to handle a signal-theory tool call. Returns `None` to fall through.
 pub fn try_handle(tool_name: &str, args: &Value) -> Option<ToolCallResult> {
     let bare = tool_name
-        .strip_prefix("signal-theory_nexvigilant_com_")?
+        .strip_prefix("signal_theory_nexvigilant_com_")?
         .replace('_', "-");
 
     let result = match bare.as_str() {
