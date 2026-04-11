@@ -86,6 +86,16 @@ CHAIN_TOOLS = {
     "run-signal-consensus-to-action": {
         "chain_file": "signal-consensus-to-action",
     },
+    # Vehicle architecture chains
+    "run-vehicle-full-cascade": {
+        "chain_file": "vehicle-full-cascade",
+    },
+    "run-vehicle-health-cascade": {
+        "chain_file": "vehicle-health-cascade",
+    },
+    "run-vehicle-governance-cascade": {
+        "chain_file": "vehicle-governance-cascade",
+    },
     # Spanish grammar chains
     "run-caso-clinico-espanol": {
         "chain_file": "caso-clinico-espanol",
