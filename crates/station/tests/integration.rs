@@ -819,7 +819,7 @@ fn test_chart_course_all_tool_names_exist_in_registry() {
         .configs
         .iter()
         .flat_map(|c| {
-            let domain_prefix = c.domain.replace('.', "_");
+            let domain_prefix = c.domain.replace('.', "_").replace('-', "_");
             c.tools.iter().map(move |t| {
                 format!("{}_{}", domain_prefix, t.name.replace('-', "_"))
             })
