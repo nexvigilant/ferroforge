@@ -49,7 +49,7 @@ const COURSES: &[Course] = &[
         description: "Investigate a safety signal: FAERS data → disproportionality → EU confirmation → case reports → trial SAEs → PRAC status → multi-regional assessment",
         steps: &[
             CourseStep { tool: "api_fda_gov_search_adverse_events", example_params: r#"{"drug_name": "semaglutide", "reaction": "pancreatitis", "limit": 10}"# },
-            CourseStep { tool: "open-vigil_fr_compute_disproportionality", example_params: r#"{"drug": "semaglutide", "event": "pancreatitis"}"# },
+            CourseStep { tool: "open_vigil_fr_compute_disproportionality", example_params: r#"{"drug": "semaglutide", "event": "pancreatitis"}"# },
             CourseStep { tool: "eudravigilance_ema_europa_eu_get_signal_summary", example_params: r#"{"substance": "semaglutide"}"# },
             CourseStep { tool: "pubmed_ncbi_nlm_nih_gov_search_case_reports", example_params: r#"{"drug": "semaglutide", "event": "pancreatitis"}"# },
             CourseStep { tool: "clinicaltrials_gov_get_serious_adverse_events", example_params: r#"{"nct_id": "NCT03548935"}"# },
@@ -62,8 +62,8 @@ const COURSES: &[Course] = &[
         description: "Assess drug-event causality: FAERS case counts → disproportionality → WHO-UMC framework → published case reports",
         steps: &[
             CourseStep { tool: "api_fda_gov_search_adverse_events", example_params: r#"{"drug_name": "metformin", "reaction": "lactic acidosis"}"# },
-            CourseStep { tool: "open-vigil_fr_compute_disproportionality", example_params: r#"{"drug": "metformin", "event": "lactic acidosis"}"# },
-            CourseStep { tool: "who-umc_org_get_causality_assessment", example_params: r#"{}"# },
+            CourseStep { tool: "open_vigil_fr_compute_disproportionality", example_params: r#"{"drug": "metformin", "event": "lactic acidosis"}"# },
+            CourseStep { tool: "who_umc_org_get_causality_assessment", example_params: r#"{}"# },
             CourseStep { tool: "pubmed_ncbi_nlm_nih_gov_search_case_reports", example_params: r#"{"drug": "metformin", "event": "lactic acidosis"}"# },
         ],
     },
@@ -93,7 +93,7 @@ const COURSES: &[Course] = &[
         description: "Map competitive terrain: drug targets → head-to-head disproportionality → clinical pipeline → global regulatory comparison",
         steps: &[
             CourseStep { tool: "go_drugbank_com_get_targets", example_params: r#"{"drug": "semaglutide"}"# },
-            CourseStep { tool: "open-vigil_fr_compare_drugs", example_params: r#"{"drug_a": "semaglutide", "drug_b": "tirzepatide"}"# },
+            CourseStep { tool: "open_vigil_fr_compare_drugs", example_params: r#"{"drug_a": "semaglutide", "drug_b": "tirzepatide"}"# },
             CourseStep { tool: "clinicaltrials_gov_search_trials", example_params: r#"{"condition": "obesity", "intervention": "GLP-1"}"# },
             CourseStep { tool: "regulatory_mesh_nexvigilant_com_map_equivalent_actions", example_params: r#"{"action_type": "boxed_warning"}"# },
         ],

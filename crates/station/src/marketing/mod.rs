@@ -40,7 +40,7 @@ fn handle_discover(args: &Value) -> Value {
         capabilities.push(json!({
             "domain": "Signal Detection", "tools": 40,
             "highlight": "PRR, ROR, IC, EBGM + preemptive 3-tier detection + Gibbs thermodynamic modeling",
-            "try_tool": "preemptive-pv_nexvigilant_com_evaluate",
+            "try_tool": "preemptive_pv_nexvigilant_com_evaluate",
         }));
         try_next = "Call quick-demo with demo='signal' to see live signal detection".into();
     }
@@ -287,10 +287,10 @@ fn handle_value_chain(args: &Value) -> Value {
             "chain_steps": [
                 {"step": 1, "tool": "rxnav_nlm_nih_gov_get_rxcui", "action": "Resolve drug identity", "output": "RxCUI + active ingredients"},
                 {"step": 2, "tool": "api_fda_gov_search_adverse_events", "action": "Pull FAERS reports", "output": "Case counts + top reactions"},
-                {"step": 3, "tool": "open-vigil_fr_compute_disproportionality", "action": "Compute PRR/ROR", "output": "Signal strength scores"},
+                {"step": 3, "tool": "open_vigil_fr_compute_disproportionality", "action": "Compute PRR/ROR", "output": "Signal strength scores"},
                 {"step": 4, "tool": "dailymed_nlm_nih_gov_get_adverse_reactions", "action": "Check labeled ADRs", "output": "Known vs unknown reactions"},
                 {"step": 5, "tool": "pubmed_ncbi_nlm_nih_gov_search_signal_literature", "action": "Search literature", "output": "Published signal evidence"},
-                {"step": 6, "tool": "who-umc_org_get_causality_assessment", "action": "Apply WHO-UMC criteria", "output": "Causality verdict"},
+                {"step": 6, "tool": "who_umc_org_get_causality_assessment", "action": "Apply WHO-UMC criteria", "output": "Causality verdict"},
             ],
             "compound_value": "Individual tools save minutes. The chain saves days. This is the full PV signal investigation that regulatory teams pay $50K+ for consultants to do manually.",
             "try_next": "Call nexvigilant_chart_course with course='signal-investigation' and drug='your drug' to run this chain live",
@@ -322,7 +322,7 @@ fn handle_value_chain(args: &Value) -> Value {
                 {"step": 1, "tool": "clinicaltrials_gov_get_serious_adverse_events", "action": "Extract trial safety data"},
                 {"step": 2, "tool": "api_fda_gov_search_adverse_events", "action": "Get post-market outcomes"},
                 {"step": 3, "tool": "dailymed_nlm_nih_gov_get_adverse_reactions", "action": "Check label ADRs"},
-                {"step": 4, "tool": "benefit-risk_nexvigilant_com_compute_qbri", "action": "Compute benefit-risk index"},
+                {"step": 4, "tool": "benefit_risk_nexvigilant_com_compute_qbri", "action": "Compute benefit-risk index"},
             ],
             "compound_value": "Pre-market + post-market + labeling → quantified benefit-risk. The QBRI score in one chain.",
             "try_next": "Call nexvigilant_chart_course with course='benefit-risk-assessment'",
