@@ -1,0 +1,95 @@
+name: vehicle-governance-cascade
+description: "Vehicle governance cascade: KCL field balance check → KVL loop conservation check → reporting velocity governor. Runs the three conservation checks then decides whether to fire the engine. The Governance layer of the vehicle architecture."
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - kcl-field-balance
+  - kvl-loop-conservation
+  - reporting-velocity-governor
+tests:
+- name: balanced fields + conserved confidence + accelerating stale — run now
+  input:
+    fields_in: 5
+    fields_out: 8
+    declared_outputs: 3
+    collisions: 0
+    accumulate_mode: true
+    confidence_before: 0.5
+    confidence_after: 0.5
+    new_evidence_fields: 0
+    current_rate: 200
+    signal_velocity: ACCELERATING
+    hours_since_last_run: 12
+    active_signals: 3
+  expect:
+    kcl_valid: true
+    balance: BALANCED
+    kvl_valid: true
+    action: run_now
+    urgency: high
+    governor_state: throttle_open
+
+- name: field collision detected + stable fresh — wait despite KCL violation
+  input:
+    fields_in: 5
+    fields_out: 7
+    declared_outputs: 3
+    collisions: 2
+    accumulate_mode: true
+    confidence_before: 0.6
+    confidence_after: 0.6
+    new_evidence_fields: 0
+    current_rate: 100
+    signal_velocity: STABLE
+    hours_since_last_run: 8
+    active_signals: 1
+  expect:
+    kcl_valid: false
+    balance: SHORT_CIRCUIT
+    kvl_valid: true
+    action: wait
+    urgency: none
+
+- name: KVL violation + spike — escalate
+  input:
+    fields_in: 5
+    fields_out: 8
+    declared_outputs: 3
+    collisions: 0
+    accumulate_mode: true
+    confidence_before: 0.2
+    confidence_after: 0.9
+    new_evidence_fields: 0
+    current_rate: 800
+    baseline_rate: 100
+    rate_ratio: 8.0
+    signal_velocity: ACCELERATING
+    hours_since_last_run: 2
+    active_signals: 5
+  expect:
+    kvl_valid: false
+    violation_type: free_amplification
+    action: escalate
+    urgency: critical
+    governor_state: throttle_escalated
+
+- name: all healthy + decelerating — wait
+  input:
+    fields_in: 3
+    fields_out: 6
+    declared_outputs: 3
+    collisions: 0
+    accumulate_mode: true
+    confidence_before: 0.7
+    confidence_after: 0.65
+    new_evidence_fields: 0
+    current_rate: 50
+    signal_velocity: DECELERATING
+    hours_since_last_run: 48
+    active_signals: 0
+  expect:
+    kcl_valid: true
+    kvl_valid: true
+    action: wait
+    urgency: none

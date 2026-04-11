@@ -1,0 +1,270 @@
+name: primitive-failure-classifier
+description: "Classify chain errors by engine primitive (Seal/Convert/Time/Lubricate/Transfer) to guide remediation"
+version: 0.1.0
+interface:
+  inputs:
+    error_message:
+      type: string
+      required: true
+    error_type:
+      type: string
+      required: true
+    step_index:
+      type: int
+      required: true
+  outputs:
+    primitive:
+      type: string
+    mode:
+      type: string
+    recommendation:
+      type: string
+tree:
+  start: check_error_type
+  nodes:
+    # First-level dispatch on error_type
+    check_error_type:
+      type: condition
+      variable: error_type
+      operator: eq
+      value: "ingress"
+      true_next: check_ingress_subtype
+      false_next: check_egress_type
+
+    # === INGRESS ERRORS (Seal primitive) ===
+    check_ingress_subtype:
+      type: condition
+      variable: error_message
+      operator: contains
+      value: "Missing required"
+      true_next: ingress_missing_field
+      false_next: check_ingress_type_mismatch
+
+    ingress_missing_field:
+      type: return
+      value:
+        primitive: "Seal"
+        mode: "intake"
+        recommendation: "Add required field to upstream output or insert adapter microgram"
+        step_index: null
+
+    check_ingress_type_mismatch:
+      type: condition
+      variable: error_message
+      operator: contains
+      value: "expected type"
+      true_next: ingress_type_mismatch
+      false_next: ingress_unknown
+
+    ingress_type_mismatch:
+      type: return
+      value:
+        primitive: "Seal"
+        mode: "type_mismatch"
+        recommendation: "Schema types disagree — add type-converting adapter"
+        step_index: null
+
+    ingress_unknown:
+      type: return
+      value:
+        primitive: "Seal"
+        mode: "unknown_ingress_error"
+        recommendation: "Ingress contract violation — inspect upstream output schema"
+        step_index: null
+
+    # === EGRESS ERRORS (Convert primitive) ===
+    check_egress_type:
+      type: condition
+      variable: error_type
+      operator: eq
+      value: "egress"
+      true_next: check_egress_subtype
+      false_next: check_execution_type
+
+    check_egress_subtype:
+      type: condition
+      variable: error_message
+      operator: contains
+      value: "Missing required output"
+      true_next: egress_missing_output
+      false_next: check_egress_type_error
+
+    egress_missing_output:
+      type: return
+      value:
+        primitive: "Convert"
+        mode: "incomplete_conversion"
+        recommendation: "Decision tree has path that doesn't produce required output — add missing return nodes"
+        step_index: null
+
+    check_egress_type_error:
+      type: condition
+      variable: error_message
+      operator: contains
+      value: "expected type"
+      true_next: egress_wrong_type
+      false_next: egress_unknown
+
+    egress_wrong_type:
+      type: return
+      value:
+        primitive: "Convert"
+        mode: "wrong_output_type"
+        recommendation: "Tree produces wrong type — check return node values and type casting"
+        step_index: null
+
+    egress_unknown:
+      type: return
+      value:
+        primitive: "Convert"
+        mode: "unknown_egress_error"
+        recommendation: "Egress contract violation — inspect return node schema"
+        step_index: null
+
+    # === EXECUTION ERRORS (Convert primitive) ===
+    check_execution_type:
+      type: condition
+      variable: error_type
+      operator: eq
+      value: "execution"
+      true_next: execution_failure
+      false_next: check_sequencing_type
+
+    execution_failure:
+      type: return
+      value:
+        primitive: "Convert"
+        mode: "evaluation_failure"
+        recommendation: "Tree evaluation failed — check node conditions, operators, and type compatibility"
+        step_index: null
+
+    # === SEQUENCING ERRORS (Time primitive) ===
+    check_sequencing_type:
+      type: condition
+      variable: error_type
+      operator: eq
+      value: "sequencing"
+      true_next: sequencing_failure
+      false_next: check_adapter_type
+
+    sequencing_failure:
+      type: return
+      value:
+        primitive: "Time"
+        mode: "phase_error"
+        recommendation: "Chain order wrong — check dependency graph and step prerequisites"
+        step_index: null
+
+    # === MISSING ADAPTER (Lubricate primitive) ===
+    check_adapter_type:
+      type: condition
+      variable: error_type
+      operator: eq
+      value: "missing_adapter"
+      true_next: adapter_mismatch
+      false_next: transfer_unknown
+
+    adapter_mismatch:
+      type: return
+      value:
+        primitive: "Lubricate"
+        mode: "impedance_mismatch"
+        recommendation: "Insert adapter microgram between incompatible steps — use compose to plan"
+        step_index: null
+
+    # === DEFAULT (Transfer primitive) ===
+    transfer_unknown:
+      type: return
+      value:
+        primitive: "Transfer"
+        mode: "unknown"
+        recommendation: "Interface contract violation — inspect chain topology and step boundaries"
+        step_index: null
+
+tests:
+  # SEAL (Ingress) - Missing field
+  - input:
+      error_message: "Step 2 (signal-to-causality): ingress: Missing required input 'signal_strength' (expected: float)"
+      error_type: "ingress"
+      step_index: 2
+    expect:
+      primitive: "Seal"
+      mode: "intake"
+      recommendation: "Add required field to upstream output or insert adapter microgram"
+
+  # SEAL (Ingress) - Type mismatch
+  - input:
+      error_message: "Step 1 (prr-signal): ingress: Field 'count' expected type integer but got string"
+      error_type: "ingress"
+      step_index: 1
+    expect:
+      primitive: "Seal"
+      mode: "type_mismatch"
+      recommendation: "Schema types disagree — add type-converting adapter"
+
+  # CONVERT (Egress) - Missing output
+  - input:
+      error_message: "Step 3 (naranjo-quick): egress: Missing required output 'causality_score'"
+      error_type: "egress"
+      step_index: 3
+    expect:
+      primitive: "Convert"
+      mode: "incomplete_conversion"
+      recommendation: "Decision tree has path that doesn't produce required output — add missing return nodes"
+
+  # CONVERT (Egress) - Wrong type
+  - input:
+      error_message: "Step 4 (case-seriousness): egress: Output field 'severity' expected type string but got int"
+      error_type: "egress"
+      step_index: 4
+    expect:
+      primitive: "Convert"
+      mode: "wrong_output_type"
+      recommendation: "Tree produces wrong type — check return node values and type casting"
+
+  # CONVERT (Execution) - Evaluation failure
+  - input:
+      error_message: "Step 2 (risk-level): execution: Condition node 'check_threshold' failed to evaluate: null operator on non-null value"
+      error_type: "execution"
+      step_index: 2
+    expect:
+      primitive: "Convert"
+      mode: "evaluation_failure"
+      recommendation: "Tree evaluation failed — check node conditions, operators, and type compatibility"
+
+  # TIME (Sequencing) - Chain order error
+  - input:
+      error_message: "Chain step 3: sequencing error — requires output from step 5 which hasn't executed yet"
+      error_type: "sequencing"
+      step_index: 3
+    expect:
+      primitive: "Time"
+      mode: "phase_error"
+      recommendation: "Chain order wrong — check dependency graph and step prerequisites"
+
+  # LUBRICATE (Missing adapter) - Impedance mismatch
+  - input:
+      error_message: "Step 1 (workflow-router) → Step 2 (signal-detect): missing_adapter: Output schema has 8 fields, input schema expects 5 specific fields"
+      error_type: "missing_adapter"
+      step_index: 1
+    expect:
+      primitive: "Lubricate"
+      mode: "impedance_mismatch"
+      recommendation: "Insert adapter microgram between incompatible steps — use compose to plan"
+
+  # TRANSFER (Unknown) - Fallback
+  - input:
+      error_message: "Chain boundary error at step 5: undefined fault code"
+      error_type: "unknown_type"
+      step_index: 5
+    expect:
+      primitive: "Transfer"
+      mode: "unknown"
+      recommendation: "Interface contract violation — inspect chain topology and step boundaries"
+
+  # Null safety test
+  - input: {}
+    expect:
+      primitive: "Transfer"
+      mode: "unknown"
+      recommendation: "Interface contract violation — inspect chain topology and step boundaries"

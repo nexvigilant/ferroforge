@@ -1,0 +1,78 @@
+name: vehicle-full-cascade
+description: "Full vehicle cascade: bioavailability correction → signal detection → causality assessment → regulatory action → organ health signal. The complete fuel-to-exhaust-to-dashboard pipeline. Engine (pv-signal-to-action v0.3.0) extended with the Observability output stage."
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  # ── FUEL: Bioavailability correction ──
+  - bioavailability-correction
+  # ── ENGINE: Signal detection + causality ──
+  - prr-signal
+  - signal-to-causality
+  - naranjo-quick
+  - causality-to-action
+  # ── EXHAUST → DASHBOARD: Organ health signal ──
+  - rsk-organ-signal
+tests:
+- name: strong signal with spontaneous source — healthy engine, expedited action
+  input:
+    observed_count: 150
+    prr: 8.5
+    naranjo_score: 7
+    is_serious: true
+    ratio: 0
+  expect:
+    correction_factor: 20.0
+    reporting_fraction_used: 0.05
+    signal_detected: true
+    causality: PROBABLE
+    regulatory_action: expedited_report
+    deadline_days: 15
+    organ: rsk-engine
+    organ_status: healthy
+    signal_strength: 1.0
+
+- name: clinical trial source with definite causality — high bioavailability
+  input:
+    observed_count: 50
+    source_type: clinical_trial
+    prr: 3.0
+    naranjo_score: 10
+    is_serious: true
+    ratio: 0
+  expect:
+    correction_factor: 1.11
+    reporting_fraction_used: 0.90
+    causality: DEFINITE
+    regulatory_action: expedited_report
+    deadline_days: 7
+    organ: rsk-engine
+    organ_status: healthy
+
+- name: weak signal with impaired engine
+  input:
+    prr: 1.5
+    naranjo_score: 0
+    ratio: 0.10
+  expect:
+    correction_factor: 20.0
+    signal_detected: false
+    regulatory_action: document
+    deadline_days: 0
+    organ: rsk-engine
+    organ_status: impaired
+    signal_strength: 0.5
+
+- name: critical engine health — still processes correctly
+  input:
+    observed_count: 200
+    prr: 2.5
+    naranjo_score: 3
+    is_serious: false
+    ratio: 0.20
+  expect:
+    causality: POSSIBLE
+    regulatory_action: monitor
+    organ: rsk-engine
+    organ_status: critical
+    signal_strength: 0.2

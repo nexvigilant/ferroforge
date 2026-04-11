@@ -1,0 +1,178 @@
+name: kvl-loop-conservation
+description: "Kirchhoff's Voltage Law analog for chain loops — verify that confidence/severity does not amplify across loop iterations without new evidence input. In circuit theory, voltage drops around a loop sum to zero. In chain loops, verdict strength must be conserved unless new data enters."
+version: 0.1.0
+primitive_signature:
+  dominant: boundary
+  expression: "delta(confidence) <= delta(evidence) — no free amplification"
+  primes: [boundary, state, causality]
+  arguments:
+    - confidence_before
+    - confidence_after
+    - new_evidence_fields
+interface:
+  inputs:
+    confidence_before:
+      type: float
+      required: true
+      description: "Verdict confidence at loop iteration N-1 (0.0-1.0)"
+    confidence_after:
+      type: float
+      required: true
+      description: "Verdict confidence at loop iteration N (0.0-1.0)"
+    new_evidence_fields:
+      type: int
+      required: false
+      description: "Number of new input fields added between iterations (0 = no new data)"
+    iteration:
+      type: int
+      required: false
+      description: "Current loop iteration number"
+  outputs:
+    kvl_valid:
+      type: bool
+    violation_type:
+      type: string
+    confidence_delta:
+      type: float
+    recommendation:
+      type: string
+tree:
+  start: check_evidence
+  nodes:
+    check_evidence:
+      type: condition
+      variable: new_evidence_fields
+      operator: gt
+      value: 0
+      true_next: evidence_present
+      false_next: check_amplification
+
+    evidence_present:
+      type: return
+      value:
+        kvl_valid: true
+        violation_type: none
+        recommendation: "KVL satisfied — confidence change justified by new evidence input"
+
+    check_amplification:
+      type: condition
+      variable: confidence_after
+      operator: gt
+      value: 0
+      true_next: compare_delta
+      false_next: confidence_dropped
+
+    confidence_dropped:
+      type: return
+      value:
+        kvl_valid: true
+        violation_type: none
+        recommendation: "KVL satisfied — confidence did not increase without evidence"
+
+    compare_delta:
+      type: condition
+      variable: confidence_before
+      operator: gte
+      value: 0
+      true_next: check_increase
+      false_next: no_baseline
+
+    no_baseline:
+      type: return
+      value:
+        kvl_valid: true
+        violation_type: none
+        recommendation: "No baseline confidence — first iteration, KVL not applicable"
+
+    check_increase:
+      type: condition
+      variable: confidence_after
+      operator: gt
+      value: 0.5
+      true_next: check_before_low
+      false_next: minor_change
+
+    check_before_low:
+      type: condition
+      variable: confidence_before
+      operator: lt
+      value: 0.5
+      true_next: kvl_violation
+      false_next: check_same_or_higher
+
+    kvl_violation:
+      type: return
+      value:
+        kvl_valid: false
+        violation_type: free_amplification
+        recommendation: "KVL VIOLATION — confidence jumped from low to high without new evidence. Loop is amplifying without energy input. Add evidence gate or cap iteration confidence."
+
+    check_same_or_higher:
+      type: condition
+      variable: confidence_before
+      operator: gte
+      value: 0.5
+      true_next: minor_change
+      false_next: kvl_violation
+
+    minor_change:
+      type: return
+      value:
+        kvl_valid: true
+        violation_type: none
+        recommendation: "KVL satisfied — confidence within expected range"
+
+tests:
+- name: new evidence justifies confidence increase
+  input:
+    confidence_before: 0.3
+    confidence_after: 0.8
+    new_evidence_fields: 3
+    iteration: 2
+  expect:
+    kvl_valid: true
+    violation_type: none
+
+- name: free amplification — confidence jumps without evidence
+  input:
+    confidence_before: 0.2
+    confidence_after: 0.9
+    new_evidence_fields: 0
+    iteration: 3
+  expect:
+    kvl_valid: false
+    violation_type: free_amplification
+
+- name: confidence stable without evidence — KVL holds
+  input:
+    confidence_before: 0.7
+    confidence_after: 0.7
+    new_evidence_fields: 0
+    iteration: 4
+  expect:
+    kvl_valid: true
+    violation_type: none
+
+- name: confidence decreased — always valid
+  input:
+    confidence_before: 0.8
+    confidence_after: 0.3
+    new_evidence_fields: 0
+    iteration: 2
+  expect:
+    kvl_valid: true
+
+- name: first iteration — no baseline
+  input:
+    confidence_before: -1
+    confidence_after: 0.5
+    new_evidence_fields: 0
+    iteration: 1
+  expect:
+    kvl_valid: true
+
+- name: null safety
+  input: {}
+  expect:
+    kvl_valid: true
+    violation_type: none

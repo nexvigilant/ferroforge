@@ -1,0 +1,150 @@
+name: kcl-field-balance
+description: "Kirchhoff's Current Law analog for chain steps — verify field conservation at each node. Fields into a step should equal fields out (in accumulate mode) or be explicitly declared as consumed. Detects silent field creation (collision) and silent field loss."
+version: 0.1.0
+primitive_signature:
+  dominant: boundary
+  expression: "N(fields_in) + N(declared_outputs) - N(collisions) = N(fields_out)"
+  primes: [boundary, quantity, state]
+  arguments:
+    - fields_in
+    - fields_out
+    - declared_outputs
+    - collisions
+interface:
+  inputs:
+    fields_in:
+      type: int
+      required: true
+      description: "Number of fields entering this step"
+    fields_out:
+      type: int
+      required: true
+      description: "Number of fields leaving this step"
+    declared_outputs:
+      type: int
+      required: false
+      description: "Number of outputs declared in this step's interface"
+    collisions:
+      type: int
+      required: false
+      description: "Number of output fields that overwrite existing fields"
+    accumulate_mode:
+      type: bool
+      required: false
+      description: "Whether the chain uses accumulate semantics"
+  outputs:
+    kcl_valid:
+      type: bool
+    balance:
+      type: string
+    field_delta:
+      type: int
+    recommendation:
+      type: string
+tree:
+  start: check_accumulate
+  nodes:
+    check_accumulate:
+      type: condition
+      variable: accumulate_mode
+      operator: neq
+      value: true
+      true_next: non_accumulate
+      false_next: check_loss
+
+    non_accumulate:
+      type: return
+      value:
+        kcl_valid: true
+        balance: REPLACED
+        field_delta: 0
+        recommendation: "Non-accumulate mode — output replaces input entirely. KCL not applicable (series circuit, not parallel)."
+
+    check_loss:
+      type: condition
+      variable: fields_out
+      operator: lt
+      value: 1
+      true_next: total_loss
+      false_next: check_collision_count
+
+    total_loss:
+      type: return
+      value:
+        kcl_valid: false
+        balance: OPEN_CIRCUIT
+        field_delta: 0
+        recommendation: "KCL VIOLATION — zero fields output. Open circuit: current has nowhere to go. Check step for empty return nodes."
+
+    check_collision_count:
+      type: condition
+      variable: collisions
+      operator: gt
+      value: 0
+      true_next: has_collisions
+      false_next: balanced
+
+    has_collisions:
+      type: return
+      value:
+        kcl_valid: false
+        balance: SHORT_CIRCUIT
+        recommendation: "KCL VIOLATION — field collisions detected. Short circuit: two sources driving the same node. Namespace output fields to prevent silent overwrite."
+
+    balanced:
+      type: return
+      value:
+        kcl_valid: true
+        balance: BALANCED
+        recommendation: "KCL satisfied — fields conserved at this node"
+
+tests:
+- name: balanced accumulate step
+  input:
+    fields_in: 5
+    fields_out: 8
+    declared_outputs: 3
+    collisions: 0
+    accumulate_mode: true
+  expect:
+    kcl_valid: true
+    balance: BALANCED
+
+- name: collision detected — short circuit
+  input:
+    fields_in: 5
+    fields_out: 7
+    declared_outputs: 3
+    collisions: 1
+    accumulate_mode: true
+  expect:
+    kcl_valid: false
+    balance: SHORT_CIRCUIT
+
+- name: zero output — open circuit
+  input:
+    fields_in: 5
+    fields_out: 0
+    declared_outputs: 3
+    collisions: 0
+    accumulate_mode: true
+  expect:
+    kcl_valid: false
+    balance: OPEN_CIRCUIT
+
+- name: non-accumulate — KCL not applicable
+  input:
+    fields_in: 5
+    fields_out: 2
+    declared_outputs: 2
+    collisions: 0
+    accumulate_mode: false
+  expect:
+    kcl_valid: true
+    balance: REPLACED
+
+- name: null safety
+  input: {}
+  expect:
+    kcl_valid: true
+    balance: REPLACED
