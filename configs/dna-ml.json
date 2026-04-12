@@ -1,0 +1,91 @@
+{
+  "domain": "dna-ml.nexvigilant.com",
+  "url_pattern": "/*",
+  "proxy": "rust-native",
+  "title": "DNA-Encoded ML Pipeline",
+  "description": "DNA-encoded machine learning for PV signal detection — encode PV features as DNA strands, compute biological similarity metrics, train augmented random forest on 17-dim feature space",
+  "tools": [
+    {
+      "name": "dna-ml-encode",
+      "description": "Encode a PV feature vector as a DNA strand. Quantizes floating-point features to bytes, then encodes as nucleotide sequence (A/T/G/C). Returns strand representation and quantized bytes.",
+      "parameters": [
+        {"name": "features", "type": "array", "required": true, "description": "Feature vector to encode (e.g. 12-element PV features)"},
+        {"name": "mins", "type": "array", "required": false, "description": "Per-feature minimum bounds for quantization"},
+        {"name": "maxs", "type": "array", "required": false, "description": "Per-feature maximum bounds for quantization"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "strand_length": {"type": "integer"},
+          "strand": {"type": "string"},
+          "feature_count": {"type": "integer"},
+          "quantized_bytes": {"type": "array", "items": {"type": "integer"}}
+        },
+        "required": ["success"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "dna-ml-similarity",
+      "description": "Compute DNA similarity between two PV feature vectors. Encodes both as DNA strands, then computes Hamming distance, GC content divergence, and longest common subsequence ratio.",
+      "parameters": [
+        {"name": "features_a", "type": "array", "required": true, "description": "First feature vector"},
+        {"name": "features_b", "type": "array", "required": true, "description": "Second feature vector"},
+        {"name": "mins", "type": "array", "required": false, "description": "Per-feature minimums for quantization"},
+        {"name": "maxs", "type": "array", "required": false, "description": "Per-feature maximums for quantization"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "hamming_distance": {"type": "number"},
+          "gc_content_a": {"type": "number"},
+          "gc_content_b": {"type": "number"},
+          "gc_divergence": {"type": "number"},
+          "lcs_ratio": {"type": "number"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "dna-ml-pipeline-run",
+      "description": "Run the full DNA-ML pipeline: FAERS data → 12 PV features → DNA encoding → 5 similarity features → 17-dim augmented vector → random forest. Returns AUC, precision, recall, F1, and feature names.",
+      "parameters": [
+        {"name": "data", "type": "array", "required": true, "description": "Raw FAERS entries: [{drug, event, a, b, c, d, ...optional fields}]"},
+        {"name": "labels", "type": "array", "required": true, "description": "Labels: ['signal' or 'noise'] for each entry (same order as data)"},
+        {"name": "n_trees", "type": "integer", "required": false, "description": "Number of trees (default: 50)"},
+        {"name": "max_depth", "type": "integer", "required": false, "description": "Maximum tree depth (default: 8)"},
+        {"name": "use_dna_features", "type": "boolean", "required": false, "description": "Include DNA similarity features (default: true)"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "pv_feature_count": {"type": "integer"},
+          "dna_feature_count": {"type": "integer"},
+          "total_features": {"type": "integer"},
+          "n_samples": {"type": "integer"},
+          "auc": {"type": "number"},
+          "precision": {"type": "number"},
+          "recall": {"type": "number"},
+          "f1": {"type": "number"},
+          "accuracy": {"type": "number"},
+          "feature_names": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": ["success"]
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false
+      }
+    }
+  ]
+}
