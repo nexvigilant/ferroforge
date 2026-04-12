@@ -1,0 +1,69 @@
+{
+  "domain": "comparator.nexvigilant.com",
+  "title": "ML vs Statistical Comparator",
+  "description": "Compare ML random forest predictions against PRR statistical threshold for any drug-event pair. Returns agreement classification (BOTH_SIGNAL, BOTH_NOISE, ML_ONLY, PRR_ONLY) with clinical interpretation.",
+  "proxy": "scripts/comparator_proxy.py",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": true
+  },
+  "tools": [
+    {
+      "name": "compare-ml-vs-prr",
+      "description": "Compare ML and PRR signal detection for a drug-event pair. Returns agreement classification and clinical interpretation. Uses live FAERS data via bot tunnel.",
+      "parameters": [
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Drug name",
+          "required": true
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "Adverse event name (MedDRA preferred term)",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "drug": { "type": "string" },
+          "event": { "type": "string" },
+          "prr": { "type": "number" },
+          "ml_probability": { "type": "number" },
+          "ml_source": { "type": "string" },
+          "prr_signal": { "type": "boolean" },
+          "ml_signal": { "type": "boolean" },
+          "agreement": { "type": "string" },
+          "interpretation": { "type": "string" }
+        },
+        "required": ["drug", "event", "agreement"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "compare-ml-vs-prr-batch",
+      "description": "Compare ML vs PRR for multiple drug-event pairs. Returns agreement summary with false positive reduction count.",
+      "parameters": [
+        {
+          "name": "targets",
+          "type": "array",
+          "description": "Array of {drug, event} objects (max 20)",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "results": { "type": "array" },
+          "summary": { "type": "object" }
+        },
+        "required": ["results", "summary"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}
