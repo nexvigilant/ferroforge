@@ -1,0 +1,52 @@
+{
+  "domain": "actuator-systems.nexvigilant.com",
+  "private": false,
+  "copyright": "© 2026 NexVigilant, LLC.",
+  "title": "Actuator Systems — Joint Classification and Motor Fault Detection",
+  "description": "Classify actuator loads by joint, motion, and intensity. Detect motor faults: overcurrent, overtemp, stall, encoder loss, phase imbalance. 8 joints × 3 intensity levels. 7 fault types with severity routing.",
+  "proxy": "scripts/microgram_proxy.py",
+  "tools": [
+    {
+      "name": "classify-actuator-load",
+      "description": "Classify actuator load by joint (shoulder/elbow/wrist/hip/knee/ankle/spine/neck), motion type, and intensity level. Returns torque class, peak power, motor type, control mode, and power tier recommendation.",
+      "parameters": [
+        { "name": "joint", "type": "string", "description": "Joint: shoulder, elbow, wrist, hip, knee, ankle, spine, neck", "required": true },
+        { "name": "motion", "type": "string", "description": "Motion: flexion, extension, rotation, stabilization", "required": true },
+        { "name": "intensity", "type": "string", "description": "Intensity: passive_assist, active_normal, peak_effort", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "torque_class": { "type": "string" },
+          "peak_power_w": { "type": "number" },
+          "motor_type": { "type": "string" },
+          "control_mode": { "type": "string" },
+          "power_tier": { "type": "string" }
+        },
+        "required": ["torque_class"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "detect-motor-fault",
+      "description": "Detect motor/actuator faults from sensor readings. 7 fault types: winding overtemp (critical/warning), overcurrent (critical/warning), encoder loss, stall, phase imbalance. Returns fault type, severity, and recommended action.",
+      "parameters": [
+        { "name": "phase_current_a", "type": "number", "description": "RMS phase current in amps", "required": true },
+        { "name": "winding_temp_c", "type": "number", "description": "Motor winding temperature in Celsius", "required": false },
+        { "name": "rpm", "type": "number", "description": "Current motor speed in RPM", "required": false },
+        { "name": "encoder_valid", "type": "boolean", "description": "Whether encoder feedback is valid", "required": false },
+        { "name": "phase_balance_pct", "type": "number", "description": "Phase current balance percentage", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "fault": { "type": "string" },
+          "severity": { "type": "string" },
+          "action": { "type": "string" }
+        },
+        "required": ["fault"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}
