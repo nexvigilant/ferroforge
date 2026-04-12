@@ -1,0 +1,297 @@
+{
+  "domain": "power-systems.nexvigilant.com",
+  "private": false,
+  "copyright": "© 2026 NexVigilant, LLC.",
+  "title": "Power Systems — Federated Battery Architecture",
+  "description": "Energy transduction, voltage topology, SoC estimation, and federated power routing for wearable and vehicle power systems. 7 micrograms + 3 chains covering physics through BMS firmware logic.",
+  "proxy": "scripts/microgram_proxy.py",
+  "tools": [
+    {
+      "name": "classify-transducer",
+      "description": "Classify a physical transducer by energy domain mapping (mechanical/thermal/optical/chemical/electromagnetic/acoustic/nuclear → electrical/mechanical/thermal/optical/acoustic). Returns transducer class, device examples, primitive formula, efficiency range, and conservation note. 17 classes covered.",
+      "parameters": [
+        {
+          "name": "input_energy",
+          "type": "string",
+          "description": "Input energy domain: mechanical, thermal, optical, chemical, electromagnetic, acoustic, nuclear",
+          "required": true
+        },
+        {
+          "name": "output_energy",
+          "type": "string",
+          "description": "Output energy domain: electrical, mechanical, thermal, optical, acoustic",
+          "required": true
+        },
+        {
+          "name": "scale",
+          "type": "string",
+          "description": "Physical scale: nano, micro, macro, industrial",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "transducer_class": { "type": "string" },
+          "device_examples": { "type": "string" },
+          "primitive_formula": { "type": "string" },
+          "efficiency_range": { "type": "string" },
+          "conservation_note": { "type": "string" }
+        },
+        "required": ["transducer_class"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "calculate-casimir-energy",
+      "description": "Compute Casimir extractable energy for parallel plate geometry. E/A = -π²ℏc/(720·d³). Routes by gap size to determine practical feasibility class. Covers sub-nm to macro regimes.",
+      "parameters": [
+        {
+          "name": "gap_nm",
+          "type": "number",
+          "description": "Plate separation in nanometers",
+          "required": true
+        },
+        {
+          "name": "area_cm2",
+          "type": "number",
+          "description": "Plate area in square centimeters",
+          "required": true
+        },
+        {
+          "name": "material",
+          "type": "string",
+          "description": "Plate material: ideal_conductor, gold, silicon, graphene, metamaterial",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "casimir_pressure_pa": { "type": "number" },
+          "energy_per_area_j_m2": { "type": "number" },
+          "total_energy_j": { "type": "number" },
+          "feasibility_class": { "type": "string" },
+          "reset_cost_note": { "type": "string" },
+          "landauer_bits_equivalent": { "type": "string" }
+        },
+        "required": ["feasibility_class"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "query-vacuum-energy-discrepancy",
+      "description": "The 10^120 vacuum energy discrepancy — worst prediction in physics. Compare QFT prediction vs cosmological observation vs Casimir measurement across 4 UV cutoff scales (Planck, electroweak, QCD, SUSY).",
+      "parameters": [
+        {
+          "name": "framework",
+          "type": "string",
+          "description": "Theoretical framework: qft, cosmological, casimir, all",
+          "required": true
+        },
+        {
+          "name": "cutoff_scale",
+          "type": "string",
+          "description": "UV cutoff for QFT: planck, electroweak, qcd, susy",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "predicted_density_j_m3": { "type": "string" },
+          "observed_density_j_m3": { "type": "string" },
+          "discrepancy_orders": { "type": "integer" },
+          "status": { "type": "string" },
+          "explanation": { "type": "string" },
+          "open_questions": { "type": "string" }
+        },
+        "required": ["status", "discrepancy_orders"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "evaluate-voltage-topology",
+      "description": "Evaluate bus voltage topology for wearable/vehicle power systems. Routes by voltage level and computes wire gauge, insulation weight, motor efficiency, and touch safety. 5 regimes: SELV (<60V) through extreme (>500V).",
+      "parameters": [
+        {
+          "name": "bus_voltage_v",
+          "type": "number",
+          "description": "Nominal bus voltage in volts",
+          "required": true
+        },
+        {
+          "name": "max_power_kw",
+          "type": "number",
+          "description": "Maximum continuous power demand in kilowatts",
+          "required": true
+        },
+        {
+          "name": "environment",
+          "type": "string",
+          "description": "Operating environment: wearable, vehicle, stationary, aerospace",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "max_current_a": { "type": "number" },
+          "wire_gauge_awg": { "type": "integer" },
+          "insulation_class": { "type": "string" },
+          "motor_efficiency_pct": { "type": "number" },
+          "touch_safety": { "type": "string" },
+          "verdict": { "type": "string" },
+          "rationale": { "type": "string" }
+        },
+        "required": ["verdict"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "estimate-soc",
+      "description": "State-of-Charge estimator using fused EKF + OCV + coulomb counting. Routes by available sensor data quality. Handles thermal override (>60°C), cold deration (<0°C), heavy load, and regeneration modes.",
+      "parameters": [
+        {
+          "name": "voltage_v",
+          "type": "number",
+          "description": "Terminal voltage in volts",
+          "required": true
+        },
+        {
+          "name": "current_a",
+          "type": "number",
+          "description": "Instantaneous current in amps (positive = discharge)",
+          "required": false
+        },
+        {
+          "name": "temperature_c",
+          "type": "number",
+          "description": "Cell temperature in Celsius",
+          "required": false
+        },
+        {
+          "name": "previous_soc",
+          "type": "number",
+          "description": "Previous SoC estimate (0.0-1.0)",
+          "required": false
+        },
+        {
+          "name": "load_state",
+          "type": "string",
+          "description": "Current load: resting, light_load, moderate_load, heavy_load, regenerating",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "soc_estimate": { "type": "number" },
+          "method_used": { "type": "string" },
+          "confidence": { "type": "number" },
+          "soh_flag": { "type": "string" },
+          "thermal_state": { "type": "string" },
+          "recommendation": { "type": "string" }
+        },
+        "required": ["soc_estimate", "method_used"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "route-power-load",
+      "description": "Route power demand to the correct energy tier in a federated battery architecture. 4 tiers: main NMC (bulk), ultracap (burst), per-limb LFP (local), aux LFP (life-critical emergency).",
+      "parameters": [
+        {
+          "name": "demand_kw",
+          "type": "number",
+          "description": "Instantaneous power demand in kilowatts",
+          "required": true
+        },
+        {
+          "name": "duration_s",
+          "type": "number",
+          "description": "Expected demand duration in seconds",
+          "required": true
+        },
+        {
+          "name": "locality",
+          "type": "string",
+          "description": "Which zone: left_arm, right_arm, left_leg, right_leg, torso, distributed",
+          "required": false
+        },
+        {
+          "name": "main_bus_status",
+          "type": "string",
+          "description": "Main bus health: nominal, degraded, failed",
+          "required": false
+        },
+        {
+          "name": "ultracap_soc",
+          "type": "number",
+          "description": "Ultracapacitor state of charge (0.0-1.0)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "source_tier": { "type": "string" },
+          "rationale": { "type": "string" },
+          "max_available_kw": { "type": "number" },
+          "thermal_note": { "type": "string" },
+          "fallback_tier": { "type": "string" }
+        },
+        "required": ["source_tier"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "schedule-limb-charge",
+      "description": "Schedule per-limb buffer charging from main bus. Prioritizes lowest-SoC limb. Throttles when bus load rises. Prevents simultaneous all-limbs-charging bus overload.",
+      "parameters": [
+        {
+          "name": "main_bus_load_pct",
+          "type": "number",
+          "description": "Current main bus utilization (0-100%)",
+          "required": true
+        },
+        {
+          "name": "left_arm_soc",
+          "type": "number",
+          "description": "Left arm buffer SoC (0.0-1.0)",
+          "required": false
+        },
+        {
+          "name": "right_arm_soc",
+          "type": "number",
+          "description": "Right arm buffer SoC (0.0-1.0)",
+          "required": false
+        },
+        {
+          "name": "left_leg_soc",
+          "type": "number",
+          "description": "Left leg buffer SoC (0.0-1.0)",
+          "required": false
+        },
+        {
+          "name": "right_leg_soc",
+          "type": "number",
+          "description": "Right leg buffer SoC (0.0-1.0)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "action": { "type": "string" },
+          "target_limb": { "type": "string" },
+          "charge_rate_w": { "type": "number" },
+          "rationale": { "type": "string" },
+          "next_priority": { "type": "string" }
+        },
+        "required": ["action"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}
