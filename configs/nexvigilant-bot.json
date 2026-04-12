@@ -1,0 +1,92 @@
+{
+  "domain": "bot.nexvigilant.com",
+  "title": "NexVigilant Bot Tunnel",
+  "description": "Public ML signal detection endpoints for AI agents. No auth required. Live FAERS disproportionality + ML random forest scoring in one call.",
+  "proxy": "scripts/bot_proxy.py",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": true
+  },
+  "tools": [
+    {
+      "name": "bot-signal-run",
+      "description": "Run ML + statistical signal detection for 8 default drugs or custom targets. Returns PRR/ROR/IC + live ML probability for each drug-event pair. No auth required.",
+      "parameters": [
+        {
+          "name": "drug",
+          "type": "string",
+          "description": "Filter to a specific drug (optional — omit for all 8 defaults)",
+          "required": false
+        },
+        {
+          "name": "event",
+          "type": "string",
+          "description": "Specific adverse event to check (requires drug parameter)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "_bot_tunnel": { "type": "string" },
+          "timestamp": { "type": "string" },
+          "station": { "type": "object" },
+          "ml_model": { "type": "object" },
+          "signals": { "type": "array" },
+          "summary": { "type": "object" }
+        },
+        "required": ["_bot_tunnel", "signals", "summary"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "bot-signal-custom",
+      "description": "Run ML + statistical signal detection for custom drug-event targets (up to 20). POST with targets array.",
+      "parameters": [
+        {
+          "name": "targets",
+          "type": "array",
+          "description": "Array of {drug, event, harm?} objects to analyze (max 20)",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "_bot_tunnel": { "type": "string" },
+          "timestamp": { "type": "string" },
+          "signals": { "type": "array" },
+          "summary": { "type": "object" }
+        },
+        "required": ["_bot_tunnel", "signals", "summary"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "bot-stream-connect",
+      "description": "Connect to SSE live broadcast stream. Returns real-time signal detection events as they arrive (health, ml_model, signal, complete). Use for live monitoring dashboards.",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "stream_url": { "type": "string" },
+          "events": { "type": "array" },
+          "note": { "type": "string" }
+        },
+        "required": ["stream_url"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    }
+  ]
+}
