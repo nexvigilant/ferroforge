@@ -1,0 +1,113 @@
+{
+  "domain": "comms-systems.nexvigilant.com",
+  "private": false,
+  "copyright": "© 2026 NexVigilant, LLC.",
+  "title": "Comms Systems — Multi-Band Communication Routing",
+  "description": "Communication link selection and security validation for wearable systems. 7 link types across 4 domains (BLE/Wi-Fi 6E/5G/LoRa/Iridium/VHF/ADS-B). Security gate validates mTLS, firmware signature, replay protection, and certificate pinning before transmission.",
+  "proxy": "scripts/microgram_proxy.py",
+  "tools": [
+    {
+      "name": "route-comms-link",
+      "description": "Route communication to optimal link based on range, data rate, criticality, and link availability. 7 link types: BLE (controller), Wi-Fi 6E (ground station), 5G (cloud), LoRa (telemetry fallback), Iridium Certus (satcom), VHF radio (ATC), ADS-B Out (position broadcast).",
+      "parameters": [
+        {
+          "name": "range_km",
+          "type": "number",
+          "description": "Distance to destination in kilometers",
+          "required": true
+        },
+        {
+          "name": "data_rate_required",
+          "type": "string",
+          "description": "Required throughput: telemetry_only, low_bandwidth, medium_bandwidth, high_bandwidth, video",
+          "required": true
+        },
+        {
+          "name": "criticality",
+          "type": "string",
+          "description": "Message criticality: routine, priority, emergency, atc_mandatory",
+          "required": false
+        },
+        {
+          "name": "airborne",
+          "type": "boolean",
+          "description": "Whether the suit is currently in flight",
+          "required": false
+        },
+        {
+          "name": "primary_5g_status",
+          "type": "string",
+          "description": "5G modem state: connected, weak, unavailable",
+          "required": false
+        },
+        {
+          "name": "wifi_available",
+          "type": "boolean",
+          "description": "Whether Wi-Fi 6E ground station is in range",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "selected_link": { "type": "string" },
+          "domain": { "type": "string" },
+          "max_data_rate": { "type": "string" },
+          "latency_class": { "type": "string" },
+          "fallback_link": { "type": "string" },
+          "security_note": { "type": "string" },
+          "rationale": { "type": "string" }
+        },
+        "required": ["selected_link"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "check-comms-security",
+      "description": "Validate communication security posture before transmitting. Gates on mTLS, firmware signature, replay protection, and certificate pinning. Blocks transmission if security requirements unmet. VHF/ADS-B always pass (unencrypted by aviation regulation).",
+      "parameters": [
+        {
+          "name": "link_type",
+          "type": "string",
+          "description": "Link type: ble_5, wifi_6e, fiveg_modem, lora_sx1276, iridium_certus, vhf_radio, adsb_out",
+          "required": true
+        },
+        {
+          "name": "mtls_active",
+          "type": "boolean",
+          "description": "Whether mTLS handshake is established",
+          "required": false
+        },
+        {
+          "name": "firmware_signed",
+          "type": "boolean",
+          "description": "Whether modem firmware signature verified at boot",
+          "required": false
+        },
+        {
+          "name": "replay_nonce_valid",
+          "type": "boolean",
+          "description": "Whether replay protection nonce counter is current",
+          "required": false
+        },
+        {
+          "name": "certificate_pinned",
+          "type": "boolean",
+          "description": "Whether TLS certificate is pinned to known CA",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "verdict": { "type": "string" },
+          "security_level": { "type": "string" },
+          "missing_controls": { "type": "string" },
+          "action": { "type": "string" }
+        },
+        "required": ["verdict"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}
