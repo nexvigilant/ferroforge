@@ -1,0 +1,131 @@
+{
+  "domain": "web-autonomy.nexvigilant.com",
+  "url_pattern": "/*",
+  "proxy": "rust-native",
+  "title": "Web Autonomy Tools",
+  "description": "Autonomous internet access for AI agents — fetch pages, search the web, extract content via CSS selectors, extract metadata and links, crawl websites. No API keys required.",
+  "tools": [
+    {
+      "name": "web-fetch",
+      "description": "Fetch a URL and return clean extracted text. Strips HTML tags, scripts, and styles. Returns page title, readable text, HTTP status, content type, and response time.",
+      "parameters": [
+        {"name": "url", "type": "string", "required": true, "description": "URL to fetch"},
+        {"name": "timeout_secs", "type": "integer", "required": false, "description": "Request timeout in seconds (default: 30)"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "url": {"type": "string"},
+          "status": {"type": "integer"},
+          "title": {"type": "string"},
+          "text": {"type": "string"},
+          "text_length": {"type": "integer"},
+          "elapsed_ms": {"type": "integer"}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "web-search",
+      "description": "Search the web using DuckDuckGo. No API key required. Returns titles, URLs, and snippets.",
+      "parameters": [
+        {"name": "query", "type": "string", "required": true, "description": "Search query"},
+        {"name": "max_results", "type": "integer", "required": false, "description": "Maximum results (default: 10)"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "query": {"type": "string"},
+          "count": {"type": "integer"},
+          "results": {"type": "array", "items": {"type": "object"}}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "web-extract",
+      "description": "Extract content from a web page using a CSS selector. Fetches the URL, then returns all elements matching the selector as text.",
+      "parameters": [
+        {"name": "url", "type": "string", "required": true, "description": "URL to fetch and extract from"},
+        {"name": "selector", "type": "string", "required": true, "description": "CSS selector (e.g. 'h1', '.class', '#id', 'table tr')"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "selector": {"type": "string"},
+          "count": {"type": "integer"},
+          "matches": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "web-links",
+      "description": "Extract all links from a web page. Returns URLs, anchor text, and internal/external classification.",
+      "parameters": [
+        {"name": "url", "type": "string", "required": true, "description": "URL to extract links from"},
+        {"name": "external_only", "type": "boolean", "required": false, "description": "Only return external links (default: false)"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "count": {"type": "integer"},
+          "links": {"type": "array", "items": {"type": "object"}}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "web-metadata",
+      "description": "Extract page metadata: title, description, OpenGraph tags, canonical URL, language, and keywords.",
+      "parameters": [
+        {"name": "url", "type": "string", "required": true, "description": "URL to extract metadata from"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "title": {"type": "string"},
+          "description": {"type": "string"},
+          "og_title": {"type": "string"},
+          "og_image": {"type": "string"},
+          "language": {"type": "string"},
+          "keywords": {"type": "array", "items": {"type": "string"}}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    },
+    {
+      "name": "web-crawl",
+      "description": "Crawl a website from a seed URL. Breadth-first traversal with configurable depth, page limit, and same-domain filtering. Returns title and text preview per page.",
+      "parameters": [
+        {"name": "url", "type": "string", "required": true, "description": "Seed URL to start crawling"},
+        {"name": "max_depth", "type": "integer", "required": false, "description": "Maximum crawl depth (default: 1)"},
+        {"name": "max_pages", "type": "integer", "required": false, "description": "Maximum pages to fetch (default: 10)"},
+        {"name": "same_domain_only", "type": "boolean", "required": false, "description": "Only follow same-domain links (default: true)"}
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "seed": {"type": "string"},
+          "total_pages": {"type": "integer"},
+          "max_depth_reached": {"type": "integer"},
+          "elapsed_ms": {"type": "integer"},
+          "pages": {"type": "array", "items": {"type": "object"}}
+        },
+        "required": ["success"]
+      },
+      "annotations": {"readOnlyHint": true, "destructiveHint": false}
+    }
+  ]
+}
