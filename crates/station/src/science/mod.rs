@@ -46,10 +46,11 @@ const COURSES: &[Course] = &[
     },
     Course {
         name: "signal-investigation",
-        description: "Investigate a safety signal: FAERS data → disproportionality → EU confirmation → case reports → trial SAEs → PRAC status → multi-regional assessment",
+        description: "Investigate a safety signal: FAERS data → disproportionality → ML vs PRR comparison → EU confirmation → case reports → trial SAEs → PRAC status → multi-regional assessment",
         steps: &[
             CourseStep { tool: "api_fda_gov_search_adverse_events", example_params: r#"{"drug_name": "semaglutide", "reaction": "pancreatitis", "limit": 10}"# },
             CourseStep { tool: "open_vigil_fr_compute_disproportionality", example_params: r#"{"drug": "semaglutide", "event": "pancreatitis"}"# },
+            CourseStep { tool: "comparator_nexvigilant_com_compare_ml_vs_prr", example_params: r#"{"drug": "semaglutide", "event": "pancreatitis"}"# },
             CourseStep { tool: "eudravigilance_ema_europa_eu_get_signal_summary", example_params: r#"{"substance": "semaglutide"}"# },
             CourseStep { tool: "pubmed_ncbi_nlm_nih_gov_search_case_reports", example_params: r#"{"drug": "semaglutide", "event": "pancreatitis"}"# },
             CourseStep { tool: "clinicaltrials_gov_get_serious_adverse_events", example_params: r#"{"nct_id": "NCT03548935"}"# },
