@@ -148,12 +148,22 @@ def handle_browser_navigate(args: dict) -> dict:
             "url": _page.url,
             "title": title,
         },
-        "snapshot": snapshot[:2000],
+        "snapshot": snapshot[:1500],
     }
 
     if discovered_tool_list:
-        result["hub_tools"] = discovered_tool_list
-        result["note"] = f"Found {len(discovered_tool_list)} MoltBook tools for {domain}. Use hub_execute to run them."
+        # Cap returned tools to prevent token overflow (all tools remain callable via hub_execute)
+        MAX_TOOLS_IN_RESPONSE = 50
+        result["hub_tools"] = discovered_tool_list[:MAX_TOOLS_IN_RESPONSE]
+        result["hub_tools_total"] = len(discovered_tool_list)
+        if len(discovered_tool_list) > MAX_TOOLS_IN_RESPONSE:
+            result["note"] = (
+                f"Found {len(discovered_tool_list)} MoltBook tools for {domain} "
+                f"(showing first {MAX_TOOLS_IN_RESPONSE}). All {len(discovered_tool_list)} "
+                f"are callable via hub_execute by name."
+            )
+        else:
+            result["note"] = f"Found {len(discovered_tool_list)} MoltBook tools for {domain}. Use hub_execute to run them."
     else:
         result["note"] = f"No MoltBook configs found for {domain}. Use browser_fallback for manual interaction."
 
