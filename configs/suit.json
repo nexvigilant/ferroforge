@@ -1,0 +1,93 @@
+{
+  "domain": "suit.nexvigilant.com",
+  "url_pattern": "/*",
+  "title": "Iron Vigil Suit HUD",
+  "description": "Helmet systems, AR overlay, voice agent, haptic feedback for the Iron Vigil suit",
+  "tools": [
+    {
+      "name": "suit-helmet-state",
+      "description": "Get current helmet state snapshot — visor position, AR optics, eye tracker, mic array, ventilation, seal integrity.",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "visor": { "type": "string", "description": "Open|Closing|Sealed|Opening|Locked" },
+          "shell": { "type": "string", "description": "Shell material" },
+          "optics": { "type": "object", "description": "AR optics config" },
+          "eye_tracker": { "type": "object", "description": "Eye tracker state" },
+          "mic_array": { "type": "object", "description": "Beamforming mic state" },
+          "ventilation": { "type": "string", "description": "Sealed|Passive|Active|Emergency" },
+          "internal_temp_c": { "type": "number" },
+          "seal_integrity": { "type": "number", "description": "0.0-1.0" }
+        },
+        "required": ["visor", "shell"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "suit-hud-frame-compose",
+      "description": "Compose a HUD frame from sensor data — attitude (pitch/roll/heading), systems health (power/thermal/integrity), threat markers, and nav waypoints.",
+      "parameters": [
+        { "name": "pitch_deg", "type": "number", "description": "Pitch in degrees", "required": false },
+        { "name": "roll_deg", "type": "number", "description": "Roll in degrees", "required": false },
+        { "name": "heading_deg", "type": "number", "description": "Heading 0-360", "required": false },
+        { "name": "altitude_m", "type": "number", "description": "Altitude in meters", "required": false },
+        { "name": "speed_mps", "type": "number", "description": "Speed in m/s", "required": false },
+        { "name": "power", "type": "number", "description": "Power 0.0-1.0", "required": false },
+        { "name": "integrity", "type": "number", "description": "Suit integrity 0.0-1.0", "required": false },
+        { "name": "thermal", "type": "string", "description": "nominal|elevated|warning|critical", "required": false },
+        { "name": "threats", "type": "string", "description": "JSON array of threat markers", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "frame": { "type": "object", "description": "Composited HUD frame" },
+          "layers": { "type": "integer", "description": "Layer count" },
+          "threats": { "type": "integer", "description": "Active threat count" },
+          "systems_ok": { "type": "boolean", "description": "All systems nominal" }
+        },
+        "required": ["frame", "layers"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "suit-haptic-cue",
+      "description": "Send a haptic cue to a body zone — pulse, buzz, ramp, threat alert, or navigation cue. 14 zones across wrists, torso belt, and exo joints.",
+      "parameters": [
+        { "name": "zone", "type": "string", "description": "Target: wrist_left, torso_front, elbow_right, etc.", "required": true },
+        { "name": "pattern", "type": "string", "description": "pulse|buzz|ramp|threat_alert|nav_left|nav_right", "required": true },
+        { "name": "intensity", "type": "number", "description": "0.0-1.0 (default: 0.5)", "required": false },
+        { "name": "duration_ms", "type": "integer", "description": "Duration in ms (default: 200)", "required": false }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cue": { "type": "object", "description": "Haptic cue details" },
+          "zone_type": { "type": "string", "description": "ERM motor|vibrotactile belt|force feedback" }
+        },
+        "required": ["cue", "zone_type"]
+      },
+      "annotations": { "readOnlyHint": false, "destructiveHint": false }
+    },
+    {
+      "name": "suit-voice-agent-state",
+      "description": "Get voice agent state — wake word detector, ASR backend, LLM routing (local/cloud/cascade), TTS config, MCP bridge status.",
+      "parameters": [],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "wake_word": { "type": "string", "description": "Listening|Activated|Cooldown|Disabled" },
+          "asr": { "type": "string", "description": "WhisperLocal|CloudFallback|Hybrid" },
+          "llm_route": { "type": "object", "description": "LLM routing config" },
+          "tts": { "type": "object", "description": "TTS config" },
+          "mcp_bridge": { "type": "object", "description": "MCP bridge state" },
+          "processing": { "type": "boolean" },
+          "commands_processed": { "type": "integer" }
+        },
+        "required": ["wake_word", "asr"]
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ],
+  "proxy": "rust-native"
+}

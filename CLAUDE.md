@@ -127,7 +127,7 @@ Source: `crates/station/src/server_streamable.rs`. Session-optional design: Clau
 
 **DO NOT deploy to webmcp-hub.com.** The third-party hub has a 50-config cap and is no longer the primary deployment target. All agent traffic routes through `mcp.nexvigilant.com`.
 
-**Deployment:** Use `scripts/deploy-cloud-run.sh` (canary by default: 10% → health check → 100%). Pass `--no-canary` for immediate full deploy.
+**Deployment:** Use `scripts/deploy-cloud-run.sh` (canary by default: 10% → health check → 100%). Pass `--no-canary` for immediate full deploy. **NEVER use ad-hoc `gcloud run deploy --source .`** — it deploys from cwd which may not be ferroforge, and skips the binary freshness gate. The script `cd`s to the correct directory automatically.
 
 ### Service Level Objectives
 

@@ -1,0 +1,283 @@
+{
+  "domain": "ats.nexvigilant.com",
+  "private": false,
+  "copyright": "\u00a9 2026 NexVigilant, LLC.",
+  "title": "ATS Resume Screening \u2014 Candidate Vigilance",
+  "description": "Cross-domain ATS resume screening tools: format compliance checking, keyword match scoring, experience relevance analysis, gap detection, and pass/fail recommendation. Vigilance applied to hiring \u2014 same signal detection principles, different boundary.",
+  "proxy": "scripts/microgram_proxy.py",
+  "tools": [
+    {
+      "name": "screen-resume",
+      "description": "Run the full ATS resume screening chain: format compliance \u2192 experience relevance \u2192 keyword match \u2192 gap detection \u2192 recommendation. Returns overall verdict (STRONG_MATCH, CONDITIONAL_MATCH, WEAK_MATCH, REJECT, RECONSIDER), pass probability, and prioritized fix list.",
+      "parameters": [
+        {
+          "name": "file_type_compatible",
+          "type": "boolean",
+          "description": "Whether the resume file type is ATS-compatible (.docx, .pdf)",
+          "required": true
+        },
+        {
+          "name": "has_standard_headers",
+          "type": "boolean",
+          "description": "Whether standard section headers exist (Experience, Education, Skills)",
+          "required": true
+        },
+        {
+          "name": "uses_simple_formatting",
+          "type": "boolean",
+          "description": "Whether formatting is ATS-parseable (no tables, columns, text boxes)",
+          "required": true
+        },
+        {
+          "name": "has_contact_info",
+          "type": "boolean",
+          "description": "Whether contact info (name, email, phone) is in plain text at top",
+          "required": true
+        },
+        {
+          "name": "sections_detected",
+          "type": "integer",
+          "description": "Number of distinct sections detected in the resume",
+          "required": true
+        },
+        {
+          "name": "matched_keywords",
+          "type": "integer",
+          "description": "Number of job description keywords found in resume",
+          "required": true
+        },
+        {
+          "name": "total_keywords",
+          "type": "integer",
+          "description": "Total keywords extracted from job description",
+          "required": true
+        },
+        {
+          "name": "direct_experience_years",
+          "type": "integer",
+          "description": "Years of directly relevant experience",
+          "required": false
+        },
+        {
+          "name": "transferable_experience_years",
+          "type": "integer",
+          "description": "Years of transferable experience from adjacent roles",
+          "required": false
+        },
+        {
+          "name": "required_years",
+          "type": "integer",
+          "description": "Years of experience required by job listing",
+          "required": false
+        },
+        {
+          "name": "missing_hard_skills",
+          "type": "integer",
+          "description": "Count of required hard skills not found in resume",
+          "required": false
+        },
+        {
+          "name": "missing_credentials",
+          "type": "integer",
+          "description": "Count of required credentials/certifications not held",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "final_output": {
+            "type": "object",
+            "description": "Accumulated screening results with overall_verdict, pass_probability, priority_fixes, format_verdict, match_tier, gap_severity, relevance_tier"
+          },
+          "steps": {
+            "type": "array",
+            "description": "Per-step decision trace through all 5 screening stages"
+          },
+          "total_duration_us": {
+            "type": "integer",
+            "description": "Total execution time in microseconds"
+          }
+        },
+        "required": ["success"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "check-format",
+      "description": "Check resume format for ATS parser compatibility. Evaluates file type, section headers, formatting complexity, contact info placement, and section count. Returns format_score (0-100) and parseable boolean.",
+      "parameters": [
+        {
+          "name": "file_type_compatible",
+          "type": "boolean",
+          "description": "Whether the file type is ATS-compatible (.docx, .pdf)",
+          "required": true
+        },
+        {
+          "name": "has_standard_headers",
+          "type": "boolean",
+          "description": "Whether standard section headers exist",
+          "required": true
+        },
+        {
+          "name": "uses_simple_formatting",
+          "type": "boolean",
+          "description": "Whether formatting is single-column, no tables/text boxes",
+          "required": true
+        },
+        {
+          "name": "has_contact_info",
+          "type": "boolean",
+          "description": "Whether contact info is in plain text at top",
+          "required": true
+        },
+        {
+          "name": "sections_detected",
+          "type": "integer",
+          "description": "Number of distinct sections detected",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "format_score": { "type": "integer" },
+          "format_verdict": { "type": "string" },
+          "parseable": { "type": "boolean" },
+          "issues": { "type": "string" }
+        },
+        "required": ["format_verdict", "parseable"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "score-keywords",
+      "description": "Score keyword overlap between resume content and job description requirements. Returns match tier (STRONG/MODERATE/WEAK) and ATS pass likelihood.",
+      "parameters": [
+        {
+          "name": "matched_keywords",
+          "type": "integer",
+          "description": "Number of job description keywords found in resume",
+          "required": true
+        },
+        {
+          "name": "total_keywords",
+          "type": "integer",
+          "description": "Total keywords extracted from job description",
+          "required": true
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "match_pct": { "type": "number" },
+          "match_tier": { "type": "string" },
+          "ats_pass_likely": { "type": "boolean" },
+          "recommendation": { "type": "string" }
+        },
+        "required": ["match_tier", "ats_pass_likely"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "detect-gaps",
+      "description": "Detect critical gaps between resume and job requirements \u2014 missing skills, experience shortfalls, credential gaps. Returns severity (CRITICAL/HIGH/MODERATE/LOW/NONE) and whether gaps are fixable via resume optimization.",
+      "parameters": [
+        {
+          "name": "missing_hard_skills",
+          "type": "integer",
+          "description": "Count of required hard skills not found in resume",
+          "required": false
+        },
+        {
+          "name": "missing_soft_skills",
+          "type": "integer",
+          "description": "Count of required soft skills not demonstrated",
+          "required": false
+        },
+        {
+          "name": "missing_credentials",
+          "type": "integer",
+          "description": "Count of required credentials not held",
+          "required": false
+        },
+        {
+          "name": "years_experience_gap",
+          "type": "integer",
+          "description": "Years below the required experience level",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "gap_severity": { "type": "string" },
+          "total_gaps": { "type": "integer" },
+          "fixable": { "type": "boolean" },
+          "priority_action": { "type": "string" }
+        },
+        "required": ["gap_severity", "fixable"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "assess-experience",
+      "description": "Score how relevant listed experience is to the target role. Classifies as HIGH (direct), MODERATE, TRANSFERABLE, or LOW. Provides reframing advice for career changers.",
+      "parameters": [
+        {
+          "name": "direct_experience_years",
+          "type": "integer",
+          "description": "Years of directly relevant experience",
+          "required": false
+        },
+        {
+          "name": "transferable_experience_years",
+          "type": "integer",
+          "description": "Years of transferable experience from adjacent roles",
+          "required": false
+        },
+        {
+          "name": "unrelated_experience_years",
+          "type": "integer",
+          "description": "Years of unrelated experience",
+          "required": false
+        },
+        {
+          "name": "required_years",
+          "type": "integer",
+          "description": "Years of experience required by the position",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "relevance_tier": { "type": "string" },
+          "effective_years": { "type": "integer" },
+          "years_experience_gap": { "type": "integer" },
+          "reframing_advice": { "type": "string" }
+        },
+        "required": ["relevance_tier"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    }
+  ]
+}

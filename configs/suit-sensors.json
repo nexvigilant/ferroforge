@@ -1,0 +1,181 @@
+{
+  "domain": "suit-sensors.nexvigilant.com",
+  "url_pattern": "/suit-sensors/*",
+  "title": "Suit Sensor Subsystems",
+  "description": "Raw hardware abstraction for NexVigilant suit sensor subsystems — IMU, force plate, strain gauge, and pilot biometrics",
+  "copyright": "© 2026 NexVigilant, LLC.",
+  "proxy": "rust-native",
+  "tools": [
+    {
+      "name": "calibrate-imu",
+      "description": "Apply calibration to a raw 9-DOF IMU reading — removes accelerometer bias/scale, gyroscope bias, and magnetometer hard-iron offset",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "accel_x": { "type": "number", "description": "Raw accelerometer X (m/s²)" },
+          "accel_y": { "type": "number", "description": "Raw accelerometer Y (m/s²)" },
+          "accel_z": { "type": "number", "description": "Raw accelerometer Z (m/s²)" },
+          "gyro_x": { "type": "number", "description": "Raw gyroscope X (rad/s)" },
+          "gyro_y": { "type": "number", "description": "Raw gyroscope Y (rad/s)" },
+          "gyro_z": { "type": "number", "description": "Raw gyroscope Z (rad/s)" },
+          "accel_bias_x": { "type": "number", "description": "Accel bias X (m/s²)", "default": 0.0 },
+          "accel_bias_y": { "type": "number", "description": "Accel bias Y (m/s²)", "default": 0.0 },
+          "accel_bias_z": { "type": "number", "description": "Accel bias Z (m/s²)", "default": 0.0 },
+          "gyro_bias_x": { "type": "number", "description": "Gyro bias X (rad/s)", "default": 0.0 },
+          "gyro_bias_y": { "type": "number", "description": "Gyro bias Y (rad/s)", "default": 0.0 },
+          "gyro_bias_z": { "type": "number", "description": "Gyro bias Z (rad/s)", "default": 0.0 }
+        },
+        "required": ["accel_x", "accel_y", "accel_z", "gyro_x", "gyro_y", "gyro_z"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "calibrated_accel": { "type": "object", "description": "Calibrated acceleration (m/s²)" },
+          "calibrated_gyro": { "type": "object", "description": "Calibrated angular velocity (rad/s)" }
+        }
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "detect-stance-phase",
+      "description": "Detect whether a foot is in stance phase (on ground) by comparing vertical ground reaction force against a threshold",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "vertical_force_n": { "type": "number", "description": "Vertical ground reaction force (N)" },
+          "threshold_n": { "type": "number", "description": "Force threshold for stance detection (N)", "default": 20.0 }
+        },
+        "required": ["vertical_force_n"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "is_stance": { "type": "boolean", "description": "True if foot is in stance phase" },
+          "vertical_force_n": { "type": "number", "description": "Input force value" },
+          "threshold_n": { "type": "number", "description": "Threshold used" }
+        }
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "compute-weight-distribution",
+      "description": "Compute bilateral weight distribution from left and right force plate vertical forces — returns 0.0 (all left) to 1.0 (all right), 0.5 = balanced",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "left_force_n": { "type": "number", "description": "Left foot vertical force (N)" },
+          "right_force_n": { "type": "number", "description": "Right foot vertical force (N)" }
+        },
+        "required": ["left_force_n", "right_force_n"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "distribution": { "type": "number", "description": "Weight distribution 0.0-1.0 (0.5 = balanced)" },
+          "total_force_n": { "type": "number", "description": "Total vertical force (N)" },
+          "dominant_side": { "type": "string", "description": "left, right, or balanced" }
+        }
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "convert-strain",
+      "description": "Convert raw voltage ratio (ΔV/V) from a Wheatstone bridge strain gauge to microstrain (µε) using gauge factor and bridge configuration",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "delta_v_ratio": { "type": "number", "description": "Voltage ratio ΔV/V (dimensionless)" },
+          "gauge_factor": { "type": "number", "description": "Gauge factor (typically 2.0-2.2 for metal foil)", "default": 2.1 },
+          "bridge_type": { "type": "string", "enum": ["quarter", "half", "full"], "description": "Wheatstone bridge configuration", "default": "quarter" }
+        },
+        "required": ["delta_v_ratio"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "microstrain": { "type": "number", "description": "Computed strain (µε)" },
+          "bridge_sensitivity": { "type": "number", "description": "Bridge sensitivity multiplier used" }
+        }
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "check-yield-alarm",
+      "description": "Check if measured strain exceeds the yield threshold for a structural element — indicates potential plastic deformation",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "microstrain": { "type": "number", "description": "Measured strain (µε)" },
+          "yield_microstrain": { "type": "number", "description": "Yield threshold (µε) for the material", "default": 2000.0 }
+        },
+        "required": ["microstrain"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "alarm": { "type": "boolean", "description": "True if yield threshold exceeded" },
+          "utilization_pct": { "type": "number", "description": "Strain as percentage of yield threshold" }
+        }
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "evaluate-biometrics",
+      "description": "Evaluate pilot biometric readings against safety thresholds — returns Normal, Warning, or Critical alarm severity",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "heart_rate_bpm": { "type": "number", "description": "Heart rate (beats per minute)" },
+          "spo2_pct": { "type": "number", "description": "Blood oxygen saturation (%)" },
+          "core_temp_c": { "type": "number", "description": "Core body temperature (°C)" },
+          "skin_temp_c": { "type": "number", "description": "Skin temperature (°C)" },
+          "gsr_us": { "type": "number", "description": "Galvanic skin response (µS)" },
+          "respiration_bpm": { "type": "number", "description": "Respiration rate (breaths/min)" },
+          "hr_max_bpm": { "type": "number", "description": "Heart rate upper alarm threshold", "default": 180.0 },
+          "hr_min_bpm": { "type": "number", "description": "Heart rate lower alarm threshold", "default": 40.0 },
+          "spo2_min_pct": { "type": "number", "description": "SpO2 lower alarm threshold", "default": 90.0 },
+          "core_temp_max_c": { "type": "number", "description": "Core temp upper alarm threshold", "default": 39.5 },
+          "core_temp_min_c": { "type": "number", "description": "Core temp lower alarm threshold", "default": 35.0 }
+        },
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "severity": { "type": "string", "enum": ["Normal", "Warning", "Critical"], "description": "Alarm severity" },
+          "readings": { "type": "object", "description": "All biometric readings evaluated" },
+          "thresholds": { "type": "object", "description": "Thresholds used" },
+          "trigger": { "type": "string", "description": "Which parameter triggered the alarm, if any" }
+        }
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    },
+    {
+      "name": "sensor-subsystem-status",
+      "description": "Get the status and configuration summary of all suit sensor subsystems — IMU, force plates, strain gauges, biometrics",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "subsystems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "status": { "type": "string" },
+                "sample_rate_hz": { "type": "number" },
+                "channels": { "type": "number" }
+              }
+            }
+          }
+        }
+      },
+      "annotations": { "readOnlyHint": true, "destructiveHint": false }
+    }
+  ]
+}

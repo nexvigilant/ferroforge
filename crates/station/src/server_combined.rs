@@ -157,6 +157,7 @@ pub async fn run_combined(
                 "https://mcp.nexvigilant.com".parse().expect("valid hardcoded URL"),
                 "https://nexvigilant.com".parse().expect("valid hardcoded URL"),
                 "https://www.nexvigilant.com".parse().expect("valid hardcoded URL"),
+                "https://nexvigilant-radio.vercel.app".parse().expect("valid hardcoded URL"),
                 "http://localhost:3000".parse().expect("valid hardcoded URL"),
                 "http://localhost:9002".parse().expect("valid hardcoded URL"),
             ]

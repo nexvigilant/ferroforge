@@ -213,6 +213,131 @@
         "readOnlyHint": true,
         "destructiveHint": false
       }
+    },
+    {
+      "name": "audio-vad-process",
+      "description": "Process an audio frame through Voice Activity Detection. Returns speech/silence classification with energy, zero-crossing rate, and adaptive threshold.",
+      "parameters": [
+        {
+          "name": "samples",
+          "type": "array",
+          "description": "F32 audio samples (mono, [-1.0, 1.0])",
+          "required": true
+        },
+        {
+          "name": "energy_threshold",
+          "type": "number",
+          "description": "Energy threshold for speech detection (default: 0.02)",
+          "required": false
+        },
+        {
+          "name": "zcr_ceiling",
+          "type": "number",
+          "description": "Zero-crossing rate ceiling for noise rejection (default: 0.4)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "is_speech": { "type": "boolean", "description": "Whether frame is speech" },
+          "energy": { "type": "number", "description": "RMS energy" },
+          "zcr": { "type": "number", "description": "Zero-crossing rate" },
+          "threshold": { "type": "number", "description": "Current adaptive threshold" },
+          "state": { "type": "string", "description": "Silence|Onset|Speech|Offset" }
+        },
+        "required": ["is_speech", "energy", "zcr", "threshold", "state"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "audio-noise-gate",
+      "description": "Process an audio frame through adaptive Noise Gate. Attenuates frames below noise floor with smooth attack/release.",
+      "parameters": [
+        {
+          "name": "samples",
+          "type": "array",
+          "description": "F32 audio samples (mono, [-1.0, 1.0])",
+          "required": true
+        },
+        {
+          "name": "threshold_multiplier",
+          "type": "number",
+          "description": "Gate threshold as multiplier of noise floor (default: 2.0)",
+          "required": false
+        },
+        {
+          "name": "floor_gain",
+          "type": "number",
+          "description": "Minimum gain when gate closed (default: 0.0)",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "state": { "type": "string", "description": "Closed|Opening|Open|Closing" },
+          "gain": { "type": "number", "description": "Current gain 0.0-1.0" },
+          "noise_floor": { "type": "number", "description": "Estimated noise floor RMS" },
+          "input_rms": { "type": "number", "description": "Input energy" },
+          "output_rms": { "type": "number", "description": "Output energy after gating" },
+          "reduction_db": { "type": "number", "description": "Gain reduction in dB" }
+        },
+        "required": ["state", "gain", "noise_floor"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
+    },
+    {
+      "name": "audio-transcribe",
+      "description": "Transcribe a WAV file using faster-whisper STT. Returns text, segments with timing, confidence, and language detection.",
+      "parameters": [
+        {
+          "name": "path",
+          "type": "string",
+          "description": "Path to WAV file to transcribe",
+          "required": true
+        },
+        {
+          "name": "model",
+          "type": "string",
+          "description": "Whisper model name (default: medium.en)",
+          "required": false
+        },
+        {
+          "name": "language",
+          "type": "string",
+          "description": "Language hint (default: en)",
+          "required": false
+        },
+        {
+          "name": "initial_prompt",
+          "type": "string",
+          "description": "Vocabulary priming prompt for domain terms",
+          "required": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "description": "Full transcribed text" },
+          "confidence": { "type": "number", "description": "Average log probability" },
+          "duration_secs": { "type": "number", "description": "Audio duration" },
+          "accepted": { "type": "boolean", "description": "Above confidence threshold" },
+          "language": { "type": "string", "description": "Detected language" },
+          "segments": { "type": "array", "description": "Timed segments" }
+        },
+        "required": ["text", "confidence", "accepted"]
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false
+      }
     }
   ],
   "proxy": "rust-native"
