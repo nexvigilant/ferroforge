@@ -156,6 +156,7 @@ pub async fn run_combined(
             vec![
                 "https://mcp.nexvigilant.com".parse().expect("valid hardcoded URL"),
                 "https://nexvigilant.com".parse().expect("valid hardcoded URL"),
+                "https://www.nexvigilant.com".parse().expect("valid hardcoded URL"),
                 "http://localhost:3000".parse().expect("valid hardcoded URL"),
                 "http://localhost:9002".parse().expect("valid hardcoded URL"),
             ]
