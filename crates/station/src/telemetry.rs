@@ -240,6 +240,12 @@ impl StationTelemetry {
         let uptime_secs = self.start_time.elapsed().as_secs().max(1);
         let total_duration_ms: u64 = ring.iter().map(|r| r.duration_ms).sum();
 
+        // SLO-relevant counts: exclude local-only and unclassified domains
+        // so expected Cloud Run failures don't inflate the public error rate.
+        const SLO_EXCLUDED: &[&str] = &["microgram.local", "unknown"];
+        let slo_calls = ring.iter().filter(|r| !SLO_EXCLUDED.contains(&r.domain.as_str())).count() as u64;
+        let slo_errors = ring.iter().filter(|r| r.is_error && !SLO_EXCLUDED.contains(&r.domain.as_str())).count() as u64;
+
         // Per-domain aggregation
         let mut domain_map: HashMap<String, Vec<&ToolCallRecord>> = HashMap::new();
         let mut tool_counts: HashMap<String, u64> = HashMap::new();
@@ -297,8 +303,9 @@ impl StationTelemetry {
             .cloned()
             .collect();
 
-        let error_rate_pct = if total_calls > 0 {
-            (total_errors as f64 / total_calls as f64) * 100.0
+        // Error rate for SLO uses filtered counts (excludes local-only domains)
+        let error_rate_pct = if slo_calls > 0 {
+            (slo_errors as f64 / slo_calls as f64) * 100.0
         } else {
             0.0
         };
@@ -323,10 +330,14 @@ impl StationTelemetry {
             "ok".to_string()
         };
 
-        // Find per-domain degradation
+        // Find per-domain degradation.
+        // Exclude local-only domains (microgram.local) and unclassified (unknown)
+        // — these are expected failures on Cloud Run and shouldn't pollute SLO.
+        const EXCLUDED_DOMAINS: &[&str] = &["microgram.local", "unknown"];
         let degraded_domains: Vec<String> = domains
             .iter()
             .filter(|d| d.call_count >= 5) // only flag domains with meaningful sample size
+            .filter(|d| !EXCLUDED_DOMAINS.contains(&d.domain.as_str()))
             .filter(|d| {
                 let rate = (d.error_count as f64 / d.call_count as f64) * 100.0;
                 rate >= ERROR_RATE_WARN_PCT

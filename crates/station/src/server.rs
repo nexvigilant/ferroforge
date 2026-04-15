@@ -139,6 +139,13 @@ fn handle_request_core(
                     tools: ToolCapability {
                         list_changed: false,
                     },
+                    resources: crate::protocol::ResourceCapability {
+                        subscribe: false,
+                        list_changed: false,
+                    },
+                    prompts: crate::protocol::PromptCapability {
+                        list_changed: false,
+                    },
                 },
                 server_info: ServerInfo {
                     name: "nexvigilant-station".into(),
@@ -235,15 +242,59 @@ fn handle_request_core(
 
         "ping" => Some(JsonRpcResponse::success(id, serde_json::json!({}))),
 
-        // Return empty lists for capabilities we don't support.
-        // Claude.ai sends these during bootstrap even when not advertised.
+        // MCP Resources — structured PV knowledge for agent context
         "resources/list" => {
-            debug!("resources/list requested (not supported, returning empty)");
-            Some(JsonRpcResponse::success(id, serde_json::json!({ "resources": [] })))
+            let result = crate::resources::list_resources(registry);
+            info!(count = result.resources.len(), "Resources list requested");
+            Some(JsonRpcResponse::success(id, serde_json::to_value(result).unwrap_or_default()))
         }
+        "resources/templates/list" => {
+            let result = crate::resources::list_resource_templates();
+            info!(count = result.resource_templates.len(), "Resource templates list requested");
+            Some(JsonRpcResponse::success(id, serde_json::to_value(result).unwrap_or_default()))
+        }
+        "resources/read" => {
+            let uri = req.params.as_ref()
+                .and_then(|p| p.get("uri"))
+                .and_then(|u| u.as_str())
+                .unwrap_or("");
+            if uri.is_empty() {
+                return Some(JsonRpcResponse::error(id, INVALID_PARAMS, "Missing uri in params"));
+            }
+            match crate::resources::read_resource(registry, uri) {
+                Ok(result) => {
+                    info!(uri = %uri, "Resource read");
+                    Some(JsonRpcResponse::success(id, serde_json::to_value(result).unwrap_or_default()))
+                }
+                Err(e) => Some(JsonRpcResponse::error(id, INVALID_PARAMS, e)),
+            }
+        }
+
+        // MCP Prompts — guided PV research workflows
         "prompts/list" => {
-            debug!("prompts/list requested (not supported, returning empty)");
-            Some(JsonRpcResponse::success(id, serde_json::json!({ "prompts": [] })))
+            let result = crate::prompts::list_prompts();
+            info!(count = result.prompts.len(), "Prompts list requested");
+            Some(JsonRpcResponse::success(id, serde_json::to_value(result).unwrap_or_default()))
+        }
+        "prompts/get" => {
+            let name = req.params.as_ref()
+                .and_then(|p| p.get("name"))
+                .and_then(|n| n.as_str())
+                .unwrap_or("");
+            let arguments = req.params.as_ref()
+                .and_then(|p| p.get("arguments"))
+                .cloned()
+                .unwrap_or(serde_json::json!({}));
+            if name.is_empty() {
+                return Some(JsonRpcResponse::error(id, INVALID_PARAMS, "Missing name in params"));
+            }
+            match crate::prompts::get_prompt(name, &arguments) {
+                Ok(result) => {
+                    info!(prompt = %name, "Prompt retrieved");
+                    Some(JsonRpcResponse::success(id, serde_json::to_value(result).unwrap_or_default()))
+                }
+                Err(e) => Some(JsonRpcResponse::error(id, INVALID_PARAMS, e)),
+            }
         }
 
         other => {

@@ -67,10 +67,25 @@ pub struct ServerInfo {
 #[derive(Debug, Serialize)]
 pub struct ServerCapabilities {
     pub tools: ToolCapability,
+    pub resources: ResourceCapability,
+    pub prompts: PromptCapability,
 }
 
 #[derive(Debug, Serialize)]
 pub struct ToolCapability {
+    #[serde(rename = "listChanged")]
+    pub list_changed: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ResourceCapability {
+    pub subscribe: bool,
+    #[serde(rename = "listChanged")]
+    pub list_changed: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PromptCapability {
     #[serde(rename = "listChanged")]
     pub list_changed: bool,
 }

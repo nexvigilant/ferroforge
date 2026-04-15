@@ -261,6 +261,16 @@ MERGE_MAP = {
     "mw": "mw",
     # --- Statemind ---
     "statemind": "statemind",
+    # --- Previously unmapped (22 tools across 9 prefixes) ---
+    "web": "devtools",             # web_crawl, web_extract, web_fetch, web_links, web_metadata, web_search
+    "ml": "ml_pipeline",           # ml_evaluate, ml_feature_extract, ml_pipeline_run, ml_predict, ml_train
+    "antivector": "antivector",    # antivector_classify, antivector_compute, antivector_label_check, antivector_report
+    "compute": "pv",               # compute tools → PV domain
+    "haptic": "suit",              # suit_haptic_cue → suit domain
+    "helmet": "suit",              # suit_helmet_state → suit domain
+    "hud": "devtools",             # hud_frame_compose → devtools
+    "verdict": "vigilance",        # verdict_from_chain → vigilance domain
+    "voice": "suit",               # suit_voice_agent_state → suit domain
 }
 
 
@@ -490,6 +500,12 @@ DOMAIN_META = {
     "visual": ("visual.nexvigilant.com", "Visual Intelligence", "Visual rendering, image analysis, and graphical output generation"),
     # --- SQI (signal quality) ---
     "sqi": ("sqi.nexvigilant.com", "Signal Quality Index", "Signal quality measurement, index computation, and quality assessment"),
+    # --- ML Pipeline ---
+    "ml_pipeline": ("ml-pipeline.nexvigilant.com", "ML Signal Pipeline", "ML model training, feature extraction, prediction, evaluation, and pipeline orchestration for PV signal detection"),
+    # --- Antivector ---
+    "antivector": ("antivector.nexvigilant.com", "Anti-Vector Analysis", "Anti-vector classification, computation, label checking, and threat reporting"),
+    # --- Suit (haptic/helmet/voice merged) ---
+    "suit": ("suit.nexvigilant.com", "Suit Systems", "Haptic feedback, helmet state management, HUD composition, and voice agent control"),
 }
 
 # Private domains (dev/ops tools, not PV-facing)

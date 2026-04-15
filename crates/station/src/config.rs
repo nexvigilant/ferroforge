@@ -393,6 +393,16 @@ impl ConfigRegistry {
         None
     }
 
+    /// Number of configs loaded.
+    pub fn config_count(&self) -> usize {
+        self.configs.len()
+    }
+
+    /// Access to the raw config list (for resources module).
+    pub fn configs(&self) -> &[HubConfig] {
+        &self.configs
+    }
+
     /// Total tool count across all configs + Rust-native meta-tools.
     /// Must match len(tool_infos()) to avoid /health vs tools/list mismatch.
     pub fn tool_count(&self) -> usize {
