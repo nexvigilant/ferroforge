@@ -145,27 +145,22 @@ pub async fn run_combined(
     ));
     StreamableState::spawn_reaper(Arc::clone(&streamable_state));
 
-    let allowed_origins = match std::env::var("ALLOWED_ORIGINS") {
-        Ok(origins) => origins
-            .split(',')
-            .map(|s| s.trim().parse::<HeaderValue>())
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| anyhow::anyhow!("invalid ALLOWED_ORIGINS value: {e}"))?,
-        Err(_) => {
-            // Safe defaults for NexVigilant ecosystem
-            vec![
-                "https://mcp.nexvigilant.com".parse().expect("valid hardcoded URL"),
-                "https://nexvigilant.com".parse().expect("valid hardcoded URL"),
-                "https://www.nexvigilant.com".parse().expect("valid hardcoded URL"),
-                "https://nexvigilant-radio.vercel.app".parse().expect("valid hardcoded URL"),
-                "http://localhost:3000".parse().expect("valid hardcoded URL"),
-                "http://localhost:9002".parse().expect("valid hardcoded URL"),
-            ]
+    // CORS: public MCP server — allow any origin for browser-based agents.
+    // Override with ALLOWED_ORIGINS env var for restricted deployments.
+    let cors_origins = match std::env::var("ALLOWED_ORIGINS") {
+        Ok(origins) if !origins.is_empty() && origins != "*" => {
+            let parsed: Vec<HeaderValue> = origins
+                .split(',')
+                .map(|s| s.trim().parse::<HeaderValue>())
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| anyhow::anyhow!("invalid ALLOWED_ORIGINS value: {e}"))?;
+            tower_http::cors::AllowOrigin::list(parsed)
         }
+        _ => tower_http::cors::AllowOrigin::any(),
     };
 
     let cors = CorsLayer::new()
-        .allow_origin(allowed_origins)
+        .allow_origin(cors_origins)
         .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
         .allow_headers([
             axum::http::header::CONTENT_TYPE,
