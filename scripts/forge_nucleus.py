@@ -81,7 +81,7 @@ def generate_page_tsx(config: dict) -> str:
     tool_count = len(config.get("tools", []))
 
     return textwrap.dedent(f'''\
-import {{ Metadata }} from "next/metadata"
+import {{ Metadata }} from "next"
 import {{ ToolCards }} from "./components/tool-cards"
 
 export const metadata: Metadata = {{

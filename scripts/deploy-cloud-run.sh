@@ -43,6 +43,28 @@ if $DRY_RUN; then
     exit 0
 fi
 
+# ---------------------------------------------------------------------------
+# Pre-build: sync data directories from rsk-core source of truth.
+# Without this, production drifts: 173 micrograms + 146 chains went missing
+# between 2026-04 canary cycles because manual copies were stale. Heligrams
+# had the same problem (see Dockerfile:38 comment, 2026-04-15).
+# Using --delete means removing a file from rsk-core removes it from prod.
+# ---------------------------------------------------------------------------
+RSK_SRC="$HOME/Projects/rsk-core/rsk"
+if [ -d "$RSK_SRC" ]; then
+    echo "--- Syncing data dirs from $RSK_SRC ---"
+    for subdir in micrograms chains heligrams; do
+        if [ -d "$RSK_SRC/$subdir" ]; then
+            before=$(find "$(dirname "$0")/../$subdir" -name '*.yaml' 2>/dev/null | wc -l)
+            rsync -a --delete "$RSK_SRC/$subdir/" "$(dirname "$0")/../$subdir/"
+            after=$(find "$(dirname "$0")/../$subdir" -name '*.yaml' 2>/dev/null | wc -l)
+            echo "  $subdir: $before -> $after files"
+        fi
+    done
+else
+    echo "WARN: $RSK_SRC not found, skipping data sync (production may drift)"
+fi
+
 # Build station binary locally (nexcore path deps require local build)
 echo "--- Building station binary locally ---"
 cd "$(dirname "$0")/.."
