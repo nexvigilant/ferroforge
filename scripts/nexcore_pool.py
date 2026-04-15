@@ -31,6 +31,7 @@ def _find_nexcore_mcp() -> str:
     if env:
         return env
     for path in ["/usr/local/bin/nexcore-mcp",
+                 os.path.expanduser("~/.cargo/bin/nexcore-mcp"),
                  os.path.expanduser("~/Projects/Active/nexcore/target/release/nexcore-mcp")]:
         if os.path.isfile(path):
             return path
@@ -120,59 +121,75 @@ class NexCorePool:
             time.sleep(0.005)
         return None
 
+    def _send_and_wait(self, req_id: int, name: str, arguments: dict) -> dict | None:
+        """Send a tools/call request and wait for response."""
+        call_req = json.dumps({
+            "jsonrpc": "2.0", "id": req_id, "method": "tools/call",
+            "params": {"name": name, "arguments": arguments},
+        }) + "\n"
+        self._proc.stdin.write(call_req)
+        self._proc.stdin.flush()
+        return self._wait_for_id(req_id)
+
+    def _parse_response(self, response: dict | None) -> dict:
+        """Parse MCP response into a simple dict."""
+        if response is None:
+            return {"status": "error", "message": "No response from nexcore-mcp within timeout"}
+        if "error" in response:
+            err = response["error"]
+            return {"status": "error", "message": err.get("message", "MCP error"), "code": err.get("code", -1)}
+        mcp_result = response.get("result", {})
+        content = mcp_result.get("content", [])
+        if content:
+            text = content[0].get("text", "")
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                return {"status": "ok", "raw": text}
+        return {"status": "ok", "result": mcp_result}
+
     def call(self, tool_name: str, arguments: dict) -> dict:
-        """Call a nexcore tool. Thread-safe, auto-reconnects."""
+        """Call a nexcore tool. Tries direct first-class, falls back to unified.
+
+        Strategy: first-class #[tool] methods → unified nexcore dispatcher.
+        This handles both 488 first-class tools and legacy unified-only tools.
+        """
         with self._lock:
             self._ensure_alive()
 
+            # 1. Try direct first-class tool call
             req_id = self._next_id
             self._next_id += 1
-
-            call_req = json.dumps({
-                "jsonrpc": "2.0", "id": req_id, "method": "tools/call",
-                "params": {
-                    "name": "nexcore",
-                    "arguments": {"command": tool_name, "params": arguments},
-                },
-            }) + "\n"
-
             try:
-                self._proc.stdin.write(call_req)
-                self._proc.stdin.flush()
+                response = self._send_and_wait(req_id, tool_name, arguments)
             except (BrokenPipeError, OSError):
-                # Process died — respawn and retry once
                 self._spawn()
                 req_id = self._next_id
                 self._next_id += 1
-                retry_req = json.dumps({
-                    "jsonrpc": "2.0", "id": req_id, "method": "tools/call",
-                    "params": {
-                        "name": "nexcore",
-                        "arguments": {"command": tool_name, "params": arguments},
-                    },
-                }) + "\n"
-                self._proc.stdin.write(retry_req)
-                self._proc.stdin.flush()
+                response = self._send_and_wait(req_id, tool_name, arguments)
 
-            response = self._wait_for_id(req_id)
+            result = self._parse_response(response)
 
-            if response is None:
-                return {"status": "error", "message": "No response from nexcore-mcp within timeout"}
-
-            if "error" in response:
-                err = response["error"]
-                return {"status": "error", "message": err.get("message", "MCP error"), "code": err.get("code", -1)}
-
-            # Extract text content from MCP result
-            mcp_result = response.get("result", {})
-            content = mcp_result.get("content", [])
-            if content:
-                text = content[0].get("text", "")
+            # 2. If "tool not found", fall back to unified dispatcher
+            if result.get("status") == "error" and "not found" in result.get("message", "").lower():
+                req_id = self._next_id
+                self._next_id += 1
                 try:
-                    return json.loads(text)
-                except json.JSONDecodeError:
-                    return {"status": "ok", "raw": text}
-            return {"status": "ok", "result": mcp_result}
+                    response = self._send_and_wait(
+                        req_id, "nexcore",
+                        {"command": tool_name, "params": arguments},
+                    )
+                except (BrokenPipeError, OSError):
+                    self._spawn()
+                    req_id = self._next_id
+                    self._next_id += 1
+                    response = self._send_and_wait(
+                        req_id, "nexcore",
+                        {"command": tool_name, "params": arguments},
+                    )
+                result = self._parse_response(response)
+
+            return result
 
     def close(self):
         """Gracefully shut down the persistent process."""
@@ -207,5 +224,8 @@ def strip_station_prefix(tool_name: str) -> str:
     marker = "_nexvigilant_com_"
     idx = tool_name.find(marker)
     if idx >= 0:
-        return tool_name[idx + len(marker):]
-    return tool_name
+        name = tool_name[idx + len(marker):]
+    else:
+        name = tool_name
+    # Station configs use hyphens, nexcore dispatch uses underscores
+    return name.replace("-", "_")
