@@ -1217,3 +1217,216 @@ fn test_health_serializes_to_json() {
     assert!(json["trend"].is_string());
     assert!(json["latency_p99_ms"].is_u64());
 }
+
+// ============================================================================
+// MCP Resources
+// ============================================================================
+
+#[test]
+fn test_resources_list_returns_all_static_resources() {
+    let registry = test_registry();
+    let result = nexvigilant_station::resources::list_resources(&registry);
+    assert!(result.resources.len() >= 15, "Expected at least 15 static resources, got {}", result.resources.len());
+
+    let uris: Vec<&str> = result.resources.iter().map(|r| r.uri.as_str()).collect();
+    assert!(uris.contains(&"nexvigilant://capabilities"));
+    assert!(uris.contains(&"nexvigilant://methods"));
+    assert!(uris.contains(&"nexvigilant://regulatory-agencies"));
+    assert!(uris.contains(&"nexvigilant://meddra"));
+    assert!(uris.contains(&"nexvigilant://faers-guide"));
+    assert!(uris.contains(&"nexvigilant://seriousness-criteria"));
+    assert!(uris.contains(&"nexvigilant://signal-detection-workflow"));
+    assert!(uris.contains(&"nexvigilant://causality-frameworks"));
+    assert!(uris.contains(&"nexvigilant://station/health"));
+}
+
+#[test]
+fn test_resource_templates_list() {
+    let result = nexvigilant_station::resources::list_resource_templates();
+    assert!(result.resource_templates.len() >= 11, "Expected at least 11 templates, got {}", result.resource_templates.len());
+
+    let templates: Vec<&str> = result.resource_templates.iter().map(|t| t.uri_template.as_str()).collect();
+    assert!(templates.contains(&"nexvigilant://drug/{name}/safety-profile"));
+    assert!(templates.contains(&"nexvigilant://drug/{name}/signals"));
+    assert!(templates.contains(&"nexvigilant://drug/{name}/label"));
+    assert!(templates.contains(&"nexvigilant://drug/{name}/interactions"));
+    assert!(templates.contains(&"nexvigilant://drug/{name}/regulatory-status"));
+    assert!(templates.contains(&"nexvigilant://guideline/ich/{code}"));
+    assert!(templates.contains(&"nexvigilant://pharma/{company}"));
+    assert!(templates.contains(&"nexvigilant://meddra/{term}"));
+    assert!(templates.contains(&"nexvigilant://course/{name}"));
+}
+
+#[test]
+fn test_read_static_resource_capabilities() {
+    let registry = test_registry();
+    let result = nexvigilant_station::resources::read_resource(&registry, "nexvigilant://capabilities");
+    assert!(result.is_ok());
+    let content = result.unwrap();
+    assert_eq!(content.contents.len(), 1);
+    let text = content.contents[0].text.as_ref().unwrap();
+    let parsed: Value = serde_json::from_str(text).expect("should be valid JSON");
+    assert_eq!(parsed["platform"], "NexVigilant Station");
+    assert!(parsed["guided_courses"].is_array());
+}
+
+#[test]
+fn test_read_static_resource_methods() {
+    let registry = test_registry();
+    let result = nexvigilant_station::resources::read_resource(&registry, "nexvigilant://methods");
+    assert!(result.is_ok());
+    let content = result.unwrap();
+    let text = content.contents[0].text.as_ref().unwrap();
+    let parsed: Value = serde_json::from_str(text).expect("should be valid JSON");
+    assert!(parsed["signal_detection"]["PRR"]["tool"].is_string());
+    assert!(parsed["causality_assessment"]["Naranjo"]["questions"].is_number());
+}
+
+#[test]
+fn test_read_static_resource_faers_guide() {
+    let registry = test_registry();
+    let result = nexvigilant_station::resources::read_resource(&registry, "nexvigilant://faers-guide");
+    assert!(result.is_ok());
+    let text = result.unwrap().contents[0].text.as_ref().unwrap().clone();
+    let parsed: Value = serde_json::from_str(&text).expect("should be valid JSON");
+    assert!(parsed["limitations"].is_array());
+    assert!(parsed["tools"]["search"].is_string());
+}
+
+#[test]
+fn test_read_static_resource_seriousness() {
+    let registry = test_registry();
+    let result = nexvigilant_station::resources::read_resource(&registry, "nexvigilant://seriousness-criteria");
+    assert!(result.is_ok());
+    let text = result.unwrap().contents[0].text.as_ref().unwrap().clone();
+    let parsed: Value = serde_json::from_str(&text).expect("should be valid JSON");
+    let criteria = parsed["criteria"].as_array().unwrap();
+    assert_eq!(criteria.len(), 6, "ICH E2A has exactly 6 seriousness criteria");
+}
+
+#[test]
+fn test_read_drug_safety_profile_template() {
+    let registry = test_registry();
+    let result = nexvigilant_station::resources::read_resource(&registry, "nexvigilant://drug/metformin/safety-profile");
+    assert!(result.is_ok());
+    let text = result.unwrap().contents[0].text.as_ref().unwrap().clone();
+    let parsed: Value = serde_json::from_str(&text).expect("should be valid JSON");
+    assert_eq!(parsed["drug"], "metformin");
+    assert!(parsed["data_sources"].is_array());
+}
+
+#[test]
+fn test_read_drug_interactions_template() {
+    let registry = test_registry();
+    let result = nexvigilant_station::resources::read_resource(&registry, "nexvigilant://drug/warfarin/interactions");
+    assert!(result.is_ok());
+    let text = result.unwrap().contents[0].text.as_ref().unwrap().clone();
+    let parsed: Value = serde_json::from_str(&text).expect("should be valid JSON");
+    assert_eq!(parsed["drug"], "warfarin");
+    assert!(parsed["data_sources"]["rxnav_interactions"]["tool"].is_string());
+}
+
+#[test]
+fn test_read_pharma_company_template() {
+    let registry = test_registry();
+    let result = nexvigilant_station::resources::read_resource(&registry, "nexvigilant://pharma/pfizer");
+    assert!(result.is_ok());
+    let text = result.unwrap().contents[0].text.as_ref().unwrap().clone();
+    let parsed: Value = serde_json::from_str(&text).expect("should be valid JSON");
+    assert_eq!(parsed["company"], "pfizer");
+    assert!(parsed["tools"]["get_portfolio"].is_string());
+}
+
+#[test]
+fn test_read_unknown_resource_returns_error() {
+    let registry = test_registry();
+    let result = nexvigilant_station::resources::read_resource(&registry, "nexvigilant://nonexistent");
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_read_domain_tools_template() {
+    let registry = test_registry();
+    let result = nexvigilant_station::resources::read_resource(&registry, "nexvigilant://domain/fda/tools");
+    assert!(result.is_ok());
+    let text = result.unwrap().contents[0].text.as_ref().unwrap().clone();
+    let parsed: Value = serde_json::from_str(&text).expect("should be valid JSON");
+    assert_eq!(parsed["domain"], "fda");
+}
+
+// ============================================================================
+// MCP Prompts
+// ============================================================================
+
+#[test]
+fn test_prompts_list_returns_six_courses() {
+    let result = nexvigilant_station::prompts::list_prompts();
+    assert_eq!(result.prompts.len(), 6);
+
+    let names: Vec<&str> = result.prompts.iter().map(|p| p.name.as_str()).collect();
+    assert!(names.contains(&"drug-safety-profile"));
+    assert!(names.contains(&"signal-investigation"));
+    assert!(names.contains(&"causality-assessment"));
+    assert!(names.contains(&"benefit-risk-assessment"));
+    assert!(names.contains(&"regulatory-intelligence"));
+    assert!(names.contains(&"competitive-landscape"));
+}
+
+#[test]
+fn test_prompt_all_have_drug_argument() {
+    let result = nexvigilant_station::prompts::list_prompts();
+    for prompt in &result.prompts {
+        let args = prompt.arguments.as_ref().expect("all prompts should have arguments");
+        let has_drug = args.iter().any(|a| a.name == "drug");
+        assert!(has_drug, "Prompt '{}' missing 'drug' argument", prompt.name);
+    }
+}
+
+#[test]
+fn test_prompt_get_drug_safety_profile() {
+    let args = json!({"drug": "metformin"});
+    let result = nexvigilant_station::prompts::get_prompt("drug-safety-profile", &args);
+    assert!(result.is_ok());
+    let prompt = result.unwrap();
+    assert!(prompt.description.is_some());
+    assert!(!prompt.messages.is_empty());
+    // Should mention the drug and tools
+    let text = match &prompt.messages[0].content {
+        nexvigilant_station::prompts::PromptContent::Text { text } => text.clone(),
+    };
+    assert!(text.contains("metformin"));
+    assert!(text.contains("api_fda_gov_search_adverse_events"));
+}
+
+#[test]
+fn test_prompt_get_signal_investigation() {
+    let args = json!({"drug": "semaglutide", "event": "pancreatitis"});
+    let result = nexvigilant_station::prompts::get_prompt("signal-investigation", &args);
+    assert!(result.is_ok());
+    let text = match &result.unwrap().messages[0].content {
+        nexvigilant_station::prompts::PromptContent::Text { text } => text.clone(),
+    };
+    assert!(text.contains("semaglutide"));
+    assert!(text.contains("pancreatitis"));
+}
+
+#[test]
+fn test_prompt_get_causality_requires_event() {
+    let args = json!({"drug": "metformin"});
+    let result = nexvigilant_station::prompts::get_prompt("causality-assessment", &args);
+    assert!(result.is_err(), "causality-assessment should require 'event' argument");
+}
+
+#[test]
+fn test_prompt_get_unknown_returns_error() {
+    let args = json!({"drug": "test"});
+    let result = nexvigilant_station::prompts::get_prompt("nonexistent-prompt", &args);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_prompt_get_missing_drug_returns_error() {
+    let args = json!({});
+    let result = nexvigilant_station::prompts::get_prompt("drug-safety-profile", &args);
+    assert!(result.is_err());
+}
