@@ -1,0 +1,200 @@
+name: vacuum-energy-discrepancy
+description: "Encodes the 10^120 vacuum energy discrepancy — the worst prediction in physics. Compares QFT prediction vs cosmological observation vs Casimir measurement. Routes by which framework the user queries from."
+version: 0.1.0
+interface:
+  inputs:
+    framework:
+      type: string
+      required: true
+      enum: [qft, cosmological, casimir, all]
+      description: "Which theoretical framework to query"
+    cutoff_scale:
+      type: string
+      required: false
+      enum: [planck, electroweak, qcd, susy]
+      description: "UV cutoff scale for QFT calculation — changes the predicted value"
+  outputs:
+    predicted_density_j_m3:
+      type: string
+    observed_density_j_m3:
+      type: string
+    discrepancy_orders:
+      type: integer
+    status:
+      type: string
+    explanation:
+      type: string
+    open_questions:
+      type: string
+tree:
+  start: route_framework
+  nodes:
+    route_framework:
+      type: condition
+      variable: framework
+      operator: eq
+      value: qft
+      true_next: route_cutoff
+      false_next: check_cosmological
+
+    check_cosmological:
+      type: condition
+      variable: framework
+      operator: eq
+      value: cosmological
+      true_next: cosmological_observation
+      false_next: check_casimir
+
+    check_casimir:
+      type: condition
+      variable: framework
+      operator: eq
+      value: casimir
+      true_next: casimir_measurement
+      false_next: full_comparison
+
+    # QFT predictions depend on UV cutoff
+    route_cutoff:
+      type: condition
+      variable: cutoff_scale
+      operator: eq
+      value: planck
+      true_next: qft_planck
+      false_next: check_electroweak
+
+    check_electroweak:
+      type: condition
+      variable: cutoff_scale
+      operator: eq
+      value: electroweak
+      true_next: qft_electroweak
+      false_next: check_qcd
+
+    check_qcd:
+      type: condition
+      variable: cutoff_scale
+      operator: eq
+      value: qcd
+      true_next: qft_qcd
+      false_next: check_susy
+
+    check_susy:
+      type: condition
+      variable: cutoff_scale
+      operator: eq
+      value: susy
+      true_next: qft_susy
+      false_next: qft_planck
+
+    qft_planck:
+      type: return
+      value:
+        predicted_density_j_m3: "~10^113 J/m³ (Planck cutoff: E_P = 1.22e19 GeV)"
+        observed_density_j_m3: "~5.4e-10 J/m³ (dark energy / cosmological constant Λ)"
+        discrepancy_orders: 122
+        status: "CATASTROPHIC_MISMATCH"
+        explanation: "Summing zero-point energies ½ℏω for all field modes up to Planck frequency. Each mode contributes ½ℏω. Number of modes ~ (E_cutoff/ℏc)³. Total ~ E_P⁴/(ℏc)³ ~ 10^113 J/m³. Observation: 5.4e-10 J/m³. The most wrong prediction in science."
+        open_questions: "Why does the vacuum energy nearly cancel? Is there a symmetry we haven't found? Does SUSY provide partial cancellation? Is the cosmological constant dynamical (quintessence)? Is the landscape/anthropic argument the only answer?"
+
+    qft_electroweak:
+      type: return
+      value:
+        predicted_density_j_m3: "~10^60 J/m³ (electroweak cutoff: ~246 GeV)"
+        observed_density_j_m3: "~5.4e-10 J/m³"
+        discrepancy_orders: 69
+        status: "SEVERE_MISMATCH"
+        explanation: "Using electroweak symmetry breaking scale as cutoff. Lower than Planck but still 69 orders wrong. If new physics enters at 246 GeV, contributions above this cancel — but why would they cancel to 10^-69 precision?"
+        open_questions: "Is the Higgs vacuum expectation value related to dark energy? Does electroweak phase transition set the cosmological constant?"
+
+    qft_qcd:
+      type: return
+      value:
+        predicted_density_j_m3: "~10^36 J/m³ (QCD cutoff: ~200 MeV)"
+        observed_density_j_m3: "~5.4e-10 J/m³"
+        discrepancy_orders: 45
+        status: "MAJOR_MISMATCH"
+        explanation: "QCD vacuum condensate contributes ~(200 MeV)⁴ ≈ 10^36 J/m³. The chiral condensate and gluon condensate are well-measured. Still 45 orders too large. Even the 'low energy' part of the Standard Model overshoots by 10^45."
+        open_questions: "Does the QCD vacuum condensate gravitationally decouple? Is there a mechanism that screens QCD contributions to Λ?"
+
+    qft_susy:
+      type: return
+      value:
+        predicted_density_j_m3: "~10^60 to 10^52 J/m³ (SUSY breaking: ~1-10 TeV)"
+        observed_density_j_m3: "~5.4e-10 J/m³"
+        discrepancy_orders: 60
+        status: "MISMATCH_REDUCED_BUT_NOT_SOLVED"
+        explanation: "Unbroken SUSY would give exactly zero vacuum energy (boson/fermion cancellation). Broken SUSY at ~TeV scale gives ~(TeV)⁴ ~ 10^52-10^60 J/m³. Better than Planck by 60 orders but still 60 orders wrong. SUSY is necessary but not sufficient."
+        open_questions: "Is SUSY real but broken at higher scale? Does the SUSY breaking mechanism encode information about Λ? LHC found no sparticles — is low-energy SUSY dead?"
+
+    cosmological_observation:
+      type: return
+      value:
+        predicted_density_j_m3: "N/A — this IS the observation"
+        observed_density_j_m3: "5.35e-10 J/m³ (Ω_Λ = 0.685, H₀ = 67.4 km/s/Mpc, Planck 2018)"
+        discrepancy_orders: 0
+        status: "MEASURED"
+        explanation: "Dark energy comprises 68.5% of the universe's energy density. Measured via Type Ia supernovae (1998, Perlmutter/Riess), CMB (Planck satellite), and BAO. The expansion is accelerating. Λ = 1.106e-52 m⁻². This is WHAT the vacuum energy is. The question is WHY this value."
+        open_questions: "Is Λ truly constant or slowly evolving (quintessence)? Is dark energy a property of spacetime or a field? Does the DESI BAO result (2024) indicate w ≠ -1?"
+
+    casimir_measurement:
+      type: return
+      value:
+        predicted_density_j_m3: "N/A — Casimir measures force, not bulk density"
+        observed_density_j_m3: "Casimir pressure at 100nm: ~1.3 Pa. Confirms QED vacuum fluctuations exist."
+        discrepancy_orders: -1
+        status: "CONFIRMS_FLUCTUATIONS_NOT_DENSITY"
+        explanation: "Casimir effect measures the DIFFERENCE in vacuum energy between plates vs outside. It confirms virtual photon modes are real but says nothing about absolute vacuum energy density. The plates modify boundary conditions (∂), creating a measurable gradient. This is why Casimir extraction works once — it's a gradient collapse, not a reservoir tap."
+        open_questions: "Can engineered metamaterials create repulsive Casimir force? Can dynamic Casimir effect (moving mirrors) extract photons continuously? Is the Casimir effect evidence for or against vacuum energy gravity?"
+
+    full_comparison:
+      type: return
+      value:
+        predicted_density_j_m3: "QFT (Planck): ~10^113, QFT (EW): ~10^60, QFT (QCD): ~10^36"
+        observed_density_j_m3: "Cosmological: 5.4e-10 J/m³. Casimir: confirms fluctuations, not density."
+        discrepancy_orders: 122
+        status: "THE_COSMOLOGICAL_CONSTANT_PROBLEM"
+        explanation: "Three measurements, three different answers. QFT says enormous. Cosmology says tiny but nonzero. Casimir says fluctuations are real but doesn't measure absolute density. The 10^120 gap between QFT and observation is the biggest unsolved problem in fundamental physics. No known mechanism produces cancellation to 120-digit precision."
+        open_questions: "1) Is there a symmetry that forces near-zero? 2) Is the landscape real (10^500 vacua, anthropic selection)? 3) Does gravity not couple to vacuum energy (violation of equivalence principle)? 4) Is QFT wrong about summing zero-point energies? 5) Is this the clue to quantum gravity?"
+
+primitive_signature:
+  dominant: 'N'
+  expression: 'N(κ(ς_predicted, ς_observed)) — quantifying the comparison gap between predicted and observed state'
+  primes: ['N', 'κ', 'ς']
+  arguments: ['∂']
+
+tests:
+- name: "QFT Planck cutoff"
+  input: { framework: qft, cutoff_scale: planck }
+  expect: { discrepancy_orders: 122, status: "CATASTROPHIC_MISMATCH" }
+
+- name: "QFT electroweak cutoff"
+  input: { framework: qft, cutoff_scale: electroweak }
+  expect: { discrepancy_orders: 69, status: "SEVERE_MISMATCH" }
+
+- name: "QFT QCD cutoff"
+  input: { framework: qft, cutoff_scale: qcd }
+  expect: { discrepancy_orders: 45, status: "MAJOR_MISMATCH" }
+
+- name: "QFT SUSY cutoff"
+  input: { framework: qft, cutoff_scale: susy }
+  expect: { discrepancy_orders: 60, status: "MISMATCH_REDUCED_BUT_NOT_SOLVED" }
+
+- name: "QFT default cutoff is Planck"
+  input: { framework: qft }
+  expect: { discrepancy_orders: 122, status: "CATASTROPHIC_MISMATCH" }
+
+- name: "cosmological observation"
+  input: { framework: cosmological }
+  expect: { discrepancy_orders: 0, status: "MEASURED" }
+
+- name: "Casimir measurement"
+  input: { framework: casimir }
+  expect: { status: "CONFIRMS_FLUCTUATIONS_NOT_DENSITY" }
+
+- name: "full comparison"
+  input: { framework: all }
+  expect: { discrepancy_orders: 122, status: "THE_COSMOLOGICAL_CONSTANT_PROBLEM" }
+
+- name: "null safety"
+  input: {}
+  expect: { discrepancy_orders: 122, status: "THE_COSMOLOGICAL_CONSTANT_PROBLEM" }

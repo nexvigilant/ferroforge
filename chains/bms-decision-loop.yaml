@@ -1,0 +1,45 @@
+name: bms-decision-loop
+description: 'Full BMS decision loop: estimate SoC → route power demand → schedule limb charging. 20μs end-to-end. The nervous system of a federated battery architecture.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - soc-estimator
+  - power-load-router
+  - limb-charge-scheduler
+tests:
+- name: normal operation — EKF fused to local limb to full charge
+  input:
+    voltage_v: 3.7
+    current_a: 15
+    temperature_c: 30
+    previous_soc: 0.7
+    load_state: moderate_load
+    demand_kw: 1.5
+    duration_s: 10
+    locality: left_arm
+    limb_buffer_soc: 0.6
+    main_bus_load_pct: 30
+    left_arm_soc: 0.2
+    right_arm_soc: 0.7
+    left_leg_soc: 0.8
+    right_leg_soc: 0.9
+  expect:
+    method_used: ekf_fused
+    source_tier: per_limb_lfp
+    action: charge_full
+    target_limb: left_arm
+- name: thermal critical — everything overrides to shutdown
+  input:
+    voltage_v: 3.8
+    current_a: 5
+    temperature_c: 65
+    previous_soc: 0.8
+    load_state: light_load
+    demand_kw: 1.0
+    duration_s: 10
+    main_bus_load_pct: 20
+    left_arm_soc: 0.5
+  expect:
+    method_used: thermal_override
+    soh_flag: THERMAL_CRITICAL

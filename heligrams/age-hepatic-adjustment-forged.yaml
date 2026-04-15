@@ -1,0 +1,151 @@
+name: age-hepatic-adjustment-helix
+description: 'Forged from microgram ''age-hepatic-adjustment''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    adjustment_needed: falsified
+sense:
+  tree:
+    start: check_age_category
+    nodes:
+      elderly_hepatic_adjustment:
+        type: return
+        value:
+          age_group: elderly
+          adjustment_needed: true
+          dose_reduction_percent: 25
+          notes: Reduce initial dose by 25-50% for hepatically-metabolized drugs in elderly
+      check_age_category:
+        type: condition
+        variable: age_years
+        operator: gte
+        value: 65
+        true_next: elderly_hepatic_adjustment
+        false_next: adult_hepatic
+      adult_hepatic:
+        type: return
+        value:
+          age_group: adult
+          adjustment_needed: false
+          notes: Standard hepatic clearance assumptions apply
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: age_years
+        operator: lt
+        value: 65
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: age_years
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      adjustment_needed: true
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      adjustment_needed: true
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when:
+      falsified: false
+      adjustment_needed: false
+    default: null
+    emit:
+      confidence: high
+      verdict: absent
+      confidence_score: 0.7
+  - when:
+      adjustment_needed: false
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.42
+      verdict: refuted
+      confidence: medium
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      age_years:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    age_years: null
+  expect:
+    confidence: high
+    verdict: absent
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    age_years: 75
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

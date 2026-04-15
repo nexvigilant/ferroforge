@@ -1,0 +1,147 @@
+name: station-epidemiology-pipeline-helix
+description: 'Forged from microgram ''station-epidemiology-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    route: falsified
+sense:
+  tree:
+    start: check_rr
+    nodes:
+      check_rr:
+        type: condition
+        variable: relative_risk
+        operator: gte
+        value: 2.0
+        true_next: check_exposure
+        false_next: low_risk
+      check_exposure:
+        type: condition
+        variable: exposed_population
+        operator: gte
+        value: 10000
+        true_next: high_impact
+        false_next: limited_impact
+      limited_impact:
+        type: return
+        value:
+          route: signal_investigation
+          reason: RR≥2.0 with limited exposure — investigate before broader use
+          priority: moderate
+          action: investigate
+      low_risk:
+        type: return
+        value:
+          route: periodic_review
+          action: monitor
+          reason: Relative risk <2.0 — no population-level signal
+          priority: low
+      high_impact:
+        type: return
+        value:
+          reason: RR≥2.0 with 10K+ exposed — significant population impact
+          action: escalate
+          priority: critical
+          route: risk_communication
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: relative_risk
+        operator: lt
+        value: 2.0
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: relative_risk
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      relative_risk:
+        type: float
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    relative_risk: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

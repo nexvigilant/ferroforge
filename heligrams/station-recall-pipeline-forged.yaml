@@ -1,0 +1,225 @@
+name: station-recall-pipeline-helix
+description: 'Forged from microgram ''station-recall-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    safety_status: falsified
+sense:
+  tree:
+    start: check_class_one
+    nodes:
+      standard_recall:
+        type: return
+        value:
+          safety_status: standard
+          next_step: routine_monitoring
+          recommended_action: Review recall details and assess current relevance
+          risk_factors: Active recall on record
+      check_medwatch:
+        type: condition
+        variable: medwatch_alert_count
+        operator: gte
+        value: 2
+        true_next: elevated_medwatch
+        false_next: check_class_three
+      urgent_class_one:
+        type: return
+        value:
+          risk_factors: Class I recall — reasonable probability of serious adverse health consequences or death
+          safety_status: urgent
+          next_step: urgent_safety_action
+          recommended_action: Immediate distribution halt and patient notification required
+      standard_class_three:
+        type: return
+        value:
+          risk_factors: Class III recall — not likely to cause adverse health consequences
+          next_step: routine_monitoring
+          safety_status: standard
+          recommended_action: Monitor recall resolution and document for safety database
+      elevated_medwatch:
+        type: return
+        value:
+          recommended_action: Review MedWatch alerts and assess cumulative safety signal
+          next_step: safety_alert_review
+          risk_factors: Multiple MedWatch safety alerts issued
+          safety_status: elevated
+      check_class_one:
+        type: condition
+        variable: recall_class
+        operator: eq
+        value: I
+        true_next: urgent_class_one
+        false_next: check_rems
+      clear_status:
+        type: return
+        value:
+          risk_factors: No active recalls or safety alerts
+          next_step: no_action
+          safety_status: clear
+          recommended_action: Standard post-market surveillance
+      urgent_rems:
+        type: return
+        value:
+          risk_factors: REMS required — FDA has determined serious risk requiring mitigation strategy
+          next_step: rems_compliance_review
+          recommended_action: Verify REMS compliance and review elements to assure safe use
+          safety_status: urgent
+      check_rems:
+        type: condition
+        variable: rems_required
+        operator: eq
+        value: true
+        true_next: urgent_rems
+        false_next: check_class_two
+      check_class_three:
+        type: condition
+        variable: recall_class
+        operator: eq
+        value: III
+        true_next: standard_class_three
+        false_next: check_any_recalls
+      check_class_two:
+        type: condition
+        variable: recall_class
+        operator: eq
+        value: II
+        true_next: elevated_class_two
+        false_next: check_medwatch
+      elevated_class_two:
+        type: return
+        value:
+          recommended_action: Review recall scope and assess patient exposure
+          safety_status: elevated
+          risk_factors: Class II recall — may cause temporary or medically reversible adverse health consequences
+          next_step: recall_scope_review
+      check_any_recalls:
+        type: condition
+        variable: recall_count
+        operator: gte
+        value: 1
+        true_next: standard_recall
+        false_next: clear_status
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: medwatch_alert_count
+        operator: neq
+        value: I
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: medwatch_alert_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      rems_required:
+        type: bool
+        required: false
+      medwatch_alert_count:
+        type: int
+        required: false
+      recall_count:
+        type: int
+        required: false
+      recall_class:
+        type: string
+        required: false
+    outputs:
+      recommended_action:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      safety_status:
+        type: string
+        required: false
+      next_step:
+        type: string
+        required: false
+      risk_factors:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    medwatch_alert_count: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    medwatch_alert_count: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

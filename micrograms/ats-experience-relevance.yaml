@@ -1,0 +1,136 @@
+name: ats-experience-relevance
+description: 'Score how relevant listed experience is to the target role — direct, transferable, or unrelated'
+version: 0.1.0
+primitive_signature:
+  dominant: μ
+  expression: μ(experience_domain, target_domain) → κ(relevance_score)
+  primes: [μ, κ, N, ∂]
+  arguments: [mapping, comparison, quantity, boundary]
+  chain_prediction: feeds ats-gap-detector
+interface:
+  inputs:
+    direct_experience_years:
+      type: integer
+      required: false
+    transferable_experience_years:
+      type: integer
+      required: false
+    unrelated_experience_years:
+      type: integer
+      required: false
+    required_years:
+      type: integer
+      required: false
+  outputs:
+    relevance_tier:
+      type: string
+    effective_years:
+      type: integer
+    years_experience_gap:
+      type: integer
+    reframing_advice:
+      type: string
+tree:
+  start: required_null
+  nodes:
+    required_null:
+      type: condition
+      variable: required_years
+      operator: is_null
+      true_next: no_requirement
+      false_next: direct_check
+    direct_check:
+      type: condition
+      variable: direct_experience_years
+      operator: gte
+      value: 5
+      true_next: highly_relevant
+      false_next: direct_moderate
+    direct_moderate:
+      type: condition
+      variable: direct_experience_years
+      operator: gte
+      value: 2
+      true_next: relevant
+      false_next: transferable_check
+    transferable_check:
+      type: condition
+      variable: transferable_experience_years
+      operator: gte
+      value: 3
+      true_next: transferable
+      false_next: low_relevance
+    no_requirement:
+      type: return
+      value:
+        relevance_tier: UNKNOWN
+        effective_years: 0
+        years_experience_gap: 0
+        reframing_advice: "No experience requirement specified — focus on skills match instead"
+    highly_relevant:
+      type: return
+      value:
+        relevance_tier: HIGH
+        effective_years: 5
+        years_experience_gap: 0
+        reframing_advice: "Direct experience is strong — lead with role-specific achievements and metrics"
+    relevant:
+      type: return
+      value:
+        relevance_tier: MODERATE
+        effective_years: 3
+        years_experience_gap: 1
+        reframing_advice: "Solid relevant experience — emphasize progression and scope expansion in the target domain"
+    transferable:
+      type: return
+      value:
+        relevance_tier: TRANSFERABLE
+        effective_years: 2
+        years_experience_gap: 2
+        reframing_advice: "Reframe transferable experience using target role vocabulary. Map prior responsibilities to job description language"
+    low_relevance:
+      type: return
+      value:
+        relevance_tier: LOW
+        effective_years: 0
+        years_experience_gap: 5
+        reframing_advice: "Limited relevant experience. Highlight projects, education, or certifications that demonstrate capability. Consider entry-level positions in target field"
+tests:
+- input:
+    direct_experience_years: 7
+    transferable_experience_years: 2
+    unrelated_experience_years: 1
+    required_years: 5
+  expect:
+    relevance_tier: HIGH
+    years_experience_gap: 0
+- input:
+    direct_experience_years: 3
+    transferable_experience_years: 4
+    required_years: 5
+  expect:
+    relevance_tier: MODERATE
+    effective_years: 3
+- input:
+    direct_experience_years: 0
+    transferable_experience_years: 5
+    required_years: 3
+  expect:
+    relevance_tier: TRANSFERABLE
+    years_experience_gap: 2
+- input:
+    direct_experience_years: 0
+    transferable_experience_years: 1
+    required_years: 5
+  expect:
+    relevance_tier: LOW
+    years_experience_gap: 5
+- input: {}
+  expect:
+    relevance_tier: UNKNOWN
+    years_experience_gap: 0
+- input:
+    direct_experience_years: 2
+    required_years: 3
+  expect:
+    relevance_tier: MODERATE

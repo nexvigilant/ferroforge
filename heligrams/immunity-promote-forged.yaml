@@ -1,0 +1,292 @@
+name: immunity-promote-helix
+description: 'Forged from microgram ''immunity-promote''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    decision: falsified
+sense:
+  tree:
+    start: validate_age
+    nodes:
+      check_critical_fix:
+        type: condition
+        variable: has_fix
+        operator: eq
+        value: true
+        true_next: promote_critical
+        false_next: defer_needs_fix
+      check_is_low:
+        type: condition
+        variable: severity
+        operator: eq
+        value: low
+        true_next: defer_low
+        false_next: reject_bad_severity
+      check_is_critical:
+        type: condition
+        variable: severity
+        operator: eq
+        value: critical
+        true_next: check_critical_age
+        false_next: check_is_high
+      defer_low_evidence:
+        type: return
+        value:
+          decision: DEFER
+          reason: Insufficient occurrences — needs more evidence
+          confidence: 75
+      check_medium_occurrences:
+        type: condition
+        variable: occurrences
+        operator: gte
+        value: 5
+        true_next: check_medium_fix
+        false_next: defer_low_evidence
+      check_high_occurrences:
+        type: condition
+        variable: occurrences
+        operator: gte
+        value: 3
+        true_next: check_high_fix
+        false_next: defer_low_evidence
+      validate_age:
+        type: condition
+        variable: age_days
+        operator: lt
+        value: 0
+        true_next: reject_invalid
+        false_next: check_is_critical
+      check_medium_age:
+        type: condition
+        variable: age_days
+        operator: gte
+        value: 21
+        true_next: check_medium_occurrences
+        false_next: defer_too_young
+      promote_medium:
+        type: return
+        value:
+          decision: PROMOTE
+          reason: Medium severity, 21+ days, 5+ occurrences, fix available
+          confidence: 70
+      check_high_age:
+        type: condition
+        variable: age_days
+        operator: gte
+        value: 14
+        true_next: check_high_occurrences
+        false_next: defer_too_young
+      check_high_fix:
+        type: condition
+        variable: has_fix
+        operator: eq
+        value: true
+        true_next: promote_high
+        false_next: defer_needs_fix
+      check_critical_age:
+        type: condition
+        variable: age_days
+        operator: gte
+        value: 7
+        true_next: check_critical_fix
+        false_next: defer_too_young
+      reject_invalid:
+        type: return
+        value:
+          confidence: 0
+          decision: REJECTED
+          reason: age_days must be non-negative
+      promote_critical:
+        type: return
+        value:
+          reason: Critical severity with fix, aged 7+ days
+          confidence: 90
+          decision: PROMOTE
+      promote_high:
+        type: return
+        value:
+          decision: PROMOTE
+          confidence: 80
+          reason: High severity, 14+ days, 3+ occurrences, fix available
+      dismiss_stale:
+        type: return
+        value:
+          reason: Pending 45+ days without meeting promotion criteria — stale
+          confidence: 75
+          decision: DISMISS
+      check_is_high:
+        type: condition
+        variable: severity
+        operator: eq
+        value: high
+        true_next: check_stale_high
+        false_next: check_is_medium
+      check_is_medium:
+        type: condition
+        variable: severity
+        operator: eq
+        value: medium
+        true_next: check_stale_medium
+        false_next: check_is_low
+      check_stale_medium:
+        type: condition
+        variable: age_days
+        operator: gte
+        value: 45
+        true_next: dismiss_stale
+        false_next: check_medium_age
+      check_medium_fix:
+        type: condition
+        variable: has_fix
+        operator: eq
+        value: true
+        true_next: promote_medium
+        false_next: defer_needs_fix
+      reject_bad_severity:
+        type: return
+        value:
+          confidence: 0
+          decision: REJECTED
+          reason: 'severity must be one of: critical, high, medium, low'
+      defer_too_young:
+        type: return
+        value:
+          decision: DEFER
+          confidence: 80
+          reason: Proposal too recent — needs more observation time
+      defer_low:
+        type: return
+        value:
+          decision: DEFER
+          reason: Low severity proposals require manual promotion
+          confidence: 85
+      check_stale_high:
+        type: condition
+        variable: age_days
+        operator: gte
+        value: 45
+        true_next: dismiss_stale
+        false_next: check_high_age
+      defer_needs_fix:
+        type: return
+        value:
+          reason: No fix template available — cannot promote without remediation
+          confidence: 80
+          decision: DEFER
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: has_fix
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: has_fix
+        operator: gte
+        value: 0
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      severity:
+        type: string
+        required: true
+      age_days:
+        type: int
+        required: true
+      has_fix:
+        type: bool
+        required: true
+      occurrences:
+        type: int
+        required: true
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      decision:
+        type: string
+        required: false
+      reason:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    has_fix: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

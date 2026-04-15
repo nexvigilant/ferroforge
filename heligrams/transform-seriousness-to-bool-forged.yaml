@@ -1,0 +1,237 @@
+name: transform-seriousness-to-bool-helix
+description: 'Forged from microgram ''transform-seriousness-to-bool''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    serious_ae: falsified
+sense:
+  tree:
+    start: check_serious
+    nodes:
+      check_lt:
+        type: condition
+        variable: criterion
+        operator: eq
+        value: LIFE_THREATENING
+        true_next: serious_lt
+        false_next: serious_other
+      not_serious:
+        type: return
+        value:
+          serious_ae: false
+          serious: false
+          fatal: false
+          source: case-seriousness
+          is_life_threatening: false
+      serious_other:
+        type: return
+        value:
+          serious_ae: true
+          is_life_threatening: false
+          fatal: false
+          serious: true
+          source: case-seriousness
+      serious_fatal:
+        type: return
+        value:
+          fatal: true
+          source: case-seriousness
+          serious: true
+          serious_ae: true
+          is_life_threatening: false
+      serious_lt:
+        type: return
+        value:
+          serious_ae: true
+          fatal: false
+          is_life_threatening: true
+          source: case-seriousness
+          serious: true
+      check_death:
+        type: condition
+        variable: criterion
+        operator: eq
+        value: DEATH
+        true_next: serious_fatal
+        false_next: check_lt
+      check_serious:
+        type: condition
+        variable: seriousness
+        operator: eq
+        value: SERIOUS
+        true_next: check_death
+        false_next: not_serious
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      serious_ae: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      serious_ae: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when:
+      falsified: false
+      serious_ae: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      criterion:
+        type: string
+        required: false
+      seriousness:
+        type: string
+        required: true
+      follow_up_complete:
+        type: bool
+        required: false
+      coding_verified:
+        type: bool
+        required: false
+      comorbidity_explains:
+        type: bool
+        required: false
+    outputs:
+      serious:
+        type: bool
+        required: false
+      is_life_threatening:
+        type: bool
+        required: false
+      source:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      fatal:
+        type: bool
+        required: false
+      verdict:
+        type: string
+        required: false
+      serious_ae:
+        type: bool
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    seriousness: SERIOUS
+    criterion: DEATH
+    comorbidity_explains: false
+    coding_verified: true
+    follow_up_complete: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    seriousness: SERIOUS
+    criterion: DEATH
+    follow_up_complete: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

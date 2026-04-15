@@ -1,0 +1,217 @@
+name: ror-signal-helix
+description: >
+  ROR signal detection with built-in falsification.
+  Sense strand: statistical threshold (ROR >= 2.0 with lower CI > 1.0).
+  Antisense strand: confounders (n too low, single-source bias, known interaction).
+  Resolution: 2x2 pairing matrix produces 4 verdicts.
+version: 0.1.0
+type: heligram
+primitive_signature:
+  dominant: '∂'
+  expression: '∂(×(κ_sense, →_antisense)) — ROR boundary with falsification'
+  primes: ['∂', 'κ', '→', 'ς', '×']
+  arguments: ['ror', 'ror_lower_ci', 'total_reports', 'single_source', 'known_interaction']
+  chain_prediction: >
+    ∂ (boundary machine). Pairs with prr-signal-helix for dual-metric confirmation.
+    ROR adds CI-awareness that PRR lacks. Chain: ror-signal-helix -> prr-signal-helix
+    produces a 4x4 agreement matrix.
+
+helix:
+  twist_rate: 3
+  base_pairs:
+    signal_detected: falsified
+    classification: null_hypothesis
+
+sense:
+  tree:
+    start: check_ror
+    nodes:
+      check_ror:
+        type: condition
+        variable: ror
+        operator: gte
+        value: 2
+        true_next: check_ci
+        false_next: no_signal
+      check_ci:
+        type: condition
+        variable: ror_lower_ci
+        operator: gt
+        value: 1
+        true_next: signal
+        false_next: weak_signal
+      signal:
+        type: return
+        value:
+          signal_detected: true
+          classification: signal
+      weak_signal:
+        type: return
+        value:
+          signal_detected: true
+          classification: weak_signal
+      no_signal:
+        type: return
+        value:
+          signal_detected: false
+          classification: noise
+
+antisense:
+  tree:
+    start: check_n
+    nodes:
+      check_n:
+        type: condition
+        variable: total_reports
+        operator: lt
+        value: 5
+        true_next: too_few
+        false_next: check_source
+      too_few:
+        type: return
+        value:
+          falsified: true
+          null_hypothesis: insufficient_n
+      check_source:
+        type: condition
+        variable: single_source
+        operator: eq
+        value: true
+        true_next: biased_source
+        false_next: check_interaction
+      biased_source:
+        type: return
+        value:
+          falsified: true
+          null_hypothesis: single_source_bias
+      check_interaction:
+        type: condition
+        variable: known_interaction
+        operator: eq
+        value: true
+        true_next: known_cause
+        false_next: no_falsification
+      known_cause:
+        type: return
+        value:
+          falsified: true
+          null_hypothesis: known_drug_interaction
+      no_falsification:
+        type: return
+        value:
+          falsified: false
+          null_hypothesis: rejected
+
+resolution:
+  mode: base_pair
+  rules:
+    - when:
+        signal_detected: true
+        falsified: false
+      emit:
+        verdict: confirmed_signal
+        confidence: high
+    - when:
+        signal_detected: true
+        falsified: true
+      emit:
+        verdict: contested_signal
+        confidence: low
+    - when:
+        signal_detected: false
+        falsified: false
+      emit:
+        verdict: no_signal
+        confidence: high
+    - default:
+        verdict: no_signal
+        confidence: medium
+
+interface:
+  major_groove:
+    inputs:
+      ror: { type: float, required: true }
+      ror_lower_ci: { type: float, required: false }
+      total_reports: { type: int, required: false }
+      single_source: { type: bool, required: false }
+      known_interaction: { type: bool, required: false }
+    outputs:
+      verdict: { type: string }
+      confidence: { type: string }
+  minor_groove:
+    inputs:
+      ror: { type: float, required: true }
+    outputs:
+      verdict: { type: string }
+
+tests:
+- name: confirmed signal — high ROR, CI above 1, sufficient n, no confounders
+  input:
+    ror: 3.2
+    ror_lower_ci: 1.8
+    total_reports: 45
+    single_source: false
+    known_interaction: false
+  expect:
+    verdict: confirmed_signal
+    confidence: high
+    agreement: true
+- name: contested signal — high ROR but insufficient reports
+  input:
+    ror: 4.0
+    ror_lower_ci: 2.1
+    total_reports: 3
+    single_source: false
+    known_interaction: false
+  expect:
+    verdict: contested_signal
+    confidence: low
+- name: contested signal — single source bias
+  input:
+    ror: 2.5
+    ror_lower_ci: 1.3
+    total_reports: 20
+    single_source: true
+    known_interaction: false
+  expect:
+    verdict: contested_signal
+    confidence: low
+- name: contested signal — known drug interaction
+  input:
+    ror: 3.0
+    ror_lower_ci: 1.5
+    total_reports: 30
+    single_source: false
+    known_interaction: true
+  expect:
+    verdict: contested_signal
+    confidence: low
+- name: weak signal — ROR high but CI crosses 1
+  input:
+    ror: 2.5
+    ror_lower_ci: 0.8
+    total_reports: 50
+    single_source: false
+    known_interaction: false
+  expect:
+    verdict: confirmed_signal
+    confidence: high
+- name: no signal — low ROR
+  input:
+    ror: 1.3
+    ror_lower_ci: 0.6
+    total_reports: 100
+    single_source: false
+    known_interaction: false
+  expect:
+    verdict: no_signal
+    confidence: high
+- name: null safety — empty input
+  input: {}
+  expect:
+    verdict: no_signal
+- name: minimal input — only ROR
+  input:
+    ror: 5.0
+  expect:
+    verdict: confirmed_signal

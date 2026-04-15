@@ -1,0 +1,196 @@
+name: adverse-reaction-extractor-helix
+description: 'Forged from microgram ''adverse-reaction-extractor''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    frequency_category: falsified
+sense:
+  tree:
+    start: check_reaction_text
+    nodes:
+      frequency_very_rare:
+        type: return
+        value:
+          frequency_category: very_rare
+          numeric_range: <0.01%
+      check_reaction_text:
+        type: condition
+        variable: reaction_text
+        operator: is_not_null
+        value: null
+        true_next: check_frequency_text
+        false_next: missing_input
+      frequency_very_common:
+        type: return
+        value:
+          frequency_category: very_common
+          numeric_range: '>=10%'
+      frequency_uncommon:
+        type: return
+        value:
+          numeric_range: 0.1-1%
+          frequency_category: uncommon
+      frequency_common:
+        type: return
+        value:
+          frequency_category: common
+          numeric_range: 1-10%
+      check_uncommon:
+        type: condition
+        variable: frequency_text
+        operator: matches
+        value: (?i)(uncommon|0.1.*1%|0.1-1)
+        true_next: frequency_uncommon
+        false_next: check_very_rare
+      frequency_rare:
+        type: return
+        value:
+          frequency_category: rare
+          numeric_range: 0.01-0.1%
+      check_rare:
+        type: condition
+        variable: frequency_text
+        operator: matches
+        value: (?i)(^rare|0.01.*0.1%|0.01-0.1)
+        true_next: frequency_rare
+        false_next: frequency_unknown
+      classify_frequency:
+        type: condition
+        variable: frequency_text
+        operator: matches
+        value: (?i)(very common|>=10%|≥10|>=10)
+        true_next: frequency_very_common
+        false_next: check_common
+      check_frequency_text:
+        type: condition
+        variable: frequency_text
+        operator: is_not_null
+        value: null
+        true_next: classify_frequency
+        false_next: frequency_unknown
+      missing_input:
+        type: return
+        value:
+          numeric_range: null
+          frequency_category: unknown
+      frequency_unknown:
+        type: return
+        value:
+          frequency_category: unknown
+          numeric_range: null
+      check_very_rare:
+        type: condition
+        variable: frequency_text
+        operator: matches
+        value: (?i)(very rare|<0.01%)
+        true_next: frequency_very_rare
+        false_next: check_rare
+      check_common:
+        type: condition
+        variable: frequency_text
+        operator: matches
+        value: (?i)^common|1.*9%|1-10|≥1%
+        true_next: frequency_common
+        false_next: check_uncommon
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: reaction_text
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: reaction_text
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      reaction_text:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    reaction_text: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

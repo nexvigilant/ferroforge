@@ -1,0 +1,119 @@
+name: dna-encode-gate
+description: 'Gates DNA encoding: validates feature vector has sufficient dimensions and non-zero values before encoding as DNA strand'
+version: 0.1.0
+family: dna-ml
+primitive_signature:
+  dominant: boundary
+  expression: '∂(N(features), ∃(non_zero))'
+  primes: [boundary, quantity, existence]
+interface:
+  inputs:
+    n_features:
+      type: int
+      required: true
+    non_zero_ratio:
+      type: float
+      required: true
+    max_value:
+      type: float
+      required: false
+  outputs:
+    gate_decision:
+      type: string
+    reason:
+      type: string
+    encoding_quality:
+      type: string
+tree:
+  start: check_min_features
+  nodes:
+    check_min_features:
+      type: condition
+      variable: n_features
+      operator: gte
+      value: 4
+      true_next: check_non_zero
+      false_next: insufficient_features
+
+    check_non_zero:
+      type: condition
+      variable: non_zero_ratio
+      operator: gte
+      value: 0.5
+      true_next: check_full_features
+      false_next: sparse_features
+
+    check_full_features:
+      type: condition
+      variable: n_features
+      operator: gte
+      value: 12
+      true_next: full_encode
+      false_next: partial_encode
+
+    full_encode:
+      type: return
+      value:
+        gate_decision: proceed
+        reason: 'Full 12-dim PV feature vector with sufficient non-zero values'
+        encoding_quality: high
+
+    partial_encode:
+      type: return
+      value:
+        gate_decision: proceed
+        reason: 'Partial feature vector — encoding will have reduced discriminative power'
+        encoding_quality: medium
+
+    sparse_features:
+      type: return
+      value:
+        gate_decision: warn
+        reason: 'More than half of features are zero — DNA strand will have low information content'
+        encoding_quality: low
+
+    insufficient_features:
+      type: return
+      value:
+        gate_decision: reject
+        reason: 'Fewer than 4 features — insufficient for meaningful DNA encoding'
+        encoding_quality: none
+
+tests:
+  - name: full_12_features
+    input:
+      n_features: 12
+      non_zero_ratio: 0.92
+      max_value: 6.93
+    expect:
+      gate_decision: proceed
+      encoding_quality: high
+
+  - name: partial_features
+    input:
+      n_features: 8
+      non_zero_ratio: 0.75
+    expect:
+      gate_decision: proceed
+      encoding_quality: medium
+
+  - name: sparse_data
+    input:
+      n_features: 12
+      non_zero_ratio: 0.3
+    expect:
+      gate_decision: warn
+      encoding_quality: low
+
+  - name: too_few_features
+    input:
+      n_features: 2
+      non_zero_ratio: 1.0
+    expect:
+      gate_decision: reject
+      encoding_quality: none
+
+  - name: null_safety
+    input: {}
+    expect:
+      gate_decision: reject

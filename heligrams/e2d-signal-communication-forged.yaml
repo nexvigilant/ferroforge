@@ -1,0 +1,233 @@
+name: e2d-signal-communication-helix
+description: 'Forged from microgram ''e2d-signal-communication''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    communication_action: falsified
+sense:
+  tree:
+    start: check_imminent_risk
+    nodes:
+      check_strength:
+        type: condition
+        variable: signal_strength
+        operator: eq
+        value: strong
+        true_next: return_expedited_signal
+        false_next: check_strength_moderate
+      check_labeling:
+        type: condition
+        variable: affects_labeling
+        operator: eq
+        value: true
+        true_next: return_label_update
+        false_next: check_authority_notified
+      check_strength_moderate:
+        type: condition
+        variable: signal_strength
+        operator: eq
+        value: moderate
+        true_next: return_enhanced_monitoring
+        false_next: return_routine_monitoring
+      check_imminent_risk:
+        type: condition
+        variable: imminent_patient_risk
+        operator: eq
+        value: true
+        true_next: return_urgent_dhpc
+        false_next: check_confirmed
+      return_notify_authority:
+        type: return
+        value:
+          communication_action: NOTIFY_REGULATORY_AUTHORITY
+          deadline_days: 15
+          urgency: HIGH
+          regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+      return_psur_inclusion:
+        type: return
+        value:
+          communication_action: PSUR_SIGNAL_SECTION
+          deadline_days: 90
+          regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+          urgency: STANDARD
+      return_expedited_signal:
+        type: return
+        value:
+          deadline_days: 15
+          urgency: HIGH
+          communication_action: EXPEDITED_SIGNAL_REPORT
+          regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+      return_enhanced_monitoring:
+        type: return
+        value:
+          urgency: STANDARD
+          communication_action: ENHANCED_MONITORING_PSUR
+          deadline_days: 90
+          regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+      return_routine_monitoring:
+        type: return
+        value:
+          urgency: LOW
+          communication_action: ROUTINE_PSUR_MONITORING
+          regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+          deadline_days: 180
+      return_urgent_dhpc:
+        type: return
+        value:
+          regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+          deadline_days: 7
+          communication_action: DEAR_HCP_LETTER
+          urgency: URGENT
+      return_label_update:
+        type: return
+        value:
+          communication_action: LABEL_UPDATE_VARIATION
+          urgency: HIGH
+          deadline_days: 15
+          regulatory_reference: ICH E2D Section 7 - Safety Signal Communication
+      check_authority_notified:
+        type: condition
+        variable: authority_notified
+        operator: eq
+        value: true
+        true_next: return_psur_inclusion
+        false_next: return_notify_authority
+      check_confirmed:
+        type: condition
+        variable: signal_confirmed
+        operator: eq
+        value: true
+        true_next: check_labeling
+        false_next: check_strength
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: signal_strength
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: signal_strength
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      affects_labeling:
+        type: bool
+        required: false
+      signal_strength:
+        type: string
+        required: false
+      imminent_patient_risk:
+        type: bool
+        required: false
+      authority_notified:
+        type: bool
+        required: false
+      signal_confirmed:
+        type: bool
+        required: false
+    outputs:
+      urgency:
+        type: string
+        required: false
+      communication_action:
+        type: string
+        required: false
+      deadline_days:
+        type: int
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    signal_strength: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    signal_strength: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - signal_strength
+  - affects_labeling
+  - imminent_patient_risk
+  - signal_confirmed
+  - authority_notified
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

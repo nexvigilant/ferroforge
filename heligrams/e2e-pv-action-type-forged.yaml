@@ -1,0 +1,215 @@
+name: e2e-pv-action-type-helix
+description: 'Forged from microgram ''e2e-pv-action-type''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regulatory_reference: falsified
+sense:
+  tree:
+    start: check_identified
+    nodes:
+      result_routine_identified:
+        type: return
+        value:
+          regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+          action_type: ROUTINE_PV
+          additional: none
+      check_serious:
+        type: condition
+        variable: serious
+        operator: eq
+        value: true
+        true_next: check_frequency
+        false_next: result_routine_identified
+      check_potential:
+        type: condition
+        variable: risk_category
+        operator: eq
+        value: POTENTIAL_RISK
+        true_next: check_plausibility
+        false_next: check_missing
+      check_identified:
+        type: condition
+        variable: risk_category
+        operator: eq
+        value: IDENTIFIED_RISK
+        true_next: check_serious
+        false_next: check_potential
+      result_targeted_followup:
+        type: return
+        value:
+          action_type: ROUTINE_PV_PLUS_ADDITIONAL
+          regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+          additional: targeted_followup
+      check_frequency:
+        type: condition
+        variable: frequency
+        operator: eq
+        value: common
+        true_next: result_risk_minimization
+        false_next: result_targeted_followup
+      result_collect_data:
+        type: return
+        value:
+          additional: collect_data
+          regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+          action_type: ROUTINE_PV_PLUS_ADDITIONAL
+      result_active_surveillance:
+        type: return
+        value:
+          additional: active_surveillance
+          regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+          action_type: ROUTINE_PV_PLUS_ADDITIONAL
+      check_plausibility:
+        type: condition
+        variable: plausibility
+        operator: eq
+        value: high
+        true_next: result_active_surveillance
+        false_next: result_routine_potential
+      result_routine_potential:
+        type: return
+        value:
+          action_type: ROUTINE_PV
+          additional: none
+          regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+      result_risk_minimization:
+        type: return
+        value:
+          action_type: ROUTINE_PV_PLUS_ADDITIONAL
+          regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+          additional: risk_minimization
+      result_routine_default:
+        type: return
+        value:
+          additional: none
+          regulatory_reference: ICH E2E Section 4 - Pharmacovigilance Plan
+          action_type: ROUTINE_PV
+      check_missing:
+        type: condition
+        variable: risk_category
+        operator: eq
+        value: MISSING_INFORMATION
+        true_next: result_collect_data
+        false_next: result_routine_default
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: serious
+        operator: neq
+        value: IDENTIFIED_RISK
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: serious
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      frequency:
+        type: string
+        required: false
+      risk_category:
+        type: string
+        required: true
+      serious:
+        type: bool
+        required: false
+      plausibility:
+        type: string
+        required: false
+    outputs:
+      regulatory_reference:
+        type: string
+        required: false
+      additional:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      action_type:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    serious: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    serious: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

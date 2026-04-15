@@ -1,0 +1,190 @@
+name: dermatologic-severity-classifier-helix
+description: 'Forged from microgram ''dermatologic-severity-classifier''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    severity: falsified
+sense:
+  tree:
+    start: check_ten
+    nodes:
+      mild:
+        type: return
+        value:
+          severity: mild
+          soc: Skin and subcutaneous tissue disorders
+          action: routine_surveillance
+      check_bsa:
+        type: condition
+        variable: bsa_percent
+        operator: gte
+        value: 30
+        true_next: serious
+        false_next: check_urticaria
+      check_urticaria:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: URTICARIA
+        true_next: moderate
+        false_next: mild
+      critical:
+        type: return
+        value:
+          severity: critical
+          soc: Skin and subcutaneous tissue disorders
+          action: immediate_expedited_report
+      check_sjs:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: STEVENS-JOHNSON
+        true_next: critical
+        false_next: check_dress
+      serious:
+        type: return
+        value:
+          action: expedited_report
+          severity: serious
+          soc: Skin and subcutaneous tissue disorders
+      check_angioedema:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: ANGIOEDEMA
+        true_next: serious
+        false_next: check_bsa
+      check_ten:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: TOXIC EPIDERMAL NECROLYSIS
+        true_next: critical
+        false_next: check_sjs
+      moderate:
+        type: return
+        value:
+          action: monitor_and_assess
+          severity: moderate
+          soc: Skin and subcutaneous tissue disorders
+      check_dress:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: DRESS
+        true_next: critical
+        false_next: check_angioedema
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: bsa_percent
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: bsa_percent
+        operator: not_contains
+        value: TOXIC EPIDERMAL NECROLYSIS
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      bsa_percent:
+        type: float
+        required: false
+      reaction_pt:
+        type: string
+        required: true
+    outputs:
+      severity:
+        type: string
+        required: false
+      soc:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    bsa_percent: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

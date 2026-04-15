@@ -1,0 +1,203 @@
+name: ebgm-signal-helix
+description: 'Forged from microgram ''ebgm-signal''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    signal_detected: falsified
+sense:
+  tree:
+    start: check_strong
+    nodes:
+      moderate_signal:
+        type: return
+        value:
+          signal_detected: true
+          signal: MODERATE
+          action: standard_review
+      check_moderate:
+        type: condition
+        variable: eb05
+        operator: gte
+        value: 2.0
+        true_next: moderate_signal
+        false_next: check_weak
+      strong_signal:
+        type: return
+        value:
+          action: expedited_review
+          signal: STRONG
+          signal_detected: true
+      check_weak:
+        type: condition
+        variable: eb05
+        operator: gte
+        value: 1.0
+        true_next: weak_signal
+        false_next: check_borderline
+      weak_signal:
+        type: return
+        value:
+          signal: WEAK
+          action: monitor
+          signal_detected: true
+      borderline_signal:
+        type: return
+        value:
+          signal: BORDERLINE
+          action: increase_sample
+          signal_detected: false
+      check_borderline:
+        type: condition
+        variable: ebgm
+        operator: gte
+        value: 2.0
+        true_next: borderline_signal
+        false_next: no_signal
+      no_signal:
+        type: return
+        value:
+          action: no_action
+          signal: NONE
+          signal_detected: false
+      check_strong:
+        type: condition
+        variable: eb05
+        operator: gte
+        value: 5.0
+        true_next: strong_signal
+        false_next: check_moderate
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: eb05
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: eb05
+        operator: lt
+        value: 5.0
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      signal_detected: true
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+      signal_detected: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when:
+      falsified: false
+      signal_detected: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when:
+      signal_detected: false
+      falsified: true
+    default: null
+    emit:
+      confidence: medium
+      confidence_score: 0.42
+      verdict: refuted
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      eb05:
+        type: float
+        required: false
+      ebgm:
+        type: float
+        required: false
+    outputs:
+      signal:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      signal_detected:
+        type: bool
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      action:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    eb05: null
+    ebgm: 8.0
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    eb05: 6.0
+    ebgm: 8.0
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

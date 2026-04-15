@@ -1,0 +1,176 @@
+name: station-meddra-pipeline-helix
+description: 'Forged from microgram ''station-meddra-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    reason: falsified
+sense:
+  tree:
+    start: check_level
+    nodes:
+      llt_route:
+        type: return
+        value:
+          reason: LLT/HLT term — upcode to PT for signal detection
+          action: upcode
+          priority: moderate
+          route: term_standardization
+      soc_route:
+        type: return
+        value:
+          reason: SOC-level term — aggregate for system organ class trending
+          priority: low
+          action: aggregate
+          route: soc_trending
+      check_level:
+        type: condition
+        variable: hierarchy_level
+        operator: eq
+        value: PT
+        true_next: check_smq
+        false_next: check_soc
+      smq_narrow:
+        type: condition
+        variable: smq_scope
+        operator: eq
+        value: narrow
+        true_next: narrow_smq
+        false_next: broad_smq
+      check_smq:
+        type: condition
+        variable: in_smq
+        operator: eq
+        value: true
+        true_next: smq_narrow
+        false_next: standard_pt
+      standard_pt:
+        type: return
+        value:
+          route: archive
+          priority: low
+          action: code
+          reason: Standard PT not in SMQ — routine coding
+      check_soc:
+        type: condition
+        variable: hierarchy_level
+        operator: eq
+        value: SOC
+        true_next: soc_route
+        false_next: llt_route
+      broad_smq:
+        type: return
+        value:
+          route: signal_validation
+          reason: PT in broad SMQ — validate specificity before signal analysis
+          priority: moderate
+          action: validate
+      narrow_smq:
+        type: return
+        value:
+          reason: PT in narrow SMQ — high-specificity safety grouping
+          priority: high
+          action: flag
+          route: signal_detection
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: hierarchy_level
+        operator: neq
+        value: PT
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: hierarchy_level
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      hierarchy_level:
+        type: string
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    hierarchy_level: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    hierarchy_level: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

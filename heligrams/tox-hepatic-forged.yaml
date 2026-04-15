@@ -1,0 +1,148 @@
+name: tox-hepatic-helix
+description: 'Forged from microgram ''tox-hepatic''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    action: falsified
+sense:
+  tree:
+    start: check_severe
+    nodes:
+      check_severe:
+        type: condition
+        variable: ALT_ULN
+        operator: gte
+        value: 10
+        true_next: severe
+        false_next: check_mild
+      mild:
+        type: return
+        value:
+          action: monitor_closely
+          organ: hepatic
+          severity: mild
+          target: liver
+      check_mild:
+        type: condition
+        variable: ALT_ULN
+        operator: gte
+        value: 3
+        true_next: mild
+        false_next: normal
+      normal:
+        type: return
+        value:
+          severity: normal
+          target: liver
+          organ: hepatic
+          action: continue
+      severe:
+        type: return
+        value:
+          action: discontinue
+          target: liver
+          organ: hepatic
+          severity: severe
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: ALT_ULN
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: ALT_ULN
+        operator: lt
+        value: 10
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      ALT_ULN:
+        type: integer
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    ALT_ULN: 20
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    ALT_ULN: 9
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

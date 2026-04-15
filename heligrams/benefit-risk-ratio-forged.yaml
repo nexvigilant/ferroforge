@@ -1,0 +1,222 @@
+name: benefit-risk-ratio-helix
+description: 'Forged from microgram ''benefit-risk-ratio''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regulatory_action: falsified
+sense:
+  tree:
+    start: check_benefit_high
+    nodes:
+      check_vulnerable_favorable:
+        type: condition
+        variable: patient_population_vulnerability
+        operator: eq
+        value: high
+        true_next: uncertain_vulnerable
+        false_next: favorable_with_monitoring
+      check_benefit_high:
+        type: condition
+        variable: benefit_score
+        operator: gte
+        value: 70
+        true_next: check_risk_low_for_high_benefit
+        false_next: check_benefit_moderate
+      check_low_benefit:
+        type: condition
+        variable: risk_score
+        operator: lt
+        value: 20
+        true_next: uncertain
+        false_next: unfavorable
+      uncertain_vulnerable:
+        type: return
+        value:
+          regulatory_action: Risk minimization measures required — contraindication review
+          br_ratio: UNCERTAIN_VULNERABLE
+          reassessment_interval: Monthly review until resolved
+          classification: Uncertain benefit-risk in vulnerable population
+      favorable:
+        type: return
+        value:
+          reassessment_interval: 12 months per PBRER cycle
+          classification: Benefits clearly outweigh risks
+          br_ratio: FAVORABLE
+          regulatory_action: No additional risk minimization required
+      unfavorable:
+        type: return
+        value:
+          reassessment_interval: Immediate regulatory action required
+          classification: Risks outweigh limited benefits
+          br_ratio: UNFAVORABLE
+          regulatory_action: Recommend market withdrawal or severe use restriction
+      unfavorable_despite_benefit:
+        type: return
+        value:
+          regulatory_action: Consider labeling changes, REMS, or market withdrawal
+          classification: Risks outweigh benefits despite demonstrated efficacy
+          br_ratio: UNFAVORABLE
+          reassessment_interval: Immediate regulatory consultation
+      uncertain:
+        type: return
+        value:
+          reassessment_interval: 3 months pending data collection
+          br_ratio: UNCERTAIN
+          regulatory_action: Initiate additional studies or post-authorization safety study
+          classification: Benefit-risk balance requires further data
+      check_benefit_moderate:
+        type: condition
+        variable: benefit_score
+        operator: gte
+        value: 40
+        true_next: check_risk_for_moderate_benefit
+        false_next: check_low_benefit
+      favorable_with_monitoring:
+        type: return
+        value:
+          regulatory_action: Implement or maintain risk minimization measures
+          reassessment_interval: 6 months with enhanced monitoring
+          classification: Benefits outweigh risks with risk minimization measures
+          br_ratio: FAVORABLE_WITH_CONDITIONS
+      check_risk_moderate_for_high_benefit:
+        type: condition
+        variable: risk_score
+        operator: lt
+        value: 70
+        true_next: check_vulnerable_favorable
+        false_next: unfavorable_despite_benefit
+      check_risk_low_for_high_benefit:
+        type: condition
+        variable: risk_score
+        operator: lt
+        value: 30
+        true_next: favorable
+        false_next: check_risk_moderate_for_high_benefit
+      check_risk_for_moderate_benefit:
+        type: condition
+        variable: risk_score
+        operator: lt
+        value: 50
+        true_next: favorable_with_monitoring
+        false_next: uncertain
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: patient_population_vulnerability
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: patient_population_vulnerability
+        operator: lt
+        value: 70
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      patient_population_vulnerability:
+        type: string
+        required: false
+      benefit_score:
+        type: int
+        required: true
+      risk_score:
+        type: int
+        required: true
+    outputs:
+      classification:
+        type: string
+        required: false
+      br_ratio:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      reassessment_interval:
+        type: string
+        required: false
+      regulatory_action:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    patient_population_vulnerability: 80
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    patient_population_vulnerability: 69
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

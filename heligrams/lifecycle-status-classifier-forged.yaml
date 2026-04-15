@@ -1,0 +1,172 @@
+name: lifecycle-status-classifier-helix
+description: 'Forged from microgram ''lifecycle-status-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    description: falsified
+sense:
+  tree:
+    start: check_new
+    nodes:
+      check_archived:
+        type: condition
+        variable: current_state
+        operator: eq
+        value: archived
+        true_next: action_audit
+        false_next: action_unknown
+      action_unknown:
+        type: return
+        value:
+          description: Unknown lifecycle state - manual intervention required
+          action: ERROR
+      check_suspended:
+        type: condition
+        variable: current_state
+        operator: eq
+        value: suspended
+        true_next: action_review
+        false_next: check_archived
+      action_review:
+        type: return
+        value:
+          action: REVIEW
+          description: Suspended entity - requires manual review before reactivation or archiving
+      action_initialize:
+        type: return
+        value:
+          action: INITIALIZE
+          description: New entity - run initialization and validation before activating
+      action_process:
+        type: return
+        value:
+          description: Active entity - process normally through standard workflow
+          action: PROCESS
+      check_new:
+        type: condition
+        variable: current_state
+        operator: eq
+        value: new
+        true_next: action_initialize
+        false_next: check_active
+      action_audit:
+        type: return
+        value:
+          action: AUDIT_ONLY
+          description: Archived entity - read-only access for audit and compliance purposes
+      check_active:
+        type: condition
+        variable: current_state
+        operator: eq
+        value: active
+        true_next: action_process
+        false_next: check_suspended
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: current_state
+        operator: neq
+        value: new
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: current_state
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      current_state:
+        type: string
+        required: false
+    outputs:
+      action:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      description:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    current_state: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    current_state: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

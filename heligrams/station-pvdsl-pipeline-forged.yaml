@@ -1,0 +1,148 @@
+name: station-pvdsl-pipeline-helix
+description: 'Forged from microgram ''station-pvdsl-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    action: falsified
+sense:
+  tree:
+    start: check_parse
+    nodes:
+      check_eval:
+        type: condition
+        variable: eval_success
+        operator: eq
+        value: true
+        true_next: success
+        false_next: eval_error
+      success:
+        type: return
+        value:
+          action: certify
+          route: archive
+          priority: low
+          reason: PVDSL compiles and evaluates — expression valid
+      parse_error:
+        type: return
+        value:
+          action: fix
+          priority: high
+          reason: PVDSL parse failure — syntax error in expression
+          route: syntax_repair
+      eval_error:
+        type: return
+        value:
+          action: debug
+          reason: PVDSL parses but evaluation fails — runtime error in function
+          route: runtime_debug
+          priority: moderate
+      check_parse:
+        type: condition
+        variable: parse_success
+        operator: eq
+        value: true
+        true_next: check_eval
+        false_next: parse_error
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: eval_success
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: eval_success
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      eval_success:
+        type: bool
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    eval_success: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    eval_success: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

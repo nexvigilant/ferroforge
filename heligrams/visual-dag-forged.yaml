@@ -1,0 +1,238 @@
+name: visual-dag-helix
+description: 'Forged from microgram ''visual-dag''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    render_format: falsified
+sense:
+  tree:
+    start: check_cycles
+    nodes:
+      small_linear_dag:
+        type: return
+        value:
+          render_format: mermaid
+          complexity: linear
+          layout_direction: TD
+          warning: none
+          notebook_cell_type: markdown
+      medium_dag:
+        type: return
+        value:
+          layout_direction: TD
+          complexity: medium
+          notebook_cell_type: markdown
+          warning: none
+          render_format: mermaid
+      large_dag:
+        type: return
+        value:
+          warning: Large DAG (20+ nodes) -- using Graphviz dot for better layout. Requires graphviz Python package.
+          complexity: large
+          layout_direction: TB
+          notebook_cell_type: code
+          render_format: dot
+      check_node_count:
+        type: condition
+        variable: node_count
+        operator: gte
+        value: 20
+        true_next: large_dag
+        false_next: check_medium
+      check_medium:
+        type: condition
+        variable: node_count
+        operator: gte
+        value: 8
+        true_next: medium_dag
+        false_next: check_parallel
+      dot_format:
+        type: return
+        value:
+          layout_direction: TB
+          notebook_cell_type: code
+          warning: none
+          render_format: dot
+          complexity: explicit
+      check_parallel:
+        type: condition
+        variable: has_parallel
+        operator: eq
+        value: true
+        true_next: small_parallel_dag
+        false_next: small_linear_dag
+      check_ascii:
+        type: condition
+        variable: format
+        operator: eq
+        value: ascii
+        true_next: ascii_format
+        false_next: check_node_count
+      cycle_warning:
+        type: return
+        value:
+          complexity: invalid
+          render_format: error
+          notebook_cell_type: markdown
+          layout_direction: none
+          warning: DAG contains cycles -- not a valid DAG. Remove cycles before visualizing.
+      ascii_format:
+        type: return
+        value:
+          notebook_cell_type: code
+          render_format: ascii
+          layout_direction: TD
+          complexity: text-only
+          warning: none
+      check_cycles:
+        type: condition
+        variable: has_cycles
+        operator: eq
+        value: true
+        true_next: cycle_warning
+        false_next: check_format
+      small_parallel_dag:
+        type: return
+        value:
+          render_format: mermaid
+          layout_direction: LR
+          complexity: parallel
+          warning: none
+          notebook_cell_type: markdown
+      check_format:
+        type: condition
+        variable: format
+        operator: eq
+        value: dot
+        true_next: dot_format
+        false_next: check_ascii
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: node_count
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: node_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      format:
+        type: string
+        required: false
+      node_count:
+        type: int
+        required: true
+      max_depth:
+        type: int
+        required: false
+      has_cycles:
+        type: bool
+        required: false
+      has_parallel:
+        type: bool
+        required: false
+    outputs:
+      render_format:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      warning:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      layout_direction:
+        type: string
+        required: false
+      complexity:
+        type: string
+        required: false
+      notebook_cell_type:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    node_count: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    node_count: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

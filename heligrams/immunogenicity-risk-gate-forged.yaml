@@ -1,0 +1,180 @@
+name: immunogenicity-risk-gate-helix
+description: 'Forged from microgram ''immunogenicity-risk-gate''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    soc: falsified
+sense:
+  tree:
+    start: check_anaphylaxis
+    nodes:
+      critical:
+        type: return
+        value:
+          soc: Immune system disorders
+          action: immediate_expedited_report
+          severity: critical
+      mild:
+        type: return
+        value:
+          severity: mild
+          action: routine_surveillance
+          soc: Immune system disorders
+      check_serum_sickness:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: SERUM SICKNESS
+        true_next: serious
+        false_next: check_autoimmune
+      moderate:
+        type: return
+        value:
+          soc: Immune system disorders
+          action: monitor_and_assess
+          severity: moderate
+      check_anaphylaxis:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: ANAPHYLAC
+        true_next: critical
+        false_next: check_serum_sickness
+      check_vasculitis:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: VASCULITIS
+        true_next: serious
+        false_next: check_infusion
+      serious:
+        type: return
+        value:
+          soc: Immune system disorders
+          action: expedited_report
+          severity: serious
+      check_autoimmune:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: AUTOIMMUNE
+        true_next: serious
+        false_next: check_vasculitis
+      check_infusion:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: INFUSION RELATED
+        true_next: moderate
+        false_next: mild
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: reaction_pt
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: reaction_pt
+        operator: not_contains
+        value: ANAPHYLAC
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      reaction_pt:
+        type: string
+        required: true
+    outputs:
+      action:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      severity:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      soc:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    reaction_pt: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

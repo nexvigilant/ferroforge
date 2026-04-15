@@ -1,0 +1,140 @@
+name: ats-gap-detector
+description: 'Detect critical gaps between resume content and job requirements — missing skills, experience, credentials'
+version: 0.1.0
+primitive_signature:
+  dominant: ∅
+  expression: ∅(job_req \ resume) → N(gap_count) at ∂(severity)
+  primes: [∅, N, ∂, κ]
+  arguments: [nothing, quantity, boundary, comparison]
+  chain_prediction: feeds ats-recommendation
+interface:
+  inputs:
+    missing_hard_skills:
+      type: integer
+      required: false
+    missing_soft_skills:
+      type: integer
+      required: false
+    missing_credentials:
+      type: integer
+      required: false
+    years_experience_gap:
+      type: integer
+      required: false
+  outputs:
+    gap_severity:
+      type: string
+    total_gaps:
+      type: integer
+    fixable:
+      type: bool
+    priority_action:
+      type: string
+tree:
+  start: credential_check
+  nodes:
+    credential_check:
+      type: condition
+      variable: missing_credentials
+      operator: gte
+      value: 1
+      true_next: credential_gap
+      false_next: experience_check
+    experience_check:
+      type: condition
+      variable: years_experience_gap
+      operator: gte
+      value: 3
+      true_next: experience_gap
+      false_next: hard_skills_check
+    hard_skills_check:
+      type: condition
+      variable: missing_hard_skills
+      operator: gte
+      value: 3
+      true_next: skills_gap
+      false_next: minor_check
+    minor_check:
+      type: condition
+      variable: missing_hard_skills
+      operator: gte
+      value: 1
+      true_next: minor_gap
+      false_next: no_gap
+    credential_gap:
+      type: return
+      value:
+        gap_severity: CRITICAL
+        total_gaps: 5
+        fixable: false
+        priority_action: "Missing required credentials (degree, certification, license). Cannot be addressed by resume wording alone — acquire the credential or target roles that don't require it"
+    experience_gap:
+      type: return
+      value:
+        gap_severity: HIGH
+        total_gaps: 4
+        fixable: false
+        priority_action: "Significant experience gap (3+ years below requirement). Reframe transferable experience from adjacent roles, or target positions at a lower seniority band"
+    skills_gap:
+      type: return
+      value:
+        gap_severity: MODERATE
+        total_gaps: 3
+        fixable: true
+        priority_action: "Multiple hard skills missing. Add relevant skills with concrete examples — even project-based or self-taught experience counts for ATS keyword matching"
+    minor_gap:
+      type: return
+      value:
+        gap_severity: LOW
+        total_gaps: 1
+        fixable: true
+        priority_action: "Minor skills gap. Add missing keywords using exact terms from the job description — ATS matches literal strings"
+    no_gap:
+      type: return
+      value:
+        gap_severity: NONE
+        total_gaps: 0
+        fixable: true
+        priority_action: "No significant gaps detected. Focus on keyword density and action verb strength"
+tests:
+- input:
+    missing_credentials: 1
+    missing_hard_skills: 0
+    missing_soft_skills: 0
+    years_experience_gap: 0
+  expect:
+    gap_severity: CRITICAL
+    fixable: false
+- input:
+    missing_credentials: 0
+    missing_hard_skills: 0
+    years_experience_gap: 5
+  expect:
+    gap_severity: HIGH
+    fixable: false
+- input:
+    missing_credentials: 0
+    missing_hard_skills: 4
+    years_experience_gap: 1
+  expect:
+    gap_severity: MODERATE
+    fixable: true
+- input:
+    missing_credentials: 0
+    missing_hard_skills: 1
+    years_experience_gap: 0
+  expect:
+    gap_severity: LOW
+    fixable: true
+- input:
+    missing_credentials: 0
+    missing_hard_skills: 0
+    years_experience_gap: 0
+  expect:
+    gap_severity: NONE
+    fixable: true
+    total_gaps: 0
+- input: {}
+  expect:
+    gap_severity: NONE
+    fixable: true

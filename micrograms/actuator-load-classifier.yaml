@@ -1,0 +1,239 @@
+name: actuator-load-classifier
+description: "Classifies actuator load demands by joint, motion type, and intensity. Routes to motor sizing, power tier, and control mode. 8 joints × 4 motion types × 3 intensity levels."
+version: 0.1.0
+interface:
+  inputs:
+    joint:
+      type: string
+      required: true
+      enum: [shoulder, elbow, wrist, hip, knee, ankle, spine, neck]
+    motion:
+      type: string
+      required: true
+      enum: [flexion, extension, rotation, stabilization]
+    intensity:
+      type: string
+      required: false
+      enum: [passive_assist, active_normal, peak_effort]
+      description: "How hard the actuator works — passive assist augments human, peak effort is full exo drive"
+    pilot_weight_kg:
+      type: float
+      required: false
+      description: "Pilot body mass in kg (default 80)"
+    payload_kg:
+      type: float
+      required: false
+      description: "External payload being carried/lifted"
+  outputs:
+    torque_class:
+      type: string
+    peak_power_w:
+      type: float
+    motor_type:
+      type: string
+    control_mode:
+      type: string
+    power_tier:
+      type: string
+    rationale:
+      type: string
+tree:
+  start: check_high_torque_joint
+  nodes:
+    # Gate 1: High-torque joints (hip, knee, ankle, spine)
+    check_high_torque_joint:
+      type: condition
+      variable: joint
+      operator: eq
+      value: hip
+      true_next: check_intensity_high
+      false_next: check_knee
+
+    check_knee:
+      type: condition
+      variable: joint
+      operator: eq
+      value: knee
+      true_next: check_intensity_high
+      false_next: check_ankle
+
+    check_ankle:
+      type: condition
+      variable: joint
+      operator: eq
+      value: ankle
+      true_next: check_intensity_high
+      false_next: check_spine
+
+    check_spine:
+      type: condition
+      variable: joint
+      operator: eq
+      value: spine
+      true_next: check_intensity_high
+      false_next: check_medium_joint
+
+    # Gate 2: Medium-torque joints (shoulder, elbow)
+    check_medium_joint:
+      type: condition
+      variable: joint
+      operator: eq
+      value: shoulder
+      true_next: check_intensity_medium
+      false_next: check_elbow
+
+    check_elbow:
+      type: condition
+      variable: joint
+      operator: eq
+      value: elbow
+      true_next: check_intensity_medium
+      false_next: low_torque_joint
+
+    # High-torque intensity routing
+    check_intensity_high:
+      type: condition
+      variable: intensity
+      operator: eq
+      value: peak_effort
+      true_next: high_torque_peak
+      false_next: check_high_active
+
+    check_high_active:
+      type: condition
+      variable: intensity
+      operator: eq
+      value: active_normal
+      true_next: high_torque_active
+      false_next: high_torque_passive
+
+    # Medium-torque intensity routing
+    check_intensity_medium:
+      type: condition
+      variable: intensity
+      operator: eq
+      value: peak_effort
+      true_next: medium_torque_peak
+      false_next: check_med_active
+
+    check_med_active:
+      type: condition
+      variable: intensity
+      operator: eq
+      value: active_normal
+      true_next: medium_torque_active
+      false_next: medium_torque_passive
+
+    # Terminal nodes
+    high_torque_peak:
+      type: return
+      value:
+        torque_class: "high_peak"
+        peak_power_w: 3000
+        motor_type: "BLDC frameless (T-Motor U15 class) + harmonic drive 100:1"
+        control_mode: "field_oriented_control_with_torque_limit"
+        power_tier: "main_bus + ultracap_burst"
+        rationale: "Hip/knee/ankle/spine at peak effort: jumping, sprinting, heavy lift. 3kW per joint. Needs ultracap for transient >2kW. Harmonic drive for torque density. FOC with torque limiting prevents pilot injury."
+
+    high_torque_active:
+      type: return
+      value:
+        torque_class: "high_active"
+        peak_power_w: 1500
+        motor_type: "BLDC frameless (T-Motor U13 class) + harmonic drive 80:1"
+        control_mode: "field_oriented_control"
+        power_tier: "main_bus_steady"
+        rationale: "Hip/knee/ankle/spine normal walking, stair climbing, standing from seated. 1.5kW continuous. Main bus handles without ultracap. FOC for smooth torque delivery."
+
+    high_torque_passive:
+      type: return
+      value:
+        torque_class: "high_passive"
+        peak_power_w: 500
+        motor_type: "BLDC frameless (T-Motor U10 class) + harmonic drive 50:1"
+        control_mode: "impedance_control"
+        power_tier: "per_limb_buffer"
+        rationale: "Hip/knee/ankle/spine passive assist: augmenting human motion, reducing fatigue. 500W. Per-limb buffer handles locally. Impedance control feels natural — spring-damper behavior."
+
+    medium_torque_peak:
+      type: return
+      value:
+        torque_class: "medium_peak"
+        peak_power_w: 1500
+        motor_type: "BLDC frameless (T-Motor U10 class) + planetary 50:1"
+        control_mode: "field_oriented_control_with_torque_limit"
+        power_tier: "main_bus + ultracap_burst"
+        rationale: "Shoulder/elbow peak: punching, throwing, overhead press. 1.5kW burst. Planetary gearbox lighter than harmonic at this scale. Ultracap for transient."
+
+    medium_torque_active:
+      type: return
+      value:
+        torque_class: "medium_active"
+        peak_power_w: 750
+        motor_type: "BLDC frameless (T-Motor U8 class) + planetary 30:1"
+        control_mode: "field_oriented_control"
+        power_tier: "main_bus_steady"
+        rationale: "Shoulder/elbow normal: reaching, carrying, tool use. 750W continuous. Main bus steady state."
+
+    medium_torque_passive:
+      type: return
+      value:
+        torque_class: "medium_passive"
+        peak_power_w: 250
+        motor_type: "BLDC frameless (T-Motor U5 class) + planetary 20:1"
+        control_mode: "impedance_control"
+        power_tier: "per_limb_buffer"
+        rationale: "Shoulder/elbow passive assist: reducing arm fatigue, tremor suppression. 250W. Per-limb buffer. Impedance control for transparency."
+
+    low_torque_joint:
+      type: return
+      value:
+        torque_class: "low"
+        peak_power_w: 100
+        motor_type: "BLDC micro (Maxon EC-i 40) + strain wave 30:1"
+        control_mode: "position_control"
+        power_tier: "per_limb_buffer"
+        rationale: "Wrist/neck: fine positioning, low torque. 100W max. Strain wave for zero backlash. Position control for precision. Per-limb buffer sufficient."
+
+primitive_signature:
+  dominant: '×'
+  expression: '×(l(ς), N(v)) — mapping located state to quantified frequency response'
+  primes: ['×', 'l', 'ς', 'N', 'v']
+  arguments: ['→']
+
+tests:
+- name: "knee peak effort — high torque + ultracap"
+  input: { joint: knee, motion: flexion, intensity: peak_effort }
+  expect: { torque_class: "high_peak", peak_power_w: 3000, power_tier: "main_bus + ultracap_burst" }
+
+- name: "hip active walking — high torque steady"
+  input: { joint: hip, motion: extension, intensity: active_normal }
+  expect: { torque_class: "high_active", peak_power_w: 1500 }
+
+- name: "ankle passive assist — per-limb buffer"
+  input: { joint: ankle, motion: stabilization, intensity: passive_assist }
+  expect: { torque_class: "high_passive", power_tier: "per_limb_buffer" }
+
+- name: "shoulder peak — medium torque + ultracap"
+  input: { joint: shoulder, motion: rotation, intensity: peak_effort }
+  expect: { torque_class: "medium_peak", peak_power_w: 1500 }
+
+- name: "elbow active — medium torque steady"
+  input: { joint: elbow, motion: flexion, intensity: active_normal }
+  expect: { torque_class: "medium_active", peak_power_w: 750 }
+
+- name: "wrist — low torque, position control"
+  input: { joint: wrist, motion: rotation }
+  expect: { torque_class: "low", peak_power_w: 100, control_mode: "position_control" }
+
+- name: "neck — low torque"
+  input: { joint: neck, motion: flexion }
+  expect: { torque_class: "low" }
+
+- name: "spine peak — high torque"
+  input: { joint: spine, motion: extension, intensity: peak_effort }
+  expect: { torque_class: "high_peak", peak_power_w: 3000 }
+
+- name: "null safety"
+  input: {}
+  expect: { torque_class: "low" }

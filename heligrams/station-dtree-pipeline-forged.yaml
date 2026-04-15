@@ -1,0 +1,161 @@
+name: station-dtree-pipeline-helix
+description: 'Forged from microgram ''station-dtree-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    route: falsified
+sense:
+  tree:
+    start: check_accuracy
+    nodes:
+      check_overfit:
+        type: condition
+        variable: train_test_gap
+        operator: gte
+        value: 0.1
+        true_next: overfit
+        false_next: excellent
+      check_accuracy:
+        type: condition
+        variable: accuracy
+        operator: gte
+        value: 0.95
+        true_next: check_overfit
+        false_next: check_low_acc
+      poor:
+        type: return
+        value:
+          route: model_retrain
+          reason: Accuracy ≤60% — insufficient, needs feature engineering
+          priority: high
+          action: retrain
+      acceptable:
+        type: return
+        value:
+          action: tune
+          priority: moderate
+          route: model_tuning
+          reason: Accuracy 60-95% — acceptable, hyperparameter tuning may improve
+      overfit:
+        type: return
+        value:
+          action: prune
+          reason: Accuracy 95%+ but train-test gap ≥10% — overfitting, prune tree
+          route: model_pruning
+          priority: high
+      check_low_acc:
+        type: condition
+        variable: accuracy
+        operator: lte
+        value: 0.6
+        true_next: poor
+        false_next: acceptable
+      excellent:
+        type: return
+        value:
+          action: deploy
+          route: archive
+          priority: low
+          reason: High accuracy, no overfit — model ready for production
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: train_test_gap
+        operator: lt
+        value: 0.95
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: train_test_gap
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      train_test_gap:
+        type: float
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    train_test_gap: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

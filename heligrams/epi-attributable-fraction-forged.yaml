@@ -1,0 +1,163 @@
+name: epi-attributable-fraction-helix
+description: 'Forged from microgram ''epi-attributable-fraction''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    epi_compliant: falsified
+sense:
+  tree:
+    start: validate_epidemiologic_data
+    nodes:
+      fraction_unknown:
+        type: return
+        value:
+          attributable_fraction: null
+          epi_compliant: false
+          population_impact: null
+          epi_measure_type: null
+          interpretation: null
+      calculate_fraction:
+        type: return
+        value:
+          epi_measure_type: attributable_fraction
+          epi_compliant: true
+          attributable_fraction: calculated_from_rr_and_prevalence
+          interpretation: proportion_of_disease_attributable_to_exposure
+          population_impact: estimated
+      check_exposure_prevalence:
+        type: condition
+        variable: exposed_population_percent
+        operator: is_not_null
+        value: null
+        true_next: calculate_fraction
+        false_next: fraction_unknown
+      validate_epidemiologic_data:
+        type: condition
+        variable: relative_risk
+        operator: is_not_null
+        value: null
+        true_next: check_exposure_prevalence
+        false_next: fraction_unknown
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: exposed_population_percent
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_negation:
+        type: condition
+        variable: exposed_population_percent
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      epi_compliant: true
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      epi_compliant: true
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when:
+      falsified: false
+      epi_compliant: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      epi_compliant: false
+    default: null
+    emit:
+      verdict: refuted
+      confidence: medium
+      confidence_score: 0.42
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      exposed_population_percent:
+        type: any
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    relative_risk: 2.5
+    exposed_population_percent: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    relative_risk: 2.5
+    exposed_population_percent: 40
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

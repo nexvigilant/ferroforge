@@ -1,0 +1,188 @@
+name: deadline-pmda-15day-helix
+description: 'Forged from microgram ''deadline-pmda-15day''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regulatory_compliant: falsified
+sense:
+  tree:
+    start: validate_event
+    nodes:
+      deadline_unknown:
+        type: return
+        value:
+          regulatory_requirement: null
+          event_category: null
+          expedited_required: null
+          regulatory_compliant: false
+          reporting_deadline_days: null
+      validate_event:
+        type: condition
+        variable: event_date
+        operator: is_not_null
+        value: null
+        true_next: check_seriousness
+        false_next: deadline_unknown
+      standard_deadline:
+        type: return
+        value:
+          expedited_required: false
+          regulatory_compliant: true
+          regulatory_requirement: PMDA_CTD_Japan
+          reporting_deadline_days: 15
+          event_category: serious_expected_adverse_reaction
+      check_unexpected:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: urgent_deadline
+        false_next: standard_deadline
+      check_seriousness:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_unexpected
+        false_next: routine_deadline
+      urgent_deadline:
+        type: return
+        value:
+          reporting_deadline_days: 7
+          event_category: serious_unexpected_adverse_reaction
+          expedited_required: true
+          regulatory_compliant: true
+          regulatory_requirement: PMDA_CTD_Japan
+      routine_deadline:
+        type: return
+        value:
+          regulatory_compliant: true
+          regulatory_requirement: PMDA_CTD_Japan
+          reporting_deadline_days: 30
+          event_category: non_serious
+          expedited_required: false
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: event_date
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: event_date
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      regulatory_compliant: true
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+      regulatory_compliant: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when:
+      falsified: false
+      regulatory_compliant: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when:
+      falsified: true
+      regulatory_compliant: false
+    default: null
+    emit:
+      confidence: medium
+      verdict: refuted
+      confidence_score: 0.42
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      event_date:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    is_unexpected: true
+    is_serious: true
+    event_date: null
+  expect:
+    confidence: high
+    verdict: absent
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input:
+    is_serious: true
+    is_unexpected: true
+    event_date: 2024-01-15
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,222 @@
+name: rems-classifier-helix
+description: 'Forged from microgram ''rems-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    rems_type: falsified
+sense:
+  tree:
+    start: restricted_dist_check
+    nodes:
+      prescriber_and_patient_check:
+        type: condition
+        variable: prescriber_certification
+        operator: eq
+        value: true
+        true_next: patient_enrollment_check
+        false_next: prescriber_or_monitoring_check
+      full_rems:
+        type: return
+        value:
+          rems_type: FULL_REMS
+          regulatory_reference: 21 CFR 314.520
+          complexity: HIGH
+          elements: ETASU,MedGuide,CommPlan
+      patient_enrollment_check:
+        type: condition
+        variable: patient_enrollment
+        operator: eq
+        value: true
+        true_next: etasu_rems
+        false_next: prescriber_or_monitoring_check
+      no_rems:
+        type: return
+        value:
+          regulatory_reference: 21 CFR 314.520
+          complexity: NONE
+          elements: ''
+          rems_type: NO_REMS
+      medguide_only:
+        type: return
+        value:
+          regulatory_reference: 21 CFR 314.520
+          rems_type: MEDGUIDE_ONLY
+          elements: MedGuide
+          complexity: LOW
+      prescriber_or_monitoring_check:
+        type: condition
+        variable: prescriber_certification
+        operator: eq
+        value: true
+        true_next: etasu_lite
+        false_next: monitoring_check
+      restricted_dist_check:
+        type: condition
+        variable: restricted_distribution
+        operator: eq
+        value: true
+        true_next: full_rems
+        false_next: prescriber_and_patient_check
+      monitoring_check:
+        type: condition
+        variable: monitoring_required
+        operator: eq
+        value: true
+        true_next: etasu_lite
+        false_next: medguide_check
+      medguide_check:
+        type: condition
+        variable: medication_guide_only
+        operator: eq
+        value: true
+        true_next: medguide_only
+        false_next: no_rems
+      etasu_rems:
+        type: return
+        value:
+          elements: ETASU,MedGuide
+          complexity: HIGH
+          rems_type: ETASU_REMS
+          regulatory_reference: 21 CFR 314.520
+      etasu_lite:
+        type: return
+        value:
+          regulatory_reference: 21 CFR 314.520
+          complexity: MODERATE
+          elements: ETASU
+          rems_type: ETASU_LITE
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: prescriber_certification
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: prescriber_certification
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      monitoring_required:
+        type: bool
+        required: false
+      medication_guide_only:
+        type: bool
+        required: false
+      patient_enrollment:
+        type: bool
+        required: false
+      prescriber_certification:
+        type: bool
+        required: false
+      restricted_distribution:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      elements:
+        type: string
+        required: false
+      rems_type:
+        type: string
+        required: false
+      complexity:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    patient_enrollment: true
+    prescriber_certification: null
+    monitoring_required: false
+    medication_guide_only: false
+    restricted_distribution: false
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    patient_enrollment: true
+    prescriber_certification: false
+    monitoring_required: false
+    medication_guide_only: false
+    restricted_distribution: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

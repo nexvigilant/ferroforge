@@ -1,0 +1,150 @@
+name: trend-cluster-geographic-helix
+description: 'Forged from microgram ''trend-cluster-geographic''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    detected: falsified
+sense:
+  tree:
+    start: check
+    nodes:
+      check:
+        type: condition
+        variable: geo_concentration
+        operator: gte
+        value: 50
+        true_next: detected
+        false_next: not_detected
+      not_detected:
+        type: return
+        value:
+          pattern: geo_cluster
+          action: continue_monitoring
+          detected: false
+      detected:
+        type: return
+        value:
+          action: investigate
+          pattern: geo_cluster
+          detected: true
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: geo_concentration
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: geo_concentration
+        operator: lt
+        value: 50
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      detected: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      detected: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when:
+      detected: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when:
+      falsified: true
+      detected: false
+    default: null
+    emit:
+      verdict: refuted
+      confidence_score: 0.42
+      confidence: medium
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      geo_concentration:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    geo_concentration: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    geo_concentration: 50
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

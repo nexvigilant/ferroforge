@@ -1,0 +1,214 @@
+name: case-medical-review-helix
+description: 'Forged from microgram ''case-medical-review''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    review_compliant: falsified
+sense:
+  tree:
+    start: validate_case
+    nodes:
+      medical_review_required:
+        type: return
+        value:
+          review_compliant: true
+          medical_review_needed: true
+          reviewer_qualification: physician_or_pharmacist
+          review_timeline_days: 5
+          expertise_required: medical_assessment
+      check_complexity:
+        type: condition
+        variable: case_complexity
+        operator: eq
+        value: high
+        true_next: medical_review_required
+        false_next: no_medical_review
+      check_seriousness:
+        type: condition
+        variable: case_seriousness
+        operator: eq
+        value: serious
+        true_next: medical_review_required
+        false_next: check_complexity
+      review_status_unknown:
+        type: return
+        value:
+          review_compliant: false
+          reviewer_qualification: null
+          review_timeline_days: null
+          medical_review_needed: null
+          expertise_required: null
+      validate_case:
+        type: condition
+        variable: case_seriousness
+        operator: is_not_null
+        value: null
+        true_next: check_seriousness
+        false_next: review_status_unknown
+      no_medical_review:
+        type: return
+        value:
+          expertise_required: null
+          medical_review_needed: false
+          reviewer_qualification: null
+          review_timeline_days: 0
+          review_compliant: true
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      review_compliant: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      review_compliant: true
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when:
+      review_compliant: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: absent
+      confidence_score: 0.7
+  - when:
+      review_compliant: false
+      falsified: true
+    default: null
+    emit:
+      verdict: refuted
+      confidence: medium
+      confidence_score: 0.42
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      follow_up_complete:
+        type: bool
+        required: false
+      comorbidity_explains:
+        type: bool
+        required: false
+      coding_verified:
+        type: bool
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    coding_verified: true
+    comorbidity_explains: false
+    case_seriousness: serious
+    follow_up_complete: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    case_seriousness: serious
+    follow_up_complete: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

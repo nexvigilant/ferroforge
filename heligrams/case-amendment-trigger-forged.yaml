@@ -1,0 +1,187 @@
+name: case-amendment-trigger-helix
+description: 'Forged from microgram ''case-amendment-trigger''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    amendment_compliant: falsified
+sense:
+  tree:
+    start: validate_new_information
+    nodes:
+      check_causality_change:
+        type: condition
+        variable: change_type
+        operator: eq
+        value: causality_change
+        true_next: requires_amendment
+        false_next: minor_update_only
+      check_change_type:
+        type: condition
+        variable: change_type
+        operator: eq
+        value: outcome_change
+        true_next: requires_amendment
+        false_next: check_causality_change
+      minor_update_only:
+        type: return
+        value:
+          amendment_compliant: true
+          submission_required: false
+          amendment_required: false
+          submission_timeline_days: 0
+          amendment_type: minor_update
+      requires_amendment:
+        type: return
+        value:
+          submission_required: true
+          amendment_compliant: true
+          submission_timeline_days: 30
+          amendment_type: substantial_amendment
+          amendment_required: true
+      check_material_change:
+        type: condition
+        variable: is_material_change
+        operator: eq
+        value: true
+        true_next: check_change_type
+        false_next: minor_update_only
+      no_amendment:
+        type: return
+        value:
+          submission_required: false
+          amendment_type: null
+          submission_timeline_days: 0
+          amendment_compliant: true
+          amendment_required: false
+      validate_new_information:
+        type: condition
+        variable: new_information_received
+        operator: eq
+        value: true
+        true_next: check_material_change
+        false_next: no_amendment
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: change_type
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: change_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      amendment_compliant: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      amendment_compliant: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      amendment_compliant: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when:
+      amendment_compliant: false
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.42
+      verdict: refuted
+      confidence: medium
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      change_type:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    new_information_received: true
+    change_type: null
+    is_material_change: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    new_information_received: true
+    is_material_change: true
+    change_type: outcome_change
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,236 @@
+name: presente-desambiguacion-helix
+description: 'Forged from microgram ''presente-desambiguacion''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    modo_resuelto: falsified
+sense:
+  tree:
+    start: check_forma_present
+    nodes:
+      check_duda_verbs:
+        type: condition
+        variable: verbo_contexto
+        operator: matches
+        value: ^(dudar|dudo|duda|dudamos|negar|niego|niega|negamos|querer|quiero|quiere|queremos|esperar|espero|espera|esperamos|temer|temo|teme|tememos|desear|deseo|desea|pedir|pido|pide|sugerir|sugiero|sugiere|recomendar|recomiendo|recomienda|prohibir|prohíbo|prohíbe|ordenar|ordeno|ordena|lamentar|lamento|lamenta)$
+        true_next: resolve_subjuntivo_high
+        false_next: resolve_ambiguo_contexto
+      heuristic_indicativo:
+        type: return
+        value:
+          modo_resuelto: INDICATIVO
+          modo_verbal: indicativo
+          resolved_mood: INDICATIVE
+          confianza_resolucion: 75
+          razon: |
+            Sin verbo rector, usando heurística morfológica. La forma verbal termina en patrón indicativo (-a, -an, -aba, -ó para 3ra persona). Confianza reducida: sin contexto, la desambiguación es probabilística.
+      check_contexto_present:
+        type: condition
+        variable: verbo_contexto
+        operator: is_null
+        value: null
+        true_next: heuristic_by_form
+        false_next: check_certeza_verbs
+      check_forma_present:
+        type: condition
+        variable: forma_verbal
+        operator: is_null
+        value: null
+        true_next: reject_missing
+        false_next: check_contexto_present
+      reject_missing:
+        type: return
+        value:
+          modo_resuelto: RECHAZADO
+          resolved_mood: REJECTED
+          confianza_resolucion: 0
+          modo_verbal: ''
+          razon: forma_verbal es obligatorio
+      check_subjuntivo_forms:
+        type: condition
+        variable: forma_verbal
+        operator: matches
+        value: ^(presente|presenten|muestre|muestren|cause|causen|produzca|produzcan|sufra|sufran|tenga|tengan|manifieste|desarrolle|padezca)$
+        true_next: heuristic_subjuntivo
+        false_next: heuristic_ambiguo
+      resolve_subjuntivo_high:
+        type: return
+        value:
+          resolved_mood: SUBJUNCTIVE
+          confianza_resolucion: 95
+          razon: |
+            Verbo rector de duda/deseo/negación detectado. Estos verbos rigen subjuntivo obligatoriamente. "Dudo que PRESENTE hepatotoxicidad" — el hablante expresa incertidumbre. Señal epistémica débil.
+          modo_resuelto: SUBJUNTIVO
+          modo_verbal: subjuntivo
+      resolve_indicativo_high:
+        type: return
+        value:
+          resolved_mood: INDICATIVE
+          razon: |
+            Verbo rector de certeza detectado. Los verbos de afirmación/conocimiento (creer, saber, afirmar) rigen indicativo en la cláusula subordinada. "Creo que PRESENTA hepatotoxicidad" — el hablante afirma.
+          modo_resuelto: INDICATIVO
+          modo_verbal: indicativo
+          confianza_resolucion: 95
+      resolve_ambiguo_contexto:
+        type: return
+        value:
+          confianza_resolucion: 40
+          modo_resuelto: AMBIGUO
+          razon: |
+            Verbo rector no clasificado como certeza ni duda. Posibilidades: verbo neutro, condicional, o error de entrada. Se requiere contexto adicional para desambiguar.
+          modo_verbal: presente
+          resolved_mood: AMBIGUOUS
+      heuristic_subjuntivo:
+        type: return
+        value:
+          razon: |
+            Sin verbo rector, usando heurística morfológica. La forma verbal termina en patrón subjuntivo (-e, -en, -a para verbos -er/-ir). Confianza baja: "presente" es la forma más ambigua del español — puede ser indicativo de "presentar" (yo presento) o subjuntivo.
+          confianza_resolucion: 60
+          resolved_mood: SUBJUNCTIVE
+          modo_resuelto: SUBJUNTIVO
+          modo_verbal: subjuntivo
+      heuristic_by_form:
+        type: condition
+        variable: forma_verbal
+        operator: matches
+        value: ^(presenta|presentan|presentaba|presentó|muestra|muestran|causa|causan|produce|producen|sufre|sufren|tiene|tienen|manifiesta|desarrolla)$
+        true_next: heuristic_indicativo
+        false_next: check_subjuntivo_forms
+      heuristic_ambiguo:
+        type: return
+        value:
+          razon: |
+            Forma verbal no reconocida por heurística morfológica. Sin verbo rector y sin patrón de terminación conocido. Requiere análisis sintáctico completo.
+          modo_verbal: presente
+          resolved_mood: AMBIGUOUS
+          confianza_resolucion: 30
+          modo_resuelto: AMBIGUO
+      check_certeza_verbs:
+        type: condition
+        variable: verbo_contexto
+        operator: matches
+        value: ^(creer|creo|cree|creemos|afirmar|afirmo|afirma|saber|sé|sabe|sabemos|confirmar|confirmo|confirma|asegurar|aseguro|asegura|notar|noto|nota|observar|observo|observa|declarar|declaro|declara|reconocer|reconozco|reconoce)$
+        true_next: resolve_indicativo_high
+        false_next: check_duda_verbs
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: verbo_contexto
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: verbo_contexto
+        operator: is_not_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      verbo_contexto:
+        type: string
+        required: false
+      forma_verbal:
+        type: string
+        required: true
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      razon:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      modo_resuelto:
+        type: string
+        required: false
+      modo_verbal:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confianza_resolucion:
+        type: int
+        required: false
+      resolved_mood:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    verbo_contexto: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - forma_verbal
+  - verbo_contexto
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

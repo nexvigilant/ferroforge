@@ -1,0 +1,148 @@
+name: soc-immune-system-helix
+description: 'Forged from microgram ''soc-immune-system''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    priority: falsified
+sense:
+  tree:
+    start: check_serious
+    nodes:
+      non_serious:
+        type: return
+        value:
+          priority: low
+          severity: non_serious
+          route: periodic_review
+          soc: Immune system
+      check_serious:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_fatal
+        false_next: non_serious
+      check_fatal:
+        type: condition
+        variable: is_fatal
+        operator: eq
+        value: true
+        true_next: fatal
+        false_next: serious
+      fatal:
+        type: return
+        value:
+          route: causality_assessment
+          soc: Immune system
+          severity: fatal
+          priority: critical
+      serious:
+        type: return
+        value:
+          severity: serious
+          priority: high
+          route: signal_investigation
+          soc: Immune system
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: is_serious
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: is_serious
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_serious:
+        type: bool
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    is_serious: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    is_serious: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

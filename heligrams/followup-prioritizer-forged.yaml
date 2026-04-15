@@ -1,0 +1,242 @@
+name: followup-prioritizer-helix
+description: 'Forged from microgram ''followup-prioritizer''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    method: falsified
+sense:
+  tree:
+    start: check_fatal
+    nodes:
+      check_days_remaining:
+        type: condition
+        variable: days_since_receipt
+        operator: gt
+        value: 0
+        true_next: compute_days_check
+        false_next: check_missing_fields_serious
+      return_urgent:
+        type: return
+        value:
+          method: phone_then_fax
+          deadline_hours: 48
+          escalation_note: Regulatory deadline approaching — expedited phone contact required within 48 hours
+          priority: URGENT
+      check_non_serious_fields:
+        type: condition
+        variable: missing_critical_fields
+        operator: gte
+        value: 5
+        true_next: return_moderate
+        false_next: return_low
+      return_high:
+        type: return
+        value:
+          escalation_note: Serious case with 3 or more missing critical fields — phone follow-up within 72 hours
+          priority: HIGH
+          deadline_hours: 72
+          method: phone
+      check_fatal:
+        type: condition
+        variable: fatal_outcome
+        operator: eq
+        value: true
+        true_next: return_critical
+        false_next: check_serious
+      check_serious:
+        type: condition
+        variable: serious
+        operator: eq
+        value: true
+        true_next: check_days_remaining
+        false_next: check_non_serious_fields
+      compute_days_check:
+        type: condition
+        variable: regulatory_deadline_days
+        operator: lte
+        value: 7
+        true_next: check_urgent_7day
+        false_next: check_urgent_15day
+      return_critical:
+        type: return
+        value:
+          priority: CRITICAL
+          deadline_hours: 24
+          method: direct_contact
+          escalation_note: Fatal outcome requires immediate follow-up within 24 hours — 7-day expedited report at risk
+      return_moderate:
+        type: return
+        value:
+          escalation_note: Non-serious case with significant data gaps — email follow-up within 7 days
+          priority: MODERATE
+          method: email
+          deadline_hours: 168
+      check_urgent_15day_threshold:
+        type: condition
+        variable: days_since_receipt
+        operator: gte
+        value: 10
+        true_next: return_urgent
+        false_next: check_missing_fields_serious
+      check_urgent_15day:
+        type: condition
+        variable: regulatory_deadline_days
+        operator: lte
+        value: 15
+        true_next: check_urgent_15day_threshold
+        false_next: check_missing_fields_serious
+      check_urgent_7day:
+        type: condition
+        variable: days_since_receipt
+        operator: gte
+        value: 2
+        true_next: return_urgent
+        false_next: check_missing_fields_serious
+      return_standard:
+        type: return
+        value:
+          priority: STANDARD
+          deadline_hours: 120
+          method: email_then_phone
+          escalation_note: Serious case — standard follow-up within 5 days, escalate to phone if no response
+      check_missing_fields_serious:
+        type: condition
+        variable: missing_critical_fields
+        operator: gte
+        value: 3
+        true_next: return_high
+        false_next: return_standard
+      return_low:
+        type: return
+        value:
+          method: batch_email
+          escalation_note: Non-serious case with minor gaps — include in next batch follow-up cycle
+          priority: LOW
+          deadline_hours: 336
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: days_since_receipt
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: days_since_receipt
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      days_since_receipt:
+        type: int
+        required: false
+      serious:
+        type: bool
+        required: false
+      regulatory_deadline_days:
+        type: int
+        required: false
+      missing_critical_fields:
+        type: int
+        required: false
+      fatal_outcome:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      deadline_hours:
+        type: int
+        required: false
+      verdict:
+        type: string
+        required: false
+      method:
+        type: string
+        required: false
+      priority:
+        type: string
+        required: false
+      escalation_note:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    days_since_receipt: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    days_since_receipt: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

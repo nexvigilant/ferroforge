@@ -1,0 +1,150 @@
+name: trend-dose-response-helix
+description: 'Forged from microgram ''trend-dose-response''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    detected: falsified
+sense:
+  tree:
+    start: check
+    nodes:
+      check:
+        type: condition
+        variable: dose_correlation
+        operator: gte
+        value: 0
+        true_next: detected
+        false_next: not_detected
+      detected:
+        type: return
+        value:
+          pattern: dose_related
+          action: investigate
+          detected: true
+      not_detected:
+        type: return
+        value:
+          pattern: dose_related
+          detected: false
+          action: continue_monitoring
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: dose_correlation
+        operator: lt
+        value: 0
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: dose_correlation
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      detected: true
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      detected: true
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when:
+      falsified: false
+      detected: false
+    default: null
+    emit:
+      confidence: high
+      verdict: absent
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      detected: false
+    default: null
+    emit:
+      confidence: medium
+      confidence_score: 0.42
+      verdict: refuted
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      dose_correlation:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    dose_correlation: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    dose_correlation: 0
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

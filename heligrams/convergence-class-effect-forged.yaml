@@ -1,0 +1,150 @@
+name: convergence-class-effect-helix
+description: 'Forged from microgram ''convergence-class-effect''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    met: falsified
+sense:
+  tree:
+    start: check
+    nodes:
+      divergent:
+        type: return
+        value:
+          action: investigate_discrepancy
+          convergence: class_effect
+          met: false
+      converged:
+        type: return
+        value:
+          action: escalate
+          met: true
+          convergence: class_effect
+      check:
+        type: condition
+        variable: class_drugs_positive
+        operator: gte
+        value: 2
+        true_next: converged
+        false_next: divergent
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: class_drugs_positive
+        operator: lt
+        value: 2
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: class_drugs_positive
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      met: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+      met: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when:
+      met: false
+      falsified: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      met: false
+    default: null
+    emit:
+      confidence: medium
+      verdict: refuted
+      confidence_score: 0.42
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      class_drugs_positive:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    class_drugs_positive: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    class_drugs_positive: 2
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

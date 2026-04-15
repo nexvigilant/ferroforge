@@ -1,0 +1,236 @@
+name: perspective-collapse-detector-helix
+description: 'Forged from microgram ''perspective-collapse-detector''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    failure_mode: falsified
+sense:
+  tree:
+    start: check_mismatch
+    nodes:
+      critical_with_high_risk:
+        type: return
+        value:
+          failure_mode: FM7-PERSPECTIVE-COLLAPSE
+          action_required: HALT signal assessment. Resolve term perspective before proceeding. Verify which domain boundary the author intended.
+          guardian_context: 'CRITICAL: Perspective collapse detected — high-risk term with multiple divergent perspectives. Signal suppression imminent.'
+          guardian_pattern: perspective_collapse_critical
+          guardian_severity: 0.95
+          guardian_source: pun-proof
+      check_route_flag:
+        type: condition
+        variable: route
+        operator: eq
+        value: FLAG
+        true_next: monitor_collapse
+        false_next: no_collapse
+      high_collapse:
+        type: return
+        value:
+          guardian_severity: 0.65
+          guardian_context: 'HIGH: Perspective divergence detected — term meaning shifts between author and reader domains. Signal may be misclassified.'
+          action_required: Flag for reviewer attention. Verify term interpretation matches regulatory context.
+          failure_mode: FM7-PERSPECTIVE-DIVERGENCE
+          guardian_source: pun-proof
+          guardian_pattern: perspective_collapse_high
+      check_route_escalate:
+        type: condition
+        variable: route
+        operator: eq
+        value: ESCALATE
+        true_next: high_collapse
+        false_next: check_route_flag
+      check_mismatch:
+        type: condition
+        variable: mismatch
+        operator: eq
+        value: true
+        true_next: check_route_block
+        false_next: no_collapse
+      critical_collapse:
+        type: condition
+        variable: risk_score
+        operator: gte
+        value: 3.0
+        true_next: critical_with_high_risk
+        false_next: critical_standard
+      check_route_block:
+        type: condition
+        variable: route
+        operator: eq
+        value: BLOCK
+        true_next: critical_collapse
+        false_next: check_route_escalate
+      monitor_collapse:
+        type: return
+        value:
+          action_required: Note in review. No immediate action required.
+          guardian_source: pun-proof
+          guardian_pattern: perspective_collapse_monitor
+          guardian_severity: 0.3
+          guardian_context: 'MONITOR: Minor perspective difference noted — term has domain-specific nuance that may affect interpretation.'
+          failure_mode: FM7-PERSPECTIVE-NUANCE
+      critical_standard:
+        type: return
+        value:
+          guardian_source: pun-proof
+          guardian_pattern: perspective_collapse_critical
+          action_required: HALT signal assessment. Disambiguate term meaning before proceeding.
+          guardian_context: 'CRITICAL: Perspective collapse detected — term carries incompatible meanings across author and reader domains.'
+          failure_mode: FM7-PERSPECTIVE-COLLAPSE
+          guardian_severity: 0.85
+      no_collapse:
+        type: return
+        value:
+          guardian_pattern: perspective_aligned
+          guardian_severity: 0.0
+          guardian_context: Perspectives aligned — no perspective collapse detected.
+          action_required: No action required. Term interpretation consistent across domains.
+          failure_mode: NONE
+          guardian_source: pun-proof
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: route
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: route
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      mismatch:
+        type: bool
+        required: false
+      route:
+        type: string
+        required: false
+      author_domain:
+        type: string
+        required: false
+      risk_score:
+        type: float
+        required: false
+      term:
+        type: string
+        required: false
+      reader_domain:
+        type: string
+        required: false
+    outputs:
+      guardian_pattern:
+        type: string
+        required: false
+      action_required:
+        type: string
+        required: false
+      guardian_severity:
+        type: float
+        required: false
+      guardian_context:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      guardian_source:
+        type: string
+        required: false
+      failure_mode:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    reader_domain: Causality
+    term: related
+    mismatch: true
+    author_domain: Temporal
+    route: null
+    risk_score: 1.5
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    reader_domain: Causality
+    term: related
+    mismatch: true
+    author_domain: Temporal
+    route: false
+    risk_score: 1.5
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

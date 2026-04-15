@@ -1,0 +1,190 @@
+name: ground-state-detector-helix
+description: 'Forged from microgram ''ground-state-detector''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    system_state: falsified
+sense:
+  tree:
+    start: check_active_channels
+    nodes:
+      check_low_activity:
+        type: condition
+        variable: active_channels
+        operator: lte
+        value: 2
+        true_next: low_activity
+        false_next: check_moderate_activity
+      minimal_activity:
+        type: return
+        value:
+          system_state: MINIMAL_ACTIVITY
+          nothing_primitive: ∅ — single ripple on still water; ground state remains dominant
+          chemistry_analog: 'Vacuum with trace particles: near-absolute absence with minimal perturbation'
+          action: Single low-severity signal detected. Minimal disturbance from ground state.
+      full_activity:
+        type: return
+        value:
+          system_state: FULL_ACTIVITY
+          chemistry_analog: 'Boiling liquid: all molecules active, maximum disorder and motion'
+          action: All four channels active. Full system engagement. No ground state advantage.
+          nothing_primitive: ∅ — completely transcended; system fully in motion state
+      check_single_channel:
+        type: condition
+        variable: active_channels
+        operator: eq
+        value: 1
+        true_next: check_severity_for_single
+        false_next: check_low_activity
+      check_active_channels:
+        type: condition
+        variable: active_channels
+        operator: eq
+        value: 0
+        true_next: ground_state
+        false_next: check_single_channel
+      low_activity:
+        type: return
+        value:
+          action: Two channels active. Low overall system load. Ground state partially engaged.
+          system_state: LOW_ACTIVITY
+          nothing_primitive: ∅ — limited activity around the ground reference frame
+          chemistry_analog: 'Diffusion at low concentration: minimal but detectable motion'
+      moderate_activity:
+        type: return
+        value:
+          system_state: MODERATE_ACTIVITY
+          action: Three channels active. Moderate system load. Ground state significantly perturbed.
+          chemistry_analog: 'Equilibrium with steady-state flow: dynamic balance with ongoing activity'
+          nothing_primitive: ∅ — clear deviation from rest; absence no longer the dominant state
+      check_moderate_activity:
+        type: condition
+        variable: active_channels
+        operator: lte
+        value: 3
+        true_next: moderate_activity
+        false_next: full_activity
+      alert_from_rest:
+        type: return
+        value:
+          system_state: ALERT_FROM_REST
+          action: Critical alert raised from near-ground state. Immediate attention required.
+          nothing_primitive: ∅ — sudden break in silence; ground state violated by high-severity event
+          chemistry_analog: 'Supercooled liquid crystallizing: phase transition from near-inert state'
+      ground_state:
+        type: return
+        value:
+          chemistry_analog: 'Absolute zero: no molecular motion, complete equilibrium'
+          nothing_primitive: ∅ — absence defines presence; ground state is the reference point
+          action: No activity detected. System at rest. Ground state established.
+          system_state: GROUND_STATE
+      check_severity_for_single:
+        type: condition
+        variable: highest_severity
+        operator: eq
+        value: high
+        true_next: alert_from_rest
+        false_next: minimal_activity
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: active_channels
+        operator: neq
+        value: 0
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: active_channels
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      active_channels:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    active_channels: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    active_channels: 1
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,160 @@
+name: coverage-tier-classifier-helix
+description: 'Forged from microgram ''coverage-tier-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    tier: falsified
+sense:
+  tree:
+    start: check_high
+    nodes:
+      low_coverage:
+        type: return
+        value:
+          tier: LOW
+          color: orange
+      check_low:
+        type: condition
+        variable: coverage_pct
+        operator: gte
+        value: 25
+        true_next: low_coverage
+        false_next: critical_gap
+      critical_gap:
+        type: return
+        value:
+          tier: CRITICAL_GAP
+          color: red
+      high_coverage:
+        type: return
+        value:
+          color: emerald
+          tier: HIGH
+      moderate_coverage:
+        type: return
+        value:
+          tier: MODERATE
+          color: amber
+      check_moderate:
+        type: condition
+        variable: coverage_pct
+        operator: gte
+        value: 50
+        true_next: moderate_coverage
+        false_next: check_low
+      check_high:
+        type: condition
+        variable: coverage_pct
+        operator: gte
+        value: 75
+        true_next: high_coverage
+        false_next: check_moderate
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: coverage_pct
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: coverage_pct
+        operator: lt
+        value: 75
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      coverage_pct:
+        type: number
+        required: true
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      tier:
+        type: string
+        required: false
+      color:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    coverage_pct: 85
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    coverage_pct: 74
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

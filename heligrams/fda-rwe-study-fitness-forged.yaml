@@ -1,0 +1,257 @@
+name: fda-rwe-study-fitness-helix
+description: 'Forged from microgram ''fda-rwe-study-fitness''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    fitness_level: falsified
+sense:
+  tree:
+    start: check_data_quality
+    nodes:
+      cross_sectional_path:
+        type: return
+        value:
+          fitness_level: LOW
+          regulatory_acceptability: Cross-sectional design generally insufficient for causal regulatory decisions
+          additional_requirements: May supplement other evidence; insufficient as standalone for efficacy or safety conclusions
+          regulatory_reference: 'FDA Guidance: Considerations for RWD and RWE (2023), Section V.E'
+      check_design:
+        type: condition
+        variable: study_design
+        operator: eq
+        value: randomized_rwe
+        true_next: randomized_rwe_purpose
+        false_next: check_external_control
+      quality_not_verified:
+        type: return
+        value:
+          regulatory_acceptability: Data quality not verified — cannot support regulatory decision
+          regulatory_reference: 'FDA Guidance: Considerations for RWD and RWE (2023), Section III — Data Quality Framework'
+          additional_requirements: Must demonstrate data relevance, reliability, and completeness per FDA RWD/RWE framework before proceeding
+          fitness_level: NOT_FIT
+      randomized_rwe_purpose:
+        type: condition
+        variable: regulatory_purpose
+        operator: eq
+        value: new_indication
+        true_next: rwe_new_indication
+        false_next: rwe_other_purpose
+      check_observational:
+        type: condition
+        variable: study_design
+        operator: eq
+        value: observational_cohort
+        true_next: observational_purpose
+        false_next: check_case_control
+      case_control_path:
+        type: return
+        value:
+          additional_requirements: Incident case definition, appropriate control sampling, exposure window specification
+          regulatory_acceptability: Case-control design acceptable for rare safety outcomes with proper control selection
+          regulatory_reference: 'FDA Guidance: Considerations for RWD and RWE (2023), Section V.D'
+          fitness_level: MODERATE
+      observational_safety:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: Considerations for RWD and RWE (2023), Section V.C'
+          fitness_level: HIGH
+          additional_requirements: Active comparator preferred. New-user design. Adequate follow-up for outcome ascertainment.
+          regulatory_acceptability: Observational cohort is well-established for postmarket safety assessment
+      external_control_source:
+        type: condition
+        variable: rwd_source
+        operator: eq
+        value: registry
+        true_next: external_registry
+        false_next: external_other
+      external_other:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: RWD Assessing EHR and Claims (2024); Considerations for RWD and RWE (2023), Section V.B'
+          fitness_level: MODERATE
+          regulatory_acceptability: EHR/claims-based external control requires extensive confounding adjustment and sensitivity analyses
+          additional_requirements: Pre-specified analysis plan, multiple analytical approaches, quantitative bias analysis
+      check_data_quality:
+        type: condition
+        variable: data_quality_verified
+        operator: eq
+        value: true
+        true_next: check_design
+        false_next: quality_not_verified
+      rwe_other_purpose:
+        type: return
+        value:
+          fitness_level: HIGH
+          regulatory_acceptability: Randomized RWE trial acceptable for label expansion, postmarket safety, and effectiveness
+          additional_requirements: Pre-specified protocol, data quality plan, sensitivity analyses
+          regulatory_reference: 'FDA Guidance: Considerations for RWD and RWE (2023), Section V.A'
+      rwe_new_indication:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: Considerations for RWD and RWE (2023), Section V.A'
+          regulatory_acceptability: Randomized RWE trial can support new indication if pre-specified protocol filed with FDA
+          additional_requirements: Pre-registration, SAP filed before unblinding, sensitivity analyses for data quality
+          fitness_level: HIGH
+      external_registry:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: RWD Assessing Registries (2023); Considerations for RWD and RWE (2023), Section V.B'
+          regulatory_acceptability: Registry-based external control may support efficacy in rare diseases or oncology with well-defined endpoints
+          fitness_level: MODERATE_HIGH
+          additional_requirements: Propensity score or other adjustment for confounding. Registry must have validated data elements.
+      observational_purpose:
+        type: condition
+        variable: regulatory_purpose
+        operator: eq
+        value: postmarket_safety
+        true_next: observational_safety
+        false_next: observational_effectiveness
+      observational_effectiveness:
+        type: return
+        value:
+          regulatory_acceptability: Observational cohort for effectiveness faces significant confounding challenges
+          fitness_level: LOW_MODERATE
+          additional_requirements: Target trial emulation framework recommended. Multiple sensitivity analyses mandatory.
+          regulatory_reference: 'FDA Guidance: Considerations for RWD and RWE (2023), Section V.C'
+      check_external_control:
+        type: condition
+        variable: study_design
+        operator: eq
+        value: single_arm_external_control
+        true_next: external_control_source
+        false_next: check_observational
+      check_case_control:
+        type: condition
+        variable: study_design
+        operator: eq
+        value: case_control
+        true_next: case_control_path
+        false_next: cross_sectional_path
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: study_design
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: study_design
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      data_quality_verified:
+        type: bool
+        required: false
+      regulatory_purpose:
+        type: string
+        required: false
+      study_design:
+        type: string
+        required: true
+      rwd_source:
+        type: string
+        required: true
+    outputs:
+      additional_requirements:
+        type: string
+        required: false
+      fitness_level:
+        type: string
+        required: false
+      regulatory_acceptability:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    study_design: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    study_design: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - rwd_source
+  - study_design
+  - regulatory_purpose
+  - data_quality_verified
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

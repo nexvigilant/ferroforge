@@ -1,0 +1,151 @@
+name: pop-pediatric-infant-helix
+description: 'Forged from microgram ''pop-pediatric-infant''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    at_risk: falsified
+sense:
+  tree:
+    start: check
+    nodes:
+      check:
+        type: condition
+        variable: age_months
+        operator: lte
+        value: 12
+        true_next: at_risk
+        false_next: standard
+      at_risk:
+        type: return
+        value:
+          action: special_monitoring
+          population: pediatric-infant
+          at_risk: true
+          reason: Infant safety — developing organs
+      standard:
+        type: return
+        value:
+          population: pediatric-infant
+          action: standard_care
+          at_risk: false
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: age_months
+        operator: gt
+        value: 12
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: age_months
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      at_risk: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      at_risk: true
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when:
+      falsified: false
+      at_risk: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      at_risk: false
+      falsified: true
+    default: null
+    emit:
+      confidence: medium
+      confidence_score: 0.42
+      verdict: refuted
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      age_months:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    age_months: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    age_months: 12
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

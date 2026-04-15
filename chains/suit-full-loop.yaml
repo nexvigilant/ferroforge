@@ -1,0 +1,48 @@
+name: suit-full-loop
+description: 'Complete suit decision loop: SoC → power routing → thermal management → actuator classification → motor fault detection → comms link → security gate. 7 subsystems, one pipeline. The full nervous system.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - soc-estimator
+  - power-load-router
+  - thermal-management-router
+  - actuator-load-classifier
+  - motor-fault-detector
+  - comms-link-router
+  - comms-security-gate
+tests:
+- name: nominal full loop — everything healthy
+  input:
+    voltage_v: 3.7
+    current_a: 15
+    temperature_c: 30
+    previous_soc: 0.7
+    load_state: moderate_load
+    demand_kw: 1.5
+    duration_s: 10
+    locality: left_leg
+    limb_buffer_soc: 0.6
+    zone: motor_controller
+    joint: knee
+    motion: flexion
+    intensity: active_normal
+    phase_current_a: 15
+    winding_temp_c: 60
+    encoder_valid: true
+    rpm: 500
+    phase_balance_pct: 95
+    range_km: 10
+    data_rate_required: medium_bandwidth
+    primary_5g_status: connected
+    link_type: fiveg_modem
+    mtls_active: true
+    firmware_signed: true
+    replay_nonce_valid: true
+    certificate_pinned: true
+  expect:
+    method_used: ekf_fused
+    source_tier: per_limb_lfp
+    torque_class: "high_active"
+    fault: "none"
+    verdict: pass

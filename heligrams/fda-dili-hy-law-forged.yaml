@@ -1,0 +1,252 @@
+name: fda-dili-hy-law-helix
+description: 'Forged from microgram ''fda-dili-hy-law''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    hy_law_case: falsified
+sense:
+  tree:
+    start: check_alt
+    nodes:
+      hy_law_confirmed:
+        type: return
+        value:
+          action_required: 'CRITICAL: Hy''s Law case confirmed. Fatality risk ~10-50% without intervention. Immediately discontinue suspect drug, report as SAE, assess for clinical trial hold.'
+          regulatory_reference: 'FDA Guidance: Drug-Induced Liver Injury: Premarketing Clinical Evaluation (2009), Section V.B — Hy''s Law'
+          dili_classification: HY_LAW_CASE
+          hy_law_case: true
+      moderate_alt_no_bili:
+        type: return
+        value:
+          action_required: ALT 3-5x ULN. Increase monitoring frequency. Consider dose reduction. Repeat LFTs within 48-72 hours.
+          regulatory_reference: 'FDA Guidance: Drug-Induced Liver Injury (2009), Section V.A'
+          hy_law_case: false
+          dili_classification: MODERATE_ALT_ELEVATION
+      severe_alt_no_bili:
+        type: return
+        value:
+          hy_law_case: false
+          regulatory_reference: 'FDA Guidance: Drug-Induced Liver Injury (2009), Section V.A'
+          dili_classification: SEVERE_ALT_ELEVATION
+          action_required: ALT >= 5x ULN without bilirubin elevation. Discontinue suspect drug. Monitor for progression to Hy's Law. Report as SAE if >= 10x ULN.
+      mild_elevation:
+        type: return
+        value:
+          dili_classification: MILD_ALT_ELEVATION
+          hy_law_case: false
+          action_required: Mild ALT elevation (2-3x ULN). Monitor LFTs at next scheduled visit. Document in case record.
+          regulatory_reference: 'FDA Guidance: Drug-Induced Liver Injury (2009), Section IV.A'
+      hy_law_possible:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: Drug-Induced Liver Injury (2009), Section V.B'
+          dili_classification: POSSIBLE_HY_LAW
+          action_required: Investigate and exclude other causes (viral hepatitis, alcohol, concomitant hepatotoxic drugs). If other causes excluded, reclassify as Hy's Law case.
+          hy_law_case: false
+      cholestatic_pattern:
+        type: return
+        value:
+          dili_classification: CHOLESTATIC_DILI
+          regulatory_reference: 'FDA Guidance: Drug-Induced Liver Injury (2009), Section IV.C'
+          action_required: Cholestatic pattern (elevated ALP) — does not meet Hy's Law criteria but requires monitoring. Evaluate for biliary obstruction.
+          hy_law_case: false
+      normal_range:
+        type: return
+        value:
+          hy_law_case: false
+          dili_classification: WITHIN_ACCEPTABLE_RANGE
+          action_required: No DILI concern at current levels. Continue routine monitoring per protocol.
+          regulatory_reference: 'FDA Guidance: Drug-Induced Liver Injury (2009), Section IV.A'
+      check_high_alt:
+        type: condition
+        variable: alt_elevation
+        operator: gte
+        value: 5.0
+        true_next: severe_alt_no_bili
+        false_next: moderate_alt_no_bili
+      check_alp_for_hy:
+        type: condition
+        variable: alkaline_phosphatase_elevated
+        operator: eq
+        value: true
+        true_next: cholestatic_pattern
+        false_next: check_other_causes
+      check_other_causes:
+        type: condition
+        variable: other_cause_excluded
+        operator: eq
+        value: true
+        true_next: hy_law_confirmed
+        false_next: hy_law_possible
+      check_alt:
+        type: condition
+        variable: alt_elevation
+        operator: gte
+        value: 3.0
+        true_next: alt_elevated_bili_check
+        false_next: check_mild_alt
+      check_mild_alt:
+        type: condition
+        variable: alt_elevation
+        operator: gte
+        value: 2.0
+        true_next: mild_elevation
+        false_next: normal_range
+      alt_elevated_bili_check:
+        type: condition
+        variable: bilirubin_elevation
+        operator: gte
+        value: 2.0
+        true_next: check_alp_for_hy
+        false_next: check_high_alt
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: alt_elevation
+        operator: lt
+        value: 3.0
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: alt_elevation
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      hy_law_case: true
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      hy_law_case: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when:
+      hy_law_case: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: absent
+  - when:
+      falsified: true
+      hy_law_case: false
+    default: null
+    emit:
+      verdict: refuted
+      confidence: medium
+      confidence_score: 0.42
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      alkaline_phosphatase_elevated:
+        type: bool
+        required: false
+      bilirubin_elevation:
+        type: float
+        required: true
+      alt_elevation:
+        type: float
+        required: true
+      other_cause_excluded:
+        type: bool
+        required: false
+    outputs:
+      action_required:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      hy_law_case:
+        type: bool
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      dili_classification:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    alkaline_phosphatase_elevated: false
+    alt_elevation: null
+    bilirubin_elevation: 3.0
+    other_cause_excluded: true
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input:
+    alkaline_phosphatase_elevated: false
+    alt_elevation: 8.0
+    bilirubin_elevation: 3.0
+    other_cause_excluded: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - alt_elevation
+  - bilirubin_elevation
+  - alkaline_phosphatase_elevated
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

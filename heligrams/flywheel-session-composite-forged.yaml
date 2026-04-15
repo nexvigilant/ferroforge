@@ -1,0 +1,225 @@
+name: flywheel-session-composite-helix
+description: 'Forged from microgram ''flywheel-session-composite''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    flywheel_assessment: falsified
+sense:
+  tree:
+    start: check_verdict
+    nodes:
+      check_above_critical:
+        type: condition
+        variable: above_critical
+        operator: eq
+        value: true
+        true_next: low_band_good_momentum
+        false_next: stalled_session
+      high_velocity_low_momentum:
+        type: return
+        value:
+          flywheel_assessment: High output but momentum below critical — sustain pace to build inertia
+          status: GREEN
+          velocity: FAST
+      moderate_session:
+        type: return
+        value:
+          velocity: MODERATE
+          status: GREEN
+          flywheel_assessment: Moderate velocity with approved reality gate — steady progress
+      degraded_session:
+        type: return
+        value:
+          velocity: SLOW
+          flywheel_assessment: Reality gate warning with low output — flywheel losing momentum
+          status: YELLOW
+      check_band_warn:
+        type: condition
+        variable: session_band
+        operator: eq
+        value: HIGH
+        true_next: warn_but_productive
+        false_next: degraded_session
+      check_momentum_high:
+        type: condition
+        variable: above_critical
+        operator: eq
+        value: true
+        true_next: optimal_session
+        false_next: high_velocity_low_momentum
+      check_verdict_warn:
+        type: condition
+        variable: verdict
+        operator: eq
+        value: WARN
+        true_next: check_band_warn
+        false_next: check_band_high
+      stalled_session:
+        type: return
+        value:
+          status: RED
+          flywheel_assessment: Low output and momentum below critical — flywheel stalling
+          velocity: STALLED
+      check_band_high:
+        type: condition
+        variable: session_band
+        operator: eq
+        value: HIGH
+        true_next: check_momentum_high
+        false_next: check_band_moderate
+      check_verdict:
+        type: condition
+        variable: verdict
+        operator: eq
+        value: BLOCKED
+        true_next: blocked_session
+        false_next: check_verdict_warn
+      optimal_session:
+        type: return
+        value:
+          flywheel_assessment: High velocity with strong momentum — flywheel fully engaged
+          status: GREEN
+          velocity: FAST
+      blocked_session:
+        type: return
+        value:
+          flywheel_assessment: Session blocked by reality gate — no forward progress possible
+          status: RED
+          velocity: STALLED
+      check_band_moderate:
+        type: condition
+        variable: session_band
+        operator: eq
+        value: MODERATE
+        true_next: moderate_session
+        false_next: check_above_critical
+      warn_but_productive:
+        type: return
+        value:
+          velocity: MODERATE
+          status: YELLOW
+          flywheel_assessment: Reality gate warning but high output — address gate issues to sustain velocity
+      low_band_good_momentum:
+        type: return
+        value:
+          status: YELLOW
+          velocity: SLOW
+          flywheel_assessment: Low session output but momentum preserved — temporary slowdown
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: above_critical
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: above_critical
+        operator: neq
+        value: BLOCKED
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      above_critical:
+        type: bool
+        required: false
+      verdict:
+        type: string
+        required: false
+      session_band:
+        type: string
+        required: false
+    outputs:
+      status:
+        type: string
+        required: true
+      verdict:
+        type: string
+        required: false
+      flywheel_assessment:
+        type: string
+        required: true
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      velocity:
+        type: string
+        required: true
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    above_critical: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    above_critical: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

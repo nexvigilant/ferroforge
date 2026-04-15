@@ -1,0 +1,356 @@
+name: compatibility-predictor-helix
+description: 'Forged from microgram ''compatibility-predictor''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    compatibility_score: falsified
+sense:
+  tree:
+    start: check_op_a_gt
+    nodes:
+      check_op_b_eq:
+        type: condition
+        variable: operator_b
+        operator: eq
+        value: eq
+        true_next: same_operator
+        false_next: diff_operator
+      diff_op_no_family:
+        type: return
+        value:
+          compatibility_score: HIGH
+          recommendation: Complementary operators — strong chain candidate. Different operators means division of labor.
+          predicted_ratio: ~43%
+          dominant_factor: Different operators (empirical avg 43%)
+      check_op_a_contains:
+        type: condition
+        variable: operator_a
+        operator: eq
+        value: contains
+        true_next: check_op_b_contains
+        false_next: check_op_a_is_null
+      check_op_b_contains:
+        type: condition
+        variable: operator_b
+        operator: eq
+        value: contains
+        true_next: same_operator
+        false_next: diff_operator
+      diff_op_same_family:
+        type: return
+        value:
+          dominant_factor: Different operators + same family = complementary specialization
+          predicted_ratio: ~50%
+          recommendation: Ideal chain pair — complementary operators with shared interface conventions. Wire A→B with confidence.
+          compatibility_score: HIGH
+      check_op_a_gte:
+        type: condition
+        variable: operator_a
+        operator: eq
+        value: gte
+        true_next: check_op_b_gte
+        false_next: check_op_a_lt
+      check_op_a_none:
+        type: condition
+        variable: operator_a
+        operator: eq
+        value: none
+        true_next: check_op_b_none
+        false_next: diff_operator
+      check_op_a_gt:
+        type: condition
+        variable: operator_a
+        operator: eq
+        value: gt
+        true_next: check_op_b_gt
+        false_next: check_op_a_gte
+      same_op_no_family:
+        type: return
+        value:
+          predicted_ratio: ~28%
+          dominant_factor: Same operator (empirical avg 28%)
+          recommendation: Compatible but redundant — both do the same type of check. Consider whether chaining adds value over using either alone.
+          compatibility_score: MEDIUM
+      check_op_a_matches:
+        type: condition
+        variable: operator_a
+        operator: eq
+        value: matches
+        true_next: check_op_b_matches
+        false_next: check_op_a_none
+      check_op_a_lte:
+        type: condition
+        variable: operator_a
+        operator: eq
+        value: lte
+        true_next: check_op_b_lte
+        false_next: check_op_a_eq
+      check_op_b_lt:
+        type: condition
+        variable: operator_b
+        operator: eq
+        value: lt
+        true_next: same_operator
+        false_next: diff_operator
+      check_op_a_is_null:
+        type: condition
+        variable: operator_a
+        operator: eq
+        value: is_null
+        true_next: check_op_b_is_null
+        false_next: check_op_a_is_not_null
+      check_op_a_is_not_null:
+        type: condition
+        variable: operator_a
+        operator: eq
+        value: is_not_null
+        true_next: check_op_b_is_not_null
+        false_next: check_op_a_matches
+      check_op_b_matches:
+        type: condition
+        variable: operator_b
+        operator: eq
+        value: matches
+        true_next: same_operator
+        false_next: diff_operator
+      check_op_b_is_null:
+        type: condition
+        variable: operator_b
+        operator: eq
+        value: is_null
+        true_next: same_operator
+        false_next: diff_operator
+      same_op_same_family:
+        type: return
+        value:
+          compatibility_score: MEDIUM
+          recommendation: Family affinity compensates for operator redundancy. Chain within family for shared interface conventions.
+          predicted_ratio: ~36%
+          dominant_factor: Same family (+7.8% boost) offsets same operator (-14.6% penalty)
+      diff_op_check_family:
+        type: condition
+        variable: family_a
+        operator: eq
+        value: '{{family_b}}'
+        true_next: diff_op_same_family
+        false_next: diff_op_diff_family
+      same_op_diff_family:
+        type: return
+        value:
+          compatibility_score: LOW
+          dominant_factor: Same operator + different family = double penalty
+          recommendation: Low compatibility predicted. These micrograms compete for the same role without sharing interface conventions.
+          predicted_ratio: ~22%
+      check_op_b_lte:
+        type: condition
+        variable: operator_b
+        operator: eq
+        value: lte
+        true_next: same_operator
+        false_next: diff_operator
+      same_op_check_family:
+        type: condition
+        variable: family_a
+        operator: eq
+        value: '{{family_b}}'
+        true_next: same_op_same_family
+        false_next: same_op_diff_family
+      diff_operator:
+        type: condition
+        variable: family_a
+        operator: is_not_null
+        value: ''
+        true_next: diff_op_check_family
+        false_next: diff_op_no_family
+      diff_op_diff_family:
+        type: return
+        value:
+          recommendation: Moderate compatibility. Operators complement but interfaces may need alias bridging.
+          predicted_ratio: ~35%
+          dominant_factor: Different operators (+14.6%) partly offset by different family (-7.8%)
+          compatibility_score: MEDIUM
+      check_op_b_gte:
+        type: condition
+        variable: operator_b
+        operator: eq
+        value: gte
+        true_next: same_operator
+        false_next: diff_operator
+      check_op_b_none:
+        type: condition
+        variable: operator_b
+        operator: eq
+        value: none
+        true_next: same_operator
+        false_next: diff_operator
+      check_op_a_lt:
+        type: condition
+        variable: operator_a
+        operator: eq
+        value: lt
+        true_next: check_op_b_lt
+        false_next: check_op_a_lte
+      check_op_a_eq:
+        type: condition
+        variable: operator_a
+        operator: eq
+        value: eq
+        true_next: check_op_b_eq
+        false_next: check_op_a_contains
+      same_operator:
+        type: condition
+        variable: family_a
+        operator: is_not_null
+        value: ''
+        true_next: same_op_check_family
+        false_next: same_op_no_family
+      check_op_b_gt:
+        type: condition
+        variable: operator_b
+        operator: eq
+        value: gt
+        true_next: same_operator
+        false_next: diff_operator
+      check_op_b_is_not_null:
+        type: condition
+        variable: operator_b
+        operator: eq
+        value: is_not_null
+        true_next: same_operator
+        false_next: diff_operator
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_negation:
+        type: condition
+        variable: operator_b
+        operator: neq
+        value: gt
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: operator_b
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      family_b:
+        type: string
+        required: false
+      size_a:
+        type: int
+        required: false
+      operator_a:
+        type: string
+        required: true
+      operator_b:
+        type: string
+        required: true
+      family_a:
+        type: string
+        required: false
+      size_b:
+        type: int
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      compatibility_score:
+        type: string
+        required: false
+      recommendation:
+        type: string
+        required: false
+      dominant_factor:
+        type: string
+        required: false
+      predicted_ratio:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    operator_b: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    operator_b: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - operator_a
+  - operator_b
+  - family_a
+  - family_b
+  - size_a
+  - size_b
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

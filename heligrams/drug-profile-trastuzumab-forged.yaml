@@ -1,0 +1,202 @@
+name: drug-profile-trastuzumab-helix
+description: 'Forged from microgram ''drug-profile-trastuzumab''. Domain: SignalDetection. 4 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    signal: falsified
+sense:
+  tree:
+    start: check_prr
+    nodes:
+      no_signal:
+        type: return
+        value:
+          drug: trastuzumab
+          action: monitor
+          harm_type: B
+          signal: false
+          expected_prr: 4.6
+      check_prr:
+        type: condition
+        variable: prr
+        operator: gte
+        value: 5.0
+        true_next: signal
+        false_next: no_signal
+      signal:
+        type: return
+        value:
+          harm_type: B
+          expected_prr: 4.6
+          action: investigate
+          drug: trastuzumab
+          signal: true
+antisense:
+  tree:
+    start: null_guard_insufficient_n
+    nodes:
+      check_notoriety_bias:
+        type: condition
+        variable: notoriety_bias
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_weber_effect
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_weber_effect:
+        type: condition
+        variable: years_on_market
+        operator: is_null
+        value: null
+        true_next: null_guard_channeling_bias
+        false_next: check_weber_effect
+      check_channeling_bias:
+        type: condition
+        variable: channeling_bias
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_insufficient_n:
+        type: condition
+        variable: case_count
+        operator: is_null
+        value: null
+        true_next: null_guard_notoriety_bias
+        false_next: check_insufficient_n
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_notoriety_bias:
+        type: condition
+        variable: notoriety_bias
+        operator: is_null
+        value: null
+        true_next: null_guard_weber_effect
+        false_next: check_notoriety_bias
+      null_guard_channeling_bias:
+        type: condition
+        variable: channeling_bias
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_channeling_bias
+      check_weber_effect:
+        type: condition
+        variable: years_on_market
+        operator: gt
+        value: 5
+        true_next: falsified
+        false_next: null_guard_channeling_bias
+      check_insufficient_n:
+        type: condition
+        variable: case_count
+        operator: lt
+        value: 3
+        true_next: falsified
+        false_next: null_guard_notoriety_bias
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      signal: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7000000000000001
+  - when:
+      signal: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.28
+  - when:
+      falsified: false
+      signal: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7000000000000001
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      case_count:
+        type: integer
+        required: false
+      channeling_bias:
+        type: bool
+        required: false
+      notoriety_bias:
+        type: bool
+        required: false
+      years_on_market:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    notoriety_bias: false
+    years_on_market: 0
+    channeling_bias: false
+    prr: 5.001
+    case_count: 13
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, insufficient_n active'
+  input:
+    prr: 5.001
+    case_count: 2
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — signal-detection with 4 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: signal-detection. Chains as dual-strand verifier before downstream consumers.'

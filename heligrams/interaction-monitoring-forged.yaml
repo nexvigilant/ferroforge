@@ -1,0 +1,199 @@
+name: interaction-monitoring-helix
+description: 'Forged from microgram ''interaction-monitoring''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    monitoring_compliant: falsified
+sense:
+  tree:
+    start: validate_management
+    nodes:
+      no_monitoring:
+        type: return
+        value:
+          monitoring_compliant: true
+          monitoring_frequency: none
+          follow_up_required: false
+          monitoring_parameters: null
+          monitoring_duration_weeks: 0
+      minimal_monitoring:
+        type: return
+        value:
+          monitoring_frequency: as_needed
+          monitoring_parameters: symptom_assessment
+          monitoring_duration_weeks: 4
+          follow_up_required: false
+          monitoring_compliant: true
+      monitoring_unknown:
+        type: return
+        value:
+          monitoring_duration_weeks: null
+          monitoring_frequency: unknown
+          monitoring_compliant: false
+          follow_up_required: null
+          monitoring_parameters: null
+      check_management_type:
+        type: condition
+        variable: management_category
+        operator: eq
+        value: intensive
+        true_next: intensive_monitoring
+        false_next: check_standard
+      check_minimal:
+        type: condition
+        variable: management_category
+        operator: eq
+        value: minimal
+        true_next: minimal_monitoring
+        false_next: no_monitoring
+      standard_monitoring:
+        type: return
+        value:
+          monitoring_parameters: clinical_response,adverse_effects
+          monitoring_duration_weeks: 12
+          monitoring_compliant: true
+          monitoring_frequency: monthly
+          follow_up_required: true
+      intensive_monitoring:
+        type: return
+        value:
+          follow_up_required: true
+          monitoring_parameters: drug_levels,renal_function,liver_function
+          monitoring_compliant: true
+          monitoring_frequency: weekly
+          monitoring_duration_weeks: 8
+      validate_management:
+        type: condition
+        variable: management_category
+        operator: is_not_null
+        value: null
+        true_next: check_management_type
+        false_next: monitoring_unknown
+      check_standard:
+        type: condition
+        variable: management_category
+        operator: eq
+        value: standard
+        true_next: standard_monitoring
+        false_next: check_minimal
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: management_category
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: management_category
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      monitoring_compliant: true
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      monitoring_compliant: true
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when:
+      monitoring_compliant: false
+      falsified: false
+    default: null
+    emit:
+      verdict: absent
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+      monitoring_compliant: false
+    default: null
+    emit:
+      confidence_score: 0.42
+      verdict: refuted
+      confidence: medium
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      management_category:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    management_category: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input:
+    management_category: intensive
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

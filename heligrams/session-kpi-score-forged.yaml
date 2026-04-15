@@ -1,0 +1,497 @@
+name: session-kpi-score-helix
+description: 'Forged from microgram ''session-kpi-score''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    value_signal: falsified
+sense:
+  tree:
+    start: check_inputs
+    nodes:
+      check_inputs:
+        type: condition
+        variable: total_tools
+        operator: is_null
+        value: null
+        true_next: reject
+        false_next: check_duration
+      velocity_check_high:
+        type: condition
+        variable: total_tools
+        operator: gte
+        value: 50
+        true_next: velocity_high
+        false_next: velocity_check_normal
+      depth_deep_exploratory:
+        type: return
+        value:
+          value_signal: EXPLORING
+          velocity: HIGH
+          depth: DEEP
+          outcome: PARTIAL
+          quality: CLEAN
+          efficiency: EXPLORATORY
+          health_score: 55
+      good_outcome_resolved:
+        type: return
+        value:
+          depth: DEEP
+          value_signal: GENERATING
+          outcome: PARTIAL
+          quality: RESOLVED
+          efficiency: PRODUCTIVE
+          velocity: HIGH
+          health_score: 75
+      velocity_idle:
+        type: condition
+        variable: total_tools
+        operator: gte
+        value: 1
+        true_next: velocity_high
+        false_next: velocity_idle_set
+      depth_moderate_balanced:
+        type: condition
+        variable: verdict_score
+        operator: gte
+        value: 2
+        true_next: balanced_moderate_ok
+        false_next: balanced_moderate_low
+      balanced_moderate_low:
+        type: return
+        value:
+          depth: MODERATE
+          value_signal: EXPLORING
+          velocity: NORMAL
+          outcome: UNMEASURED
+          health_score: 45
+          efficiency: BALANCED
+          quality: UNTRACKED
+      velocity_low:
+        type: condition
+        variable: write_count
+        operator: gte
+        value: 1
+        true_next: score_efficiency_balanced
+        false_next: score_efficiency_readonly
+      deep_productive_partial:
+        type: condition
+        variable: verdict_score
+        operator: gte
+        value: 2
+        true_next: good_outcome
+        false_next: productive_deep_weak
+      score_velocity:
+        type: condition
+        variable: duration_minutes
+        operator: lte
+        value: 0
+        true_next: velocity_idle
+        false_next: velocity_check_high
+      good_outcome:
+        type: return
+        value:
+          quality: CLEAN
+          velocity: HIGH
+          health_score: 80
+          value_signal: GENERATING
+          efficiency: PRODUCTIVE
+          outcome: PARTIAL
+          depth: DEEP
+      reject:
+        type: return
+        value:
+          efficiency: UNKNOWN
+          value_signal: STALLED
+          quality: UNKNOWN
+          outcome: UNKNOWN
+          velocity: UNKNOWN
+          health_score: 0
+          depth: UNKNOWN
+      depth_basic_readonly:
+        type: return
+        value:
+          health_score: 10
+          outcome: UNMEASURED
+          efficiency: READ_ONLY
+          quality: UNTRACKED
+          velocity: LOW
+          depth: BASIC
+          value_signal: STALLED
+      balanced_moderate_ok:
+        type: return
+        value:
+          efficiency: BALANCED
+          quality: CLEAN
+          depth: MODERATE
+          health_score: 60
+          outcome: PARTIAL
+          value_signal: BUILDING
+          velocity: NORMAL
+      shallow_balanced_ok:
+        type: return
+        value:
+          health_score: 50
+          velocity: NORMAL
+          quality: CLEAN
+          efficiency: BALANCED
+          depth: SHALLOW
+          outcome: PARTIAL
+          value_signal: EXPLORING
+      productive_deep_capa:
+        type: condition
+        variable: capa_closed
+        operator: gte
+        value: 1
+        true_next: good_outcome_resolved
+        false_next: moderate_outcome_open
+      moderate_productive_other:
+        type: condition
+        variable: verdict_score
+        operator: gte
+        value: 2
+        true_next: moderate_productive_partial
+        false_next: moderate_productive_low
+      score_efficiency_exploratory:
+        type: condition
+        variable: mcp_count
+        operator: gte
+        value: 5
+        true_next: depth_deep_exploratory
+        false_next: depth_shallow_exploratory
+      moderate_productive_partial:
+        type: return
+        value:
+          health_score: 70
+          velocity: NORMAL
+          depth: MODERATE
+          efficiency: PRODUCTIVE
+          outcome: PARTIAL
+          value_signal: BUILDING
+          quality: CLEAN
+      check_duration:
+        type: condition
+        variable: duration_minutes
+        operator: is_null
+        value: null
+        true_next: reject
+        false_next: score_velocity
+      depth_deep_productive:
+        type: condition
+        variable: verdict_score
+        operator: gte
+        value: 3
+        true_next: best_outcome
+        false_next: deep_productive_partial
+      best_outcome:
+        type: return
+        value:
+          depth: DEEP
+          value_signal: GENERATING
+          velocity: HIGH
+          efficiency: PRODUCTIVE
+          outcome: DEMONSTRATED
+          health_score: 95
+          quality: CLEAN
+      score_efficiency_balanced:
+        type: condition
+        variable: mcp_count
+        operator: gte
+        value: 3
+        true_next: depth_moderate_balanced
+        false_next: depth_shallow_balanced
+      moderate_outcome_open:
+        type: return
+        value:
+          depth: DEEP
+          health_score: 60
+          efficiency: PRODUCTIVE
+          value_signal: BUILDING
+          quality: OPEN_ISSUES
+          outcome: PARTIAL
+          velocity: HIGH
+      velocity_idle_set:
+        type: return
+        value:
+          efficiency: READ_ONLY
+          value_signal: STALLED
+          depth: BASIC
+          velocity: IDLE
+          outcome: UNMEASURED
+          quality: UNTRACKED
+          health_score: 5
+      velocity_high:
+        type: condition
+        variable: write_count
+        operator: gte
+        value: 5
+        true_next: score_efficiency_productive
+        false_next: score_efficiency_exploratory
+      velocity_normal:
+        type: condition
+        variable: write_count
+        operator: gte
+        value: 3
+        true_next: score_efficiency_productive
+        false_next: score_efficiency_balanced
+      score_efficiency_readonly:
+        type: condition
+        variable: mcp_count
+        operator: gte
+        value: 1
+        true_next: depth_shallow_readonly
+        false_next: depth_basic_readonly
+      depth_moderate_productive:
+        type: condition
+        variable: verdict_score
+        operator: gte
+        value: 3
+        true_next: moderate_productive_demonstrated
+        false_next: moderate_productive_other
+      depth_shallow_balanced:
+        type: condition
+        variable: verdict_score
+        operator: gte
+        value: 2
+        true_next: shallow_balanced_ok
+        false_next: shallow_balanced_low
+      productive_deep_weak:
+        type: condition
+        variable: capa_triggered
+        operator: gte
+        value: 1
+        true_next: productive_deep_capa
+        false_next: productive_deep_unmeasured
+      moderate_productive_demonstrated:
+        type: return
+        value:
+          outcome: DEMONSTRATED
+          velocity: HIGH
+          efficiency: PRODUCTIVE
+          health_score: 85
+          value_signal: GENERATING
+          quality: CLEAN
+          depth: MODERATE
+      depth_shallow_exploratory:
+        type: return
+        value:
+          depth: SHALLOW
+          health_score: 40
+          velocity: HIGH
+          quality: UNTRACKED
+          value_signal: EXPLORING
+          outcome: UNMEASURED
+          efficiency: EXPLORATORY
+      velocity_check_normal:
+        type: condition
+        variable: total_tools
+        operator: gte
+        value: 10
+        true_next: velocity_normal
+        false_next: velocity_low
+      shallow_balanced_low:
+        type: return
+        value:
+          quality: UNTRACKED
+          velocity: LOW
+          value_signal: EXPLORING
+          depth: SHALLOW
+          outcome: UNMEASURED
+          efficiency: BALANCED
+          health_score: 35
+      productive_deep_unmeasured:
+        type: return
+        value:
+          outcome: UNMEASURED
+          efficiency: PRODUCTIVE
+          depth: DEEP
+          quality: UNTRACKED
+          value_signal: BUILDING
+          health_score: 65
+          velocity: HIGH
+      moderate_productive_low:
+        type: return
+        value:
+          value_signal: BUILDING
+          outcome: UNMEASURED
+          depth: MODERATE
+          efficiency: PRODUCTIVE
+          health_score: 55
+          velocity: NORMAL
+          quality: UNTRACKED
+      score_efficiency_productive:
+        type: condition
+        variable: mcp_count
+        operator: gte
+        value: 5
+        true_next: depth_deep_productive
+        false_next: depth_moderate_productive
+      depth_shallow_readonly:
+        type: return
+        value:
+          value_signal: STALLED
+          quality: UNTRACKED
+          health_score: 20
+          velocity: LOW
+          efficiency: READ_ONLY
+          outcome: UNMEASURED
+          depth: SHALLOW
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: total_tools
+        operator: is_not_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: total_tools
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      duration_minutes:
+        type: int
+        required: true
+      verdict_score:
+        type: int
+        required: true
+      capa_closed:
+        type: int
+        required: true
+      agent_count:
+        type: int
+        required: true
+      total_tools:
+        type: int
+        required: true
+      read_count:
+        type: int
+        required: true
+      mcp_count:
+        type: int
+        required: true
+      write_count:
+        type: int
+        required: true
+      capa_triggered:
+        type: int
+        required: true
+      files_modified:
+        type: int
+        required: true
+    outputs:
+      health_score:
+        type: int
+        required: false
+      value_signal:
+        type: string
+        required: false
+      quality:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      depth:
+        type: string
+        required: false
+      efficiency:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      outcome:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      velocity:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    total_tools: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - total_tools
+  - duration_minutes
+  - read_count
+  - write_count
+  - mcp_count
+  - agent_count
+  - files_modified
+  - capa_triggered
+  - capa_closed
+  - verdict_score
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

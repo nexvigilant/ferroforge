@@ -1,0 +1,169 @@
+name: session-prompt-dag
+version: "1.0.0"
+description: >
+  Decision DAG for fast-food session prompts. Routes through dependency order:
+  wire → audit → measure → investigate → validate. Each node is a cold-start
+  prompt with prerequisites encoded as edges.
+
+interface:
+  inputs:
+    epi_pages_wired:
+      type: bool
+      required: false
+    epi_audit_done:
+      type: bool
+      required: false
+    flywheel_measured:
+      type: bool
+      required: false
+    parallel_preference:
+      type: string
+      required: false
+  outputs:
+    task:
+      type: string
+    prompt:
+      type: string
+    priority:
+      type: int
+    difficulty:
+      type: string
+    depends_on:
+      type: string
+    next:
+      type: string
+
+tree:
+  start: check_wiring
+  nodes:
+    check_wiring:
+      type: condition
+      variable: epi_pages_wired
+      operator: eq
+      value: true
+      true_next: check_audit
+      false_next: wire_epi_pages
+
+    wire_epi_pages:
+      type: return
+      value:
+        task: wire-epi-imports
+        prompt: "Wire the 5 epidemiology void pages (cohort-calculator, epidemiology-calculator, rate-calculator, survival-calculator, survival-plotter) to import from @/lib/pv-compute/epidemiology.ts"
+        priority: 1
+        difficulty: low
+        depends_on: none
+        next: audit-epi-math
+
+    check_audit:
+      type: condition
+      variable: epi_audit_done
+      operator: eq
+      value: true
+      true_next: check_flywheel
+      false_next: audit_epi_duplication
+
+    audit_epi_duplication:
+      type: return
+      value:
+        task: audit-epi-math
+        prompt: "Audit the 4 epidemiology sub-calculators for duplicate math — if cohort-calculator and rate-calculator both implement incidence_rate inline, that is a conservation violation"
+        priority: 2
+        difficulty: medium
+        depends_on: wire-epi-imports
+        next: flywheel-measurement
+
+    check_flywheel:
+      type: condition
+      variable: flywheel_measured
+      operator: eq
+      value: true
+      true_next: check_parallel
+      false_next: measure_flywheel
+
+    measure_flywheel:
+      type: return
+      value:
+        task: flywheel-measurement
+        prompt: "Run /flywheel after wiring the epidemiology pages to measure whether rim_integrity ticks up from 88% to 93% coverage"
+        priority: 3
+        difficulty: low
+        depends_on: audit-epi-math
+        next: parallel-fork
+
+    check_parallel:
+      type: condition
+      variable: parallel_preference
+      operator: eq
+      value: physics
+      true_next: check_primitive_physics
+      false_next: run_signal_e2e
+
+    check_primitive_physics:
+      type: return
+      value:
+        task: primitive-physics-wiring
+        prompt: "Check if primitive-physics.tsx should import from primitive-canvas.ts for composition/distance math, or if it needs its own pv-compute module for P1-P6 axiom computations"
+        priority: 4
+        difficulty: medium
+        depends_on: none
+        next: done
+
+    run_signal_e2e:
+      type: return
+      value:
+        task: signal-e2e-validation
+        prompt: "Run station-signal semaglutide muscle-atrophy to exercise the full Anatomy-Physiology-Nervous System wiring end-to-end"
+        priority: 5
+        difficulty: low
+        depends_on: none
+        next: done
+
+tests:
+  - name: "fresh start routes to wiring"
+    input:
+      epi_pages_wired: false
+    expect:
+      task: wire-epi-imports
+      priority: 1
+
+  - name: "wired but unaudited routes to audit"
+    input:
+      epi_pages_wired: true
+      epi_audit_done: false
+    expect:
+      task: audit-epi-math
+      priority: 2
+
+  - name: "wired and audited routes to flywheel"
+    input:
+      epi_pages_wired: true
+      epi_audit_done: true
+      flywheel_measured: false
+    expect:
+      task: flywheel-measurement
+      priority: 3
+
+  - name: "all done, physics preference"
+    input:
+      epi_pages_wired: true
+      epi_audit_done: true
+      flywheel_measured: true
+      parallel_preference: physics
+    expect:
+      task: primitive-physics-wiring
+      priority: 4
+
+  - name: "all done, default routes to signal e2e"
+    input:
+      epi_pages_wired: true
+      epi_audit_done: true
+      flywheel_measured: true
+    expect:
+      task: signal-e2e-validation
+      priority: 5
+
+  - name: "null input defaults to wiring"
+    input: {}
+    expect:
+      task: wire-epi-imports
+      priority: 1

@@ -1,0 +1,172 @@
+name: data-completeness-helix
+description: 'Forged from microgram ''data-completeness''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    proceed: falsified
+sense:
+  tree:
+    start: complete_check
+    nodes:
+      insufficient:
+        type: return
+        value:
+          proceed: false
+          needs_enrichment: true
+          completeness: INSUFFICIENT
+      partial:
+        type: return
+        value:
+          completeness: PARTIAL
+          proceed: true
+          needs_enrichment: true
+      complete_check:
+        type: condition
+        variable: pct_filled
+        operator: gte
+        value: 95
+        true_next: complete
+        false_next: partial_check
+      complete:
+        type: return
+        value:
+          completeness: COMPLETE
+          proceed: true
+          needs_enrichment: false
+      partial_check:
+        type: condition
+        variable: pct_filled
+        operator: gte
+        value: 70
+        true_next: partial
+        false_next: insufficient
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: pct_filled
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: pct_filled
+        operator: lt
+        value: 95
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      proceed: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      proceed: true
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      falsified: false
+      proceed: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when:
+      falsified: true
+      proceed: false
+    default: null
+    emit:
+      confidence: medium
+      verdict: refuted
+      confidence_score: 0.42
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      pct_filled:
+        type: int
+        required: false
+    outputs:
+      completeness:
+        type: string
+        required: false
+      needs_enrichment:
+        type: bool
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      proceed:
+        type: bool
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    pct_filled: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    pct_filled: 98
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

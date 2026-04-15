@@ -1,0 +1,188 @@
+name: smm-credibility-gate-helix
+description: 'Forged from microgram ''smm-credibility-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    cs_range: falsified
+sense:
+  tree:
+    start: check_exemplary
+    nodes:
+      check_exemplary:
+        type: condition
+        variable: severity_band
+        operator: eq
+        value: EXEMPLARY
+        true_next: authoritative
+        false_next: check_high
+      check_moderate:
+        type: condition
+        variable: severity_band
+        operator: eq
+        value: MODERATE
+        true_next: conditional
+        false_next: check_low
+      not_credible:
+        type: return
+        value:
+          cs_range: 0.00-0.29
+          integration_weight: exclude
+          credibility_level: NOT_CREDIBLE
+          review_action: Exclude from K-state. Structural integrity insufficient for evidence integration.
+      check_high:
+        type: condition
+        variable: severity_band
+        operator: eq
+        value: HIGH
+        true_next: credible
+        false_next: check_moderate
+      authoritative:
+        type: return
+        value:
+          review_action: Integrate at full weight. Minor violations annotated.
+          cs_range: 0.90-1.00
+          credibility_level: AUTHORITATIVE
+          integration_weight: full
+      check_low:
+        type: condition
+        variable: severity_band
+        operator: eq
+        value: LOW
+        true_next: weak
+        false_next: not_credible
+      weak:
+        type: return
+        value:
+          credibility_level: WEAK
+          review_action: Integrate at 0.25x weight. Requires supporting corroboration from independent sources.
+          cs_range: 0.30-0.59
+          integration_weight: low
+      conditional:
+        type: return
+        value:
+          credibility_level: CONDITIONAL
+          review_action: Integrate at 0.60x weight. Violation summary appended. Remediation recommended.
+          integration_weight: conditional
+          cs_range: 0.60-0.79
+      credible:
+        type: return
+        value:
+          integration_weight: high
+          cs_range: 0.80-0.89
+          review_action: Integrate at high weight. Advisory flags for minor gaps.
+          credibility_level: CREDIBLE
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: severity_band
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: severity_band
+        operator: neq
+        value: EXEMPLARY
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      severity_band:
+        type: string
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      cs_range:
+        type: string
+        required: false
+      credibility_level:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      integration_weight:
+        type: string
+        required: false
+      review_action:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    severity_band: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    severity_band: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

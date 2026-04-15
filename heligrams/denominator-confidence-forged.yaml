@@ -1,0 +1,253 @@
+name: denominator-confidence-helix
+description: 'Forged from microgram ''denominator-confidence''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    epistemic_status: falsified
+sense:
+  tree:
+    start: check_capture
+    nodes:
+      check_moderate_capture:
+        type: condition
+        variable: capture_pct
+        operator: gte
+        value: 60
+        true_next: moderate_capture
+        false_next: check_low_capture
+      census_reconciled:
+        type: return
+        value:
+          epistemic_status: verified fact — transaction ledger with reconciliation
+          usable_for: true incidence rates, regulatory submissions, publication-grade epidemiology
+          confidence_tier: census
+          denominator_class: counted
+          warning: none
+      high_estimated:
+        type: condition
+        variable: has_dedup
+        operator: eq
+        value: true
+        true_next: high_deduped
+        false_next: high_raw
+      high_deduped:
+        type: return
+        value:
+          confidence_tier: high
+          warning: Not a transaction ledger. Denominator is estimated, not counted.
+          epistemic_status: high-confidence estimate — deduplicated, >90% capture
+          usable_for: signal detection, trend analysis, internal decision-making
+          denominator_class: estimated
+      check_low_capture:
+        type: condition
+        variable: capture_pct
+        operator: gte
+        value: 30
+        true_next: low_capture
+        false_next: insufficient_capture
+      low_capture:
+        type: return
+        value:
+          confidence_tier: low
+          epistemic_status: low capture — denominator is a model output, not a count
+          denominator_class: modeled
+          usable_for: hypothesis generation only, not suitable for rate computation
+          warning: Denominator below 60% capture. Rates computed from this source are unreliable.
+      check_capture:
+        type: condition
+        variable: capture_pct
+        operator: gte
+        value: 90
+        true_next: high_capture
+        false_next: check_moderate_capture
+      insufficient_capture:
+        type: return
+        value:
+          usable_for: nothing — this is the FAERS paradigm (unknown denominator)
+          warning: Capture below 30%. This is not a denominator, it is a guess. Do not compute rates.
+          denominator_class: unknown
+          epistemic_status: insufficient — denominator is effectively unknown
+          confidence_tier: unusable
+      census_unreconciled:
+        type: return
+        value:
+          denominator_class: counted
+          epistemic_status: counted but unreconciled — may contain duplicates
+          confidence_tier: census
+          usable_for: incidence rate estimation, internal signal detection
+          warning: Deduplication not confirmed. Run reconciliation before regulatory use.
+      high_raw:
+        type: return
+        value:
+          warning: Possible duplicates inflate denominator. Dedup before rate computation.
+          denominator_class: estimated
+          epistemic_status: moderate estimate — high capture but no deduplication
+          confidence_tier: moderate
+          usable_for: screening, hypothesis generation
+      census_grade:
+        type: condition
+        variable: has_reconciliation
+        operator: eq
+        value: true
+        true_next: census_reconciled
+        false_next: census_unreconciled
+      claims_moderate:
+        type: return
+        value:
+          usable_for: signal screening, denominator approximation, trend detection
+          warning: Cash-pay, mail-order, and compounding pharmacy fills are likely missing.
+          denominator_class: estimated
+          confidence_tier: moderate
+          epistemic_status: claims-based estimate — 60-90% capture, known blind spots
+      moderate_capture:
+        type: condition
+        variable: source_type
+        operator: eq
+        value: claims
+        true_next: claims_moderate
+        false_next: other_moderate
+      high_capture:
+        type: condition
+        variable: is_transaction_ledger
+        operator: eq
+        value: true
+        true_next: census_grade
+        false_next: high_estimated
+      other_moderate:
+        type: return
+        value:
+          usable_for: signal screening with correction factor
+          confidence_tier: moderate
+          denominator_class: estimated
+          epistemic_status: partial capture — model-dependent correction required
+          warning: Apply capture adjustment factor before computing rates.
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: capture_pct
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: capture_pct
+        operator: lt
+        value: 90
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      source_type:
+        type: string
+        required: true
+      has_dedup:
+        type: bool
+        required: false
+      capture_pct:
+        type: float
+        required: true
+      is_transaction_ledger:
+        type: bool
+        required: false
+      has_reconciliation:
+        type: bool
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence_tier:
+        type: string
+        required: false
+      warning:
+        type: string
+        required: false
+      usable_for:
+        type: string
+        required: false
+      epistemic_status:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      denominator_class:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    capture_pct: 100
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    capture_pct: 89
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

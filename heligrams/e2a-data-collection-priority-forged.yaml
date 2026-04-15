@@ -1,0 +1,227 @@
+name: e2a-data-collection-priority-helix
+description: 'Forged from microgram ''e2a-data-collection-priority''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regulatory_reference: falsified
+sense:
+  tree:
+    start: check_minimum_criteria
+    nodes:
+      urgent_minimum_criteria:
+        type: return
+        value:
+          regulatory_reference: ICH E2A Section III.A / IV.A - Minimum criteria collection required before processing
+          data_domains_needed: reporter,patient,drug,event
+          days_to_collect: 2
+          rationale: Minimum ICSR criteria not met — case cannot be processed. Collect 4 minimum elements within 2 days.
+          collection_priority: URGENT
+      check_unexpected_only:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: low_priority_unexpected_nonserious
+        false_next: routine_priority
+      routine_priority:
+        type: return
+        value:
+          days_to_collect: 90
+          data_domains_needed: event_description
+          rationale: Non-serious expected event — routine data collection for aggregate reporting
+          regulatory_reference: ICH E2A Section IV.A - Expected non-serious events documented in routine periodic reports
+          collection_priority: ROUTINE
+      check_serious:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_unexpected_serious
+        false_next: check_unexpected_only
+      check_minimum_criteria:
+        type: condition
+        variable: has_minimum_criteria
+        operator: eq
+        value: true
+        true_next: check_fatal_outcome
+        false_next: urgent_minimum_criteria
+      check_unexpected_serious:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: high_priority_susar
+        false_next: medium_priority_serious_expected
+      high_priority_fatal:
+        type: return
+        value:
+          regulatory_reference: ICH E2A Section IV.A - Fatal cases require complete data collection for 7-day report
+          days_to_collect: 3
+          collection_priority: HIGH
+          data_domains_needed: outcome,autopsy,cause_of_death,medical_history
+          rationale: Fatal case — high priority collection of autopsy data, cause of death, and complete medical history within 3 days
+      high_priority_susar:
+        type: return
+        value:
+          collection_priority: HIGH
+          regulatory_reference: ICH E2A Section IV.A - SUSARs require complete data collection for expedited reporting
+          data_domains_needed: event_details,drug_exposure,outcome,medical_review
+          days_to_collect: 5
+          rationale: Serious unexpected reaction (SUSAR) — high priority data collection to support expedited report within 7-15 day deadline
+      medium_priority_serious_expected:
+        type: return
+        value:
+          data_domains_needed: event_details,outcome,drug_exposure
+          rationale: Serious expected reaction — medium priority collection for periodic safety update inclusion
+          collection_priority: MEDIUM
+          days_to_collect: 30
+          regulatory_reference: ICH E2A Section IV.A - Serious expected reactions collected for periodic reporting
+      low_priority_unexpected_nonserious:
+        type: return
+        value:
+          rationale: Non-serious unexpected event — low priority collection for line listing in periodic report
+          regulatory_reference: ICH E2A Section IV.A - Non-serious events collected for periodic safety updates
+          data_domains_needed: event_description,outcome
+          collection_priority: LOW
+          days_to_collect: 60
+      check_fatal_outcome:
+        type: condition
+        variable: outcome_fatal
+        operator: eq
+        value: true
+        true_next: high_priority_fatal
+        false_next: check_serious
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: is_unexpected
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: is_unexpected
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      report_deadline_days:
+        type: int
+        required: false
+      is_unexpected:
+        type: bool
+        required: false
+      outcome_fatal:
+        type: bool
+        required: false
+      is_serious:
+        type: bool
+        required: false
+      has_minimum_criteria:
+        type: bool
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      data_domains_needed:
+        type: string
+        required: false
+      days_to_collect:
+        type: int
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      rationale:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      collection_priority:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    is_unexpected: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    is_unexpected: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - has_minimum_criteria
+  - outcome_fatal
+  - is_serious
+  - is_unexpected
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

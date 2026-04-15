@@ -1,0 +1,260 @@
+name: limb-charge-scheduler
+description: "Schedules per-limb buffer charging from main bus during low-demand windows. Prioritizes lowest-SoC limb. Throttles when main bus load rises. Prevents all-limbs-charging-simultaneously bus overload."
+version: 0.1.0
+interface:
+  inputs:
+    main_bus_load_pct:
+      type: float
+      required: true
+      description: "Current main bus utilization (0-100%)"
+    left_arm_soc:
+      type: float
+      required: false
+      description: "Left arm buffer SoC (0.0-1.0)"
+    right_arm_soc:
+      type: float
+      required: false
+      description: "Right arm buffer SoC (0.0-1.0)"
+    left_leg_soc:
+      type: float
+      required: false
+      description: "Left leg buffer SoC (0.0-1.0)"
+    right_leg_soc:
+      type: float
+      required: false
+      description: "Right leg buffer SoC (0.0-1.0)"
+    charge_rate_limit_w:
+      type: float
+      required: false
+      description: "Max charge rate per limb in watts (default ~200W = 1C for 200Wh)"
+  outputs:
+    action:
+      type: string
+    target_limb:
+      type: string
+    charge_rate_w:
+      type: float
+    rationale:
+      type: string
+    next_priority:
+      type: string
+tree:
+  start: check_bus_headroom
+  nodes:
+    # Gate 1: Is there bus headroom to charge?
+    check_bus_headroom:
+      type: condition
+      variable: main_bus_load_pct
+      operator: gt
+      value: 70
+      true_next: suspend_charging
+      false_next: check_moderate_load
+
+    check_moderate_load:
+      type: condition
+      variable: main_bus_load_pct
+      operator: gt
+      value: 40
+      true_next: throttled_charge
+      false_next: full_rate_charge
+
+    # Gate 2: Find lowest SoC limb (priority chain)
+    throttled_charge:
+      type: condition
+      variable: left_arm_soc
+      operator: lt
+      value: 0.3
+      true_next: charge_left_arm_throttled
+      false_next: check_right_arm_low
+
+    check_right_arm_low:
+      type: condition
+      variable: right_arm_soc
+      operator: lt
+      value: 0.3
+      true_next: charge_right_arm_throttled
+      false_next: check_left_leg_low
+
+    check_left_leg_low:
+      type: condition
+      variable: left_leg_soc
+      operator: lt
+      value: 0.3
+      true_next: charge_left_leg_throttled
+      false_next: check_right_leg_low
+
+    check_right_leg_low:
+      type: condition
+      variable: right_leg_soc
+      operator: lt
+      value: 0.3
+      true_next: charge_right_leg_throttled
+      false_next: all_adequate_throttled
+
+    # Full rate path
+    full_rate_charge:
+      type: condition
+      variable: left_arm_soc
+      operator: lt
+      value: 0.8
+      true_next: charge_left_arm_full
+      false_next: check_right_arm_full
+
+    check_right_arm_full:
+      type: condition
+      variable: right_arm_soc
+      operator: lt
+      value: 0.8
+      true_next: charge_right_arm_full
+      false_next: check_left_leg_full
+
+    check_left_leg_full:
+      type: condition
+      variable: left_leg_soc
+      operator: lt
+      value: 0.8
+      true_next: charge_left_leg_full
+      false_next: check_right_leg_full
+
+    check_right_leg_full:
+      type: condition
+      variable: right_leg_soc
+      operator: lt
+      value: 0.8
+      true_next: charge_right_leg_full
+      false_next: all_full
+
+    # Terminal nodes
+    suspend_charging:
+      type: return
+      value:
+        action: suspend
+        target_limb: none
+        charge_rate_w: 0
+        rationale: "Main bus >70% load. All limb charging suspended. Bus headroom reserved for actuators."
+        next_priority: "Resume when bus drops below 70%"
+
+    charge_left_arm_throttled:
+      type: return
+      value:
+        action: charge_throttled
+        target_limb: left_arm
+        charge_rate_w: 100
+        rationale: "Left arm critically low (<30%). Throttled charge at 100W — bus is 40-70% loaded."
+        next_priority: "Next lowest SoC limb after left arm reaches 30%"
+
+    charge_right_arm_throttled:
+      type: return
+      value:
+        action: charge_throttled
+        target_limb: right_arm
+        charge_rate_w: 100
+        rationale: "Right arm critically low (<30%). Throttled charge at 100W."
+        next_priority: "Next lowest SoC limb"
+
+    charge_left_leg_throttled:
+      type: return
+      value:
+        action: charge_throttled
+        target_limb: left_leg
+        charge_rate_w: 100
+        rationale: "Left leg critically low (<30%). Throttled charge at 100W."
+        next_priority: "Next lowest SoC limb"
+
+    charge_right_leg_throttled:
+      type: return
+      value:
+        action: charge_throttled
+        target_limb: right_leg
+        charge_rate_w: 100
+        rationale: "Right leg critically low (<30%). Throttled charge at 100W."
+        next_priority: "Next lowest SoC limb"
+
+    all_adequate_throttled:
+      type: return
+      value:
+        action: hold
+        target_limb: none
+        charge_rate_w: 0
+        rationale: "All limbs above 30% and bus is 40-70% loaded. Hold charging — bus headroom more valuable than topping off."
+        next_priority: "Resume full-rate when bus drops below 40%"
+
+    charge_left_arm_full:
+      type: return
+      value:
+        action: charge_full
+        target_limb: left_arm
+        charge_rate_w: 200
+        rationale: "Left arm below 80%. Full-rate 200W charge — bus has headroom (<40% load)."
+        next_priority: "Next lowest SoC limb"
+
+    charge_right_arm_full:
+      type: return
+      value:
+        action: charge_full
+        target_limb: right_arm
+        charge_rate_w: 200
+        rationale: "Right arm below 80%. Full-rate 200W charge."
+        next_priority: "Next lowest SoC limb"
+
+    charge_left_leg_full:
+      type: return
+      value:
+        action: charge_full
+        target_limb: left_leg
+        charge_rate_w: 200
+        rationale: "Left leg below 80%. Full-rate 200W charge."
+        next_priority: "Next lowest SoC limb"
+
+    charge_right_leg_full:
+      type: return
+      value:
+        action: charge_full
+        target_limb: right_leg
+        charge_rate_w: 200
+        rationale: "Right leg below 80%. Full-rate 200W charge."
+        next_priority: "Next lowest SoC limb"
+
+    all_full:
+      type: return
+      value:
+        action: complete
+        target_limb: none
+        charge_rate_w: 0
+        rationale: "All limbs above 80%. Charging complete. Bus fully available for actuators."
+        next_priority: "Monitor for SoC drop below 80%"
+
+primitive_signature:
+  dominant: '→'
+  expression: '→(l(N(ς))) — causal routing of quantified state by location priority'
+  primes: ['→', 'l', 'N', 'ς']
+  arguments: ['v']
+
+tests:
+- name: "high bus load — suspend"
+  input: { main_bus_load_pct: 85, left_arm_soc: 0.2 }
+  expect: { action: suspend, charge_rate_w: 0 }
+
+- name: "moderate bus, left arm critical — throttled charge"
+  input: { main_bus_load_pct: 55, left_arm_soc: 0.15, right_arm_soc: 0.5 }
+  expect: { action: charge_throttled, target_limb: left_arm, charge_rate_w: 100 }
+
+- name: "low bus, left arm needs charge — full rate"
+  input: { main_bus_load_pct: 20, left_arm_soc: 0.5, right_arm_soc: 0.9, left_leg_soc: 0.9, right_leg_soc: 0.9 }
+  expect: { action: charge_full, target_limb: left_arm, charge_rate_w: 200 }
+
+- name: "low bus, all limbs full"
+  input: { main_bus_load_pct: 15, left_arm_soc: 0.9, right_arm_soc: 0.85, left_leg_soc: 0.95, right_leg_soc: 0.88 }
+  expect: { action: complete, charge_rate_w: 0 }
+
+- name: "moderate bus, all above 30% — hold"
+  input: { main_bus_load_pct: 50, left_arm_soc: 0.5, right_arm_soc: 0.6, left_leg_soc: 0.4, right_leg_soc: 0.7 }
+  expect: { action: hold, charge_rate_w: 0 }
+
+- name: "right leg critical at moderate load"
+  input: { main_bus_load_pct: 60, left_arm_soc: 0.5, right_arm_soc: 0.5, left_leg_soc: 0.5, right_leg_soc: 0.1 }
+  expect: { action: charge_throttled, target_limb: right_leg, charge_rate_w: 100 }
+
+- name: "null safety — null SoCs treated as full, bus as idle"
+  input: {}
+  expect: { action: complete, charge_rate_w: 0 }

@@ -1,0 +1,148 @@
+name: station-wikipedia-pipeline-helix
+description: 'Forged from microgram ''station-wikipedia-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    reason: falsified
+sense:
+  tree:
+    start: check_drug
+    nodes:
+      check_drug:
+        type: condition
+        variable: is_drug_article
+        operator: eq
+        value: true
+        true_next: check_safety_section
+        false_next: non_drug
+      non_drug:
+        type: return
+        value:
+          reason: Non-drug Wikipedia article — reference only
+          action: archive
+          route: archive
+          priority: low
+      check_safety_section:
+        type: condition
+        variable: has_safety_section
+        operator: eq
+        value: true
+        true_next: extract_safety
+        false_next: no_safety
+      extract_safety:
+        type: return
+        value:
+          priority: moderate
+          reason: Drug article with safety section — extract ADRs for cross-reference
+          route: knowledge_extraction
+          action: extract
+      no_safety:
+        type: return
+        value:
+          reason: Drug article missing safety section — gap in public knowledge
+          action: flag
+          priority: low
+          route: archive
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: is_drug_article
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: is_drug_article
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_drug_article:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    is_drug_article: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    is_drug_article: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

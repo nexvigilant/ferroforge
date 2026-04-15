@@ -1,0 +1,181 @@
+name: prr-signal-helix
+description: >
+  PRR signal detection with built-in falsification.
+  Sense strand: statistical threshold (PRR >= 2.0).
+  Antisense strand: confounders (n too low, notoriety bias).
+  Resolution: 2x2 pairing matrix produces 4 verdicts from 2 binary inputs.
+version: 0.1.0
+type: heligram
+primitive_signature:
+  dominant: '∂'
+  expression: '∂(×(κ_sense, →_antisense)) — boundary couples comparison and causality'
+  primes: ['∂', 'κ', '→', 'ς', '×']
+  arguments: ['prr', 'total_reports', 'notoriety_bias']
+  chain_prediction: >
+    ∂ (boundary machine). Sense strand is κ (comparison),
+    antisense is → (falsification). Pairing constraint P produces
+    4 verdicts where microgram produces 2. Upgrade path: chain into
+    naranjo-causality-helix for full causality assessment.
+
+helix:
+  twist_rate: 3
+  base_pairs:
+    signal_detected: falsified
+    classification: null_hypothesis
+
+sense:
+  tree:
+    start: check
+    nodes:
+      check:
+        type: condition
+        variable: prr
+        operator: gte
+        value: 2
+        true_next: signal
+        false_next: no_signal
+      signal:
+        type: return
+        value:
+          signal_detected: true
+          classification: signal
+      no_signal:
+        type: return
+        value:
+          signal_detected: false
+          classification: noise
+
+antisense:
+  tree:
+    start: check_n
+    nodes:
+      check_n:
+        type: condition
+        variable: total_reports
+        operator: lt
+        value: 3
+        true_next: too_few
+        false_next: check_notoriety
+      too_few:
+        type: return
+        value:
+          falsified: true
+          null_hypothesis: insufficient_n
+      check_notoriety:
+        type: condition
+        variable: notoriety_bias
+        operator: eq
+        value: true
+        true_next: biased
+        false_next: no_falsification
+      biased:
+        type: return
+        value:
+          falsified: true
+          null_hypothesis: notoriety_bias
+      no_falsification:
+        type: return
+        value:
+          falsified: false
+          null_hypothesis: rejected
+
+resolution:
+  mode: base_pair
+  rules:
+    - when:
+        signal_detected: true
+        falsified: false
+      emit:
+        verdict: confirmed_signal
+        confidence: high
+    - when:
+        signal_detected: true
+        falsified: true
+      emit:
+        verdict: contested_signal
+        confidence: low
+    - when:
+        signal_detected: false
+        falsified: false
+      emit:
+        verdict: no_signal
+        confidence: high
+    - default:
+        verdict: no_signal
+        confidence: medium
+
+interface:
+  major_groove:
+    inputs:
+      prr: { type: float, required: true }
+      total_reports: { type: int, required: false }
+      notoriety_bias: { type: bool, required: false }
+    outputs:
+      verdict: { type: string }
+      confidence: { type: string }
+  minor_groove:
+    inputs:
+      prr: { type: float, required: true }
+    outputs:
+      verdict: { type: string }
+
+tests:
+- name: confirmed signal — high PRR, sufficient n, no bias
+  input:
+    prr: 3.5
+    total_reports: 50
+    notoriety_bias: false
+  expect:
+    verdict: confirmed_signal
+    confidence: high
+    agreement: true
+- name: contested signal — high PRR but insufficient n
+  input:
+    prr: 3.5
+    total_reports: 2
+    notoriety_bias: false
+  expect:
+    verdict: contested_signal
+    confidence: low
+- name: contested signal — high PRR but notoriety bias
+  input:
+    prr: 4.0
+    total_reports: 100
+    notoriety_bias: true
+  expect:
+    verdict: contested_signal
+    confidence: low
+- name: no signal — low PRR, clean data
+  input:
+    prr: 1.2
+    total_reports: 100
+    notoriety_bias: false
+  expect:
+    verdict: no_signal
+    confidence: high
+- name: no signal — low PRR, insufficient n
+  input:
+    prr: 0.5
+    total_reports: 1
+    notoriety_bias: false
+  expect:
+    verdict: no_signal
+    confidence: medium
+- name: null safety — empty input
+  input: {}
+  expect:
+    verdict: no_signal
+- name: boundary — PRR exactly 2.0, sufficient n
+  input:
+    prr: 2.0
+    total_reports: 10
+    notoriety_bias: false
+  expect:
+    verdict: confirmed_signal
+    confidence: high
+- name: sense-only degradation — missing antisense inputs defaults to no-falsification
+  input:
+    prr: 3.5
+  expect:
+    verdict: confirmed_signal
+    confidence: high

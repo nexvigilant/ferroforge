@@ -1,0 +1,211 @@
+name: recall-severity-classifier-helix
+description: 'Forged from microgram ''recall-severity-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    public_warning: falsified
+sense:
+  tree:
+    start: validate_class
+    nodes:
+      check_class_ii:
+        type: condition
+        variable: recall_class
+        operator: matches
+        value: (?i)^II$
+        true_next: check_reason_ii
+        false_next: check_class_iii
+      validate_reason:
+        type: condition
+        variable: reason
+        operator: is_not_null
+        value: null
+        true_next: classify_class
+        false_next: missing_input
+      severity_class_ii_minor:
+        type: return
+        value:
+          severity: adverse_health
+          rationale: Class II recall with moderate quality issue requiring professional guidance
+          public_warning: false
+      classify_class:
+        type: condition
+        variable: recall_class
+        operator: matches
+        value: (?i)^I$
+        true_next: severity_class_i
+        false_next: check_class_ii
+      missing_input:
+        type: return
+        value:
+          severity: null
+          rationale: null
+          public_warning: false
+      validate_class:
+        type: condition
+        variable: recall_class
+        operator: is_not_null
+        value: null
+        true_next: validate_reason
+        false_next: missing_input
+      check_class_iii:
+        type: condition
+        variable: recall_class
+        operator: matches
+        value: (?i)^III$
+        true_next: severity_class_iii
+        false_next: unknown_class
+      unknown_class:
+        type: return
+        value:
+          severity: null
+          public_warning: false
+          rationale: null
+      severity_class_ii_major:
+        type: return
+        value:
+          rationale: Class II recall with significant quality defect that could cause adverse health
+          severity: adverse_health
+          public_warning: true
+      severity_class_i:
+        type: return
+        value:
+          severity: life_threatening
+          public_warning: true
+          rationale: Class I recalls have the most serious potential for adverse health consequences
+      check_reason_ii:
+        type: condition
+        variable: reason
+        operator: matches
+        value: (?i)(contamination|sterility|potency|impurity)
+        true_next: severity_class_ii_major
+        false_next: severity_class_ii_minor
+      severity_class_iii:
+        type: return
+        value:
+          severity: unlikely_harm
+          public_warning: false
+          rationale: Class III recalls are unlikely to cause adverse health consequences
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: recall_class
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: recall_class
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      public_warning: true
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      public_warning: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      public_warning: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when:
+      public_warning: false
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.42
+      verdict: refuted
+      confidence: medium
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      recall_class:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    recall_class: null
+    reason: ZZZZZ_NO_MATCH
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    recall_class: I
+    reason: ZZZZZ_NO_MATCH
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

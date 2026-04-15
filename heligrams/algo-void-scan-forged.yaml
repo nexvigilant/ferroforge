@@ -1,0 +1,315 @@
+name: algo-void-scan-helix
+description: 'Forged from microgram ''algo-void-scan''. Domain: CausalityAssessment. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    gap_count: falsified
+sense:
+  tree:
+    start: count_rechallenge
+    nodes:
+      three_gaps:
+        type: return
+        value:
+          gap_count: 3
+          highest_value_gap: rechallenge_data
+          algorithm: 'VOID: 3 gaps — rechallenge + dose-response + time-to-onset absent'
+          completeness: incomplete
+      count_rechallenge:
+        type: condition
+        variable: has_rechallenge_data
+        operator: eq
+        value: false
+        true_next: gap_rechallenge
+        false_next: count_dose_response
+      complete:
+        type: return
+        value:
+          algorithm: 'VOID: 0 gaps — all 7 data elements present. Assessment fully evidenced.'
+          highest_value_gap: none
+          completeness: complete
+          gap_count: 0
+      count_dose_response:
+        type: condition
+        variable: has_dose_response
+        operator: eq
+        value: false
+        true_next: dose_response_gap
+        false_next: check_minor_gaps
+      gap_rechallenge:
+        type: condition
+        variable: has_dose_response
+        operator: eq
+        value: false
+        true_next: gap_both_critical
+        false_next: check_remaining_with_rechallenge_gap
+      gap_both_critical:
+        type: condition
+        variable: has_time_to_onset
+        operator: eq
+        value: false
+        true_next: three_plus_gaps
+        false_next: two_critical_gaps
+      minor_gap:
+        type: return
+        value:
+          completeness: near_complete
+          algorithm: 'VOID: 1 minor gap — time-to-onset absent'
+          highest_value_gap: time_to_onset
+          gap_count: 1
+      two_critical_gaps:
+        type: return
+        value:
+          highest_value_gap: rechallenge_data
+          algorithm: 'VOID: 2 critical gaps — rechallenge + dose-response absent'
+          completeness: partial
+          gap_count: 2
+      check_minor_gaps:
+        type: condition
+        variable: has_time_to_onset
+        operator: eq
+        value: false
+        true_next: minor_gap
+        false_next: check_class
+      minor_gap_class:
+        type: return
+        value:
+          gap_count: 1
+          algorithm: 'VOID: 1 minor gap — class comparison absent'
+          highest_value_gap: class_comparison
+          completeness: near_complete
+      rechallenge_plus_onset_gap:
+        type: return
+        value:
+          gap_count: 2
+          highest_value_gap: rechallenge_data
+          completeness: partial
+          algorithm: 'VOID: 2 gaps — rechallenge + time-to-onset absent'
+      dose_response_gap:
+        type: return
+        value:
+          algorithm: 'VOID: 1 gap — dose-response absent'
+          completeness: near_complete
+          gap_count: 1
+          highest_value_gap: dose_response
+      check_class:
+        type: condition
+        variable: has_class_comparison
+        operator: eq
+        value: false
+        true_next: minor_gap_class
+        false_next: complete
+      check_remaining_with_rechallenge_gap:
+        type: condition
+        variable: has_time_to_onset
+        operator: eq
+        value: false
+        true_next: rechallenge_plus_onset_gap
+        false_next: rechallenge_only_gap
+      three_plus_gaps:
+        type: condition
+        variable: has_class_comparison
+        operator: eq
+        value: false
+        true_next: four_gaps
+        false_next: three_gaps
+      four_gaps:
+        type: return
+        value:
+          completeness: incomplete
+          algorithm: 'VOID: 4 gaps detected — rechallenge, dose-response, time-to-onset, class comparison all absent'
+          gap_count: 4
+          highest_value_gap: rechallenge_data
+      rechallenge_only_gap:
+        type: return
+        value:
+          highest_value_gap: rechallenge_data
+          algorithm: 'VOID: 1 gap — rechallenge data absent (caps Naranjo at POSSIBLE)'
+          gap_count: 1
+          completeness: near_complete
+antisense:
+  tree:
+    start: null_guard_alternative_cause
+    nodes:
+      check_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: eq
+        value: likely
+        true_next: falsified
+        false_next: null_guard_temporal_implausible
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: is_null
+        value: null
+        true_next: null_guard_temporal_implausible
+        false_next: check_alternative_cause
+      null_guard_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: is_null
+        value: null
+        true_next: null_guard_no_dechallenge
+        false_next: check_temporal_implausible
+      null_guard_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_no_dechallenge
+      check_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_no_dechallenge
+      check_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_dose_response:
+        type: boolean
+        required: true
+      temporal_plausible:
+        type: bool
+        required: false
+      has_class_comparison:
+        type: boolean
+        required: true
+      has_clinical_trial_data:
+        type: boolean
+        required: true
+      dechallenge_positive:
+        type: bool
+        required: false
+      has_disproportionality:
+        type: boolean
+        required: true
+      has_rechallenge_data:
+        type: boolean
+        required: true
+      has_labeling_acknowledgment:
+        type: boolean
+        required: true
+      has_time_to_onset:
+        type: boolean
+        required: true
+      alternative_causes:
+        type: string
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      gap_count:
+        type: integer
+        required: false
+      completeness:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      highest_value_gap:
+        type: string
+        required: false
+      algorithm:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    has_labeling_acknowledgment: true
+    temporal_plausible: true
+    dechallenge_positive: true
+    has_time_to_onset: true
+    has_class_comparison: false
+    has_disproportionality: true
+    alternative_causes: none
+    has_clinical_trial_data: true
+    has_dose_response: true
+    has_rechallenge_data: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, alternative_cause active'
+  input:
+    has_labeling_acknowledgment: true
+    has_time_to_onset: true
+    has_class_comparison: false
+    has_disproportionality: true
+    alternative_causes: likely
+    has_clinical_trial_data: true
+    has_dose_response: true
+    has_rechallenge_data: true
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — causality-assessment with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: causality-assessment. Chains as dual-strand verifier before downstream consumers.'

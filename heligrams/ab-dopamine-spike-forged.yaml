@@ -1,0 +1,166 @@
+name: ab-dopamine-spike-helix
+description: 'Forged from microgram ''ab-dopamine-spike''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    threat: falsified
+sense:
+  tree:
+    start: check_level
+    nodes:
+      check_level:
+        type: condition
+        variable: dopamine_level
+        operator: gt
+        value: 0.7
+        true_next: check_consecutive
+        false_next: clean
+      clean:
+        type: return
+        value:
+          threat: false
+          response: PASS
+      adaptation:
+        type: return
+        value:
+          response: 'WARN: hedonic adaptation risk — 3+ consecutive rewards without decay'
+          threat: true
+      check_consecutive:
+        type: condition
+        variable: reward_count_consecutive
+        operator: gte
+        value: 3
+        true_next: adaptation
+        false_next: clean
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: dopamine_level
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: dopamine_level
+        operator: lte
+        value: 0.7
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      threat: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      threat: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when:
+      falsified: false
+      threat: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: absent
+  - when:
+      threat: false
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.42
+      confidence: medium
+      verdict: refuted
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      dopamine_level:
+        type: number
+        required: true
+      reward_count_consecutive:
+        type: number
+        required: true
+    outputs:
+      threat:
+        type: boolean
+        required: false
+      response:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    dopamine_level: null
+    reward_count_consecutive: 3
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    dopamine_level: 0.8
+    reward_count_consecutive: 3
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

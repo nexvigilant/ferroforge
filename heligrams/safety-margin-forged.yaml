@@ -1,0 +1,160 @@
+name: safety-margin-helix
+description: 'Forged from microgram ''safety-margin''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    score_min: falsified
+sense:
+  tree:
+    start: check_danger
+    nodes:
+      caution:
+        type: return
+        value:
+          score_min: 33
+          zone: CAUTION
+          color: yellow
+          score_max: 66
+      safe:
+        type: return
+        value:
+          color: green
+          score_min: 66
+          score_max: 100
+          zone: SAFE
+      danger:
+        type: return
+        value:
+          color: red
+          score_max: 33
+          zone: DANGER
+          score_min: 0
+      check_danger:
+        type: condition
+        variable: d
+        operator: lte
+        value: 0
+        true_next: danger
+        false_next: check_caution
+      check_caution:
+        type: condition
+        variable: d
+        operator: lte
+        value: 1
+        true_next: caution
+        false_next: safe
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: d
+        operator: gt
+        value: 0
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: d
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      d:
+        type: float
+        required: true
+    outputs:
+      zone:
+        type: string
+        required: false
+      score_max:
+        type: int
+        required: false
+      verdict:
+        type: string
+        required: false
+      score_min:
+        type: int
+        required: false
+      color:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    d: 0
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    d: 1
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

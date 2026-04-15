@@ -1,0 +1,164 @@
+name: reporter-distribution-analyzer-helix
+description: 'Forged from microgram ''reporter-distribution-analyzer''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    reporter_quality: falsified
+sense:
+  tree:
+    start: validate_hcp_percent
+    nodes:
+      high_quality:
+        type: return
+        value:
+          reporter_quality: high
+          rationale: Reports from healthcare professionals carry higher credibility
+          weight_adjustment: 1.2
+      classify_quality:
+        type: condition
+        variable: hcp_percent
+        operator: gte
+        value: 70
+        true_next: high_quality
+        false_next: check_medium
+      invalid_input:
+        type: return
+        value:
+          rationale: null
+          weight_adjustment: 0.5
+          reporter_quality: unknown
+      validate_consumer_percent:
+        type: condition
+        variable: consumer_percent
+        operator: gte
+        value: 0
+        true_next: classify_quality
+        false_next: invalid_input
+      validate_hcp_percent:
+        type: condition
+        variable: hcp_percent
+        operator: gte
+        value: 0
+        true_next: validate_consumer_percent
+        false_next: invalid_input
+      low_quality:
+        type: return
+        value:
+          reporter_quality: low
+          weight_adjustment: 0.6
+          rationale: Consumer-dominated reports require additional validation
+      medium_quality:
+        type: return
+        value:
+          rationale: Mixed reporter distribution provides moderate confidence
+          reporter_quality: medium
+          weight_adjustment: 0.9
+      check_medium:
+        type: condition
+        variable: hcp_percent
+        operator: gte
+        value: 40
+        true_next: medium_quality
+        false_next: low_quality
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: hcp_percent
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: hcp_percent
+        operator: lt
+        value: 0
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      hcp_percent:
+        type: integer
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    hcp_percent: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,148 @@
+name: dashboard-metric-classifier-helix
+description: 'Forged from microgram ''dashboard-metric-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    health: falsified
+sense:
+  tree:
+    start: check_critical
+    nodes:
+      check_critical:
+        type: condition
+        variable: metric_value
+        operator: gte
+        value: 90
+        true_next: critical
+        false_next: check_warn
+      critical:
+        type: return
+        value:
+          health: CRITICAL
+          description: Metric exceeds critical threshold - immediate action required
+      warning:
+        type: return
+        value:
+          health: WARNING
+          description: Metric exceeds warning threshold - monitor and investigate
+      check_warn:
+        type: condition
+        variable: metric_value
+        operator: gte
+        value: 70
+        true_next: warning
+        false_next: healthy
+      healthy:
+        type: return
+        value:
+          health: HEALTHY
+          description: Metric within normal range - no action required
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_negation:
+        type: condition
+        variable: metric_value
+        operator: lt
+        value: 90
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: metric_value
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      metric_value:
+        type: int
+        required: false
+    outputs:
+      description:
+        type: string
+        required: false
+      health:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    metric_value: 100
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    metric_value: 89
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

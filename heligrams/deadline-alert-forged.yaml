@@ -1,0 +1,195 @@
+name: deadline-alert-helix
+description: 'Forged from microgram ''deadline-alert''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    alert_level: falsified
+sense:
+  tree:
+    start: null_guard
+    nodes:
+      check_soon:
+        type: condition
+        variable: deadline_days
+        operator: lte
+        value: 15
+        true_next: check_actionable_soon
+        false_next: routine
+      action:
+        type: return
+        value:
+          alert_level: ACTION
+          days_remaining_label: 8-15
+          response: Prepare submission with available data
+      unknown_return:
+        type: return
+        value:
+          response: Deadline data missing — cannot assess urgency
+          alert_level: UNKNOWN
+          days_remaining_label: unknown
+      review:
+        type: return
+        value:
+          response: Approaching deadline — review data completeness
+          days_remaining_label: 8-15
+          alert_level: REVIEW
+      routine:
+        type: return
+        value:
+          alert_level: ROUTINE
+          response: Within normal timeline
+          days_remaining_label: '>15'
+      check_actionable_soon:
+        type: condition
+        variable: actionable
+        operator: eq
+        value: true
+        true_next: action
+        false_next: review
+      null_guard:
+        type: condition
+        variable: deadline_days
+        operator: is_null
+        value: null
+        true_next: unknown_return
+        false_next: check_urgent
+      check_actionable_urgent:
+        type: condition
+        variable: actionable
+        operator: eq
+        value: true
+        true_next: critical
+        false_next: escalate
+      check_urgent:
+        type: condition
+        variable: deadline_days
+        operator: lte
+        value: 7
+        true_next: check_actionable_urgent
+        false_next: check_soon
+      critical:
+        type: return
+        value:
+          alert_level: CRITICAL
+          days_remaining_label: <=7
+          response: Immediate submission required
+      escalate:
+        type: return
+        value:
+          response: Deadline imminent but data insufficient — escalate for decision
+          alert_level: ESCALATE
+          days_remaining_label: <=7
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: deadline_days
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: deadline_days
+        operator: is_not_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      deadline_days:
+        type: int
+        required: false
+      actionable:
+        type: bool
+        required: false
+    outputs:
+      alert_level:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      days_remaining_label:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      response:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    deadline_days: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

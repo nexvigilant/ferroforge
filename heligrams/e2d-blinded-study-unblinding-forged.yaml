@@ -1,0 +1,305 @@
+name: e2d-blinded-study-unblinding-helix
+description: 'Forged from microgram ''e2d-blinded-study-unblinding''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    report_after_unblinding: falsified
+sense:
+  tree:
+    start: check_blinded
+    nodes:
+      check_blinded:
+        type: condition
+        variable: study_blinded
+        operator: eq
+        value: true
+        true_next: check_serious
+        false_next: return_not_blinded
+      check_fatal:
+        type: condition
+        variable: is_fatal
+        operator: eq
+        value: true
+        true_next: check_sop_urgent
+        false_next: check_lt
+      return_unblind_urgent:
+        type: return
+        value:
+          report_after_unblinding: true
+          regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+          unblind_required: true
+          unblind_urgency: IMMEDIATE_7_DAY
+      return_not_blinded:
+        type: return
+        value:
+          unblind_required: false
+          unblind_urgency: NOT_APPLICABLE_OPEN_STUDY
+          report_after_unblinding: false
+          regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+      return_no_unblind:
+        type: return
+        value:
+          unblind_required: false
+          report_after_unblinding: false
+          unblind_urgency: NOT_REQUIRED_NON_SERIOUS
+          regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+      return_unblind_standard:
+        type: return
+        value:
+          unblind_urgency: STANDARD_15_DAY
+          report_after_unblinding: true
+          unblind_required: true
+          regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+      check_lt:
+        type: condition
+        variable: is_life_threatening
+        operator: eq
+        value: true
+        true_next: check_sop_urgent
+        false_next: check_sop_standard
+      return_unblind_urgent_no_sop:
+        type: return
+        value:
+          report_after_unblinding: true
+          regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+          unblind_required: true
+          unblind_urgency: IMMEDIATE_7_DAY_ESTABLISH_SOP
+      check_serious:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_unexpected
+        false_next: return_no_unblind
+      check_unexpected:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: check_fatal
+        false_next: return_no_unblind_expected
+      return_no_unblind_expected:
+        type: return
+        value:
+          unblind_required: false
+          report_after_unblinding: false
+          regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+          unblind_urgency: NOT_REQUIRED_EXPECTED
+      check_sop_urgent:
+        type: condition
+        variable: unblinding_sop_exists
+        operator: eq
+        value: true
+        true_next: return_unblind_urgent
+        false_next: return_unblind_urgent_no_sop
+      check_sop_standard:
+        type: condition
+        variable: unblinding_sop_exists
+        operator: eq
+        value: true
+        true_next: return_unblind_standard
+        false_next: return_unblind_standard_no_sop
+      return_unblind_standard_no_sop:
+        type: return
+        value:
+          unblind_required: true
+          report_after_unblinding: true
+          regulatory_reference: ICH E2D Section 4.3 - Unblinding for Reporting Purposes
+          unblind_urgency: STANDARD_15_DAY_ESTABLISH_SOP
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      report_after_unblinding: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      report_after_unblinding: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      report_after_unblinding: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      coding_verified:
+        type: bool
+        required: false
+      is_serious:
+        type: bool
+        required: false
+      is_unexpected:
+        type: bool
+        required: false
+      study_blinded:
+        type: bool
+        required: false
+      comorbidity_explains:
+        type: bool
+        required: false
+      unblinding_sop_exists:
+        type: bool
+        required: false
+      is_life_threatening:
+        type: bool
+        required: false
+      follow_up_complete:
+        type: bool
+        required: false
+      is_fatal:
+        type: bool
+        required: false
+    outputs:
+      regulatory_reference:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      unblind_required:
+        type: bool
+        required: false
+      unblind_urgency:
+        type: string
+        required: false
+      report_after_unblinding:
+        type: bool
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    is_life_threatening: false
+    study_blinded: true
+    comorbidity_explains: false
+    is_fatal: true
+    unblinding_sop_exists: true
+    is_unexpected: true
+    follow_up_complete: true
+    is_serious: true
+    coding_verified: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    is_fatal: true
+    unblinding_sop_exists: true
+    is_unexpected: true
+    is_life_threatening: false
+    is_serious: true
+    follow_up_complete: false
+    study_blinded: true
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - study_blinded
+  - is_serious
+  - is_unexpected
+  - is_fatal
+  - is_life_threatening
+  - unblinding_sop_exists
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

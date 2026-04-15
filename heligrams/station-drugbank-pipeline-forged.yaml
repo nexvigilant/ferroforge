@@ -1,0 +1,162 @@
+name: station-drugbank-pipeline-helix
+description: 'Forged from microgram ''station-drugbank-pipeline''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    priority: falsified
+sense:
+  tree:
+    start: check_interaction
+    nodes:
+      major_interaction:
+        type: return
+        value:
+          priority: high
+          reason: Major drug interaction detected — cross-reference with FAERS for AE signal
+          action: alert
+          route: interaction_signal
+      check_interaction:
+        type: condition
+        variable: has_interaction
+        operator: eq
+        value: true
+        true_next: interaction_severity
+        false_next: check_contraindication
+      minor_interaction:
+        type: return
+        value:
+          priority: low
+          reason: Minor/moderate interaction — log for polypharmacy analysis
+          route: interaction_log
+          action: note
+      check_contraindication:
+        type: condition
+        variable: has_contraindication
+        operator: eq
+        value: true
+        true_next: contraindication_alert
+        false_next: pharmacology_review
+      interaction_severity:
+        type: condition
+        variable: interaction_severity
+        operator: eq
+        value: major
+        true_next: major_interaction
+        false_next: minor_interaction
+      contraindication_alert:
+        type: return
+        value:
+          reason: Contraindication found — verify against current labeling
+          route: label_comparison
+          priority: high
+          action: alert
+      pharmacology_review:
+        type: return
+        value:
+          action: review
+          reason: Clean pharmacology profile — archive for reference
+          priority: low
+          route: archive
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: has_interaction
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: has_interaction
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_interaction:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    has_interaction: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    has_interaction: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

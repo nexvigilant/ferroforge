@@ -1,0 +1,271 @@
+name: perturbation-novelty-assessor-helix
+description: 'Forged from microgram ''perturbation-novelty-assessor''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    falsifiability_test: falsified
+sense:
+  tree:
+    start: check_decoupled
+    nodes:
+      check_boundary:
+        type: condition
+        variable: boundary_parameterized
+        operator: eq
+        value: true
+        true_next: check_novel_boundary
+        false_next: two_of_three
+      learned_and_boundary:
+        type: return
+        value:
+          falsifiability_test: 'Test transfer: does the model generalize to held-out boundaries? If not, the boundary parameterization is nominal.'
+          novelty_class: PARTIAL — learned + boundary parameterized, not decoupled
+          recommendation: Decouple representation from evaluation explicitly. The learning + boundary combination is powerful but fragile without architectural separation.
+          innovation_count: '2'
+          advantage_over_qsp: Learns representations and projects to multiple boundaries. But without explicit decoupling, representation and evaluation may be entangled, limiting transfer.
+      boundary_only:
+        type: return
+        value:
+          novelty_class: MINIMAL — boundary parameterized only
+          innovation_count: '1'
+          advantage_over_qsp: Multi-boundary evaluation, but with hand-specified coupled models. This is multi-task QSP.
+          falsifiability_test: Does multi-task formulation outperform independent single-task models? Standard multi-task learning question.
+          recommendation: Add learning (to discover unknown mechanisms) and decoupling (to separate what from where). Boundary parameterization alone is a UI improvement, not a scientific one.
+      two_of_three:
+        type: return
+        value:
+          recommendation: Parameterize the boundary. Without boundary-as-variable, you lose the coverage advantage and novel boundary prediction — the two most distinctive capabilities.
+          novelty_class: PARTIAL — decoupled + learned, boundary not parameterized
+          falsifiability_test: Compare learned representation vs hand-specified QSP at the same boundaries. If the learned model captures no mechanisms that QSP misses, the learning adds nothing.
+          advantage_over_qsp: Learned representation discovers mechanisms humans didn't specify. But boundary is still structural — each evaluation requires model modification.
+          innovation_count: '2'
+      no_innovations:
+        type: return
+        value:
+          innovation_count: '0'
+          recommendation: 'The perturbation pattern concept without the three architectural innovations is a repackaging with better notation. Implement at least two of: decouple, learn, parameterize boundary.'
+          advantage_over_qsp: None. This is standard endpoint-specific safety modeling. QSP, AOP, or network pharmacology with different notation.
+          novelty_class: CONVENTIONAL — no framework innovations present
+          falsifiability_test: N/A — no novel claims to falsify.
+      count_without_decoupling:
+        type: condition
+        variable: representation_learned
+        operator: eq
+        value: true
+        true_next: check_boundary_no_decoupling
+        false_next: check_boundary_alone
+      decoupled_only:
+        type: return
+        value:
+          falsifiability_test: Does the decoupled architecture produce identical results to coupled endpoint-specific models? If yes, the decoupling is notational, not functional.
+          novelty_class: MINIMAL — decoupled only
+          recommendation: Decoupling alone is a software engineering improvement, not a scientific one. Add either learning or boundary parameterization to gain genuine capability.
+          advantage_over_qsp: Architectural separation of representation and evaluation, but without learning or boundary parameterization, this is essentially multi-output QSP with extra steps.
+          innovation_count: '1'
+      check_boundary_alone:
+        type: condition
+        variable: boundary_parameterized
+        operator: eq
+        value: true
+        true_next: boundary_only
+        false_next: no_innovations
+      full_framework_known_boundaries:
+        type: return
+        value:
+          innovation_count: '3'
+          advantage_over_qsp: Single representation evaluated at all boundaries simultaneously. Coverage advantage over building N separate QSP models. But each individual QSP model may outperform at its own boundary.
+          recommendation: Focus evaluation on low-data and rare boundaries. The framework's value is coverage and transfer, not per-boundary accuracy where QSP has had decades of refinement.
+          novelty_class: FULL FRAMEWORK — known boundaries
+          falsifiability_test: 'Head-to-head: compare shared representation vs boundary-specific QSP at low-data boundaries (< 50 reports). If QSP wins even at low-data boundaries, the cross-boundary transfer property is not doing real work.'
+      check_learned:
+        type: condition
+        variable: representation_learned
+        operator: eq
+        value: true
+        true_next: check_boundary
+        false_next: count_decoupled_only
+      check_boundary_no_decoupling:
+        type: condition
+        variable: boundary_parameterized
+        operator: eq
+        value: true
+        true_next: learned_and_boundary
+        false_next: learned_only
+      check_novel_boundary:
+        type: condition
+        variable: has_novel_boundary
+        operator: eq
+        value: true
+        true_next: full_framework_with_novel
+        false_next: full_framework_known_boundaries
+      decoupled_and_boundary:
+        type: return
+        value:
+          recommendation: Consider learning the representation. Hand-specification limits you to known mechanisms — the very ones that QSP already handles well.
+          innovation_count: '2'
+          advantage_over_qsp: Multi-boundary projection from single model. But the model is hand-specified, so it only captures known mechanisms. Unknown mechanisms that cause unexpected AEs are invisible.
+          novelty_class: PARTIAL — decoupled + boundary parameterized, representation specified
+          falsifiability_test: Compare against standard multi-endpoint QSP. If hand-specified shared model doesn't outperform separate hand-specified models, decoupling adds nothing.
+      full_framework_with_novel:
+        type: return
+        value:
+          recommendation: This is the strongest use case. Novel boundary prediction is where the framework is unfalsifiably better than endpoint-specific approaches — they literally cannot compete because they don't exist for unmeasured endpoints.
+          novelty_class: FULL FRAMEWORK — novel boundary prediction
+          advantage_over_qsp: Predicts outcomes at boundaries that have no historical data. QSP cannot ask questions about unmeasured endpoints. This can.
+          innovation_count: '3'
+          falsifiability_test: Compare predictions at the novel boundary against first empirical measurements when they become available. If QSP (built post-hoc for that boundary) outperforms the pre-existing projection, the framework adds nothing.
+      check_decoupled:
+        type: condition
+        variable: representation_decoupled
+        operator: eq
+        value: true
+        true_next: check_learned
+        false_next: count_without_decoupling
+      learned_only:
+        type: return
+        value:
+          advantage_over_qsp: May discover mechanisms QSP misses. But each boundary requires separate evaluation, same as QSP. This is standard ML-for-safety-prediction.
+          innovation_count: '1'
+          recommendation: This is what most ML-in-pharma papers do. The framework's innovations are specifically designed to go beyond this.
+          novelty_class: CONVENTIONAL ML — learned representation, endpoint-specific
+          falsifiability_test: 'Standard ML benchmark: compare against QSP at the same endpoints. If QSP wins on interpretability with comparable accuracy, the learning adds cost without benefit.'
+      count_decoupled_only:
+        type: condition
+        variable: boundary_parameterized
+        operator: eq
+        value: true
+        true_next: decoupled_and_boundary
+        false_next: decoupled_only
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: boundary_parameterized
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_negation:
+        type: condition
+        variable: boundary_parameterized
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_novel_boundary:
+        type: bool
+        required: false
+      representation_learned:
+        type: bool
+        required: true
+      baseline_approach:
+        type: string
+        required: false
+      representation_decoupled:
+        type: bool
+        required: true
+      num_boundaries_evaluated:
+        type: int
+        required: false
+      boundary_parameterized:
+        type: bool
+        required: true
+    outputs:
+      recommendation:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      falsifiability_test:
+        type: string
+        required: false
+      advantage_over_qsp:
+        type: string
+        required: false
+      novelty_class:
+        type: string
+        required: false
+      innovation_count:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    boundary_parameterized: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    boundary_parameterized: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

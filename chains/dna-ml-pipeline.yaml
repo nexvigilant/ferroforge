@@ -1,0 +1,56 @@
+name: dna-ml-pipeline
+description: 'DNA-encoded ML pipeline chain: gate feature quality → classify DNA similarity → verdict on model quality'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - dna-encode-gate
+  - dna-similarity-classifier
+  - dna-ml-verdict
+tests:
+- name: full pipeline, excellent model with DNA features
+  input:
+    n_features: 12
+    non_zero_ratio: 0.92
+    hamming_distance: 0.15
+    gc_divergence: 0.05
+    lcs_ratio: 0.85
+    auc: 0.95
+    n_samples: 100
+    total_features: 17
+    dna_feature_count: 5
+  expect:
+    gate_decision: proceed
+    encoding_quality: high
+    similarity_level: high
+    verdict: accept
+    model_grade: A
+
+- name: sparse features with low similarity, poor model
+  input:
+    n_features: 12
+    non_zero_ratio: 0.3
+    hamming_distance: 0.7
+    gc_divergence: 0.4
+    auc: 0.55
+    n_samples: 40
+    total_features: 17
+  expect:
+    gate_decision: warn
+    encoding_quality: low
+    similarity_level: low
+    verdict: investigate
+    model_grade: C
+
+- name: insufficient features blocks pipeline
+  input:
+    n_features: 2
+    non_zero_ratio: 1.0
+    hamming_distance: 0.5
+    gc_divergence: 0.3
+    auc: 0.8
+    n_samples: 50
+    total_features: 12
+  expect:
+    gate_decision: reject
+    encoding_quality: none

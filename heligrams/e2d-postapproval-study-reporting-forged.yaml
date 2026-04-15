@@ -1,0 +1,304 @@
+name: e2d-postapproval-study-reporting-helix
+description: 'Forged from microgram ''e2d-postapproval-study-reporting''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    expedited_required: falsified
+sense:
+  tree:
+    start: check_interventional
+    nodes:
+      check_interventional:
+        type: condition
+        variable: is_interventional
+        operator: eq
+        value: true
+        true_next: check_serious_interventional
+        false_next: check_study_type_obs
+      return_periodic_interventional:
+        type: return
+        value:
+          reporting_pathway: DSUR_PERIODIC
+          regulatory_reference: ICH E2D Section 4.3 / ICH E2F DSUR
+          deadline_days: 365
+          expedited_required: false
+      return_registry_protocol:
+        type: return
+        value:
+          regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Safety Reporting
+          reporting_pathway: REGISTRY_PROTOCOL_DEFINED
+          deadline_days: 15
+          expedited_required: true
+      return_standard_periodic:
+        type: return
+        value:
+          expedited_required: false
+          regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+          reporting_pathway: STANDARD_PERIODIC
+          deadline_days: 90
+      return_expedited_obs:
+        type: return
+        value:
+          deadline_days: 15
+          reporting_pathway: SPONTANEOUS_EQUIVALENT_EXPEDITED
+          expedited_required: true
+          regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Safety Reporting
+      return_aggregate_obs:
+        type: return
+        value:
+          regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+          reporting_pathway: AGGREGATE_LINE_LISTING
+          expedited_required: false
+          deadline_days: 90
+      check_serious_interventional:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_unexpected_interventional
+        false_next: return_periodic_interventional
+      return_expedited_interventional:
+        type: return
+        value:
+          reporting_pathway: IND_EQUIVALENT_EXPEDITED
+          regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Safety Reporting
+          deadline_days: 15
+          expedited_required: true
+      check_registry:
+        type: condition
+        variable: study_type
+        operator: eq
+        value: registry
+        true_next: check_protocol_registry
+        false_next: return_standard_periodic
+      check_protocol_registry:
+        type: condition
+        variable: protocol_defined
+        operator: eq
+        value: true
+        true_next: return_registry_protocol
+        false_next: return_aggregate_obs
+      check_unexpected_interventional:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: return_expedited_interventional
+        false_next: return_periodic_interventional
+      check_serious_obs:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_unexpected_obs
+        false_next: return_aggregate_obs
+      return_periodic_obs:
+        type: return
+        value:
+          expedited_required: false
+          deadline_days: 90
+          regulatory_reference: ICH E2D Section 6 / ICH E2C(R2)
+          reporting_pathway: PSUR_AGGREGATE
+      check_study_type_obs:
+        type: condition
+        variable: study_type
+        operator: eq
+        value: observational
+        true_next: check_serious_obs
+        false_next: check_registry
+      check_unexpected_obs:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: return_expedited_obs
+        false_next: return_periodic_obs
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      expedited_required: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+      expedited_required: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      falsified: false
+      expedited_required: false
+    default: null
+    emit:
+      verdict: absent
+      confidence_score: 0.7
+      confidence: high
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_unexpected:
+        type: bool
+        required: false
+      comorbidity_explains:
+        type: bool
+        required: false
+      study_type:
+        type: string
+        required: false
+      is_serious:
+        type: bool
+        required: false
+      is_interventional:
+        type: bool
+        required: false
+      protocol_defined:
+        type: bool
+        required: false
+      follow_up_complete:
+        type: bool
+        required: false
+      coding_verified:
+        type: bool
+        required: false
+    outputs:
+      regulatory_reference:
+        type: string
+        required: false
+      deadline_days:
+        type: int
+        required: false
+      expedited_required:
+        type: bool
+        required: false
+      reporting_pathway:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    comorbidity_explains: false
+    is_interventional: true
+    is_unexpected: true
+    is_serious: true
+    study_type: interventional
+    follow_up_complete: true
+    coding_verified: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    is_interventional: true
+    is_unexpected: true
+    is_serious: true
+    study_type: interventional
+    follow_up_complete: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - study_type
+  - is_interventional
+  - is_serious
+  - is_unexpected
+  - protocol_defined
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

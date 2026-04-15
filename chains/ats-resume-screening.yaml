@@ -1,0 +1,92 @@
+name: ats-resume-screening
+description: 'ATS resume screening pipeline: format compliance → experience relevance → keyword match → gap detection → recommendation. Cross-domain vigilance tool for candidate screening across any industry.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - ats-format-compliance
+  - ats-experience-relevance
+  - ats-keyword-match
+  - ats-gap-detector
+  - ats-recommendation
+tests:
+- name: perfect candidate — all checks pass, strong match
+  input:
+    file_type_compatible: true
+    has_standard_headers: true
+    uses_simple_formatting: true
+    has_contact_info: true
+    sections_detected: 5
+    direct_experience_years: 8
+    transferable_experience_years: 2
+    required_years: 5
+    matched_keywords: 85
+    total_keywords: 100
+    missing_hard_skills: 0
+    missing_credentials: 0
+    years_experience_gap: 0
+  expect:
+    format_verdict: PASS
+    relevance_tier: HIGH
+    match_tier: STRONG
+    gap_severity: NONE
+    overall_verdict: STRONG_MATCH
+    ats_pass_likely: true
+- name: format blocker — good match but incompatible file
+  input:
+    file_type_compatible: false
+    has_standard_headers: true
+    uses_simple_formatting: true
+    has_contact_info: true
+    sections_detected: 4
+    direct_experience_years: 5
+    required_years: 3
+    matched_keywords: 80
+    total_keywords: 100
+    missing_hard_skills: 0
+    missing_credentials: 0
+  expect:
+    format_verdict: FAIL
+    parseable: false
+    overall_verdict: REJECT
+- name: career changer — transferable experience, moderate keywords
+  input:
+    file_type_compatible: true
+    has_standard_headers: true
+    uses_simple_formatting: true
+    has_contact_info: true
+    sections_detected: 4
+    direct_experience_years: 0
+    transferable_experience_years: 6
+    required_years: 3
+    matched_keywords: 55
+    total_keywords: 100
+    missing_hard_skills: 2
+    missing_credentials: 0
+  expect:
+    format_verdict: PASS
+    relevance_tier: TRANSFERABLE
+    match_tier: MODERATE
+    gap_severity: LOW
+    overall_verdict: CONDITIONAL_MATCH
+- name: underqualified — missing credentials, experience gap
+  input:
+    file_type_compatible: true
+    has_standard_headers: true
+    uses_simple_formatting: true
+    has_contact_info: true
+    sections_detected: 4
+    direct_experience_years: 0
+    transferable_experience_years: 1
+    required_years: 5
+    matched_keywords: 30
+    total_keywords: 100
+    missing_hard_skills: 5
+    missing_credentials: 1
+    years_experience_gap: 4
+  expect:
+    format_verdict: PASS
+    relevance_tier: LOW
+    match_tier: WEAK
+    gap_severity: CRITICAL
+    overall_verdict: RECONSIDER

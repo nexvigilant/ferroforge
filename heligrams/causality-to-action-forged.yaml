@@ -1,0 +1,264 @@
+name: causality-to-action-helix
+description: 'Forged from microgram ''causality-to-action''. Domain: CausalityAssessment. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    reason: falsified
+sense:
+  tree:
+    start: check_causality_present
+    nodes:
+      document_only:
+        type: return
+        value:
+          reason: Doubtful or no causality - document internally for signal tracking
+          regulatory_action: document
+          reporting_type: internal_record
+          deadline_days: 0
+      check_probable:
+        type: condition
+        variable: causality
+        operator: eq
+        value: PROBABLE
+        true_next: probable_serious_check
+        false_next: check_possible
+      check_possible:
+        type: condition
+        variable: causality
+        operator: eq
+        value: POSSIBLE
+        true_next: monitor_and_document
+        false_next: document_only
+      expedited_report:
+        type: return
+        value:
+          regulatory_action: expedited_report
+          deadline_days: 7
+          reporting_type: IND_safety_report
+          reason: Serious case with definite causality requires 7-day expedited reporting per ICH E2B
+      monitor_and_document:
+        type: return
+        value:
+          reporting_type: PSUR_PBRER
+          deadline_days: 90
+          regulatory_action: monitor
+          reason: Possible causality - monitor and include in periodic reporting
+      check_causality_present:
+        type: condition
+        variable: causality
+        operator: is_null
+        value: null
+        true_next: reject_missing_causality
+        false_next: check_definite
+      reject_missing_causality:
+        type: return
+        value:
+          reason: 'REJECTED: causality field is required. This microgram must receive output from naranjo-quick or equivalent causality assessment. Direct bypass from signal detection is not permitted.'
+          reporting_type: none
+          regulatory_action: REJECTED
+          deadline_days: 0
+      check_definite:
+        type: condition
+        variable: causality
+        operator: eq
+        value: DEFINITE
+        true_next: definite_serious_check
+        false_next: check_probable
+      definite_serious_check:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: expedited_report
+        false_next: standard_report
+      standard_report:
+        type: return
+        value:
+          deadline_days: 15
+          reporting_type: 15_day_report
+          reason: Definite causality warrants 15-day standard reporting
+          regulatory_action: standard_report
+      probable_serious_check:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: probable_serious
+        false_next: periodic_report
+      probable_serious:
+        type: return
+        value:
+          regulatory_action: expedited_report
+          reporting_type: 15_day_report
+          deadline_days: 15
+          reason: Serious case with probable causality requires 15-day expedited reporting per ICH E2B
+      periodic_report:
+        type: return
+        value:
+          reporting_type: PSUR_PBRER
+          deadline_days: 90
+          reason: Probable causality in non-serious case included in periodic safety update
+          regulatory_action: periodic_report
+antisense:
+  tree:
+    start: null_guard_alternative_cause
+    nodes:
+      check_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_no_dechallenge
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: is_null
+        value: null
+        true_next: null_guard_temporal_implausible
+        false_next: check_alternative_cause
+      check_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      check_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: eq
+        value: likely
+        true_next: falsified
+        false_next: null_guard_temporal_implausible
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: is_null
+        value: null
+        true_next: null_guard_no_dechallenge
+        false_next: check_temporal_implausible
+      null_guard_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_no_dechallenge
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      dechallenge_positive:
+        type: bool
+        required: false
+      causality:
+        type: string
+        required: true
+      is_serious:
+        type: bool
+        required: false
+      alternative_causes:
+        type: string
+        required: false
+      temporal_plausible:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      reason:
+        type: string
+        required: false
+      regulatory_action:
+        type: string
+        required: false
+      deadline_days:
+        type: int
+        required: false
+      verdict:
+        type: string
+        required: false
+      reporting_type:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    dechallenge_positive: true
+    alternative_causes: none
+    causality: DEFINITE
+    is_serious: true
+    temporal_plausible: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, alternative_cause active'
+  input:
+    causality: DEFINITE
+    is_serious: true
+    alternative_causes: likely
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — causality-assessment with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - causality
+  - is_serious
+  chain_prediction: 'Forged heligram. Domain: causality-assessment. Chains as dual-strand verifier before downstream consumers.'

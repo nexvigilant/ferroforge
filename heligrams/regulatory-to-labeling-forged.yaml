@@ -1,0 +1,167 @@
+name: regulatory-to-labeling-helix
+description: 'Forged from microgram ''regulatory-to-labeling''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    section_affected: falsified
+sense:
+  tree:
+    start: check_decision
+    nodes:
+      check_decision:
+        type: condition
+        variable: regulatory_decision
+        operator: eq
+        value: restrict
+        true_next: restrict_path
+        false_next: check_warn
+      restrict_path:
+        type: return
+        value:
+          section_affected: contraindications_and_restrictions
+          labeling_action: add_restriction
+          urgency_level: immediate
+      check_warn:
+        type: condition
+        variable: regulatory_decision
+        operator: eq
+        value: warn
+        true_next: warn_path
+        false_next: check_withdraw
+      check_withdraw:
+        type: condition
+        variable: regulatory_decision
+        operator: eq
+        value: withdraw
+        true_next: withdraw_path
+        false_next: monitor_path
+      withdraw_path:
+        type: return
+        value:
+          urgency_level: immediate
+          section_affected: indications_and_usage
+          labeling_action: remove_indication
+      warn_path:
+        type: return
+        value:
+          section_affected: warnings_and_precautions
+          labeling_action: add_warning
+          urgency_level: immediate
+      monitor_path:
+        type: return
+        value:
+          section_affected: patient_monitoring
+          urgency_level: routine
+          labeling_action: add_monitoring_requirement
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: regulatory_decision
+        operator: neq
+        value: restrict
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: regulatory_decision
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      regulatory_decision:
+        type: string
+        required: true
+    outputs:
+      section_affected:
+        type: string
+        required: false
+      labeling_action:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      urgency_level:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    regulatory_decision: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    regulatory_decision: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

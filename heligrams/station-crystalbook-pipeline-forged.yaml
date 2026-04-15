@@ -1,0 +1,148 @@
+name: station-crystalbook-pipeline-helix
+description: 'Forged from microgram ''station-crystalbook-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    route: falsified
+sense:
+  tree:
+    start: check_law
+    nodes:
+      clean:
+        type: return
+        value:
+          route: archive
+          reason: No law violations — 8-law compliance verified
+          priority: low
+          action: certify
+      vice_annihilate:
+        type: return
+        value:
+          action: annihilate
+          priority: critical
+          reason: Capital vice detected alongside law violation — destroy before it spreads
+          route: vice_remediation
+      check_vice:
+        type: condition
+        variable: vice_detected
+        operator: eq
+        value: true
+        true_next: vice_annihilate
+        false_next: law_fix
+      check_law:
+        type: condition
+        variable: violated_law
+        operator: gte
+        value: 1
+        true_next: check_vice
+        false_next: clean
+      law_fix:
+        type: return
+        value:
+          route: law_compliance
+          reason: Law violation without vice — structural fix needed
+          action: remediate
+          priority: high
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: vice_detected
+        operator: lt
+        value: 1
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: vice_detected
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      vice_detected:
+        type: integer
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    vice_detected: 11
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    vice_detected: 0
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,271 @@
+name: sota-pubmed-triage-helix
+description: 'Forged from microgram ''sota-pubmed-triage''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    evidence_level: falsified
+sense:
+  tree:
+    start: check_article_type
+    nodes:
+      check_case_series:
+        type: condition
+        variable: article_type
+        operator: eq
+        value: case_series
+        true_next: evidence_2
+        false_next: evidence_1
+      observational_recent:
+        type: return
+        value:
+          evidence_level: 3
+          triage_action: MONITOR — recent observational study. Log for periodic SOTA review.
+          novelty_estimate: LOW
+          authority_weight: 2
+      case_series_recent:
+        type: return
+        value:
+          novelty_estimate: NONE
+          evidence_level: 2
+          authority_weight: 1
+          triage_action: SKIP — case series insufficient for frontier assessment.
+      evidence_3:
+        type: condition
+        variable: pub_year
+        operator: gte
+        value: 2024
+        true_next: observational_recent
+        false_next: observational_old
+      rct_peer:
+        type: return
+        value:
+          authority_weight: 2
+          novelty_estimate: MODERATE
+          triage_action: EVALUATE — RCT, peer-reviewed. Run SOTA drift detection if methodology is novel.
+          evidence_level: 4
+      check_rct:
+        type: condition
+        variable: article_type
+        operator: eq
+        value: rct
+        true_next: evidence_4
+        false_next: check_observational
+      evidence_4:
+        type: condition
+        variable: is_guideline_cited
+        operator: eq
+        value: 1
+        true_next: rct_guideline
+        false_next: rct_peer
+      check_observational:
+        type: condition
+        variable: article_type
+        operator: eq
+        value: observational
+        true_next: evidence_3
+        false_next: check_case_series
+      high_evidence_peer:
+        type: return
+        value:
+          novelty_estimate: MODERATE
+          evidence_level: 5
+          triage_action: EVALUATE — systematic review/meta-analysis, peer-reviewed. Run SOTA drift detection.
+          authority_weight: 2
+      check_sr:
+        type: condition
+        variable: article_type
+        operator: eq
+        value: systematic_review
+        true_next: evidence_5
+        false_next: check_rct
+      evidence_2:
+        type: condition
+        variable: pub_year
+        operator: gte
+        value: 2024
+        true_next: case_series_recent
+        false_next: skip_old
+      high_evidence_guideline:
+        type: return
+        value:
+          triage_action: EVALUATE — systematic review/meta-analysis cited in guidelines. Run SOTA drift detection.
+          authority_weight: 4
+          evidence_level: 5
+          novelty_estimate: HIGH
+      observational_old:
+        type: return
+        value:
+          novelty_estimate: NONE
+          evidence_level: 3
+          triage_action: SKIP — older observational study. Below frontier relevance threshold.
+          authority_weight: 2
+      check_article_type:
+        type: condition
+        variable: article_type
+        operator: eq
+        value: meta_analysis
+        true_next: evidence_5
+        false_next: check_sr
+      skip_old:
+        type: return
+        value:
+          novelty_estimate: NONE
+          triage_action: SKIP — older low-evidence publication. Not frontier-relevant.
+          evidence_level: 1
+          authority_weight: 1
+      evidence_5:
+        type: condition
+        variable: is_guideline_cited
+        operator: eq
+        value: 1
+        true_next: high_evidence_guideline
+        false_next: high_evidence_peer
+      low_evidence_recent:
+        type: return
+        value:
+          novelty_estimate: NONE
+          triage_action: SKIP — editorial/letter/case report. Not frontier-relevant.
+          evidence_level: 1
+          authority_weight: 1
+      evidence_1:
+        type: condition
+        variable: pub_year
+        operator: gte
+        value: 2024
+        true_next: low_evidence_recent
+        false_next: skip_old
+      rct_guideline:
+        type: return
+        value:
+          novelty_estimate: HIGH
+          evidence_level: 4
+          authority_weight: 4
+          triage_action: EVALUATE — RCT cited in guidelines. Run SOTA drift detection.
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: article_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: article_type
+        operator: neq
+        value: meta_analysis
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_guideline_cited:
+        type: int
+        required: false
+      pub_year:
+        type: int
+        required: true
+      article_type:
+        type: string
+        required: true
+      citation_count:
+        type: int
+        required: false
+    outputs:
+      authority_weight:
+        type: int
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      evidence_level:
+        type: int
+        required: false
+      triage_action:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      novelty_estimate:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    article_type: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    article_type: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - article_type
+  - pub_year
+  - citation_count
+  - is_guideline_cited
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

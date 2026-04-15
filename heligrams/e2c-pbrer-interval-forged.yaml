@@ -1,0 +1,187 @@
+name: e2c-pbrer-interval-helix
+description: 'Forged from microgram ''e2c-pbrer-interval''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regulatory_reference: falsified
+sense:
+  tree:
+    start: check_years_lt_2
+    nodes:
+      return_12:
+        type: return
+        value:
+          regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+          interval_months: 12
+      return_36:
+        type: return
+        value:
+          regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+          interval_months: 36
+      check_rmp_36:
+        type: condition
+        variable: risk_management_plan_required
+        operator: eq
+        value: true
+        true_next: return_12_rmp
+        false_next: return_36
+      return_12_rmp:
+        type: return
+        value:
+          interval_months: 12
+          regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+      check_rmp_12:
+        type: condition
+        variable: risk_management_plan_required
+        operator: eq
+        value: true
+        true_next: return_12_rmp
+        false_next: return_12
+      check_rmp_6:
+        type: condition
+        variable: risk_management_plan_required
+        operator: eq
+        value: true
+        true_next: return_6
+        false_next: return_6
+      check_years_lt_5:
+        type: condition
+        variable: years_since_approval
+        operator: lt
+        value: 5
+        true_next: check_rmp_12
+        false_next: check_renewal
+      return_6:
+        type: return
+        value:
+          interval_months: 6
+          regulatory_reference: ICH E2C(R2) Section 2 - Reporting Interval
+      check_renewal:
+        type: condition
+        variable: renewal_granted
+        operator: eq
+        value: true
+        true_next: check_rmp_36
+        false_next: check_rmp_12
+      check_years_lt_2:
+        type: condition
+        variable: years_since_approval
+        operator: lt
+        value: 2
+        true_next: check_rmp_6
+        false_next: check_years_lt_5
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: risk_management_plan_required
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: risk_management_plan_required
+        operator: gte
+        value: 2
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      renewal_granted:
+        type: bool
+        required: false
+      years_since_approval:
+        type: number
+        required: true
+      risk_management_plan_required:
+        type: bool
+        required: false
+    outputs:
+      regulatory_reference:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      interval_months:
+        type: number
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    risk_management_plan_required: 0
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    risk_management_plan_required: 2
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

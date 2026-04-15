@@ -1,0 +1,64 @@
+name: strain-gauge-yield-alarm
+description: 'Classify structural strain severity against yield and fatigue thresholds. Gates suit structural health.'
+version: 0.1.0
+interface:
+  inputs:
+    microstrain_abs:
+      type: number
+      required: true
+      description: 'Absolute measured strain in microstrain (µε). Pre-computed: abs(raw_microstrain).'
+  outputs:
+    severity:
+      type: string
+    action:
+      type: string
+    margin_pct:
+      type: number
+tree:
+  start: check_yield
+  nodes:
+    check_yield:
+      type: condition
+      variable: microstrain_abs
+      operator: gt
+      value: 2000
+      true_next: yield_exceeded
+      false_next: check_fatigue
+    check_fatigue:
+      type: condition
+      variable: microstrain_abs
+      operator: gt
+      value: 800
+      true_next: fatigue_zone
+      false_next: nominal
+    yield_exceeded:
+      type: return
+      value:
+        severity: 'CRITICAL'
+        action: 'ABORT — structural yield exceeded. Inspect for plastic deformation.'
+        margin_pct: 0
+    fatigue_zone:
+      type: return
+      value:
+        severity: 'WARNING'
+        action: 'Log cycle count — operating in fatigue-sensitive range'
+        margin_pct: 50
+    nominal:
+      type: return
+      value:
+        severity: 'NOMINAL'
+        action: 'Continue — strain within elastic range'
+        margin_pct: 100
+tests:
+- input: { microstrain_abs: 500 }
+  expect: { severity: 'NOMINAL' }
+- input: { microstrain_abs: 1200 }
+  expect: { severity: 'WARNING' }
+- input: { microstrain_abs: 2500 }
+  expect: { severity: 'CRITICAL' }
+- input: { microstrain_abs: 2100 }
+  expect: { severity: 'CRITICAL' }
+- input: { microstrain_abs: 900 }
+  expect: { severity: 'WARNING' }
+- input: {}
+  expect: { severity: 'NOMINAL' }

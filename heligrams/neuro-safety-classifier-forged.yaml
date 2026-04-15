@@ -1,0 +1,187 @@
+name: neuro-safety-classifier-helix
+description: 'Forged from microgram ''neuro-safety-classifier''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    severity: falsified
+sense:
+  tree:
+    start: check_pml
+    nodes:
+      serious:
+        type: return
+        value:
+          severity: serious
+          soc: Nervous system disorders
+          action: expedited_report
+      critical:
+        type: return
+        value:
+          action: immediate_expedited_report
+          soc: Nervous system disorders
+          severity: critical
+      check_gbs:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: GUILLAIN-BARRE
+        true_next: critical
+        false_next: check_neuropathy
+      moderate:
+        type: return
+        value:
+          severity: moderate
+          soc: Nervous system disorders
+          action: monitor_and_assess
+      mild:
+        type: return
+        value:
+          soc: Nervous system disorders
+          severity: mild
+          action: routine_surveillance
+      check_neuropathy:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: NEUROPATHY
+        true_next: moderate
+        false_next: check_syncope
+      check_encephalitis:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: ENCEPHALITIS
+        true_next: critical
+        false_next: check_gbs
+      check_syncope:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: SYNCOPE
+        true_next: moderate
+        false_next: mild
+      check_pml:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: PROGRESSIVE MULTIFOCAL LEUKOENCEPHALOPATHY
+        true_next: critical
+        false_next: check_seizure
+      check_seizure:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: SEIZURE
+        true_next: serious
+        false_next: check_encephalitis
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: reaction_pt
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: reaction_pt
+        operator: not_contains
+        value: PROGRESSIVE MULTIFOCAL LEUKOENCEPHALOPATHY
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      reaction_pt:
+        type: string
+        required: true
+    outputs:
+      confidence:
+        type: string
+        required: false
+      severity:
+        type: string
+        required: false
+      soc:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    reaction_pt: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

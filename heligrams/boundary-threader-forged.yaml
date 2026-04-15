@@ -1,0 +1,315 @@
+name: boundary-threader-helix
+description: 'Forged from microgram ''boundary-threader''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    analytical_capability: falsified
+sense:
+  tree:
+    start: check_streams
+    nodes:
+      check_boundary:
+        type: condition
+        variable: boundary_type
+        operator: eq
+        value: national
+        true_next: national_boundary
+        false_next: check_state
+      national_boundary:
+        type: condition
+        variable: stream_count
+        operator: gte
+        value: 3
+        true_next: national_multi
+        false_next: national_single
+      zip_npi:
+        type: return
+        value:
+          analytical_capability: Catchment-level incidence, Voronoi tessellation, spatial signal clustering, pharmacy-resolved denominators
+          precision_tier: catchment
+          verification_level: high
+          warning: none
+          threading_status: npi_resolved
+          denominator_type: counted
+      custom_boundary:
+        type: condition
+        variable: has_temporal_window
+        operator: eq
+        value: true
+        true_next: custom_temporal
+        false_next: custom_static
+      national_single:
+        type: return
+        value:
+          analytical_capability: National aggregate rates, limited reconciliation
+          warning: Single stream at national level lacks cross-verification. Add streams to confirm denominator.
+          precision_tier: population
+          denominator_type: estimated
+          verification_level: moderate
+          threading_status: single_stream
+      state_single:
+        type: return
+        value:
+          analytical_capability: State aggregate rates, no cross-stream verification
+          precision_tier: jurisdiction
+          verification_level: moderate
+          threading_status: single_stream
+          warning: Single stream cannot self-verify. Reconciliation with national boundary not possible.
+          denominator_type: estimated
+      check_streams:
+        type: condition
+        variable: stream_count
+        operator: gte
+        value: 1
+        true_next: check_boundary
+        false_next: no_streams
+      check_state:
+        type: condition
+        variable: boundary_type
+        operator: eq
+        value: state
+        true_next: state_boundary
+        false_next: check_chain
+      check_zip:
+        type: condition
+        variable: boundary_type
+        operator: eq
+        value: zip
+        true_next: zip_boundary
+        false_next: check_pharmacy
+      state_boundary:
+        type: condition
+        variable: stream_count
+        operator: gte
+        value: 2
+        true_next: state_verified
+        false_next: state_single
+      no_streams:
+        type: return
+        value:
+          warning: No data streams available. NexCore requires at least 1 stream to thread.
+          verification_level: none
+          analytical_capability: none
+          threading_status: no_streams
+          denominator_type: absent
+          precision_tier: unusable
+      pharmacy_boundary:
+        type: return
+        value:
+          warning: none
+          precision_tier: ground_node
+          threading_status: atomic_resolved
+          verification_level: maximum
+          denominator_type: counted
+          analytical_capability: Individual pharmacy incidence, ground-truth denominator, maximum resolution, upward reconciliation through all levels
+      check_pharmacy:
+        type: condition
+        variable: boundary_type
+        operator: eq
+        value: pharmacy
+        true_next: pharmacy_boundary
+        false_next: custom_boundary
+      custom_static:
+        type: return
+        value:
+          warning: No temporal window. Add time boundary for drift detection and trend analysis.
+          analytical_capability: Custom boundary without temporal context, limited to point-in-time analysis
+          verification_level: low
+          precision_tier: custom
+          denominator_type: estimated
+          threading_status: custom_unwindowed
+      check_chain:
+        type: condition
+        variable: boundary_type
+        operator: eq
+        value: chain
+        true_next: chain_boundary
+        false_next: check_zip
+      zip_boundary:
+        type: condition
+        variable: has_npi_resolution
+        operator: eq
+        value: true
+        true_next: zip_npi
+        false_next: zip_aggregate
+      custom_temporal:
+        type: return
+        value:
+          verification_level: moderate
+          denominator_type: estimated
+          warning: Custom boundaries require manual reconciliation with standard hierarchy levels.
+          analytical_capability: Custom boundary with temporal windowing, Weber effect detection, drift analysis
+          precision_tier: custom
+          threading_status: custom_threaded
+      zip_aggregate:
+        type: return
+        value:
+          analytical_capability: ZIP-level aggregate rates, spatial clustering without pharmacy resolution
+          verification_level: moderate
+          warning: Without NPI resolution, pharmacy-level reconciliation is not possible within this ZIP.
+          precision_tier: catchment
+          threading_status: aggregate_only
+          denominator_type: estimated
+      chain_boundary:
+        type: return
+        value:
+          warning: none
+          verification_level: high
+          precision_tier: distribution
+          denominator_type: counted
+          analytical_capability: Chain-specific utilization, distribution channel analysis, chain-to-chain comparison
+          threading_status: chain_threaded
+      state_verified:
+        type: return
+        value:
+          precision_tier: jurisdiction
+          denominator_type: counted
+          warning: none
+          threading_status: multi_stream_threaded
+          verification_level: high
+          analytical_capability: State-level incidence rates, regulatory jurisdiction alignment, upward reconciliation to national
+      national_multi:
+        type: return
+        value:
+          precision_tier: population
+          denominator_type: counted
+          analytical_capability: National incidence rates, cross-stream reconciliation, population-level signal detection
+          threading_status: multi_stream_threaded
+          verification_level: high
+          warning: none
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: boundary_type
+        operator: lt
+        value: 1
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: boundary_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      boundary_type:
+        type: string
+        required: true
+      has_npi_resolution:
+        type: bool
+        required: false
+      geographic_level:
+        type: string
+        required: false
+      has_temporal_window:
+        type: bool
+        required: false
+      denominator_source:
+        type: string
+        required: false
+      stream_count:
+        type: int
+        required: true
+    outputs:
+      analytical_capability:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      threading_status:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      warning:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      precision_tier:
+        type: string
+        required: false
+      verification_level:
+        type: string
+        required: false
+      denominator_type:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    boundary_type: 11
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    boundary_type: 0
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

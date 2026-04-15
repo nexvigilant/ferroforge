@@ -1,0 +1,148 @@
+name: tox-endocrine-helix
+description: 'Forged from microgram ''tox-endocrine''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    severity: falsified
+sense:
+  tree:
+    start: check_severe
+    nodes:
+      check_mild:
+        type: condition
+        variable: tsh_ratio
+        operator: gte
+        value: 2.0
+        true_next: mild
+        false_next: normal
+      severe:
+        type: return
+        value:
+          severity: severe
+          action: discontinue
+          organ: endocrine
+          target: thyroid
+      mild:
+        type: return
+        value:
+          action: monitor_closely
+          target: thyroid
+          severity: mild
+          organ: endocrine
+      check_severe:
+        type: condition
+        variable: tsh_ratio
+        operator: gte
+        value: 5.0
+        true_next: severe
+        false_next: check_mild
+      normal:
+        type: return
+        value:
+          organ: endocrine
+          action: continue
+          target: thyroid
+          severity: normal
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: tsh_ratio
+        operator: lt
+        value: 5.0
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: tsh_ratio
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      tsh_ratio:
+        type: float
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    tsh_ratio: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input:
+    tsh_ratio: 5.001
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

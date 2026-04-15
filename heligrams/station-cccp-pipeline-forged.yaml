@@ -1,0 +1,148 @@
+name: station-cccp-pipeline-helix
+description: 'Forged from microgram ''station-cccp-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    reason: falsified
+sense:
+  tree:
+    start: check_level
+    nodes:
+      independent:
+        type: return
+        value:
+          reason: Entrustment L4+ — independent practice level achieved
+          priority: low
+          action: certify
+          route: certification
+      check_level:
+        type: condition
+        variable: entrustment_level
+        operator: gte
+        value: 4
+        true_next: independent
+        false_next: check_progress
+      major_gaps:
+        type: return
+        value:
+          reason: 5+ competency gaps — structured development plan needed
+          route: learning_plan
+          priority: high
+          action: remediate
+      check_progress:
+        type: condition
+        variable: gap_count
+        operator: gte
+        value: 5
+        true_next: major_gaps
+        false_next: on_track
+      on_track:
+        type: return
+        value:
+          route: periodic_review
+          action: continue
+          priority: moderate
+          reason: Progressing with minor gaps — continue current pathway
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: entrustment_level
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: entrustment_level
+        operator: lt
+        value: 4
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      entrustment_level:
+        type: integer
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    entrustment_level: 14
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    entrustment_level: 3
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

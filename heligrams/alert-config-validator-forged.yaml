@@ -1,0 +1,187 @@
+name: alert-config-validator-helix
+description: 'Forged from microgram ''alert-config-validator''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    status: falsified
+sense:
+  tree:
+    start: check_threshold
+    nodes:
+      check_threshold:
+        type: condition
+        variable: has_threshold
+        operator: eq
+        value: true
+        true_next: check_notification
+        false_next: missing_threshold
+      valid:
+        type: return
+        value:
+          status: VALID
+          description: Alert configuration complete - threshold, notification, and severity all valid
+      check_notification:
+        type: condition
+        variable: has_notification
+        operator: eq
+        value: true
+        true_next: check_severity_critical
+        false_next: missing_notification
+      check_severity_critical:
+        type: condition
+        variable: severity
+        operator: eq
+        value: critical
+        true_next: valid
+        false_next: check_severity_high
+      missing_threshold:
+        type: return
+        value:
+          description: Alert configuration missing threshold - cannot trigger without a threshold value
+          status: MISSING_THRESHOLD
+      missing_notification:
+        type: return
+        value:
+          status: MISSING_NOTIFICATION
+          description: Alert configuration missing notification channel - alerts have nowhere to be sent
+      check_severity_high:
+        type: condition
+        variable: severity
+        operator: eq
+        value: high
+        true_next: valid
+        false_next: check_severity_medium
+      invalid_severity:
+        type: return
+        value:
+          description: Alert severity must be critical/high/medium/low
+          status: INVALID_SEVERITY
+      check_severity_low:
+        type: condition
+        variable: severity
+        operator: eq
+        value: low
+        true_next: valid
+        false_next: invalid_severity
+      check_severity_medium:
+        type: condition
+        variable: severity
+        operator: eq
+        value: medium
+        true_next: valid
+        false_next: check_severity_low
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: has_threshold
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_negation:
+        type: condition
+        variable: has_threshold
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_threshold:
+        type: bool
+        required: false
+      has_notification:
+        type: bool
+        required: false
+      severity:
+        type: string
+        required: false
+    outputs:
+      description:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      status:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    has_threshold: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    has_threshold: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

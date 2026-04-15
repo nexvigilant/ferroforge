@@ -1,0 +1,43 @@
+name: ml-signal-to-action
+description: 'End-to-end ML signal pipeline: PRR signal strength → ML vs statistical comparison → causality-informed action routing. Takes disproportionality scores and ML probability, classifies agreement, then routes to appropriate PV action.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - prr-signal
+  - ml-vs-statistical-comparator
+  - causality-to-action
+tests:
+  - name: strong signal — both agree, escalate to causality
+    input:
+      drug_count: 18407
+      no_drug_count: 11787
+      drug_no_event_count: 408476
+      no_drug_no_event_count: 19568319
+      ml_probability: 0.96
+      causality_score: 7
+    expect:
+      signal_strength: strong
+      agreement: BOTH_SIGNAL
+      action: escalate
+  - name: noise — both agree, archive
+    input:
+      drug_count: 8500
+      no_drug_count: 890000
+      drug_no_event_count: 418383
+      no_drug_no_event_count: 18683117
+      ml_probability: 0.07
+      causality_score: 1
+    expect:
+      agreement: BOTH_NOISE
+  - name: false alarm — PRR only, deprioritize
+    input:
+      drug_count: 12000
+      no_drug_count: 320000
+      drug_no_event_count: 78000
+      no_drug_no_event_count: 19590000
+      ml_probability: 0.17
+      causality_score: 2
+    expect:
+      agreement: PRR_ONLY
+      action: deprioritize

@@ -1,0 +1,222 @@
+name: e2a-ae-vs-adr-helix
+description: 'Forged from microgram ''e2a-ae-vs-adr''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    reportable: falsified
+sense:
+  tree:
+    start: causal_check
+    nodes:
+      classify_adr:
+        type: return
+        value:
+          reportable: true
+          definition: Adverse Drug Reaction - noxious and unintended response at doses normally used
+          regulatory_reference: ICH E2A Section 2 - Definitions
+          classification: ADR
+      causal_check:
+        type: condition
+        variable: reasonable_causal_relationship
+        operator: eq
+        value: 'true'
+        true_next: classify_adr
+        false_next: causal_false_check
+      classify_ae_suspect:
+        type: return
+        value:
+          classification: AE_SUSPECT
+          reportable: true
+          regulatory_reference: ICH E2A Section 2 - Definitions
+          definition: Adverse Event with unknown causality but temporal association present
+      study_check:
+        type: condition
+        variable: occurred_during_study
+        operator: eq
+        value: true
+        true_next: classify_ae
+        false_next: classify_not_related
+      classify_ae_unlikely:
+        type: return
+        value:
+          classification: AE_UNLIKELY
+          definition: Adverse Event with unknown causality and no temporal association
+          reportable: false
+          regulatory_reference: ICH E2A Section 2 - Definitions
+      classify_not_related:
+        type: return
+        value:
+          definition: Event occurred outside study context with no causal relationship
+          reportable: false
+          classification: NOT_RELATED
+          regulatory_reference: ICH E2A Section 2 - Definitions
+      default_ae:
+        type: return
+        value:
+          definition: Adverse Event - default classification when causality not assessed
+          regulatory_reference: ICH E2A Section 2 - Definitions
+          reportable: true
+          classification: AE
+      causal_unknown_check:
+        type: condition
+        variable: reasonable_causal_relationship
+        operator: eq
+        value: unknown
+        true_next: temporal_check
+        false_next: default_ae
+      temporal_check:
+        type: condition
+        variable: temporal_association
+        operator: eq
+        value: true
+        true_next: classify_ae_suspect
+        false_next: classify_ae_unlikely
+      classify_ae:
+        type: return
+        value:
+          definition: Adverse Event - untoward medical occurrence during study without causal relationship
+          reportable: true
+          classification: AE
+          regulatory_reference: ICH E2A Section 2 - Definitions
+      causal_false_check:
+        type: condition
+        variable: reasonable_causal_relationship
+        operator: eq
+        value: 'false'
+        true_next: study_check
+        false_next: causal_unknown_check
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: reasonable_causal_relationship
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: reasonable_causal_relationship
+        operator: neq
+        value: 'true'
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      reportable: true
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      reportable: true
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      falsified: false
+      reportable: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      reasonable_causal_relationship:
+        type: string
+        required: false
+      temporal_association:
+        type: bool
+        required: false
+      occurred_during_study:
+        type: bool
+        required: false
+    outputs:
+      regulatory_reference:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      classification:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      reportable:
+        type: bool
+        required: false
+      definition:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    temporal_association: true
+    reasonable_causal_relationship: null
+    occurred_during_study: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    temporal_association: true
+    reasonable_causal_relationship: __negated__
+    occurred_during_study: true
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

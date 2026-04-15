@@ -1,0 +1,151 @@
+name: pvos-calibrate-gate-helix
+description: 'Forged from microgram ''pvos-calibrate-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    decision: falsified
+sense:
+  tree:
+    start: check_sample
+    nodes:
+      insufficient_data:
+        type: return
+        value:
+          decision: INSUFFICIENT_DATA
+          description: Sample size below 100 - collect more cases before calibrating thresholds
+      insufficient_feedback:
+        type: return
+        value:
+          decision: INSUFFICIENT_DATA
+          description: Feedback count below 10 - collect more signal review feedback before calibrating
+      calibrate:
+        type: return
+        value:
+          decision: CALIBRATE
+          description: Sufficient data and feedback - proceed with threshold calibration
+      check_feedback:
+        type: condition
+        variable: feedback_count
+        operator: gte
+        value: 10
+        true_next: calibrate
+        false_next: insufficient_feedback
+      check_sample:
+        type: condition
+        variable: sample_size
+        operator: gte
+        value: 100
+        true_next: check_feedback
+        false_next: insufficient_data
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: feedback_count
+        operator: lt
+        value: 100
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: feedback_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      sample_size:
+        type: int
+        required: false
+      feedback_count:
+        type: int
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      description:
+        type: string
+        required: false
+      decision:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    feedback_count: 110
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    feedback_count: 99
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

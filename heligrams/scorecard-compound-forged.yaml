@@ -1,0 +1,237 @@
+name: scorecard-compound-helix
+description: 'Forged from microgram ''scorecard-compound''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    compound_level: falsified
+sense:
+  tree:
+    start: parse_levels
+    nodes:
+      parse_levels:
+        type: condition
+        variable: session_levels
+        operator: contains
+        value: ','
+        true_next: multi_session
+        false_next: single_session
+      check_spark_heavy:
+        type: condition
+        variable: session_levels
+        operator: contains
+        value: '4'
+        true_next: mixed_chain
+        false_next: all_sparks
+      multi_session:
+        type: condition
+        variable: session_levels
+        operator: contains
+        value: '3'
+        true_next: check_spark_heavy
+        false_next: check_high_compound
+      all_sparks:
+        type: return
+        value:
+          compound_level: 3.0
+          chain_expression: →(κ(ς(∅))) × n — energy without persistence, repeated
+          persistence_ratio: 0.0
+          governor_signal: HALT — every session is producing sparks. Stop new work. Commit existing work. The flywheel is generating heat, not momentum. π=0 across all sessions.
+          spark_count: all
+          compound_verdict: heat_accumulation
+          deficit: 0.5
+      mixed_chain:
+        type: condition
+        variable: session_levels
+        operator: contains
+        value: '5'
+        true_next: mixed_with_ships
+        false_next: mixed_persist_spark
+      mixed_with_ships:
+        type: return
+        value:
+          deficit: -0.5
+          spark_count: some
+          governor_signal: CONTINUE — shipping is happening. Clear remaining sparks before starting new chains. persistence_ratio above 0.5 = healthy.
+          compound_verdict: healthy_with_sparks
+          compound_level: 4.0
+          persistence_ratio: 0.6
+          chain_expression: Σ(∝,π,→) / n — mix of shipped, persisted, and sparked
+      mixed_persist_spark:
+        type: return
+        value:
+          chain_expression: Σ(π,→) / n — persisting some, sparking others
+          governor_signal: CONSOLIDATE — persistence ratio below 0.5. Commit existing sparks before starting new work. One consolidation session per two production sessions.
+          persistence_ratio: 0.4
+          compound_level: 3.5
+          compound_verdict: consolidation_needed
+          deficit: 0.0
+          spark_count: some
+      check_high_compound:
+        type: condition
+        variable: session_levels
+        operator: contains
+        value: '5'
+        true_next: shipping_chain
+        false_next: low_chain
+      shipping_chain:
+        type: return
+        value:
+          governor_signal: CONTINUE — the flywheel is converting energy to momentum. Ship rate high.
+          compound_level: 4.5
+          deficit: -1.0
+          spark_count: 0
+          persistence_ratio: 0.9
+          compound_verdict: shipping
+          chain_expression: ∝(π(→(κ(ς(∅))))) dominant — full product chain completing
+      low_chain:
+        type: return
+        value:
+          spark_count: 0
+          compound_verdict: research_phase
+          chain_expression: ς(∅) + κ(ς(∅)) — measuring and comparing, not acting
+          persistence_ratio: 0.0
+          deficit: 2.0
+          governor_signal: CONTINUE if audit/research phase. ESCALATE if implementation phase — product chain is not advancing past L2.
+          compound_level: 1.5
+      single_session:
+        type: return
+        value:
+          governor_signal: N/A
+          deficit: 0
+          persistence_ratio: 1.0
+          compound_level: '{{session_levels}}'
+          compound_verdict: single_session
+          spark_count: 0
+          chain_expression: single unit — use session-scorecard directly
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: session_levels
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: session_levels
+        operator: not_contains
+        value: ','
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      session_levels:
+        type: string
+        required: true
+      scale:
+        type: string
+        required: false
+      target_level:
+        type: float
+        required: false
+    outputs:
+      governor_signal:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      persistence_ratio:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      compound_verdict:
+        type: string
+        required: false
+      compound_level:
+        type: float
+        required: false
+      deficit:
+        type: float
+        required: false
+      spark_count:
+        type: int
+        required: false
+      confidence:
+        type: string
+        required: false
+      chain_expression:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    session_levels: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - ∝
+  - π
+  - →
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

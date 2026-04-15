@@ -1,0 +1,155 @@
+name: psur-signal-summary-helix
+description: 'Forged from microgram ''psur-signal-summary''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    psur_signal_compliant: falsified
+sense:
+  tree:
+    start: validate_signals
+    nodes:
+      no_signals:
+        type: return
+        value:
+          summary_content: statement_no_new_signals
+          psur_signal_compliant: true
+          label_update_indicated: false
+          escalation_required: false
+          signal_summary_required: false
+      check_signal_count:
+        type: condition
+        variable: signal_count
+        operator: gte
+        value: 1
+        true_next: summarize_signals
+        false_next: no_signals
+      summarize_signals:
+        type: return
+        value:
+          summary_content: signal_list,causality_assessment,recommendations
+          escalation_required: true
+          psur_signal_compliant: true
+          label_update_indicated: true
+          signal_summary_required: true
+      validate_signals:
+        type: condition
+        variable: signals_identified
+        operator: eq
+        value: true
+        true_next: check_signal_count
+        false_next: no_signals
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: signal_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: signal_count
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      psur_signal_compliant: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      psur_signal_compliant: true
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      psur_signal_compliant: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      signal_count:
+        type: bool
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    signal_count: null
+    signals_identified: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    signal_count: false
+    signals_identified: true
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

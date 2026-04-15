@@ -1,0 +1,204 @@
+name: forge-quality-floor-classify-helix
+description: 'Forged from microgram ''forge-quality-floor-classify''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regime: falsified
+sense:
+  tree:
+    start: check_total_present
+    nodes:
+      check_demonstrated_present:
+        type: condition
+        variable: demonstrated
+        operator: is_null
+        value: null
+        true_next: reject
+        false_next: check_high
+      cautious_low:
+        type: return
+        value:
+          regime: CAUTIOUS
+          action: Low success rate — lower quality bar to encourage shipping
+          quality_floor: 0.25
+      cautious:
+        type: return
+        value:
+          action: Moderate success rate — standard Forge thresholds
+          regime: CAUTIOUS
+          quality_floor: 0.313
+      check_high:
+        type: condition
+        variable: demonstrated
+        operator: gte
+        value: 5
+        true_next: confident
+        false_next: check_moderate
+      confident:
+        type: return
+        value:
+          quality_floor: 0.5
+          action: High success rate — ship with confidence
+          regime: CONFIDENT
+      degraded:
+        type: return
+        value:
+          quality_floor: 0.15
+          action: Zero successes — learning mode, accept any working output
+          regime: DEGRADED
+      check_total_nonzero:
+        type: condition
+        variable: total
+        operator: gt
+        value: 0
+        true_next: check_demonstrated_present
+        false_next: use_default
+      reject:
+        type: return
+        value:
+          action: Missing inputs — using evolved default 0.313
+          quality_floor: 0.313
+          regime: REJECTED
+      check_moderate:
+        type: condition
+        variable: demonstrated
+        operator: gte
+        value: 2
+        true_next: cautious
+        false_next: check_any
+      check_any:
+        type: condition
+        variable: demonstrated
+        operator: gte
+        value: 1
+        true_next: cautious_low
+        false_next: degraded
+      check_total_present:
+        type: condition
+        variable: total
+        operator: is_null
+        value: null
+        true_next: reject
+        false_next: check_total_nonzero
+      use_default:
+        type: return
+        value:
+          regime: CAUTIOUS
+          quality_floor: 0.313
+          action: No session data — using evolved default 0.313
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: demonstrated
+        operator: is_not_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: demonstrated
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      demonstrated:
+        type: int
+        required: true
+      total:
+        type: int
+        required: true
+    outputs:
+      quality_floor:
+        type: float
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      regime:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    demonstrated: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - demonstrated
+  - total
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

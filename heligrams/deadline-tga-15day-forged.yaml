@@ -1,0 +1,188 @@
+name: deadline-tga-15day-helix
+description: 'Forged from microgram ''deadline-tga-15day''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regulatory_compliant: falsified
+sense:
+  tree:
+    start: validate_event
+    nodes:
+      routine_deadline:
+        type: return
+        value:
+          reporting_deadline_days: 30
+          event_category: non_serious
+          regulatory_requirement: TGA_Australia
+          regulatory_compliant: true
+          urgent_notification_required: false
+      validate_event:
+        type: condition
+        variable: event_date
+        operator: is_not_null
+        value: null
+        true_next: check_seriousness
+        false_next: deadline_unknown
+      serious_unexpected_deadline:
+        type: return
+        value:
+          regulatory_requirement: TGA_Australia
+          regulatory_compliant: true
+          reporting_deadline_days: 15
+          event_category: serious_unexpected_adverse_reaction
+          urgent_notification_required: true
+      check_seriousness:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_unexpectedness
+        false_next: routine_deadline
+      deadline_unknown:
+        type: return
+        value:
+          regulatory_requirement: null
+          urgent_notification_required: null
+          reporting_deadline_days: null
+          event_category: null
+          regulatory_compliant: false
+      check_unexpectedness:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: serious_unexpected_deadline
+        false_next: serious_expected_deadline
+      serious_expected_deadline:
+        type: return
+        value:
+          urgent_notification_required: false
+          reporting_deadline_days: 30
+          event_category: serious_expected_adverse_reaction
+          regulatory_requirement: TGA_Australia
+          regulatory_compliant: true
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: event_date
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: event_date
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      regulatory_compliant: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      regulatory_compliant: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when:
+      regulatory_compliant: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when:
+      regulatory_compliant: false
+      falsified: true
+    default: null
+    emit:
+      confidence: medium
+      confidence_score: 0.42
+      verdict: refuted
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      event_date:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    event_date: null
+    is_unexpected: true
+    is_serious: true
+  expect:
+    confidence: high
+    verdict: absent
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    event_date: 2024-01-15
+    is_serious: true
+    is_unexpected: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

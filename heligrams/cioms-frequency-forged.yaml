@@ -1,0 +1,201 @@
+name: cioms-frequency-helix
+description: 'Forged from microgram ''cioms-frequency''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    cioms_category: falsified
+sense:
+  tree:
+    start: very_common_check
+    nodes:
+      common_check:
+        type: condition
+        variable: incidence_pct
+        operator: gte
+        value: 1.0
+        true_next: common
+        false_next: uncommon_check
+      common:
+        type: return
+        value:
+          cioms_category: '>=1/100 to <1/10'
+          label_text: Common
+          frequency: COMMON
+          section_in_smpc: Section 4.8
+      very_rare_check:
+        type: condition
+        variable: incidence_pct
+        operator: gt
+        value: 0.0
+        true_next: very_rare
+        false_next: not_known
+      rare:
+        type: return
+        value:
+          frequency: RARE
+          label_text: Rare
+          cioms_category: '>=1/10,000 to <1/1,000'
+          section_in_smpc: Section 4.8
+      rare_check:
+        type: condition
+        variable: incidence_pct
+        operator: gte
+        value: 0.01
+        true_next: rare
+        false_next: very_rare_check
+      very_common:
+        type: return
+        value:
+          label_text: Very common
+          section_in_smpc: Section 4.8
+          frequency: VERY_COMMON
+          cioms_category: '>=1/10'
+      very_common_check:
+        type: condition
+        variable: incidence_pct
+        operator: gte
+        value: 10.0
+        true_next: very_common
+        false_next: common_check
+      uncommon_check:
+        type: condition
+        variable: incidence_pct
+        operator: gte
+        value: 0.1
+        true_next: uncommon
+        false_next: rare_check
+      uncommon:
+        type: return
+        value:
+          cioms_category: '>=1/1,000 to <1/100'
+          section_in_smpc: Section 4.8
+          label_text: Uncommon
+          frequency: UNCOMMON
+      very_rare:
+        type: return
+        value:
+          label_text: Very rare
+          frequency: VERY_RARE
+          section_in_smpc: Section 4.8
+          cioms_category: <1/10,000
+      not_known:
+        type: return
+        value:
+          section_in_smpc: Section 4.8
+          cioms_category: not known
+          label_text: Frequency not known
+          frequency: NOT_KNOWN
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: incidence_pct
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: incidence_pct
+        operator: lt
+        value: 10.0
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      incidence_pct:
+        type: float
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      section_in_smpc:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      cioms_category:
+        type: string
+        required: false
+      frequency:
+        type: string
+        required: false
+      label_text:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    incidence_pct: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

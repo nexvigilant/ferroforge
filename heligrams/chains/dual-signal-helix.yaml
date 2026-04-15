@@ -1,0 +1,55 @@
+name: dual-signal-helix
+description: >
+  Dual-metric signal detection chain: PRR + ROR heligrams in sequence.
+  First heligram evaluates PRR threshold with sample-size falsification.
+  Second evaluates ROR with CI-awareness and source-bias falsification.
+  Twist point after step 2 reviews agreement across both metrics.
+  Chain verdict: both confirmed = strong signal, one contested = investigate,
+  both contested = likely false positive, both no_signal = closed.
+version: 0.1.0
+type: heligram_chain
+helix:
+  twist_rate: 2
+micrograms_dir: ..
+accumulate: true
+steps:
+  - prr-signal-helix
+  - ror-signal-helix
+tests:
+- name: both confirm — strong signal
+  input:
+    prr: 3.5
+    total_reports: 50
+    notoriety_bias: false
+    ror: 3.2
+    ror_lower_ci: 1.8
+    single_source: false
+    known_interaction: false
+  expect:
+    verdict: confirmed_signal
+- name: PRR confirms, ROR contested — investigate
+  input:
+    prr: 3.5
+    total_reports: 50
+    notoriety_bias: false
+    ror: 3.0
+    ror_lower_ci: 1.5
+    single_source: true
+    known_interaction: false
+  expect:
+    signal_detected: true
+- name: both no signal — closed
+  input:
+    prr: 1.0
+    total_reports: 100
+    notoriety_bias: false
+    ror: 0.8
+    ror_lower_ci: 0.3
+    single_source: false
+    known_interaction: false
+  expect:
+    verdict: no_signal
+- name: null safety
+  input: {}
+  expect:
+    verdict: no_signal

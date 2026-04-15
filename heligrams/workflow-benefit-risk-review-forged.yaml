@@ -1,0 +1,145 @@
+name: workflow-benefit-risk-review-helix
+description: 'Forged from microgram ''workflow-benefit-risk-review''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    assessors: falsified
+sense:
+  tree:
+    start: check_stage
+    nodes:
+      ongoing:
+        type: return
+        value:
+          assessors: 2
+          depth: signal_triggered
+          chain: benefit-risk → vigilance
+      full_review:
+        type: return
+        value:
+          depth: comprehensive
+          assessors: 4
+          chain: benefit-risk → epidemiology → compliance → ema
+      check_stage:
+        type: condition
+        variable: lifecycle_stage
+        operator: eq
+        value: approval
+        true_next: full_review
+        false_next: check_psur
+      check_psur:
+        type: condition
+        variable: lifecycle_stage
+        operator: eq
+        value: psur
+        true_next: periodic_review
+        false_next: ongoing
+      periodic_review:
+        type: return
+        value:
+          assessors: 3
+          depth: periodic
+          chain: benefit-risk → ema → compliance
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: lifecycle_stage
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_negation:
+        type: condition
+        variable: lifecycle_stage
+        operator: neq
+        value: approval
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      lifecycle_stage:
+        type: string
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    lifecycle_stage: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    lifecycle_stage: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

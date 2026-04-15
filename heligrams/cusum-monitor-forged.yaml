@@ -1,0 +1,198 @@
+name: cusum-monitor-helix
+description: 'Forged from microgram ''cusum-monitor''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    cusum_breached: falsified
+sense:
+  tree:
+    start: check_breach
+    nodes:
+      accumulating:
+        type: return
+        value:
+          action: Current value elevated above baseline. Continue monitoring and update cumulative sum.
+          status: ACCUMULATING
+          cusum_breached: false
+      alert:
+        type: return
+        value:
+          action: Shift detected — cumulative deviation exceeds threshold. Initiate signal review.
+          status: ALERT
+          cusum_breached: true
+      normal:
+        type: return
+        value:
+          status: NORMAL
+          cusum_breached: false
+          action: No deviation detected. Routine monitoring continues.
+      check_threshold:
+        type: condition
+        variable: previous_cusum
+        operator: gte
+        value: 500
+        true_next: alert
+        false_next: check_elevated
+      check_elevated:
+        type: condition
+        variable: current_value
+        operator: gt
+        value: 150
+        true_next: accumulating
+        false_next: normal
+      check_breach:
+        type: condition
+        variable: previous_cusum
+        operator: gt
+        value: 0
+        true_next: check_threshold
+        false_next: check_elevated
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: previous_cusum
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: previous_cusum
+        operator: lte
+        value: 0
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      cusum_breached: true
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      cusum_breached: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      cusum_breached: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: absent
+  - when:
+      falsified: true
+      cusum_breached: false
+    default: null
+    emit:
+      verdict: refuted
+      confidence: medium
+      confidence_score: 0.42
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      threshold_h:
+        type: int
+        required: false
+      baseline_mean:
+        type: int
+        required: false
+      previous_cusum:
+        type: int
+        required: false
+      current_value:
+        type: int
+        required: false
+    outputs:
+      status:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      action:
+        type: string
+        required: false
+      cusum_breached:
+        type: bool
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    current_value: 200
+    baseline_mean: 100
+    previous_cusum: null
+    threshold_h: 500
+  expect:
+    confidence: high
+    verdict: absent
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    current_value: 200
+    baseline_mean: 100
+    previous_cusum: 550
+    threshold_h: 500
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - previous_cusum
+  - threshold_h
+  - current_value
+  - baseline_mean
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

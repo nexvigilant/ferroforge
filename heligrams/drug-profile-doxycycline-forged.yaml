@@ -1,0 +1,240 @@
+name: drug-profile-doxycycline-helix
+description: 'Forged from microgram ''drug-profile-doxycycline''. Domain: SignalDetection. 4 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    drug: falsified
+sense:
+  tree:
+    start: check_prr_present
+    nodes:
+      check_prr_present:
+        type: condition
+        variable: prr
+        operator: is_null
+        value: null
+        true_next: unknown
+        false_next: check_high_prr
+      check_high_prr:
+        type: condition
+        variable: prr
+        operator: gte
+        value: 3.0
+        true_next: check_serious
+        false_next: check_moderate_prr
+      high_risk:
+        type: return
+        value:
+          drug: doxycycline
+          monitoring: weekly
+          risk_level: HIGH
+      elevated:
+        type: return
+        value:
+          risk_level: ELEVATED
+          monitoring: biweekly
+          drug: doxycycline
+      check_serious:
+        type: condition
+        variable: serious_pct
+        operator: gte
+        value: 0.5
+        true_next: high_risk
+        false_next: elevated
+      check_moderate_prr:
+        type: condition
+        variable: prr
+        operator: gte
+        value: 2.0
+        true_next: moderate
+        false_next: low_risk
+      moderate:
+        type: return
+        value:
+          risk_level: MODERATE
+          drug: doxycycline
+          monitoring: monthly
+      low_risk:
+        type: return
+        value:
+          risk_level: LOW
+          monitoring: quarterly
+          drug: doxycycline
+      unknown:
+        type: return
+        value:
+          drug: doxycycline
+          risk_level: UNKNOWN
+          monitoring: baseline
+antisense:
+  tree:
+    start: null_guard_insufficient_n
+    nodes:
+      check_notoriety_bias:
+        type: condition
+        variable: notoriety_bias
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_weber_effect
+      check_insufficient_n:
+        type: condition
+        variable: case_count
+        operator: lt
+        value: 3
+        true_next: falsified
+        false_next: null_guard_notoriety_bias
+      check_channeling_bias:
+        type: condition
+        variable: channeling_bias
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_channeling_bias:
+        type: condition
+        variable: channeling_bias
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_channeling_bias
+      null_guard_notoriety_bias:
+        type: condition
+        variable: notoriety_bias
+        operator: is_null
+        value: null
+        true_next: null_guard_weber_effect
+        false_next: check_notoriety_bias
+      check_weber_effect:
+        type: condition
+        variable: years_on_market
+        operator: gt
+        value: 5
+        true_next: falsified
+        false_next: null_guard_channeling_bias
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_weber_effect:
+        type: condition
+        variable: years_on_market
+        operator: is_null
+        value: null
+        true_next: null_guard_channeling_bias
+        false_next: check_weber_effect
+      null_guard_insufficient_n:
+        type: condition
+        variable: case_count
+        operator: is_null
+        value: null
+        true_next: null_guard_notoriety_bias
+        false_next: check_insufficient_n
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7000000000000001
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.28
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      notoriety_bias:
+        type: bool
+        required: false
+      case_count:
+        type: int
+        required: false
+      serious_pct:
+        type: float
+        required: false
+      channeling_bias:
+        type: bool
+        required: false
+      prr:
+        type: float
+        required: true
+      years_on_market:
+        type: integer
+        required: false
+    outputs:
+      monitoring:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      risk_level:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    notoriety_bias: false
+    years_on_market: 0
+    case_count: 13
+    channeling_bias: false
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, insufficient_n active'
+  input:
+    case_count: 2
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — signal-detection with 4 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - prr
+  - case_count
+  - serious_pct
+  chain_prediction: 'Forged heligram. Domain: signal-detection. Chains as dual-strand verifier before downstream consumers.'

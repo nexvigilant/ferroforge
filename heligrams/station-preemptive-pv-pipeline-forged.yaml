@@ -1,0 +1,148 @@
+name: station-preemptive-pv-pipeline-helix
+description: 'Forged from microgram ''station-preemptive-pv-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    priority: falsified
+sense:
+  tree:
+    start: check_trajectory
+    nodes:
+      narrow_window:
+        type: return
+        value:
+          priority: high
+          route: risk_management
+          reason: Intervention window ≤7 days — prepare risk minimization measures
+          action: prepare
+      wide_window:
+        type: return
+        value:
+          action: monitor
+          route: enhanced_monitoring
+          priority: moderate
+          reason: Intervention window >7 days — time to gather more data
+      check_trajectory:
+        type: condition
+        variable: trajectory_severity
+        operator: eq
+        value: critical
+        true_next: critical_trajectory
+        false_next: check_window
+      check_window:
+        type: condition
+        variable: intervention_window_days
+        operator: lte
+        value: 7
+        true_next: narrow_window
+        false_next: wide_window
+      critical_trajectory:
+        type: return
+        value:
+          priority: critical
+          reason: Predicted critical trajectory — preemptive intervention required NOW
+          route: preemptive_action
+          action: intervene
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: trajectory_severity
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: trajectory_severity
+        operator: neq
+        value: critical
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      trajectory_severity:
+        type: string
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    trajectory_severity: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    trajectory_severity: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

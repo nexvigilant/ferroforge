@@ -1,0 +1,186 @@
+name: fda-abuse-deterrent-eval-helix
+description: 'Forged from microgram ''fda-abuse-deterrent-eval''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    labeling_claim: falsified
+sense:
+  tree:
+    start: check_in_vitro
+    nodes:
+      partial_resistant_path:
+        type: return
+        value:
+          labeling_claim: Labeling may describe partial resistance to specific manipulation pathways. Must specify which pathways are and are not deterred.
+          evaluation_category: PARTIAL_DETERRENCE
+          regulatory_reference: 'FDA Guidance: Abuse-Deterrent Opioids (2015), Section III.B'
+          study_requirements: Category 1-2 data supports partial claim. Category 3 clinical study recommended for the specific abuse pathway.
+      not_resistant_path:
+        type: return
+        value:
+          study_requirements: Standard NDA requirements apply. Consider REMS with ETASS for opioid products.
+          labeling_claim: No abuse-deterrent labeling claim supportable. Product may still be approved as standard opioid formulation.
+          evaluation_category: NO_DETERRENT_CLAIM
+          regulatory_reference: 'FDA Guidance: Abuse-Deterrent Opioids (2015), Section II; Opioid REMS'
+      check_in_vitro:
+        type: condition
+        variable: in_vitro_result
+        operator: eq
+        value: resistant
+        true_next: check_clinical_study
+        false_next: check_partial
+      check_partial:
+        type: condition
+        variable: in_vitro_result
+        operator: eq
+        value: partially_resistant
+        true_next: partial_resistant_path
+        false_next: not_resistant_path
+      full_evaluation:
+        type: return
+        value:
+          study_requirements: 'Complete: In vitro manipulation (Cat 1), PK (Cat 2), Clinical abuse potential (Cat 3). Category 4 (postmarket) studies recommended.'
+          evaluation_category: CATEGORY_1_2_3
+          labeling_claim: Labeling may describe abuse-deterrent properties with Categories 1-3 data. Include specific abuse pathways tested and limitations.
+          regulatory_reference: 'FDA Guidance: Abuse-Deterrent Opioids - Evaluation and Labeling (2015), Sections III-IV'
+      in_vitro_only:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: Abuse-Deterrent Opioids (2015), Section III.C'
+          labeling_claim: Labeling may describe physical/chemical properties but cannot claim reduced abuse without clinical (Cat 3) data
+          evaluation_category: CATEGORY_1_2_ONLY
+          study_requirements: Category 3 clinical abuse potential study needed to support abuse-deterrent labeling claim
+      check_clinical_study:
+        type: condition
+        variable: clinical_abuse_study
+        operator: eq
+        value: true
+        true_next: full_evaluation
+        false_next: in_vitro_only
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: in_vitro_result
+        operator: neq
+        value: resistant
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: in_vitro_result
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      formulation_category:
+        type: string
+        required: true
+      abuse_pathway:
+        type: string
+        required: true
+      clinical_abuse_study:
+        type: bool
+        required: false
+      in_vitro_result:
+        type: string
+        required: false
+    outputs:
+      evaluation_category:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      study_requirements:
+        type: string
+        required: false
+      labeling_claim:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    in_vitro_result: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    in_vitro_result: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - in_vitro_result
+  - clinical_abuse_study
+  - abuse_pathway
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

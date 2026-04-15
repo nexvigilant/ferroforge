@@ -1,0 +1,167 @@
+name: ml-train-gate
+description: 'Gates ML model training: validates sufficient labeled samples, class balance, and feature completeness before allowing training to proceed'
+version: 0.1.0
+family: ml-pipeline
+interface:
+  inputs:
+    n_samples:
+      type: int
+      required: true
+    n_signal:
+      type: int
+      required: true
+    n_features:
+      type: int
+      required: false
+    signal_ratio:
+      type: float
+      required: true
+  outputs:
+    gate_decision:
+      type: string
+    reason:
+      type: string
+    recommended_n_trees:
+      type: int
+tree:
+  start: check_minimum_samples
+  nodes:
+    check_minimum_samples:
+      type: condition
+      variable: n_samples
+      operator: gte
+      value: 20
+      true_next: check_signal_ratio_low
+      false_next: insufficient_data
+
+    check_signal_ratio_low:
+      type: condition
+      variable: signal_ratio
+      operator: gte
+      value: 0.15
+      true_next: check_signal_ratio_high
+      false_next: imbalanced_signal
+
+    check_signal_ratio_high:
+      type: condition
+      variable: signal_ratio
+      operator: lte
+      value: 0.85
+      true_next: check_features
+      false_next: imbalanced_noise
+
+    check_features:
+      type: condition
+      variable: n_features
+      operator: gte
+      value: 12
+      true_next: check_large_dataset
+      false_next: pass_with_warning
+
+    check_large_dataset:
+      type: condition
+      variable: n_samples
+      operator: gte
+      value: 100
+      true_next: gate_pass_large
+      false_next: gate_pass_small
+
+    gate_pass_large:
+      type: return
+      value:
+        gate_decision: pass
+        reason: 'Sufficient data (>=100 samples), balanced classes, full features'
+        recommended_n_trees: 100
+
+    gate_pass_small:
+      type: return
+      value:
+        gate_decision: pass
+        reason: 'Adequate data (20-99 samples), balanced classes — using smaller forest'
+        recommended_n_trees: 50
+
+    pass_with_warning:
+      type: return
+      value:
+        gate_decision: pass_with_warning
+        reason: 'Feature count below 12 — model may underperform. Ensure all PV features extracted.'
+        recommended_n_trees: 50
+
+    insufficient_data:
+      type: return
+      value:
+        gate_decision: fail
+        reason: 'Fewer than 20 labeled samples. Need more data before training.'
+        recommended_n_trees: 0
+
+    imbalanced_signal:
+      type: return
+      value:
+        gate_decision: fail
+        reason: 'Signal class < 15% of samples. Add more confirmed signal pairs.'
+        recommended_n_trees: 0
+
+    imbalanced_noise:
+      type: return
+      value:
+        gate_decision: fail
+        reason: 'Noise class < 15% of samples. Add more confirmed noise pairs.'
+        recommended_n_trees: 0
+
+tests:
+  - name: sufficient_balanced
+    input:
+      n_samples: 200
+      n_signal: 80
+      n_features: 12
+      signal_ratio: 0.4
+    expect:
+      gate_decision: pass
+      recommended_n_trees: 100
+
+  - name: small_dataset
+    input:
+      n_samples: 30
+      n_signal: 12
+      n_features: 12
+      signal_ratio: 0.4
+    expect:
+      gate_decision: pass
+      recommended_n_trees: 50
+
+  - name: too_few_samples
+    input:
+      n_samples: 8
+      n_signal: 4
+      n_features: 12
+      signal_ratio: 0.5
+    expect:
+      gate_decision: fail
+
+  - name: imbalanced_too_few_signals
+    input:
+      n_samples: 100
+      n_signal: 5
+      n_features: 12
+      signal_ratio: 0.05
+    expect:
+      gate_decision: fail
+
+  - name: missing_features
+    input:
+      n_samples: 50
+      n_signal: 20
+      n_features: 8
+      signal_ratio: 0.4
+    expect:
+      gate_decision: pass_with_warning
+
+  - name: edge_minimal
+    input:
+      n_samples: 20
+      n_signal: 10
+      n_features: 12
+      signal_ratio: 0.5
+    expect:
+      gate_decision: pass
+      recommended_n_trees: 50

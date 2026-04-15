@@ -1,0 +1,222 @@
+name: pvos-detect-router-helix
+description: 'Forged from microgram ''pvos-detect-router''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    algorithm: falsified
+sense:
+  tree:
+    start: check_contingency
+    nodes:
+      unknown_algorithm:
+        type: return
+        value:
+          algorithm: UNKNOWN
+          description: Unrecognized algorithm - choose PRR/ROR/IC/EBGM/Chi2/Fisher
+          method: error
+      route_ror:
+        type: return
+        value:
+          method: reporting_odds_ratio
+          description: Route to ROR computation - requires 2x2 contingency table
+          algorithm: ROR
+      check_ebgm:
+        type: condition
+        variable: algorithm
+        operator: eq
+        value: EBGM
+        true_next: route_ebgm
+        false_next: check_chi2
+      route_prr:
+        type: return
+        value:
+          algorithm: PRR
+          description: Route to PRR computation - requires 2x2 contingency table
+          method: proportional_reporting_ratio
+      route_ebgm:
+        type: return
+        value:
+          method: empirical_bayes_geometric_mean
+          algorithm: EBGM
+          description: Route to EBGM computation - empirical Bayes geometric mean
+      check_fisher:
+        type: condition
+        variable: algorithm
+        operator: eq
+        value: Fisher
+        true_next: route_fisher
+        false_next: unknown_algorithm
+      route_chi2:
+        type: return
+        value:
+          algorithm: Chi2
+          method: chi_squared_test
+          description: Route to Chi-squared test - frequentist independence test
+      check_prr:
+        type: condition
+        variable: algorithm
+        operator: eq
+        value: PRR
+        true_next: route_prr
+        false_next: check_ror
+      no_data:
+        type: return
+        value:
+          algorithm: NONE
+          description: No contingency table available - cannot run signal detection
+          method: error
+      route_ic:
+        type: return
+        value:
+          method: information_component
+          description: Route to IC computation - Bayesian information component
+          algorithm: IC
+      check_contingency:
+        type: condition
+        variable: has_contingency
+        operator: eq
+        value: true
+        true_next: check_prr
+        false_next: no_data
+      route_fisher:
+        type: return
+        value:
+          method: fishers_exact_test
+          algorithm: Fisher
+          description: Route to Fisher exact test - exact significance for small counts
+      check_ic:
+        type: condition
+        variable: algorithm
+        operator: eq
+        value: IC
+        true_next: route_ic
+        false_next: check_ebgm
+      check_ror:
+        type: condition
+        variable: algorithm
+        operator: eq
+        value: ROR
+        true_next: route_ror
+        false_next: check_ic
+      check_chi2:
+        type: condition
+        variable: algorithm
+        operator: eq
+        value: Chi2
+        true_next: route_chi2
+        false_next: check_fisher
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: algorithm
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: algorithm
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_contingency:
+        type: bool
+        required: false
+      algorithm:
+        type: string
+        required: false
+    outputs:
+      description:
+        type: string
+        required: false
+      method:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      algorithm:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    algorithm: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    algorithm: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

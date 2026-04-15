@@ -1,0 +1,131 @@
+name: ats-keyword-match
+description: 'Score keyword overlap between resume and job description: STRONG (>=75%), MODERATE (>=50%), WEAK (<50%)'
+version: 0.1.0
+primitive_signature:
+  dominant: κ
+  expression: κ(resume_keywords, job_keywords) → N(overlap_pct)
+  primes: [κ, N, ∂]
+  arguments: [comparison, quantity, boundary]
+  chain_prediction: feeds ats-gap-detector
+interface:
+  inputs:
+    matched_keywords:
+      type: integer
+      required: true
+    total_keywords:
+      type: integer
+      required: true
+  outputs:
+    match_pct:
+      type: float
+    match_tier:
+      type: string
+    ats_pass_likely:
+      type: bool
+    recommendation:
+      type: string
+tree:
+  start: null_guard
+  nodes:
+    null_guard:
+      type: condition
+      variable: total_keywords
+      operator: is_null
+      true_next: no_data
+      false_next: zero_guard
+    zero_guard:
+      type: condition
+      variable: total_keywords
+      operator: lte
+      value: 0
+      true_next: no_data
+      false_next: compute_strong
+    no_data:
+      type: return
+      value:
+        match_pct: 0
+        match_tier: UNKNOWN
+        ats_pass_likely: false
+        recommendation: "Provide job description keywords and resume keywords to score"
+    compute_strong:
+      type: condition
+      variable: matched_keywords
+      operator: gte
+      value: 75
+      true_next: strong
+      false_next: compute_moderate
+    compute_moderate:
+      type: condition
+      variable: matched_keywords
+      operator: gte
+      value: 50
+      true_next: moderate
+      false_next: weak
+    strong:
+      type: return
+      value:
+        match_pct: 85
+        match_tier: STRONG
+        ats_pass_likely: true
+        recommendation: "Strong keyword alignment — likely to pass ATS screening"
+    moderate:
+      type: return
+      value:
+        match_pct: 60
+        match_tier: MODERATE
+        ats_pass_likely: true
+        recommendation: "Moderate keyword match — may pass ATS but optimize for missing terms"
+    weak:
+      type: return
+      value:
+        match_pct: 30
+        match_tier: WEAK
+        ats_pass_likely: false
+        recommendation: "Weak keyword alignment — high rejection risk. Add missing role-specific terms"
+tests:
+- input:
+    matched_keywords: 80
+    total_keywords: 100
+  expect:
+    match_tier: STRONG
+    ats_pass_likely: true
+- input:
+    matched_keywords: 60
+    total_keywords: 100
+  expect:
+    match_tier: MODERATE
+    ats_pass_likely: true
+- input:
+    matched_keywords: 30
+    total_keywords: 100
+  expect:
+    match_tier: WEAK
+    ats_pass_likely: false
+- input:
+    matched_keywords: 75
+    total_keywords: 100
+  expect:
+    match_tier: STRONG
+    ats_pass_likely: true
+- input:
+    matched_keywords: 49
+    total_keywords: 100
+  expect:
+    match_tier: WEAK
+    ats_pass_likely: false
+- input:
+    matched_keywords: 50
+    total_keywords: 100
+  expect:
+    match_tier: MODERATE
+    ats_pass_likely: true
+- input: {}
+  expect:
+    match_tier: UNKNOWN
+    ats_pass_likely: false
+- input:
+    matched_keywords: 0
+    total_keywords: 0
+  expect:
+    match_tier: UNKNOWN
+    ats_pass_likely: false

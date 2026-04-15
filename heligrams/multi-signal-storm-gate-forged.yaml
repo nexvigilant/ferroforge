@@ -1,0 +1,207 @@
+name: multi-signal-storm-gate-helix
+description: 'Forged from microgram ''multi-signal-storm-gate''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    severity: falsified
+sense:
+  tree:
+    start: check_nms
+    nodes:
+      check_malignant_hyper:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: MALIGNANT HYPERTHERMIA
+        true_next: critical_mh
+        false_next: check_high_temp
+      check_serotonin:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: SEROTONIN SYNDROME
+        true_next: critical_ss
+        false_next: check_malignant_hyper
+      serious_hyperthermia:
+        type: return
+        value:
+          severity: serious
+          syndrome: unspecified_hyperthermia
+          action: expedited_report
+          soc: General disorders
+      check_high_temp:
+        type: condition
+        variable: temperature_celsius
+        operator: gte
+        value: 41
+        true_next: serious_hyperthermia
+        false_next: check_rigidity
+      mild:
+        type: return
+        value:
+          soc: General disorders
+          severity: mild
+          syndrome: none
+          action: routine_surveillance
+      check_nms:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: NEUROLEPTIC MALIGNANT
+        true_next: critical_nms
+        false_next: check_serotonin
+      serious_rigidity:
+        type: return
+        value:
+          severity: serious
+          syndrome: unspecified_rigidity
+          soc: Musculoskeletal and connective tissue disorders
+          action: expedited_report
+      critical_nms:
+        type: return
+        value:
+          syndrome: neuroleptic_malignant_syndrome
+          action: immediate_expedited_report
+          severity: critical
+          soc: Nervous system disorders
+      critical_ss:
+        type: return
+        value:
+          action: immediate_expedited_report
+          syndrome: serotonin_syndrome
+          severity: critical
+          soc: Nervous system disorders
+      critical_mh:
+        type: return
+        value:
+          syndrome: malignant_hyperthermia
+          action: immediate_expedited_report
+          soc: Musculoskeletal and connective tissue disorders
+          severity: critical
+      check_rigidity:
+        type: condition
+        variable: muscle_rigidity
+        operator: eq
+        value: true
+        true_next: serious_rigidity
+        false_next: mild
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: reaction_pt
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: reaction_pt
+        operator: not_contains
+        value: NEUROLEPTIC MALIGNANT
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      muscle_rigidity:
+        type: bool
+        required: false
+      reaction_pt:
+        type: string
+        required: true
+      temperature_celsius:
+        type: float
+        required: false
+    outputs:
+      severity:
+        type: string
+        required: false
+      syndrome:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      soc:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    reaction_pt: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

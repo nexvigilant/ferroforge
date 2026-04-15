@@ -1,0 +1,172 @@
+name: state-query-router-helix
+description: 'Forged from microgram ''state-query-router''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    repository: falsified
+sense:
+  tree:
+    start: check_case
+    nodes:
+      check_case:
+        type: condition
+        variable: entity_type
+        operator: eq
+        value: case
+        true_next: route_case
+        false_next: check_signal
+      check_signal:
+        type: condition
+        variable: entity_type
+        operator: eq
+        value: signal
+        true_next: route_signal
+        false_next: check_workflow
+      check_workflow:
+        type: condition
+        variable: entity_type
+        operator: eq
+        value: workflow
+        true_next: route_workflow
+        false_next: check_alert
+      check_alert:
+        type: condition
+        variable: entity_type
+        operator: eq
+        value: alert
+        true_next: route_alert
+        false_next: unknown_entity
+      route_signal:
+        type: return
+        value:
+          repository: signal_fsm
+          description: Route to signal state machine repository - tracks signal triage states
+      route_workflow:
+        type: return
+        value:
+          repository: workflow_fsm
+          description: Route to workflow state machine repository - tracks workflow execution states
+      route_alert:
+        type: return
+        value:
+          repository: alert_fsm
+          description: Route to alert state machine repository - tracks alert acknowledgment states
+      unknown_entity:
+        type: return
+        value:
+          description: Unknown entity type - choose case/signal/workflow/alert
+          repository: error
+      route_case:
+        type: return
+        value:
+          description: Route to case state machine repository - tracks case lifecycle states
+          repository: case_fsm
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: entity_type
+        operator: neq
+        value: case
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: entity_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      entity_type:
+        type: string
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      description:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      repository:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    entity_type: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    entity_type: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

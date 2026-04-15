@@ -1,0 +1,79 @@
+name: imu-health-gate
+description: 'Classify IMU sensor health from temperature drift and gyro bias magnitude. Gates readings before fusion.'
+version: 0.1.0
+interface:
+  inputs:
+    temp_drift_abs_c:
+      type: number
+      required: true
+      description: 'Absolute temperature drift from calibration in °C (pre-computed: abs(current - cal))'
+    gyro_bias_magnitude:
+      type: number
+      required: true
+      description: 'Gyroscope bias magnitude in rad/s (norm of 3-axis bias)'
+  outputs:
+    status:
+      type: string
+    trust:
+      type: number
+    action:
+      type: string
+tree:
+  start: check_temp_drift
+  nodes:
+    check_temp_drift:
+      type: condition
+      variable: temp_drift_abs_c
+      operator: gt
+      value: 20
+      true_next: recalibrate
+      false_next: check_gyro_bias
+    check_gyro_bias:
+      type: condition
+      variable: gyro_bias_magnitude
+      operator: gt
+      value: 0.05
+      true_next: degraded
+      false_next: check_mild_drift
+    check_mild_drift:
+      type: condition
+      variable: temp_drift_abs_c
+      operator: gt
+      value: 10
+      true_next: warning
+      false_next: healthy
+    recalibrate:
+      type: return
+      value:
+        status: 'FAIL'
+        trust: 0.2
+        action: 'Recalibrate IMU — temperature drift exceeds 20°C from calibration'
+    degraded:
+      type: return
+      value:
+        status: 'DEGRADED'
+        trust: 0.5
+        action: 'Gyro bias elevated — increase filter gain or recalibrate'
+    warning:
+      type: return
+      value:
+        status: 'WARNING'
+        trust: 0.8
+        action: 'Temperature drifted 10-20°C — monitor for further drift'
+    healthy:
+      type: return
+      value:
+        status: 'PASS'
+        trust: 1.0
+        action: 'IMU healthy — proceed with fusion'
+tests:
+- input: { temp_drift_abs_c: 0, gyro_bias_magnitude: 0.01 }
+  expect: { status: 'PASS', trust: 1.0 }
+- input: { temp_drift_abs_c: 25, gyro_bias_magnitude: 0.01 }
+  expect: { status: 'FAIL', trust: 0.2 }
+- input: { temp_drift_abs_c: 0, gyro_bias_magnitude: 0.1 }
+  expect: { status: 'DEGRADED', trust: 0.5 }
+- input: { temp_drift_abs_c: 13, gyro_bias_magnitude: 0.01 }
+  expect: { status: 'WARNING', trust: 0.8 }
+- input: {}
+  expect: { status: 'PASS', trust: 1.0 }

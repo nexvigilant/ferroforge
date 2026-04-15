@@ -1,0 +1,249 @@
+name: anti-vector-classify
+description: 'Classify a confirmed harm signal into its anti-vector strategy. Maps harm type (A-H) to primary anti-vector class (mechanistic/epistemic/architectural), recommended measures, and common biases.'
+version: 1.0.0
+interface:
+  inputs:
+    harm_type:
+      type: string
+      required: true
+    signal_magnitude:
+      type: float
+      required: true
+    confidence:
+      type: float
+      required: false
+  outputs:
+    primary_class:
+      type: string
+    secondary_class:
+      type: string
+    description:
+      type: string
+    first_measure:
+      type: string
+    primary_bias:
+      type: string
+    proportionality_tier:
+      type: string
+tree:
+  start: check_a
+  nodes:
+    check_a:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: "A"
+      true_next: tier_a
+      false_next: check_b
+    tier_a:
+      type: condition
+      variable: signal_magnitude
+      operator: gt
+      value: 0.8
+      true_next: return_a_critical
+      false_next: return_a_standard
+    return_a_critical:
+      type: return
+      value:
+        primary_class: mechanistic
+        secondary_class: architectural
+        description: "Acute harm: break the rapid-onset pathway via dose control or contraindication"
+        first_measure: contraindication
+        primary_bias: notoriety_bias
+        proportionality_tier: critical
+    return_a_standard:
+      type: return
+      value:
+        primary_class: mechanistic
+        secondary_class: architectural
+        description: "Acute harm: break the rapid-onset pathway via dose control or contraindication"
+        first_measure: dose_modification
+        primary_bias: notoriety_bias
+        proportionality_tier: standard
+
+    check_b:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: "B"
+      true_next: return_b
+      false_next: check_c
+    return_b:
+      type: return
+      value:
+        primary_class: architectural
+        secondary_class: mechanistic
+        description: "Cumulative harm: monitor accumulation markers, adjust dose over time"
+        first_measure: required_monitoring
+        primary_bias: depletion_of_susceptibles
+        proportionality_tier: standard
+
+    check_c:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: "C"
+      true_next: return_c
+      false_next: check_d
+    return_c:
+      type: return
+      value:
+        primary_class: mechanistic
+        secondary_class: epistemic
+        description: "Off-target harm: map the off-target mechanism, distinguish from indication"
+        first_measure: label_update
+        primary_bias: indication_bias
+        proportionality_tier: standard
+
+    check_d:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: "D"
+      true_next: return_d
+      false_next: check_e
+    return_d:
+      type: return
+      value:
+        primary_class: architectural
+        secondary_class: mechanistic
+        description: "Cascade harm: install circuit breakers at propagation boundaries"
+        first_measure: rems
+        primary_bias: stimulated_reporting
+        proportionality_tier: standard
+
+    check_e:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: "E"
+      true_next: return_e
+      false_next: check_f
+    return_e:
+      type: return
+      value:
+        primary_class: epistemic
+        secondary_class: architectural
+        description: "Idiosyncratic harm: identify the susceptible subspace, screen before exposure"
+        first_measure: required_monitoring
+        primary_bias: channeling_bias
+        proportionality_tier: standard
+
+    check_f:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: "F"
+      true_next: return_f
+      false_next: check_g
+    return_f:
+      type: return
+      value:
+        primary_class: mechanistic
+        secondary_class: architectural
+        description: "Saturation harm: find the capacity threshold, enforce dose ceiling"
+        first_measure: dose_modification
+        primary_bias: weber_effect
+        proportionality_tier: standard
+
+    check_g:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: "G"
+      true_next: return_g
+      false_next: check_h
+    return_g:
+      type: return
+      value:
+        primary_class: epistemic
+        secondary_class: architectural
+        description: "Interaction harm: map the combination space, contraindicate dangerous pairs"
+        first_measure: contraindication
+        primary_bias: channeling_bias
+        proportionality_tier: standard
+
+    check_h:
+      type: condition
+      variable: harm_type
+      operator: eq
+      value: "H"
+      true_next: return_h
+      false_next: return_default
+    return_h:
+      type: return
+      value:
+        primary_class: epistemic
+        secondary_class: architectural
+        description: "Population harm: identify the vulnerable subgroup, tailor risk communication"
+        first_measure: label_update
+        primary_bias: channeling_bias
+        proportionality_tier: standard
+
+    return_default:
+      type: return
+      value:
+        primary_class: architectural
+        secondary_class: epistemic
+        description: "Unknown harm type: default to architectural containment"
+        first_measure: label_update
+        primary_bias: unknown
+        proportionality_tier: low
+
+tests:
+  - name: "Acute harm maps to mechanistic"
+    input:
+      harm_type: "A"
+      signal_magnitude: 0.7
+    expect:
+      primary_class: mechanistic
+
+  - name: "Cascade harm maps to architectural"
+    input:
+      harm_type: "D"
+      signal_magnitude: 0.5
+    expect:
+      primary_class: architectural
+
+  - name: "Idiosyncratic harm maps to epistemic"
+    input:
+      harm_type: "E"
+      signal_magnitude: 0.4
+    expect:
+      primary_class: epistemic
+
+  - name: "Population harm maps to epistemic"
+    input:
+      harm_type: "H"
+      signal_magnitude: 0.6
+    expect:
+      primary_class: epistemic
+
+  - name: "Critical acute gets contraindication"
+    input:
+      harm_type: "A"
+      signal_magnitude: 0.9
+    expect:
+      proportionality_tier: critical
+      first_measure: contraindication
+
+  - name: "Standard acute gets dose modification"
+    input:
+      harm_type: "A"
+      signal_magnitude: 0.5
+    expect:
+      proportionality_tier: standard
+      first_measure: dose_modification
+
+  - name: "Unknown harm type defaults safely"
+    input:
+      harm_type: "Z"
+      signal_magnitude: 0.3
+    expect:
+      primary_class: architectural
+      proportionality_tier: low
+
+  - name: "Null input defaults safely"
+    input: {}
+    expect:
+      primary_class: architectural

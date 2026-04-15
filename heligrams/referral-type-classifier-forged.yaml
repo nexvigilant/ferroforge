@@ -1,0 +1,170 @@
+name: referral-type-classifier-helix
+description: 'Forged from microgram ''referral-type-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    procedure_type: falsified
+sense:
+  tree:
+    start: validate_reason
+    nodes:
+      check_efficacy:
+        type: condition
+        variable: reason
+        operator: matches
+        value: (?i)^efficacy$
+        true_next: referral_efficacy
+        false_next: check_pv
+      referral_safety:
+        type: return
+        value:
+          procedure_type: safety_signal_assessment
+          article_type: art31
+          typical_timeline_months: 6
+      classify_reason:
+        type: condition
+        variable: reason
+        operator: matches
+        value: (?i)^safety$
+        true_next: referral_safety
+        false_next: check_efficacy
+      referral_pv:
+        type: return
+        value:
+          typical_timeline_months: 4
+          article_type: art107i
+          procedure_type: pharmacovigilance_procedure
+      referral_efficacy:
+        type: return
+        value:
+          article_type: art20
+          typical_timeline_months: 12
+          procedure_type: efficacy_reassessment
+      missing_input:
+        type: return
+        value:
+          procedure_type: null
+          article_type: null
+          typical_timeline_months: null
+      referral_other:
+        type: return
+        value:
+          procedure_type: special_procedure
+          typical_timeline_months: 9
+          article_type: other
+      validate_reason:
+        type: condition
+        variable: reason
+        operator: is_not_null
+        value: null
+        true_next: classify_reason
+        false_next: missing_input
+      check_pv:
+        type: condition
+        variable: reason
+        operator: matches
+        value: (?i)^pharmacovigilance$
+        true_next: referral_pv
+        false_next: referral_other
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: reason
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: reason
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      reason:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    reason: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

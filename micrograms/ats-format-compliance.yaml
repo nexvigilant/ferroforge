@@ -1,0 +1,176 @@
+name: ats-format-compliance
+description: 'Check resume format for ATS parser compatibility — headers, file type, encoding, structure'
+version: 0.1.0
+primitive_signature:
+  dominant: ∂
+  expression: ∂(resume_format) → ∃(parseable) | ∅(rejected)
+  primes: [∂, ς, κ]
+  arguments: [boundary, state, comparison]
+  chain_prediction: feeds ats-keyword-match
+interface:
+  inputs:
+    has_standard_headers:
+      type: bool
+      required: false
+    uses_simple_formatting:
+      type: bool
+      required: false
+    file_type_compatible:
+      type: bool
+      required: false
+    has_contact_info:
+      type: bool
+      required: false
+    sections_detected:
+      type: integer
+      required: false
+  outputs:
+    format_score:
+      type: integer
+    format_verdict:
+      type: string
+    parseable:
+      type: bool
+    issues:
+      type: string
+tree:
+  start: file_type_check
+  nodes:
+    file_type_check:
+      type: condition
+      variable: file_type_compatible
+      operator: eq
+      value: false
+      true_next: format_fail
+      false_next: headers_check
+    headers_check:
+      type: condition
+      variable: has_standard_headers
+      operator: eq
+      value: false
+      true_next: headers_missing
+      false_next: formatting_check
+    formatting_check:
+      type: condition
+      variable: uses_simple_formatting
+      operator: eq
+      value: false
+      true_next: complex_format
+      false_next: contact_check
+    contact_check:
+      type: condition
+      variable: has_contact_info
+      operator: eq
+      value: false
+      true_next: no_contact
+      false_next: sections_check
+    sections_check:
+      type: condition
+      variable: sections_detected
+      operator: gte
+      value: 3
+      true_next: format_pass
+      false_next: few_sections
+    format_fail:
+      type: return
+      value:
+        format_score: 10
+        format_verdict: FAIL
+        parseable: false
+        issues: "Incompatible file type — use .docx or .pdf. Avoid images, infographics, or non-standard formats"
+    headers_missing:
+      type: return
+      value:
+        format_score: 40
+        format_verdict: WARN
+        parseable: true
+        issues: "Missing standard section headers (Experience, Education, Skills). ATS uses headers to parse sections"
+    complex_format:
+      type: return
+      value:
+        format_score: 50
+        format_verdict: WARN
+        parseable: true
+        issues: "Complex formatting detected (tables, columns, text boxes, headers/footers). Simplify to single-column layout"
+    no_contact:
+      type: return
+      value:
+        format_score: 60
+        format_verdict: WARN
+        parseable: true
+        issues: "Contact information not detected at top. Place name, email, phone in plain text at document start"
+    few_sections:
+      type: return
+      value:
+        format_score: 65
+        format_verdict: WARN
+        parseable: true
+        issues: "Fewer than 3 sections detected. Standard: Summary, Experience, Education, Skills (minimum)"
+    format_pass:
+      type: return
+      value:
+        format_score: 90
+        format_verdict: PASS
+        parseable: true
+        issues: "Format is ATS-compatible"
+tests:
+- input:
+    file_type_compatible: false
+    has_standard_headers: true
+    uses_simple_formatting: true
+    has_contact_info: true
+    sections_detected: 4
+  expect:
+    format_verdict: FAIL
+    parseable: false
+- input:
+    file_type_compatible: true
+    has_standard_headers: true
+    uses_simple_formatting: true
+    has_contact_info: true
+    sections_detected: 4
+  expect:
+    format_verdict: PASS
+    parseable: true
+    format_score: 90
+- input:
+    file_type_compatible: true
+    has_standard_headers: false
+    uses_simple_formatting: true
+    has_contact_info: true
+    sections_detected: 4
+  expect:
+    format_verdict: WARN
+    format_score: 40
+- input:
+    file_type_compatible: true
+    has_standard_headers: true
+    uses_simple_formatting: false
+    has_contact_info: true
+    sections_detected: 4
+  expect:
+    format_verdict: WARN
+    format_score: 50
+- input:
+    file_type_compatible: true
+    has_standard_headers: true
+    uses_simple_formatting: true
+    has_contact_info: false
+    sections_detected: 4
+  expect:
+    format_verdict: WARN
+    format_score: 60
+- input:
+    file_type_compatible: true
+    has_standard_headers: true
+    uses_simple_formatting: true
+    has_contact_info: true
+    sections_detected: 2
+  expect:
+    format_verdict: WARN
+    format_score: 65
+- input: {}
+  expect:
+    format_verdict: WARN
+    parseable: true
+    format_score: 65

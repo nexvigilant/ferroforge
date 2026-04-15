@@ -1,0 +1,360 @@
+name: primitive-recognizer-helix
+description: 'Forged from microgram ''primitive-recognizer''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    ner_tag: falsified
+sense:
+  tree:
+    start: classify_behavior
+    nodes:
+      boundary_without_transition:
+        type: return
+        value:
+          ner_tag: B-BOUNDARY
+          action: check_measurement_point
+          confidence: 75
+          primary_primitive: Boundary (partial)
+          secondary_primitive: Void (emptyset)
+          composition: partial(emptyset)
+      comparison_span:
+        type: return
+        value:
+          secondary_primitive: State (varsigma)
+          confidence: 85
+          action: evaluate_delta
+          primary_primitive: Comparison (kappa)
+          composition: kappa(varsigma_a, varsigma_b)
+          ner_tag: B-COMPARISON
+      false_convergence:
+        type: return
+        value:
+          composition: rho(emptyset) [false convergence]
+          ner_tag: B-CONVERGE
+          primary_primitive: Self-reference (rho)
+          secondary_primitive: Void (emptyset)
+          confidence: 70
+          action: apply_convergence_guard
+      transformation_span:
+        type: condition
+        variable: is_reversible
+        operator: eq
+        value: true
+        true_next: reversible_transform
+        false_next: irreversible_transform
+      unknown_behavior:
+        type: return
+        value:
+          composition: emptyset
+          confidence: 30
+          primary_primitive: Void (emptyset)
+          ner_tag: O
+          action: investigate
+          secondary_primitive: Void (emptyset)
+      check_oscillation:
+        type: condition
+        variable: behavior_type
+        operator: eq
+        value: oscillation
+        true_next: oscillation_span
+        false_next: check_state_change
+      state_change_span:
+        type: return
+        value:
+          composition: arrow(varsigma_old, varsigma_new)
+          action: record_transition
+          secondary_primitive: Causality (arrow)
+          ner_tag: B-STATE
+          confidence: 85
+          primary_primitive: State (varsigma)
+      check_decay:
+        type: condition
+        variable: behavior_type
+        operator: eq
+        value: decay
+        true_next: decay_span
+        false_next: check_convergence
+      classify_behavior:
+        type: condition
+        variable: behavior_type
+        operator: eq
+        value: measurement
+        true_next: measurement_span
+        false_next: check_comparison
+      check_persistence:
+        type: condition
+        variable: behavior_type
+        operator: eq
+        value: persistence
+        true_next: persistence_span
+        false_next: check_boundary
+      irreversible_transform:
+        type: return
+        value:
+          composition: proportional(arrow(varsigma))
+          confidence: 90
+          action: gate_before_applying
+          primary_primitive: Irreversibility (proportional)
+          ner_tag: B-IRREVERSIBLE
+          secondary_primitive: Causality (arrow)
+      boundary_with_transition:
+        type: return
+        value:
+          primary_primitive: Boundary (partial)
+          composition: partial(times(varsigma, emptyset)) = exists
+          action: validate_at_consumer
+          ner_tag: B-BOUNDARY
+          confidence: 90
+          secondary_primitive: Existence (exists)
+      check_convergence:
+        type: condition
+        variable: behavior_type
+        operator: eq
+        value: convergence
+        true_next: convergence_span
+        false_next: unknown_behavior
+      check_state_change:
+        type: condition
+        variable: behavior_type
+        operator: eq
+        value: state_change
+        true_next: state_change_span
+        false_next: check_accumulation
+      persistence_span:
+        type: return
+        value:
+          confidence: 95
+          primary_primitive: Persistence (pi)
+          ner_tag: B-PERSIST
+          secondary_primitive: State (varsigma)
+          action: commit_and_verify
+          composition: pi(varsigma)
+      decay_span:
+        type: return
+        value:
+          confidence: 80
+          ner_tag: B-DECAY
+          composition: N(varsigma) * e^(-nu*t)
+          secondary_primitive: Frequency (nu)
+          action: check_half_life
+          primary_primitive: Quantity (N)
+      check_boundary:
+        type: condition
+        variable: behavior_type
+        operator: eq
+        value: boundary_crossing
+        true_next: boundary_span
+        false_next: check_oscillation
+      reversible_transform:
+        type: return
+        value:
+          action: apply_and_verify
+          confidence: 80
+          secondary_primitive: State (varsigma)
+          primary_primitive: Causality (arrow)
+          composition: arrow(varsigma) [reversible]
+          ner_tag: B-TRANSFORM
+      measurement_span:
+        type: return
+        value:
+          composition: varsigma(partial(x))
+          confidence: 90
+          ner_tag: B-STATE
+          secondary_primitive: Boundary (partial)
+          primary_primitive: State (varsigma)
+          action: observe
+      check_transformation:
+        type: condition
+        variable: behavior_type
+        operator: eq
+        value: transformation
+        true_next: transformation_span
+        false_next: check_persistence
+      check_accumulation:
+        type: condition
+        variable: behavior_type
+        operator: eq
+        value: accumulation
+        true_next: accumulation_span
+        false_next: check_decay
+      convergence_span:
+        type: condition
+        variable: produces_output
+        operator: eq
+        value: true
+        true_next: productive_convergence
+        false_next: false_convergence
+      oscillation_span:
+        type: return
+        value:
+          ner_tag: B-FREQUENCY
+          action: measure_period
+          confidence: 85
+          primary_primitive: Frequency (nu)
+          composition: nu(varsigma) [periodic]
+          secondary_primitive: State (varsigma)
+      productive_convergence:
+        type: return
+        value:
+          composition: rho(pi(output))
+          confidence: 85
+          action: ship_result
+          secondary_primitive: Persistence (pi)
+          ner_tag: B-CONVERGE
+          primary_primitive: Self-reference (rho)
+      check_comparison:
+        type: condition
+        variable: behavior_type
+        operator: eq
+        value: comparison
+        true_next: comparison_span
+        false_next: check_transformation
+      accumulation_span:
+        type: return
+        value:
+          secondary_primitive: Persistence (pi)
+          ner_tag: B-ACCUMULATE
+          action: monitor_growth_rate
+          primary_primitive: Quantity (N)
+          confidence: 80
+          composition: N(pi(varsigma)) [growing]
+      boundary_span:
+        type: condition
+        variable: has_state_change
+        operator: eq
+        value: true
+        true_next: boundary_with_transition
+        false_next: boundary_without_transition
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: is_reversible
+        operator: neq
+        value: measurement
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: is_reversible
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_state_change:
+        type: bool
+        required: false
+      has_boundary:
+        type: bool
+        required: false
+      produces_output:
+        type: bool
+        required: false
+      behavior_type:
+        type: string
+        required: true
+      is_reversible:
+        type: bool
+        required: false
+      frequency:
+        type: string
+        required: false
+    outputs:
+      action:
+        type: string
+        required: false
+      secondary_primitive:
+        type: string
+        required: false
+      ner_tag:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      composition:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      primary_primitive:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    is_reversible: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    is_reversible: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

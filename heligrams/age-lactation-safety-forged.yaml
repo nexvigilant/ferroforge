@@ -1,0 +1,147 @@
+name: age-lactation-safety-helix
+description: 'Forged from microgram ''age-lactation-safety''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    message: falsified
+sense:
+  tree:
+    start: check_lactation_status
+    nodes:
+      check_lactation_status:
+        type: condition
+        variable: is_breastfeeding
+        operator: eq
+        value: true
+        true_next: check_drug_transfer
+        false_next: not_breastfeeding
+      high_transfer_alert:
+        type: return
+        value:
+          message: High milk transfer; drug contraindicated during breastfeeding
+          recommendation: contraindicated
+          breastfeeding_status: lactating
+          transfer_risk: high
+      not_breastfeeding:
+        type: return
+        value:
+          transfer_risk: none
+          breastfeeding_status: not_breastfeeding
+          message: Not breastfeeding; standard dosing applies
+      check_drug_transfer:
+        type: condition
+        variable: high_milk_transfer
+        operator: eq
+        value: true
+        true_next: high_transfer_alert
+        false_next: moderate_transfer
+      moderate_transfer:
+        type: return
+        value:
+          breastfeeding_status: lactating
+          transfer_risk: low_to_moderate
+          recommendation: compatible
+          message: Low/moderate milk transfer; generally compatible with breastfeeding
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_negation:
+        type: condition
+        variable: is_breastfeeding
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: is_breastfeeding
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_breastfeeding:
+        type: bool
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    is_breastfeeding: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    is_breastfeeding: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

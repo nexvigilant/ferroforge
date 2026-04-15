@@ -1,0 +1,206 @@
+name: algo-select-triage-helix
+description: 'Forged from microgram ''algo-select-triage''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    verdict: falsified
+sense:
+  tree:
+    start: check_correctness
+    nodes:
+      check_very_high:
+        type: condition
+        variable: recurrence_count
+        operator: gte
+        value: 80
+        true_next: persist
+        false_next: watch
+      check_low:
+        type: condition
+        variable: recurrence_count
+        operator: gte
+        value: 10
+        true_next: check_lenient_threshold
+        false_next: decay
+      persist:
+        type: return
+        value:
+          verdict: persist
+          algorithm: 'SELECT: ν(∃ at ∂_fitness) → π — frequency above threshold, item persists'
+      decay_broken:
+        type: return
+        value:
+          verdict: decay
+          algorithm: 'SELECT: κ(output, expected) fails — incorrect output, immediate decay'
+      watch:
+        type: return
+        value:
+          algorithm: 'SELECT: ν near ∂_fitness — within margin of threshold, monitor next generation'
+          verdict: watch
+      check_opportunities:
+        type: condition
+        variable: total_opportunities
+        operator: lte
+        value: 0
+        true_next: decay_no_data
+        false_next: check_high_frequency
+      check_mid_frequency:
+        type: condition
+        variable: recurrence_count
+        operator: gte
+        value: 40
+        true_next: watch
+        false_next: check_low
+      check_high_against_threshold:
+        type: condition
+        variable: fitness_threshold
+        operator: lte
+        value: 0.5
+        true_next: persist
+        false_next: check_very_high
+      decay_no_data:
+        type: return
+        value:
+          verdict: decay
+          algorithm: 'SELECT: N(opportunities) = 0 — no data to measure ν'
+      check_lenient_threshold:
+        type: condition
+        variable: fitness_threshold
+        operator: lte
+        value: 0.1
+        true_next: persist
+        false_next: decay
+      decay:
+        type: return
+        value:
+          algorithm: 'SELECT: ν(∃ at ∂_fitness) → ∅ — frequency below threshold, item decays'
+          verdict: decay
+      check_correctness:
+        type: condition
+        variable: produces_correct_output
+        operator: eq
+        value: false
+        true_next: decay_broken
+        false_next: check_opportunities
+      check_high_frequency:
+        type: condition
+        variable: recurrence_count
+        operator: gte
+        value: 50
+        true_next: check_high_against_threshold
+        false_next: check_mid_frequency
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: recurrence_count
+        operator: neq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: recurrence_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      total_opportunities:
+        type: integer
+        required: true
+      recurrence_count:
+        type: integer
+        required: true
+      fitness_threshold:
+        type: float
+        required: true
+      produces_correct_output:
+        type: boolean
+        required: true
+    outputs:
+      algorithm:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    recurrence_count: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    recurrence_count: true
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

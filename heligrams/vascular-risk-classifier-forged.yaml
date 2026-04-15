@@ -1,0 +1,194 @@
+name: vascular-risk-classifier-helix
+description: 'Forged from microgram ''vascular-risk-classifier''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    severity: falsified
+sense:
+  tree:
+    start: check_pe
+    nodes:
+      serious:
+        type: return
+        value:
+          severity: serious
+          soc: Vascular disorders
+          action: expedited_report
+          regulatory_reference: ICH E2D
+      check_dvt:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: DEEP VEIN THROMBOSIS
+        true_next: serious
+        false_next: check_stroke
+      moderate:
+        type: return
+        value:
+          soc: Vascular disorders
+          regulatory_reference: ICH E2B
+          severity: moderate
+          action: monitor_and_assess
+      check_haemorrhage:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: HAEMORRHAGE
+        true_next: serious
+        false_next: check_thrombosis
+      mild:
+        type: return
+        value:
+          action: routine_surveillance
+          severity: mild
+          soc: Vascular disorders
+          regulatory_reference: ICH E2B
+      critical:
+        type: return
+        value:
+          action: immediate_expedited_report
+          soc: Vascular disorders
+          regulatory_reference: ICH E2D
+          severity: critical
+      check_stroke:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: CEREBROVASCULAR ACCIDENT
+        true_next: critical
+        false_next: check_haemorrhage
+      check_thrombosis:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: THROMBOSIS
+        true_next: serious
+        false_next: check_hypertension
+      check_hypertension:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: HYPERTENSION
+        true_next: moderate
+        false_next: mild
+      check_pe:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: PULMONARY EMBOLISM
+        true_next: critical
+        false_next: check_dvt
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: reaction_pt
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: reaction_pt
+        operator: not_contains
+        value: PULMONARY EMBOLISM
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      reaction_pt:
+        type: string
+        required: true
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      soc:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      severity:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    reaction_pt: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

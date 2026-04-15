@@ -1,0 +1,209 @@
+name: power-load-router
+description: "Routes power demand to the correct energy tier in a federated battery architecture. 4 tiers: main NMC (bulk), ultracap (burst), per-limb LFP (local), aux LFP (life-critical). Routes by demand magnitude, duration, and locality."
+version: 0.1.0
+interface:
+  inputs:
+    demand_kw:
+      type: float
+      required: true
+      description: "Instantaneous power demand in kilowatts"
+    duration_s:
+      type: float
+      required: true
+      description: "Expected demand duration in seconds"
+    locality:
+      type: string
+      required: false
+      enum: [left_arm, right_arm, left_leg, right_leg, torso, distributed]
+      description: "Which limb/zone needs power"
+    main_bus_status:
+      type: string
+      required: false
+      enum: [nominal, degraded, failed]
+      description: "Main battery bus health"
+    ultracap_soc:
+      type: float
+      required: false
+      description: "Ultracapacitor state of charge (0.0-1.0)"
+    limb_buffer_soc:
+      type: float
+      required: false
+      description: "Target limb buffer SoC (0.0-1.0)"
+  outputs:
+    source_tier:
+      type: string
+    rationale:
+      type: string
+    max_available_kw:
+      type: float
+    thermal_note:
+      type: string
+    fallback_tier:
+      type: string
+tree:
+  start: check_main_bus
+  nodes:
+    # Gate 1: Is main bus alive?
+    check_main_bus:
+      type: condition
+      variable: main_bus_status
+      operator: eq
+      value: failed
+      true_next: emergency_aux
+      false_next: check_main_degraded
+
+    check_main_degraded:
+      type: condition
+      variable: main_bus_status
+      operator: eq
+      value: degraded
+      true_next: degraded_routing
+      false_next: check_burst
+
+    # Gate 2: Is this a burst demand?
+    check_burst:
+      type: condition
+      variable: duration_s
+      operator: lte
+      value: 5
+      true_next: check_burst_magnitude
+      false_next: check_local_demand
+
+    check_burst_magnitude:
+      type: condition
+      variable: demand_kw
+      operator: gt
+      value: 5
+      true_next: check_ucap_soc
+      false_next: check_local_demand
+
+    check_ucap_soc:
+      type: condition
+      variable: ultracap_soc
+      operator: gt
+      value: 0.2
+      true_next: ultracap_burst
+      false_next: main_bus_burst_fallback
+
+    # Gate 3: Is this a local limb demand?
+    check_local_demand:
+      type: condition
+      variable: locality
+      operator: eq
+      value: distributed
+      true_next: main_bus_steady
+      false_next: check_limb_demand_size
+
+    check_limb_demand_size:
+      type: condition
+      variable: demand_kw
+      operator: lte
+      value: 2
+      true_next: check_limb_soc
+      false_next: main_bus_steady
+
+    check_limb_soc:
+      type: condition
+      variable: limb_buffer_soc
+      operator: gt
+      value: 0.15
+      true_next: limb_buffer
+      false_next: main_bus_steady
+
+    # Terminal nodes
+    emergency_aux:
+      type: return
+      value:
+        source_tier: aux_lfp
+        rationale: "Main bus FAILED. Aux LFP takes life-critical loads ONLY: HUD, comms, BMS, safety MCUs, BRS deployer. All actuators shed."
+        max_available_kw: 0.5
+        thermal_note: "LFP has wide thermal margin. Focus on safe landing, not performance."
+        fallback_tier: none_land_immediately
+
+    degraded_routing:
+      type: return
+      value:
+        source_tier: main_bus_derated
+        rationale: "Main bus degraded — module offline or cell fault. Derate to 50% max power. Shed non-essential loads. Per-limb buffers supplement."
+        max_available_kw: 15
+        thermal_note: "Monitor remaining module temps closely. One module failure increases load on survivors."
+        fallback_tier: aux_lfp
+
+    ultracap_burst:
+      type: return
+      value:
+        source_tier: ultracap_bank
+        rationale: "Short burst (≤5s) at high power (>5kW). Ultracaps handle transient without stressing main pack C-rate."
+        max_available_kw: 10
+        thermal_note: "Ultracaps self-heat at high discharge. 6S balancing board active. Recharge from main bus immediately after burst."
+        fallback_tier: main_bus
+
+    main_bus_burst_fallback:
+      type: return
+      value:
+        source_tier: main_bus
+        rationale: "Burst demand but ultracaps depleted (SoC ≤ 20%). Main pack handles burst directly — higher C-rate stress."
+        max_available_kw: 30
+        thermal_note: "High C-rate discharge on NMC. Monitor cell temps. Molicel P45B handles 45A continuous but thermal headroom shrinks."
+        fallback_tier: aux_lfp
+
+    limb_buffer:
+      type: return
+      value:
+        source_tier: per_limb_lfp
+        rationale: "Local demand ≤2kW at specific limb. Per-limb LFP handles without bus current. Eliminates wiring loss and bus voltage sag."
+        max_available_kw: 2
+        thermal_note: "LFP pouch in limb fairing. Ambient cooling from airflow. Recharge from main bus during low-demand windows."
+        fallback_tier: main_bus
+
+    main_bus_steady:
+      type: return
+      value:
+        source_tier: main_bus
+        rationale: "Steady-state distributed demand. Main NMC pack provides bulk power at optimal C-rate."
+        max_available_kw: 30
+        thermal_note: "14S32P provides ample parallel paths. Per-cell current stays below 15A continuous at 30kW/400V."
+        fallback_tier: ultracap_bank
+
+primitive_signature:
+  dominant: '→'
+  expression: '→(l(ς), v(N)) — causally routing located state by frequency-matched quantity'
+  primes: ['→', 'l', 'ς', 'v', 'N']
+  arguments: ['∂']
+
+tests:
+- name: "main bus failure — emergency aux"
+  input: { demand_kw: 1.0, duration_s: 10.0, main_bus_status: failed }
+  expect: { source_tier: aux_lfp }
+
+- name: "burst demand — ultracap"
+  input: { demand_kw: 8.0, duration_s: 2.0, ultracap_soc: 0.8 }
+  expect: { source_tier: ultracap_bank }
+
+- name: "burst but ultracap empty — main bus fallback"
+  input: { demand_kw: 8.0, duration_s: 2.0, ultracap_soc: 0.1 }
+  expect: { source_tier: main_bus }
+
+- name: "local limb demand — per-limb buffer"
+  input: { demand_kw: 1.5, duration_s: 10.0, locality: left_arm, limb_buffer_soc: 0.6 }
+  expect: { source_tier: per_limb_lfp }
+
+- name: "local limb but buffer depleted — main bus"
+  input: { demand_kw: 1.5, duration_s: 10.0, locality: left_arm, limb_buffer_soc: 0.1 }
+  expect: { source_tier: main_bus }
+
+- name: "steady distributed — main bus"
+  input: { demand_kw: 5.0, duration_s: 60.0, locality: distributed }
+  expect: { source_tier: main_bus }
+
+- name: "degraded bus"
+  input: { demand_kw: 5.0, duration_s: 10.0, main_bus_status: degraded }
+  expect: { source_tier: main_bus_derated }
+
+- name: "high local demand exceeds limb buffer — main bus"
+  input: { demand_kw: 3.0, duration_s: 10.0, locality: right_leg, limb_buffer_soc: 0.9 }
+  expect: { source_tier: main_bus }
+
+- name: "null safety"
+  input: {}
+  expect: { source_tier: main_bus }

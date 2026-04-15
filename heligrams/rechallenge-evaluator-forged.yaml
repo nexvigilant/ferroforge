@@ -1,0 +1,247 @@
+name: rechallenge-evaluator-helix
+description: 'Forged from microgram ''rechallenge-evaluator''. Domain: CausalityAssessment. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    experiment_criterion_met: falsified
+sense:
+  tree:
+    start: check_first_vs_baseline
+    nodes:
+      check_first_vs_baseline:
+        type: condition
+        variable: first_exposure_rate
+        operator: gt
+        value: '{{baseline_rate}}'
+        true_next: first_elevated_check_rechallenge
+        false_next: first_not_elevated_check_rechallenge
+      check_rechallenge_eq_first:
+        type: condition
+        variable: rechallenge_rate
+        operator: eq
+        value: '{{first_exposure_rate}}'
+        true_next: classic_rechallenge_equal
+        false_next: classic_rechallenge_lower
+      sensitization:
+        type: return
+        value:
+          experiment_criterion_met: yes
+          interpretation: Sensitization — rechallenge rate exceeds first exposure. Immune-mediated or cumulative mechanism suspected. Strong experiment criterion with dose-escalation concern.
+          confidence: HIGH
+          pattern: SENSITIZATION
+      first_not_elevated_check_rechallenge:
+        type: condition
+        variable: rechallenge_rate
+        operator: gt
+        value: '{{baseline_rate}}'
+        true_next: inconsistent_delayed
+        false_next: no_effect
+      first_elevated_check_rechallenge:
+        type: condition
+        variable: rechallenge_rate
+        operator: gt
+        value: '{{baseline_rate}}'
+        true_next: rechallenge_elevated_check_vs_first
+        false_next: tolerance_pattern
+      rechallenge_elevated_check_vs_first:
+        type: condition
+        variable: rechallenge_rate
+        operator: gt
+        value: '{{first_exposure_rate}}'
+        true_next: sensitization
+        false_next: check_rechallenge_eq_first
+      classic_rechallenge_equal:
+        type: return
+        value:
+          interpretation: Classic rechallenge — rate elevated during both exposures at equal level. Strong Bradford Hill experiment criterion support.
+          confidence: HIGH
+          pattern: CLASSIC_RECHALLENGE
+          experiment_criterion_met: yes
+      tolerance_pattern:
+        type: return
+        value:
+          pattern: TOLERANCE
+          confidence: MEDIUM
+          experiment_criterion_met: no
+          interpretation: First exposure elevated but rechallenge normal. Suggests tolerance development or adaptation. Experiment criterion not met — effect is not reproducible.
+      classic_rechallenge_lower:
+        type: return
+        value:
+          pattern: CLASSIC_RECHALLENGE
+          experiment_criterion_met: yes
+          interpretation: Rechallenge positive but at lower rate than first exposure. Partial tolerance may be developing. Still supports experiment criterion.
+          confidence: MEDIUM
+      no_effect:
+        type: return
+        value:
+          interpretation: No elevation at either exposure. No evidence of drug-event relationship via experiment criterion.
+          experiment_criterion_met: no
+          pattern: NO_EFFECT
+          confidence: HIGH
+      inconsistent_delayed:
+        type: return
+        value:
+          interpretation: First exposure normal but rechallenge elevated. Delayed onset or coincidental. Experiment criterion not cleanly met — investigate confounders.
+          experiment_criterion_met: no
+          pattern: INCONSISTENT
+          confidence: LOW
+antisense:
+  tree:
+    start: null_guard_alternative_cause
+    nodes:
+      check_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_no_dechallenge
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: is_null
+        value: null
+        true_next: null_guard_temporal_implausible
+        false_next: check_alternative_cause
+      null_guard_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: is_null
+        value: null
+        true_next: null_guard_no_dechallenge
+        false_next: check_temporal_implausible
+      check_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: eq
+        value: likely
+        true_next: falsified
+        false_next: null_guard_temporal_implausible
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_no_dechallenge
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      baseline_rate:
+        type: float
+        required: true
+      rechallenge_rate:
+        type: float
+        required: true
+      first_exposure_rate:
+        type: float
+        required: true
+      temporal_plausible:
+        type: bool
+        required: false
+      dechallenge_positive:
+        type: bool
+        required: false
+      alternative_causes:
+        type: string
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      experiment_criterion_met:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      interpretation:
+        type: string
+        required: false
+      pattern:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    dechallenge_positive: true
+    alternative_causes: none
+    temporal_plausible: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, alternative_cause active'
+  input:
+    alternative_causes: likely
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — causality-assessment with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - baseline_rate
+  - first_exposure_rate
+  - rechallenge_rate
+  chain_prediction: 'Forged heligram. Domain: causality-assessment. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,267 @@
+name: fda-postmarket-study-type-helix
+description: 'Forged from microgram ''fda-postmarket-study-type''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regulatory_reference: falsified
+sense:
+  tree:
+    start: check_obligation
+    nodes:
+      pmr_delayed:
+        type: return
+        value:
+          regulatory_reference: FDA PMR/PMC Annual Status Report Guidance (2023), Section IV; FDAAA 2007 Section 902
+          report_form: FDA Form 3988 — Delay notification with revised schedule
+          enforcement_action: FDA reviews justification. May accept revised timeline or escalate to enforcement. Possible civil money penalties under FDAAA.
+          status_code: D
+      pmr_check_ongoing:
+        type: condition
+        variable: study_status
+        operator: eq
+        value: ongoing
+        true_next: pmr_check_overdue
+        false_next: pmr_check_delayed
+      pmr_check_overdue:
+        type: condition
+        variable: overdue
+        operator: eq
+        value: true
+        true_next: pmr_overdue
+        false_next: pmr_on_track
+      pmr_submitted:
+        type: return
+        value:
+          regulatory_reference: FDA PMR/PMC Annual Status Report Guidance (2023), Section III.B
+          report_form: FDA Form 3988 — Study Report Submitted
+          status_code: S
+          enforcement_action: Awaiting FDA review. No enforcement action.
+      pmc_ongoing:
+        type: return
+        value:
+          report_form: FDA Form 3989 — Annual Status Report
+          regulatory_reference: FDA PMR/PMC Annual Status Report Guidance (2023), Section V
+          status_code: P
+          enforcement_action: Voluntary commitment. FDA may reclassify as PMR if safety concern arises.
+      pmr_status_check:
+        type: condition
+        variable: study_status
+        operator: eq
+        value: fulfilled
+        true_next: pmr_fulfilled
+        false_next: pmr_check_submitted
+      pmr_check_submitted:
+        type: condition
+        variable: study_status
+        operator: eq
+        value: submitted
+        true_next: pmr_submitted
+        false_next: pmr_check_ongoing
+      pmr_pending:
+        type: return
+        value:
+          report_form: FDA Form 3988 — Not yet initiated
+          status_code: R
+          regulatory_reference: FDA PMR/PMC Annual Status Report Guidance (2023), Section III.A
+          enforcement_action: Must provide timeline for initiation. FDA monitors for progress.
+      check_pmr_efficacy:
+        type: condition
+        variable: obligation_type
+        operator: eq
+        value: pmr_efficacy
+        true_next: pmr_status_check
+        false_next: check_pmr_cp
+      pmc_released:
+        type: return
+        value:
+          enforcement_action: NONE — FDA has released sponsor from this commitment
+          regulatory_reference: FDA PMR/PMC Annual Status Report Guidance (2023), Section V
+          report_form: FDA Form 3989 — Released from commitment
+          status_code: X
+      pmr_fulfilled:
+        type: return
+        value:
+          enforcement_action: NONE — obligation complete
+          status_code: F
+          regulatory_reference: FDA PMR/PMC Annual Status Report Guidance (2023), Section III.B; 21 CFR 314.81(b)(2)(vii)
+          report_form: FDA Form 3988 — Final Status Report
+      pmr_on_track:
+        type: return
+        value:
+          report_form: FDA Form 3988 — Annual Progress Report
+          status_code: P
+          regulatory_reference: FDA PMR/PMC Annual Status Report Guidance (2023), Section III.A
+          enforcement_action: NONE — PMR on schedule
+      pmr_check_delayed:
+        type: condition
+        variable: study_status
+        operator: eq
+        value: delayed
+        true_next: pmr_delayed
+        false_next: pmr_pending
+      pmr_overdue:
+        type: return
+        value:
+          report_form: FDA Form 3988 — Annual Progress Report with milestone justification
+          enforcement_action: FDA may issue untitled letter, require meeting, or deem PMR not met. Potential misbranding under FD&C Act 505(o)(3)(E).
+          status_code: P (overdue)
+          regulatory_reference: FDA PMR/PMC Annual Status Report Guidance (2023), Section IV; FD&C Act 505(o)(3)
+      check_obligation:
+        type: condition
+        variable: obligation_type
+        operator: eq
+        value: pmr_safety
+        true_next: pmr_status_check
+        false_next: check_pmr_efficacy
+      pmc_status_check:
+        type: condition
+        variable: study_status
+        operator: eq
+        value: fulfilled
+        true_next: pmc_fulfilled
+        false_next: pmc_check_released
+      pmc_check_released:
+        type: condition
+        variable: study_status
+        operator: eq
+        value: released
+        true_next: pmc_released
+        false_next: pmc_ongoing
+      pmc_fulfilled:
+        type: return
+        value:
+          enforcement_action: NONE — commitment fulfilled
+          regulatory_reference: FDA PMR/PMC Annual Status Report Guidance (2023), Section V
+          status_code: F
+          report_form: FDA Form 3989 — Final Status Report
+      check_pmr_cp:
+        type: condition
+        variable: obligation_type
+        operator: eq
+        value: pmr_clinical_pharmacology
+        true_next: pmr_status_check
+        false_next: pmc_status_check
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: study_status
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: study_status
+        operator: neq
+        value: pmr_safety
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      obligation_type:
+        type: string
+        required: true
+      study_status:
+        type: string
+        required: true
+      overdue:
+        type: bool
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      status_code:
+        type: string
+        required: false
+      report_form:
+        type: string
+        required: false
+      enforcement_action:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    study_status: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    study_status: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - obligation_type
+  - study_status
+  - overdue
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

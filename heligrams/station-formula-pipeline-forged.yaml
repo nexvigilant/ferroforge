@@ -1,0 +1,148 @@
+name: station-formula-pipeline-helix
+description: 'Forged from microgram ''station-formula-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    reason: falsified
+sense:
+  tree:
+    start: check_type
+    nodes:
+      signal:
+        type: return
+        value:
+          reason: Signal strength formula — feed to signal-theory pipeline
+          priority: moderate
+          action: route
+          route: signal_detection
+      check_flywheel:
+        type: condition
+        variable: formula_type
+        operator: eq
+        value: flywheel_velocity
+        true_next: flywheel
+        false_next: generic
+      check_type:
+        type: condition
+        variable: formula_type
+        operator: eq
+        value: signal_strength
+        true_next: signal
+        false_next: check_flywheel
+      flywheel:
+        type: return
+        value:
+          route: session_metrics
+          action: route
+          priority: moderate
+          reason: Flywheel velocity — feed to session health metrics
+      generic:
+        type: return
+        value:
+          route: archive
+          action: compute
+          reason: Generic formula computation — return result
+          priority: low
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: formula_type
+        operator: neq
+        value: signal_strength
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: formula_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      formula_type:
+        type: string
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    formula_type: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    formula_type: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

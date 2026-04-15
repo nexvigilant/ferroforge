@@ -1,0 +1,200 @@
+name: dna-ml-verdict
+description: 'Classifies DNA-ML pipeline result: evaluates AUC, feature lift, and sample sufficiency to produce a verdict on model quality'
+version: 0.1.0
+family: dna-ml
+primitive_signature:
+  dominant: state
+  expression: 'ς(auc, dna_lift) → verdict'
+  primes: [state, quantity, comparison, boundary]
+interface:
+  inputs:
+    auc:
+      type: float
+      required: true
+    n_samples:
+      type: int
+      required: true
+    total_features:
+      type: int
+      required: true
+    dna_feature_count:
+      type: int
+      required: false
+  outputs:
+    verdict:
+      type: string
+    model_grade:
+      type: string
+    recommendation:
+      type: string
+    dna_contribution:
+      type: string
+tree:
+  start: check_auc_excellent
+  nodes:
+    check_auc_excellent:
+      type: condition
+      variable: auc
+      operator: gte
+      value: 0.9
+      true_next: check_sample_size_excellent
+      false_next: check_auc_good
+
+    check_sample_size_excellent:
+      type: condition
+      variable: n_samples
+      operator: gte
+      value: 50
+      true_next: check_dna_used_excellent
+      false_next: excellent_small_sample
+
+    check_dna_used_excellent:
+      type: condition
+      variable: total_features
+      operator: gte
+      value: 17
+      true_next: grade_a_dna
+      false_next: grade_a_baseline
+
+    check_auc_good:
+      type: condition
+      variable: auc
+      operator: gte
+      value: 0.7
+      true_next: check_sample_size_good
+      false_next: check_auc_poor
+
+    check_sample_size_good:
+      type: condition
+      variable: n_samples
+      operator: gte
+      value: 30
+      true_next: grade_b
+      false_next: grade_b_underpowered
+
+    check_auc_poor:
+      type: condition
+      variable: auc
+      operator: gte
+      value: 0.5
+      true_next: grade_c
+      false_next: grade_f
+
+    grade_a_dna:
+      type: return
+      value:
+        verdict: accept
+        model_grade: A
+        recommendation: 'Model ready for production signal detection with DNA augmentation'
+        dna_contribution: active
+
+    grade_a_baseline:
+      type: return
+      value:
+        verdict: accept
+        model_grade: A
+        recommendation: 'Excellent model — consider adding DNA features for additional robustness'
+        dna_contribution: not_used
+
+    excellent_small_sample:
+      type: return
+      value:
+        verdict: provisional
+        model_grade: A-
+        recommendation: 'High AUC but small sample — validate on larger dataset before production'
+        dna_contribution: unknown
+
+    grade_b:
+      type: return
+      value:
+        verdict: provisional
+        model_grade: B
+        recommendation: 'Good performance — investigate misclassified pairs and retrain with more data'
+        dna_contribution: partial
+
+    grade_b_underpowered:
+      type: return
+      value:
+        verdict: provisional
+        model_grade: B-
+        recommendation: 'Good AUC but underpowered — collect more labeled samples'
+        dna_contribution: insufficient_data
+
+    grade_c:
+      type: return
+      value:
+        verdict: investigate
+        model_grade: C
+        recommendation: 'Near-chance performance — check feature quality and label accuracy'
+        dna_contribution: inconclusive
+
+    grade_f:
+      type: return
+      value:
+        verdict: reject
+        model_grade: F
+        recommendation: 'Below chance — model is anti-correlated. Check label inversion or data leakage'
+        dna_contribution: irrelevant
+
+tests:
+  - name: perfect_dna_model
+    input:
+      auc: 1.0
+      n_samples: 100
+      total_features: 17
+      dna_feature_count: 5
+    expect:
+      verdict: accept
+      model_grade: A
+      dna_contribution: active
+
+  - name: perfect_baseline_only
+    input:
+      auc: 0.95
+      n_samples: 80
+      total_features: 12
+    expect:
+      verdict: accept
+      model_grade: A
+      dna_contribution: not_used
+
+  - name: good_small_sample
+    input:
+      auc: 0.92
+      n_samples: 15
+      total_features: 17
+    expect:
+      verdict: provisional
+      model_grade: A-
+
+  - name: moderate_model
+    input:
+      auc: 0.75
+      n_samples: 50
+      total_features: 17
+    expect:
+      verdict: provisional
+      model_grade: B
+
+  - name: near_chance
+    input:
+      auc: 0.55
+      n_samples: 100
+      total_features: 17
+    expect:
+      verdict: investigate
+      model_grade: C
+
+  - name: anti_correlated
+    input:
+      auc: 0.3
+      n_samples: 50
+      total_features: 12
+    expect:
+      verdict: reject
+      model_grade: F
+
+  - name: null_safety
+    input: {}
+    expect:
+      verdict: reject

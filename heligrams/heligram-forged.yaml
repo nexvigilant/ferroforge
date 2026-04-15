@@ -1,0 +1,251 @@
+name: heligram-helix
+description: 'Forged from microgram ''heligram''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    can_advance_to_1: falsified
+sense:
+  tree:
+    start: boundary_strong
+    nodes:
+      state_strong:
+        type: condition
+        variable: state
+        operator: gte
+        value: 0.5
+        true_next: void_strong
+        false_next: state_is_weakest
+      state_collapsing:
+        type: return
+        value:
+          can_advance_to_1: false
+          vice_risk: Critical ς gap — conservation failing
+          helix_verdict: Cannot advance. State is too thin for existence.
+          binding_laws: Law 7 (Active Maintenance) — urgent
+          existence_class: collapsing
+          weakest: state
+          can_advance: false
+      state_weak_not_collapsing:
+        type: return
+        value:
+          can_advance_to_1: true
+          binding_laws: Law 2 (Sufficient Portion), Law 5 (Measured Intake), Law 7 (Active Maintenance)
+          weakest: state
+          helix_verdict: Can advance, but enrich state (ς) first.
+          vice_risk: Greed, Gluttony, Sloth — thin state means thin measurement
+          existence_class: weak
+          can_advance: true
+      void_is_weakest:
+        type: return
+        value:
+          can_advance_to_1: true
+          helix_verdict: Can advance. Clarify what this system is NOT.
+          binding_laws: Law 4 (Generous Witness), Law 6 (Measured Response)
+          existence_class: moderate
+          vice_risk: Envy, Wrath — unclear void invites foreign patterns
+          can_advance: true
+          weakest: void
+      boundary_weak_state:
+        type: condition
+        variable: boundary
+        operator: gte
+        value: 0.1
+        true_next: boundary_weak_not_collapsing
+        false_next: boundary_collapsing
+      all_strong:
+        type: return
+        value:
+          can_advance_to_1: true
+          helix_verdict: Strong enough to advance. The truth at higher resolution awaits.
+          existence_class: strong
+          can_advance: true
+          vice_risk: Low — all primitives healthy
+          binding_laws: All 8 laws in balance
+          weakest: none
+      boundary_strong:
+        type: condition
+        variable: boundary
+        operator: gte
+        value: 0.5
+        true_next: state_strong
+        false_next: boundary_weak_state
+      void_strong:
+        type: condition
+        variable: void
+        operator: gte
+        value: 0.5
+        true_next: all_strong
+        false_next: void_is_weakest
+      state_is_weakest:
+        type: condition
+        variable: state
+        operator: gte
+        value: 0.1
+        true_next: state_weak_not_collapsing
+        false_next: state_collapsing
+      boundary_weak_not_collapsing:
+        type: return
+        value:
+          can_advance: true
+          can_advance_to_1: true
+          vice_risk: Pride, Lust, Corruption — fuzzy boundaries leak existence
+          helix_verdict: Can advance, but sharpen boundary (∂) first.
+          weakest: boundary
+          existence_class: weak
+          binding_laws: Law 1 (True Measure), Law 3 (Bounded Pursuit), Law 8 (Sovereign Boundary)
+      boundary_collapsing:
+        type: return
+        value:
+          binding_laws: Law 8 (Sovereign Boundary) — existential
+          helix_verdict: Cannot advance. Without boundary, there is no inside or outside.
+          weakest: boundary
+          can_advance: false
+          can_advance_to_1: false
+          existence_class: collapsing
+          vice_risk: Critical ∂ gap — no boundary means no existence
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: state
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: state
+        operator: lt
+        value: 0.5
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      can_advance_to_1: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      can_advance_to_1: true
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when:
+      falsified: false
+      can_advance_to_1: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      can_advance_to_1: false
+      falsified: true
+    default: null
+    emit:
+      confidence: medium
+      verdict: refuted
+      confidence_score: 0.42
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      state:
+        type: float
+        required: true
+      void:
+        type: float
+        required: true
+      boundary:
+        type: float
+        required: true
+    outputs:
+      existence_class:
+        type: string
+        required: false
+      vice_risk:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      can_advance:
+        type: bool
+        required: false
+      confidence:
+        type: string
+        required: false
+      weakest:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    boundary: 0.9
+    void: 0.7
+    state: null
+  expect:
+    confidence: high
+    verdict: absent
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    boundary: 0.9
+    void: 0.7
+    state: 0.8
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - boundary
+  - state
+  - void
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

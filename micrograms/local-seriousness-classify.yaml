@@ -1,0 +1,62 @@
+name: local-seriousness-classify
+description: >
+  Pre-filter: classify adverse event seriousness using local Ollama (qwen2.5:3b).
+  Zero API cost. ~6s on CPU. ICH E2A criteria.
+  Routes to local_nexvigilant_com_classify Station tool.
+version: 1.0.0
+interface:
+  inputs:
+    narrative:
+      type: string
+      required: true
+      description: Adverse event report narrative text
+  outputs:
+    classification:
+      type: string
+    criteria:
+      type: string
+    confidence:
+      type: number
+    model:
+      type: string
+    route:
+      type: string
+tree:
+  start: check_narrative
+  nodes:
+    check_narrative:
+      type: condition
+      variable: narrative
+      operator: eq
+      value: ""
+      true_next: empty_result
+      false_next: route_to_ollama
+    empty_result:
+      type: return
+      value:
+        classification: "UNKNOWN"
+        criteria: "none"
+        confidence: 0.0
+        model: "none"
+        route: "skip"
+    route_to_ollama:
+      type: return
+      value:
+        classification: "PENDING"
+        criteria: "ich_e2a"
+        confidence: 0.0
+        model: "qwen2.5:3b"
+        route: "local_nexvigilant_com_classify(text=narrative, categories='SERIOUS,NON-SERIOUS', context='ICH E2A seriousness criteria')"
+tests:
+  - name: empty_narrative
+    input:
+      narrative: ""
+    expect:
+      classification: "UNKNOWN"
+      route: "skip"
+  - name: has_narrative
+    input:
+      narrative: "Patient hospitalized for severe allergic reaction"
+    expect:
+      classification: "PENDING"
+      model: "qwen2.5:3b"

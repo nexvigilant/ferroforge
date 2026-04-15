@@ -1,0 +1,212 @@
+name: algo-seal-commitment-helix
+description: 'Forged from microgram ''algo-seal-commitment''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    seal_verdict: falsified
+sense:
+  tree:
+    start: check_defined
+    nodes:
+      check_defined:
+        type: condition
+        variable: decision_defined
+        operator: eq
+        value: false
+        true_next: block_undefined
+        false_next: check_multi_perspective
+      check_evidence:
+        type: condition
+        variable: evidence_sufficient
+        operator: eq
+        value: true
+        true_next: check_impossible
+        false_next: block_weak_evidence
+      block_no_perspective:
+        type: return
+        value:
+          seal_verdict: BLOCK
+          algorithm: 'SEAL blocked: zero perspectives — Failure Mode #7 risk'
+      check_single_cost_trivial:
+        type: condition
+        variable: reversibility_cost
+        operator: eq
+        value: trivial
+        true_next: warn_proceed
+        false_next: check_single_cost_moderate
+      block_undefined:
+        type: return
+        value:
+          seal_verdict: BLOCK
+          algorithm: 'SEAL blocked: DEFINE not applied — cannot seal an unfixed variable'
+      warn_proceed:
+        type: return
+        value:
+          seal_verdict: WARN_PROCEED
+          algorithm: 'SEAL with warning: 1 perspective but low reversal cost — proceed with caution'
+      block_weak_evidence:
+        type: return
+        value:
+          algorithm: 'SEAL blocked: insufficient evidence — ∝(DEFINE) on weak evidence creates irreversible error'
+          seal_verdict: BLOCK
+      check_impossible:
+        type: condition
+        variable: reversibility_cost
+        operator: eq
+        value: impossible
+        true_next: seal_irreversible
+        false_next: seal_reversible
+      seal_irreversible:
+        type: return
+        value:
+          algorithm: 'SEAL: ∝(μ(ς → π(ς))) — truly irreversible commitment. No inverse exists.'
+          seal_verdict: SEAL
+      seal_reversible:
+        type: return
+        value:
+          seal_verdict: SEAL
+          algorithm: 'SEAL: ∝(μ(ς → π(ς))) — commitment executed. Reversal possible but costly.'
+      check_single_cost_moderate:
+        type: condition
+        variable: reversibility_cost
+        operator: eq
+        value: moderate
+        true_next: warn_proceed
+        false_next: block_high_stakes_single
+      check_single_perspective:
+        type: condition
+        variable: perspectives_checked
+        operator: gte
+        value: 1
+        true_next: check_single_cost_trivial
+        false_next: block_no_perspective
+      check_multi_perspective:
+        type: condition
+        variable: perspectives_checked
+        operator: gte
+        value: 2
+        true_next: check_evidence
+        false_next: check_single_perspective
+      block_high_stakes_single:
+        type: return
+        value:
+          seal_verdict: BLOCK
+          algorithm: 'SEAL blocked: 1 perspective on expensive/impossible reversal — ∝ amplifies perspective collapse'
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: decision_defined
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: decision_defined
+        operator: neq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      evidence_sufficient:
+        type: boolean
+        required: true
+      reversibility_cost:
+        type: string
+        required: true
+      perspectives_checked:
+        type: integer
+        required: true
+      decision_defined:
+        type: boolean
+        required: true
+    outputs:
+      seal_verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      algorithm:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    decision_defined: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    decision_defined: true
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

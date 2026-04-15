@@ -1,0 +1,193 @@
+name: audit-query-router-helix
+description: 'Forged from microgram ''audit-query-router''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    table: falsified
+sense:
+  tree:
+    start: check_all
+    nodes:
+      unknown_operation:
+        type: return
+        value:
+          table: none
+          description: Unknown operation type - choose ingest/detect/triage/report/all
+          scope: error
+      route_all:
+        type: return
+        value:
+          description: Full audit trail - query all operations across the PVOS lifecycle
+          scope: all
+          table: audit_log
+      route_ingest:
+        type: return
+        value:
+          description: Ingest audit - query case ingestion and validation events
+          scope: ingest
+          table: audit_log
+      check_triage:
+        type: condition
+        variable: operation
+        operator: eq
+        value: triage
+        true_next: route_triage
+        false_next: check_report
+      check_ingest:
+        type: condition
+        variable: operation
+        operator: eq
+        value: ingest
+        true_next: route_ingest
+        false_next: check_detect
+      route_triage:
+        type: return
+        value:
+          scope: triage
+          table: audit_log
+          description: Triage audit - query signal triage decisions and reviewer actions
+      check_detect:
+        type: condition
+        variable: operation
+        operator: eq
+        value: detect
+        true_next: route_detect
+        false_next: check_triage
+      check_report:
+        type: condition
+        variable: operation
+        operator: eq
+        value: report
+        true_next: route_report
+        false_next: unknown_operation
+      route_detect:
+        type: return
+        value:
+          table: audit_log
+          scope: detect
+          description: Detection audit - query signal detection algorithm runs and results
+      check_all:
+        type: condition
+        variable: operation
+        operator: eq
+        value: all
+        true_next: route_all
+        false_next: check_ingest
+      route_report:
+        type: return
+        value:
+          scope: report
+          table: audit_log
+          description: Report audit - query regulatory submission events and deadlines
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: operation
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_negation:
+        type: condition
+        variable: operation
+        operator: neq
+        value: all
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      operation:
+        type: string
+        required: false
+    outputs:
+      description:
+        type: string
+        required: false
+      table:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      scope:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    operation: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    operation: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

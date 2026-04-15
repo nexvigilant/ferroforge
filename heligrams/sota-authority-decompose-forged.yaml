@@ -1,0 +1,266 @@
+name: sota-authority-decompose-helix
+description: 'Forged from microgram ''sota-authority-decompose''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    authority_class: falsified
+sense:
+  tree:
+    start: check_evidence_basis
+    nodes:
+      sovereign_authority:
+        type: return
+        value:
+          authority_class: SOVEREIGN
+          authority_score: 95
+          recommendation: Accepted as definitive. Challenge only with evidence_basis >= 4 AND consensus_level >= 4.
+          defensibility: MAXIMUM
+          vulnerability: Slow to update — consensus cycles of 5-10 years can lag behind frontier movement
+      check_sovereign:
+        type: condition
+        variable: institutional_backing
+        operator: gte
+        value: 4
+        true_next: check_sovereign_credential
+        false_next: check_established
+      check_sovereign_credential:
+        type: condition
+        variable: credential_strength
+        operator: gte
+        value: 4
+        true_next: sovereign_authority
+        false_next: check_established
+      check_evidence_basis:
+        type: condition
+        variable: evidence_basis
+        operator: gte
+        value: 3
+        true_next: check_consensus
+        false_next: check_assertion_only
+      established_authority:
+        type: return
+        value:
+          authority_class: ESTABLISHED
+          recommendation: Strong but verify cross-jurisdictional. Accepted for single-market decisions.
+          vulnerability: Regional bias — may reflect one regulatory tradition over another. Check cross-jurisdictional alignment.
+          defensibility: HIGH
+          authority_score: 75
+      emerging_authority:
+        type: return
+        value:
+          recommendation: Provisional. Monitor for consensus convergence. Do not use as sole basis for standard-setting.
+          authority_class: EMERGING
+          defensibility: MODERATE
+          vulnerability: Credential-evidence gap — authority may exceed evidence base. Verify evidence_basis independently.
+          authority_score: 50
+      naked_assertion:
+        type: return
+        value:
+          recommendation: Reject immediately. This is opinion presented as standard. Flag as Takeda-pattern violation.
+          defensibility: NONE
+          authority_class: ASSERTION
+          authority_score: 0
+          vulnerability: Pure assertion — no evidence, no consensus, no institutional backing. The definition of indefensible authority.
+      lone_authority:
+        type: return
+        value:
+          vulnerability: Single-source authority — no consensus check, no peer validation. Maximum Takeda risk.
+          recommendation: Reject as threshold authority. Individual expertise informs but cannot define frontier.
+          authority_score: 10
+          defensibility: MINIMAL
+          authority_class: LONE
+      weak_evidence:
+        type: return
+        value:
+          vulnerability: Case-based only — insufficient evidence to establish authority claim. Anecdote is not frontier.
+          defensibility: NONE
+          authority_score: 5
+          recommendation: Reject. Authority claims require minimum observational evidence (level 3).
+          authority_class: UNGROUNDED
+      check_assertion_only:
+        type: condition
+        variable: evidence_basis
+        operator: lte
+        value: 1
+        true_next: naked_assertion
+        false_next: weak_evidence
+      check_credential_low:
+        type: condition
+        variable: credential_strength
+        operator: gte
+        value: 2
+        true_next: emerging_authority
+        false_next: contested_authority
+      check_credential_mid:
+        type: condition
+        variable: credential_strength
+        operator: gte
+        value: 3
+        true_next: established_authority
+        false_next: check_credential_low
+      check_established:
+        type: condition
+        variable: credential_strength
+        operator: gte
+        value: 3
+        true_next: established_authority
+        false_next: emerging_authority
+      check_local_consensus:
+        type: condition
+        variable: consensus_level
+        operator: gte
+        value: 2
+        true_next: check_credential_mid
+        false_next: lone_authority
+      contested_authority:
+        type: return
+        value:
+          authority_class: CONTESTED
+          vulnerability: 'Consensus deficit — local agreement without broad validation. Takeda-pattern risk: authority asserted without defensible criteria.'
+          defensibility: LOW
+          recommendation: Do not accept as threshold authority. Require evidence_basis >= 3 AND consensus_level >= 3 before recognition.
+          authority_score: 25
+      check_consensus:
+        type: condition
+        variable: consensus_level
+        operator: gte
+        value: 4
+        true_next: check_sovereign
+        false_next: check_local_consensus
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: institutional_backing
+        operator: lt
+        value: 3
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: institutional_backing
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      evidence_basis:
+        type: int
+        required: true
+      institutional_backing:
+        type: int
+        required: true
+      consensus_level:
+        type: int
+        required: true
+      credential_strength:
+        type: int
+        required: true
+    outputs:
+      authority_score:
+        type: int
+        required: false
+      defensibility:
+        type: string
+        required: false
+      vulnerability:
+        type: string
+        required: false
+      recommendation:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      authority_class:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    institutional_backing: 13
+    consensus_level: 5
+    credential_strength: 5
+    evidence_basis: 1
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    institutional_backing: 2
+    consensus_level: 5
+    credential_strength: 5
+    evidence_basis: 1
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - consensus_level
+  - credential_strength
+  - evidence_basis
+  - institutional_backing
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

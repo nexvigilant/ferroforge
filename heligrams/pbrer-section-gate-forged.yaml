@@ -1,0 +1,275 @@
+name: pbrer-section-gate-helix
+description: 'Forged from microgram ''pbrer-section-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    status: falsified
+sense:
+  tree:
+    start: check_section_intro
+    nodes:
+      safety_complete:
+        type: return
+        value:
+          status: complete
+          missing_elements: none
+      signals_check_count:
+        type: condition
+        variable: signal_count
+        operator: gte
+        value: 0
+        true_next: signals_complete
+        false_next: signals_complete
+      br_partial:
+        type: return
+        value:
+          status: partial
+          missing_elements: benefit-risk assessment
+      check_section_safety:
+        type: condition
+        variable: section_id
+        operator: eq
+        value: safety
+        true_next: safety_check_faers
+        false_next: check_section_signals
+      br_check_assessment:
+        type: condition
+        variable: has_benefit_risk
+        operator: eq
+        value: true
+        true_next: br_complete
+        false_next: br_partial
+      conclusions_complete:
+        type: return
+        value:
+          status: complete
+          missing_elements: none
+      check_section_intro:
+        type: condition
+        variable: section_id
+        operator: eq
+        value: intro
+        true_next: intro_check_faers
+        false_next: check_section_safety
+      safety_check_faers:
+        type: condition
+        variable: has_faers_data
+        operator: eq
+        value: true
+        true_next: safety_complete
+        false_next: safety_missing
+      conclusions_check:
+        type: condition
+        variable: has_faers_data
+        operator: eq
+        value: true
+        true_next: conclusions_check_br
+        false_next: conclusions_no_data
+      br_no_faers:
+        type: return
+        value:
+          missing_elements: FAERS data and benefit-risk assessment
+          status: missing
+      signals_check_faers:
+        type: condition
+        variable: has_faers_data
+        operator: eq
+        value: true
+        true_next: signals_check_count
+        false_next: signals_no_data
+      check_section_signals:
+        type: condition
+        variable: section_id
+        operator: eq
+        value: signals
+        true_next: signals_check_faers
+        false_next: check_section_benefit_risk
+      signals_no_data:
+        type: return
+        value:
+          missing_elements: FAERS signal detection data required
+          status: missing
+      conclusions_check_br:
+        type: condition
+        variable: has_benefit_risk
+        operator: eq
+        value: true
+        true_next: conclusions_complete
+        false_next: conclusions_partial
+      conclusions_partial:
+        type: return
+        value:
+          missing_elements: benefit-risk assessment for final conclusions
+          status: partial
+      check_section_benefit_risk:
+        type: condition
+        variable: section_id
+        operator: eq
+        value: benefit-risk
+        true_next: br_check_faers
+        false_next: conclusions_check
+      br_check_faers:
+        type: condition
+        variable: has_faers_data
+        operator: eq
+        value: true
+        true_next: br_check_assessment
+        false_next: br_no_faers
+      signals_complete:
+        type: return
+        value:
+          status: complete
+          missing_elements: none
+      intro_missing:
+        type: return
+        value:
+          status: partial
+          missing_elements: FAERS exposure data
+      intro_check_faers:
+        type: condition
+        variable: has_faers_data
+        operator: eq
+        value: true
+        true_next: intro_complete
+        false_next: intro_missing
+      intro_complete:
+        type: return
+        value:
+          status: complete
+          missing_elements: none
+      safety_missing:
+        type: return
+        value:
+          status: missing
+          missing_elements: FAERS safety data required
+      br_complete:
+        type: return
+        value:
+          missing_elements: none
+          status: complete
+      conclusions_no_data:
+        type: return
+        value:
+          missing_elements: All prerequisite sections incomplete
+          status: missing
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: signal_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: signal_count
+        operator: neq
+        value: intro
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_guidelines:
+        type: bool
+        required: false
+      has_benefit_risk:
+        type: bool
+        required: false
+      has_faers_data:
+        type: bool
+        required: true
+      section_id:
+        type: string
+        required: true
+      signal_count:
+        type: number
+        required: true
+    outputs:
+      status:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      missing_elements:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    signal_count: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    signal_count: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

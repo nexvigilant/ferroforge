@@ -1,0 +1,208 @@
+name: reporting-rate-gate-helix
+description: 'Forged from microgram ''reporting-rate-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    chemistry_analog: falsified
+sense:
+  tree:
+    start: check_baseline
+    nodes:
+      check_stable_threshold:
+        type: condition
+        variable: rate_change_pct
+        operator: gte
+        value: -20
+        true_next: stable
+        false_next: declining
+      watch:
+        type: return
+        value:
+          chemistry_analog: Moderate acceleration in reaction kinetics
+          action: Flag for enhanced surveillance - reporting rate increased 20-49% quarter-over-quarter
+          frequency_primitive: ν — rate of change over time
+          trend: WATCH
+      new_signal:
+        type: return
+        value:
+          action: Initiate signal evaluation - no prior baseline, new event reporting detected
+          chemistry_analog: Appearance of new reaction intermediate with no baseline
+          frequency_primitive: ν — rate of change over time
+          trend: NEW_SIGNAL
+      signal_emerging:
+        type: return
+        value:
+          frequency_primitive: ν — rate of change over time
+          chemistry_analog: Dramatic increase in reaction velocity
+          action: Escalate to signal evaluation - reporting rate increased ≥50% quarter-over-quarter
+          trend: SIGNAL_EMERGING
+      check_no_baseline_count:
+        type: condition
+        variable: current_count
+        operator: gt
+        value: 0
+        true_next: new_signal
+        false_next: no_activity
+      check_watch_threshold:
+        type: condition
+        variable: rate_change_pct
+        operator: gte
+        value: 20
+        true_next: watch
+        false_next: check_stable_threshold
+      check_baseline:
+        type: condition
+        variable: baseline_exists
+        operator: eq
+        value: true
+        true_next: check_baseline_rate
+        false_next: check_no_baseline_count
+      check_baseline_rate:
+        type: condition
+        variable: rate_change_pct
+        operator: gte
+        value: 50
+        true_next: signal_emerging
+        false_next: check_watch_threshold
+      no_activity:
+        type: return
+        value:
+          action: Continue routine monitoring - no baseline and no current events
+          chemistry_analog: Zero reaction rate across periods
+          trend: NO_ACTIVITY
+          frequency_primitive: ν — rate of change over time
+      stable:
+        type: return
+        value:
+          action: Continue standard monitoring - reporting rate within normal variation (-20% to +19%)
+          chemistry_analog: Steady-state reaction equilibrium
+          frequency_primitive: ν — rate of change over time
+          trend: STABLE
+      declining:
+        type: return
+        value:
+          trend: DECLINING
+          chemistry_analog: Reaction rate decreasing toward completion
+          frequency_primitive: ν — rate of change over time
+          action: Document trend - reporting rate declined >20% quarter-over-quarter
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: rate_change_pct
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: rate_change_pct
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      rate_change_pct:
+        type: i64
+        required: true
+      current_count:
+        type: i64
+        required: true
+      baseline_exists:
+        type: bool
+        required: true
+    outputs:
+      frequency_primitive:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      chemistry_analog:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+      trend:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    rate_change_pct: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    rate_change_pct: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

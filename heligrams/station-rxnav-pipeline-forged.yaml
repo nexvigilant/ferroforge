@@ -1,0 +1,197 @@
+name: station-rxnav-pipeline-helix
+description: 'Forged from microgram ''station-rxnav-pipeline''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    interaction_risk: falsified
+sense:
+  tree:
+    start: check_high_severity_critical
+    nodes:
+      significant_risk:
+        type: return
+        value:
+          interaction_risk: significant
+          recommended_action: Review high-severity interactions and assess clinical significance
+          next_step: clinical_assessment
+          risk_factors: High-severity drug interaction present
+      notable_risk:
+        type: return
+        value:
+          recommended_action: Document interactions and monitor for clinical impact
+          risk_factors: Multiple drug interactions without high severity
+          interaction_risk: notable
+          next_step: routine_monitoring
+      minimal_risk:
+        type: return
+        value:
+          interaction_risk: minimal
+          next_step: no_action
+          risk_factors: Few or no significant drug interactions
+          recommended_action: Standard prescribing precautions
+      check_high_severity_critical:
+        type: condition
+        variable: severity_high_count
+        operator: gte
+        value: 3
+        true_next: critical_risk
+        false_next: check_high_severity_any
+      significant_risk_moderate:
+        type: return
+        value:
+          next_step: polypharmacy_review
+          interaction_risk: significant
+          risk_factors: 5+ moderate-severity interactions — cumulative risk concern
+          recommended_action: Review moderate interactions for cumulative effect and polypharmacy risk
+      check_high_severity_any:
+        type: condition
+        variable: severity_high_count
+        operator: gte
+        value: 1
+        true_next: significant_risk
+        false_next: check_moderate_severity
+      critical_risk:
+        type: return
+        value:
+          next_step: interaction_review
+          recommended_action: Immediate review of concomitant medications and contraindication check
+          interaction_risk: critical
+          risk_factors: 3+ high-severity drug interactions identified
+      check_moderate_severity:
+        type: condition
+        variable: severity_moderate_count
+        operator: gte
+        value: 5
+        true_next: significant_risk_moderate
+        false_next: check_interaction_count
+      check_interaction_count:
+        type: condition
+        variable: interaction_count
+        operator: gte
+        value: 3
+        true_next: notable_risk
+        false_next: minimal_risk
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: severity_high_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: severity_high_count
+        operator: lt
+        value: 3
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      interaction_count:
+        type: int
+        required: false
+      severity_high_count:
+        type: int
+        required: false
+      severity_moderate_count:
+        type: int
+        required: false
+      drug_class:
+        type: string
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      recommended_action:
+        type: string
+        required: false
+      risk_factors:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      interaction_risk:
+        type: string
+        required: false
+      next_step:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    severity_high_count: 13
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    severity_high_count: 2
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

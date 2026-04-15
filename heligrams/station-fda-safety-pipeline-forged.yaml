@@ -1,0 +1,176 @@
+name: station-fda-safety-pipeline-helix
+description: 'Forged from microgram ''station-fda-safety-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    route: falsified
+sense:
+  tree:
+    start: check_comm_type
+    nodes:
+      class23_recall:
+        type: return
+        value:
+          route: recall_monitor
+          action: investigate
+          priority: moderate
+          reason: Class II/III recall — temporary or unlikely adverse health consequences
+      safety_labeling:
+        type: return
+        value:
+          action: review
+          priority: moderate
+          reason: Safety labeling change — compare before/after for new risks
+          route: label_comparison
+      class1_recall:
+        type: return
+        value:
+          reason: Class I recall — serious health consequences or death
+          action: escalate
+          priority: critical
+          route: recall_urgent
+      recall_class:
+        type: condition
+        variable: recall_class
+        operator: eq
+        value: 1
+        true_next: class1_recall
+        false_next: class23_recall
+      check_recall:
+        type: condition
+        variable: comm_type
+        operator: eq
+        value: recall
+        true_next: recall_class
+        false_next: check_medwatch
+      boxed_warning:
+        type: return
+        value:
+          priority: critical
+          route: labeling_urgent
+          action: escalate
+          reason: New boxed warning — highest FDA safety action, immediate labeling review
+      check_comm_type:
+        type: condition
+        variable: comm_type
+        operator: eq
+        value: boxed_warning
+        true_next: boxed_warning
+        false_next: check_recall
+      medwatch_alert:
+        type: return
+        value:
+          reason: MedWatch safety alert — new safety information emerging
+          priority: high
+          route: signal_investigation
+          action: investigate
+      check_medwatch:
+        type: condition
+        variable: comm_type
+        operator: eq
+        value: medwatch
+        true_next: medwatch_alert
+        false_next: safety_labeling
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: recall_class
+        operator: neq
+        value: boxed_warning
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: recall_class
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      recall_class:
+        type: string
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    recall_class: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    recall_class: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,290 @@
+name: e2d-mah-reporting-obligation-helix
+description: 'Forged from microgram ''e2d-mah-reporting-obligation''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    submit_to_authority: falsified
+sense:
+  tree:
+    start: check_serious_unexpected
+    nodes:
+      return_eu_eudravigilance_domestic:
+        type: return
+        value:
+          submit_to_authority: true
+          regulatory_reference: ICH E2D Section 4 / EU 2010-84-EU Article 107
+          submission_pathway: EUDRAVIGILANCE_DOMESTIC
+          submission_format: E2B_R3_ICH
+      return_eu_eudravigilance_foreign:
+        type: return
+        value:
+          submission_format: E2B_R3_ICH
+          submission_pathway: EUDRAVIGILANCE_FOREIGN
+          regulatory_reference: ICH E2D Section 4 / EU 2010-84-EU Article 107
+          submit_to_authority: true
+      return_us_faers:
+        type: return
+        value:
+          submission_pathway: FDA_MEDWATCH_FAERS
+          submit_to_authority: true
+          submission_format: MedWatch_3500A
+          regulatory_reference: ICH E2D Section 4 / 21 CFR 314.80
+      return_authority_forward:
+        type: return
+        value:
+          submission_pathway: AUTHORITY_FORWARD_MANDATORY
+          regulatory_reference: ICH E2D Section 4 - MAH Reporting Obligations
+          submit_to_authority: true
+          submission_format: E2B_R3_ICH
+      return_periodic_only:
+        type: return
+        value:
+          regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+          submit_to_authority: false
+          submission_format: PSUR_PBRER
+          submission_pathway: PERIODIC_REPORT_ONLY
+      check_region:
+        type: condition
+        variable: marketing_authorization_region
+        operator: eq
+        value: EU
+        true_next: check_foreign_eu
+        false_next: check_region_us
+      check_region_us:
+        type: condition
+        variable: marketing_authorization_region
+        operator: eq
+        value: US
+        true_next: return_us_faers
+        false_next: check_region_ich
+      check_received_from_authority:
+        type: condition
+        variable: received_from_authority
+        operator: eq
+        value: true
+        true_next: return_authority_forward
+        false_next: check_region
+      return_national_authority:
+        type: return
+        value:
+          submission_pathway: NATIONAL_AUTHORITY
+          submission_format: LOCAL_FORMAT
+          regulatory_reference: ICH E2D Section 4 - MAH Reporting Obligations
+          submit_to_authority: true
+      return_ich_e2b:
+        type: return
+        value:
+          regulatory_reference: ICH E2D Section 4 / ICH E2B(R3)
+          submit_to_authority: true
+          submission_pathway: ICH_E2B_NATIONAL
+          submission_format: E2B_R3_ICH
+      check_region_ich:
+        type: condition
+        variable: marketing_authorization_region
+        operator: eq
+        value: ICH
+        true_next: return_ich_e2b
+        false_next: return_national_authority
+      check_serious_unexpected:
+        type: condition
+        variable: serious_unexpected
+        operator: eq
+        value: true
+        true_next: check_received_from_authority
+        false_next: return_periodic_only
+      check_foreign_eu:
+        type: condition
+        variable: is_foreign_case
+        operator: eq
+        value: true
+        true_next: return_eu_eudravigilance_foreign
+        false_next: return_eu_eudravigilance_domestic
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      submit_to_authority: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+      submit_to_authority: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when:
+      submit_to_authority: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: absent
+      confidence_score: 0.7
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      source_country:
+        type: string
+        required: false
+      comorbidity_explains:
+        type: bool
+        required: false
+      serious_unexpected:
+        type: bool
+        required: false
+      is_foreign_case:
+        type: bool
+        required: false
+      received_from_authority:
+        type: bool
+        required: false
+      marketing_authorization_region:
+        type: string
+        required: false
+      coding_verified:
+        type: bool
+        required: false
+      follow_up_complete:
+        type: bool
+        required: false
+    outputs:
+      submission_format:
+        type: string
+        required: false
+      submission_pathway:
+        type: string
+        required: false
+      submit_to_authority:
+        type: bool
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    comorbidity_explains: false
+    marketing_authorization_region: EU
+    coding_verified: true
+    serious_unexpected: true
+    received_from_authority: false
+    is_foreign_case: false
+    follow_up_complete: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    marketing_authorization_region: EU
+    serious_unexpected: true
+    received_from_authority: false
+    is_foreign_case: false
+    follow_up_complete: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - source_country
+  - received_from_authority
+  - is_foreign_case
+  - marketing_authorization_region
+  - serious_unexpected
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

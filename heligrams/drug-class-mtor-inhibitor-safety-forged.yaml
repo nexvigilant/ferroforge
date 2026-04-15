@@ -1,0 +1,172 @@
+name: drug-class-mtor-inhibitor-safety-helix
+description: 'Forged from microgram ''drug-class-mtor-inhibitor-safety''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    monitoring_required: falsified
+sense:
+  tree:
+    start: check_baseline_lipids
+    nodes:
+      wound_healing_alert:
+        type: return
+        value:
+          surgery_planning: required
+          risk_level: high
+          message: Impaired wound healing history; mTOR inhibitor worsens healing; plan surgery carefully
+      lipid_alert:
+        type: return
+        value:
+          lipid_monitoring: required
+          risk_level: moderate
+          message: Elevated triglycerides; mTOR inhibitor may further elevate lipids
+      oral_alert:
+        type: return
+        value:
+          dental_monitoring: required
+          risk_level: moderate
+          message: Poor oral hygiene; mTOR inhibitor stomatitis risk; enhance dental care
+      standard_dosing:
+        type: return
+        value:
+          monitoring_required: true
+          risk_level: low
+          message: Standard mTOR inhibitor dosing appropriate
+      check_oral_health:
+        type: condition
+        variable: poor_oral_hygiene
+        operator: eq
+        value: true
+        true_next: oral_alert
+        false_next: standard_dosing
+      check_poor_wound_healing:
+        type: condition
+        variable: impaired_wound_healing_history
+        operator: eq
+        value: true
+        true_next: wound_healing_alert
+        false_next: check_oral_health
+      check_baseline_lipids:
+        type: condition
+        variable: baseline_triglycerides_mg_dl
+        operator: gte
+        value: 300
+        true_next: lipid_alert
+        false_next: check_poor_wound_healing
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: poor_oral_hygiene
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: poor_oral_hygiene
+        operator: lt
+        value: 300
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      monitoring_required: true
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      monitoring_required: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when:
+      monitoring_required: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      poor_oral_hygiene:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    poor_oral_hygiene: 310
+    impaired_wound_healing_history: false
+    baseline_triglycerides_mg_dl: 200
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    poor_oral_hygiene: 299
+    impaired_wound_healing_history: false
+    baseline_triglycerides_mg_dl: 200
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

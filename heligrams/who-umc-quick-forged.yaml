@@ -1,0 +1,257 @@
+name: who-umc-quick-helix
+description: 'Forged from microgram ''who-umc-quick''. Domain: CausalityAssessment. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    regulatory_use: falsified
+sense:
+  tree:
+    start: time_plausible_check
+    nodes:
+      no_alternative_check:
+        type: condition
+        variable: no_alternative_explanation
+        operator: eq
+        value: true
+        true_next: dechallenge_check
+        false_next: possible_low
+      unclassified:
+        type: return
+        value:
+          regulatory_use: Collect more information before assessment
+          causality: UNCLASSIFIED
+          who_score: 1
+          description: Temporal relationship not established or insufficient information
+      unlikely:
+        type: return
+        value:
+          who_score: 2
+          description: Plausible time but reaction not previously known to drug
+          causality: UNLIKELY
+          regulatory_use: Low priority for regulatory action
+      time_plausible_check:
+        type: condition
+        variable: time_plausible
+        operator: eq
+        value: true
+        true_next: known_reaction_check
+        false_next: unclassified
+      certain:
+        type: return
+        value:
+          description: All criteria met including positive rechallenge
+          regulatory_use: Highest confidence for regulatory action
+          causality: CERTAIN
+          who_score: 6
+      rechallenge_check:
+        type: condition
+        variable: rechallenge_positive
+        operator: eq
+        value: true
+        true_next: certain
+        false_next: probable
+      known_reaction_check:
+        type: condition
+        variable: known_reaction
+        operator: eq
+        value: true
+        true_next: no_alternative_check
+        false_next: unlikely
+      probable:
+        type: return
+        value:
+          regulatory_use: Strong signal for further investigation
+          description: Plausible time, known reaction, no alternative, positive dechallenge
+          who_score: 5
+          causality: PROBABLE
+      possible_low:
+        type: return
+        value:
+          regulatory_use: Monitor and collect additional information
+          causality: POSSIBLE
+          description: Plausible time and known reaction but alternative explanations exist
+          who_score: 3
+      dechallenge_check:
+        type: condition
+        variable: dechallenge_positive
+        operator: eq
+        value: true
+        true_next: rechallenge_check
+        false_next: probable
+antisense:
+  tree:
+    start: null_guard_alternative_cause
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_no_dechallenge
+      null_guard_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: is_null
+        value: null
+        true_next: null_guard_temporal_implausible
+        false_next: check_alternative_cause
+      null_guard_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_no_dechallenge
+      check_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: eq
+        value: likely
+        true_next: falsified
+        false_next: null_guard_temporal_implausible
+      null_guard_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: is_null
+        value: null
+        true_next: null_guard_no_dechallenge
+        false_next: check_temporal_implausible
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      dechallenge_positive:
+        type: bool
+        required: false
+      time_plausible:
+        type: bool
+        required: false
+      no_alternative_explanation:
+        type: bool
+        required: false
+      known_reaction:
+        type: bool
+        required: false
+      alternative_causes:
+        type: string
+        required: false
+      rechallenge_positive:
+        type: bool
+        required: false
+      temporal_plausible:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      causality:
+        type: string
+        required: false
+      who_score:
+        type: int
+        required: false
+      verdict:
+        type: string
+        required: false
+      regulatory_use:
+        type: string
+        required: false
+      description:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    no_alternative_explanation: false
+    temporal_plausible: true
+    known_reaction: true
+    time_plausible: true
+    rechallenge_positive: true
+    dechallenge_positive: true
+    alternative_causes: none
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, alternative_cause active'
+  input:
+    time_plausible: true
+    no_alternative_explanation: false
+    dechallenge_positive: true
+    rechallenge_positive: true
+    known_reaction: true
+    alternative_causes: likely
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — causality-assessment with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - time_plausible
+  - known_reaction
+  - no_alternative_explanation
+  - dechallenge_positive
+  - rechallenge_positive
+  chain_prediction: 'Forged heligram. Domain: causality-assessment. Chains as dual-strand verifier before downstream consumers.'

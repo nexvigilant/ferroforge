@@ -1,0 +1,227 @@
+name: smq-relevance-checker-helix
+description: 'Forged from microgram ''smq-relevance-checker''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    likely_relevant: falsified
+sense:
+  tree:
+    start: validate_inputs
+    nodes:
+      missing_input:
+        type: return
+        value:
+          confidence: 0.0
+          likely_relevant: false
+          scope: null
+      check_smq_cardiac:
+        type: condition
+        variable: smq_name
+        operator: matches
+        value: (?i)(cardiac|heart|arrhythmia)
+        true_next: relevant_narrow
+        false_next: not_relevant
+      check_respiratory:
+        type: condition
+        variable: event_term
+        operator: matches
+        value: (?i)(respiratory|asthma|pneumonia|dyspnea)
+        true_next: check_smq_respiratory
+        false_next: check_neuro
+      relevant_narrow:
+        type: return
+        value:
+          likely_relevant: true
+          scope: narrow
+          confidence: 0.9
+      validate_smq:
+        type: condition
+        variable: smq_name
+        operator: is_not_null
+        value: null
+        true_next: check_relevance
+        false_next: missing_input
+      check_neuro:
+        type: condition
+        variable: event_term
+        operator: matches
+        value: (?i)(seizure|stroke|neurological|brain)
+        true_next: check_smq_neuro
+        false_next: check_infection
+      check_smq_respiratory:
+        type: condition
+        variable: smq_name
+        operator: matches
+        value: (?i)(respiratory|asthma|lung|pneumonia)
+        true_next: relevant_broad
+        false_next: not_relevant
+      relevant_broad:
+        type: return
+        value:
+          confidence: 0.7
+          likely_relevant: true
+          scope: broad
+      check_relevance:
+        type: condition
+        variable: event_term
+        operator: matches
+        value: (?i)(cardiac|heart|arrhythmia|infarction)
+        true_next: check_smq_cardiac
+        false_next: check_respiratory
+      not_relevant:
+        type: return
+        value:
+          scope: none
+          confidence: 0.8
+          likely_relevant: false
+      check_smq_infection:
+        type: condition
+        variable: smq_name
+        operator: matches
+        value: (?i)(infection|sepsis|immunosuppression)
+        true_next: relevant_broad
+        false_next: not_relevant
+      validate_inputs:
+        type: condition
+        variable: event_term
+        operator: is_not_null
+        value: null
+        true_next: validate_smq
+        false_next: missing_input
+      check_smq_neuro:
+        type: condition
+        variable: smq_name
+        operator: matches
+        value: (?i)(neuro|seizure|brain|stroke)
+        true_next: relevant_narrow
+        false_next: not_relevant
+      check_infection:
+        type: condition
+        variable: event_term
+        operator: matches
+        value: (?i)(infection|sepsis|pneumonia|abscess)
+        true_next: check_smq_infection
+        false_next: not_relevant
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: smq_name
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: smq_name
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      likely_relevant: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      likely_relevant: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when:
+      falsified: false
+      likely_relevant: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      likely_relevant: false
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.42
+      confidence: medium
+      verdict: refuted
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      smq_name:
+        type: any
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    event_term: cardiac
+    smq_name: null
+  expect:
+    confidence: high
+    verdict: absent
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    event_term: cardiac
+    smq_name: cardiac
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

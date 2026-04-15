@@ -1,0 +1,254 @@
+name: algo-validation-to-assessment-bridge-helix
+description: 'Forged from microgram ''algo-validation-to-assessment-bridge''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    evidence_sufficient: falsified
+sense:
+  tree:
+    start: check_confidence
+    nodes:
+      check_confidence:
+        type: condition
+        variable: confidence
+        operator: gte
+        value: 70
+        true_next: high_confidence
+        false_next: check_mid_confidence
+      low_confidence:
+        type: return
+        value:
+          evidence_sufficient: false
+          tolerance_met: false
+          decision_defined: false
+          perspectives_checked: 1
+          algorithm: 'BRIDGE: confidence < 40 → evidence insufficient, decision undefined, not converged'
+      bridge_confirmed_unstable:
+        type: return
+        value:
+          perspectives_checked: 3
+          algorithm: 'BRIDGE: CONFIRMED but trend not stable → evidence present, convergence needed'
+          decision_defined: true
+          tolerance_met: false
+          evidence_sufficient: true
+      bridge_full_ready:
+        type: return
+        value:
+          evidence_sufficient: true
+          algorithm: 'BRIDGE: CONFIRMED + high confidence + STABLE → full assessment readiness'
+          perspectives_checked: 4
+          tolerance_met: true
+          decision_defined: true
+      probable_high:
+        type: condition
+        variable: trend
+        operator: eq
+        value: STABLE
+        true_next: bridge_probable_stable
+        false_next: bridge_probable_unstable
+      confirmed_high:
+        type: condition
+        variable: trend
+        operator: eq
+        value: STABLE
+        true_next: bridge_full_ready
+        false_next: bridge_confirmed_unstable
+      bridge_probable_unstable:
+        type: return
+        value:
+          algorithm: 'BRIDGE: PROBABLE but unstable → evidence present, needs convergence monitoring'
+          decision_defined: true
+          tolerance_met: false
+          perspectives_checked: 2
+          evidence_sufficient: true
+      bridge_emerging:
+        type: return
+        value:
+          evidence_sufficient: false
+          perspectives_checked: 1
+          algorithm: 'BRIDGE: mid-confidence + RISING → emerging signal, do NOT commit, monitor closely'
+          tolerance_met: false
+          decision_defined: false
+      bridge_uncertain:
+        type: return
+        value:
+          algorithm: 'BRIDGE: mid-confidence + not rising → insufficient, re-evaluate at next cycle'
+          perspectives_checked: 1
+          decision_defined: false
+          evidence_sufficient: false
+          tolerance_met: false
+      bridge_probable_stable:
+        type: return
+        value:
+          evidence_sufficient: true
+          decision_defined: true
+          perspectives_checked: 3
+          tolerance_met: true
+          algorithm: 'BRIDGE: PROBABLE + stable → ready for assessment, moderate confidence'
+      mid_confidence:
+        type: condition
+        variable: trend
+        operator: eq
+        value: RISING
+        true_next: bridge_emerging
+        false_next: bridge_uncertain
+      high_confidence:
+        type: condition
+        variable: overall
+        operator: eq
+        value: CONFIRMED
+        true_next: confirmed_high
+        false_next: probable_high
+      check_mid_confidence:
+        type: condition
+        variable: confidence
+        operator: gte
+        value: 40
+        true_next: mid_confidence
+        false_next: low_confidence
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: confidence
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: confidence
+        operator: lt
+        value: 70
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      evidence_sufficient: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+      evidence_sufficient: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      evidence_sufficient: false
+      falsified: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      evidence_sufficient: false
+      falsified: true
+    default: null
+    emit:
+      confidence: medium
+      verdict: refuted
+      confidence_score: 0.42
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      overall:
+        type: string
+        required: true
+      confidence:
+        type: integer
+        required: true
+      trend:
+        type: string
+        required: true
+    outputs:
+      perspectives_checked:
+        type: integer
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      algorithm:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      decision_defined:
+        type: boolean
+        required: false
+      verdict:
+        type: string
+        required: false
+      evidence_sufficient:
+        type: boolean
+        required: false
+      tolerance_met:
+        type: boolean
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    trend: STABLE
+    confidence: null
+    overall: CONFIRMED
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input:
+    trend: STABLE
+    confidence: 95
+    overall: CONFIRMED
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

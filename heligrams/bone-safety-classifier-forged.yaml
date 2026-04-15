@@ -1,0 +1,167 @@
+name: bone-safety-classifier-helix
+description: 'Forged from microgram ''bone-safety-classifier''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    soc: falsified
+sense:
+  tree:
+    start: check_osteonecrosis
+    nodes:
+      check_osteonecrosis:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: OSTEONECROSIS
+        true_next: serious
+        false_next: check_fracture
+      check_fracture:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: FRACTURE
+        true_next: serious
+        false_next: check_osteoporosis
+      check_osteoporosis:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: OSTEOPOROSIS
+        true_next: moderate
+        false_next: check_bmd
+      check_bmd:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: BONE DENSITY
+        true_next: moderate
+        false_next: mild
+      moderate:
+        type: return
+        value:
+          soc: Musculoskeletal and connective tissue disorders
+          action: monitor_and_assess
+          severity: moderate
+      serious:
+        type: return
+        value:
+          action: expedited_report
+          severity: serious
+          soc: Musculoskeletal and connective tissue disorders
+      mild:
+        type: return
+        value:
+          action: routine_surveillance
+          soc: Musculoskeletal and connective tissue disorders
+          severity: mild
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: reaction_pt
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: reaction_pt
+        operator: not_contains
+        value: OSTEONECROSIS
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      reaction_pt:
+        type: string
+        required: true
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      soc:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      action:
+        type: string
+        required: false
+      severity:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    reaction_pt: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

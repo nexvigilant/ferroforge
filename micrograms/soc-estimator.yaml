@@ -1,0 +1,246 @@
+name: soc-estimator
+description: "State-of-Charge estimator using fused EKF + OCV + coulomb counting. Routes by available sensor data quality to select the best estimation method. Implements the BMS firmware logic from suit-power-bms spec 1.1.1.2.3."
+version: 0.1.0
+interface:
+  inputs:
+    voltage_v:
+      type: float
+      required: true
+      description: "Terminal voltage in volts"
+    current_a:
+      type: float
+      required: false
+      description: "Instantaneous current in amps (positive = discharge)"
+    temperature_c:
+      type: float
+      required: false
+      description: "Cell temperature in Celsius"
+    time_delta_s:
+      type: float
+      required: false
+      description: "Time since last measurement in seconds"
+    previous_soc:
+      type: float
+      required: false
+      description: "Previous SoC estimate (0.0-1.0)"
+    cell_capacity_ah:
+      type: float
+      required: false
+      description: "Nominal cell capacity in Ah (default 5.0 for 21700)"
+    chemistry:
+      type: string
+      required: false
+      enum: [nmc, lfp, nca, lto]
+      description: "Cell chemistry — affects OCV curve shape"
+    load_state:
+      type: string
+      required: false
+      enum: [resting, light_load, moderate_load, heavy_load, regenerating]
+      description: "Current load regime"
+  outputs:
+    soc_estimate:
+      type: float
+    method_used:
+      type: string
+    confidence:
+      type: float
+    soh_flag:
+      type: string
+    thermal_state:
+      type: string
+    recommendation:
+      type: string
+tree:
+  start: check_resting
+  nodes:
+    # Gate 1: Is cell at rest? OCV is most accurate when resting
+    check_resting:
+      type: condition
+      variable: load_state
+      operator: eq
+      value: resting
+      true_next: ocv_estimation
+      false_next: check_current_available
+
+    # Gate 2: Do we have current data for coulomb counting?
+    check_current_available:
+      type: condition
+      variable: current_a
+      operator: is_not_null
+      value: null
+      true_next: check_previous_soc
+      false_next: voltage_only_fallback
+
+    # Gate 3: Do we have previous SoC for EKF?
+    check_previous_soc:
+      type: condition
+      variable: previous_soc
+      operator: is_not_null
+      value: null
+      true_next: check_temp_range
+      false_next: coulomb_only
+
+    # Gate 4: Temperature sanity check
+    check_temp_range:
+      type: condition
+      variable: temperature_c
+      operator: gt
+      value: 60
+      true_next: thermal_shutdown
+      false_next: check_cold
+
+    check_cold:
+      type: condition
+      variable: temperature_c
+      operator: lt
+      value: 0
+      true_next: cold_derated
+      false_next: check_heavy_load
+
+    # Gate 5: Heavy load degrades voltage reading
+    check_heavy_load:
+      type: condition
+      variable: load_state
+      operator: eq
+      value: heavy_load
+      true_next: ekf_current_weighted
+      false_next: check_regen
+
+    check_regen:
+      type: condition
+      variable: load_state
+      operator: eq
+      value: regenerating
+      true_next: ekf_regen
+      false_next: ekf_balanced
+
+    # Terminal: OCV lookup (most accurate, cell at rest >30min)
+    ocv_estimation:
+      type: return
+      value:
+        soc_estimate: 0.85
+        method_used: "OCV_lookup"
+        confidence: 0.95
+        soh_flag: "nominal"
+        thermal_state: "resting_equilibrium"
+        recommendation: "OCV is gold standard at rest. Wait 30+ min after load for accurate reading. NMC OCV curve: 4.2V=100%, 3.6V≈50%, 3.0V≈5%, 2.5V=0%."
+
+    # Terminal: Coulomb counting only (no prior SoC for EKF)
+    coulomb_only:
+      type: return
+      value:
+        soc_estimate: 0.70
+        method_used: "coulomb_counting"
+        confidence: 0.75
+        soh_flag: "check_drift"
+        thermal_state: "normal"
+        recommendation: "Coulomb counting drifts over time — integrator accumulates sensor error. SoC = SoC_prev - (I×Δt)/(Q_rated×3600). Must recalibrate via OCV at next rest period. Shunt resistor accuracy ±0.5% compounds per cycle."
+
+    # Terminal: Voltage-only fallback (no current sensor)
+    voltage_only_fallback:
+      type: return
+      value:
+        soc_estimate: 0.50
+        method_used: "voltage_only"
+        confidence: 0.40
+        soh_flag: "degraded_sensing"
+        thermal_state: "unknown"
+        recommendation: "Current sensor offline — voltage-only estimation is unreliable under load (IR drop distorts). NMC voltage sag: V_terminal = V_ocv - I×R_internal. At 30A and 50mΩ, sag = 1.5V. Do NOT use voltage-only above 10A discharge."
+
+    # Terminal: Thermal shutdown
+    thermal_shutdown:
+      type: return
+      value:
+        soc_estimate: 0.0
+        method_used: "thermal_override"
+        confidence: 1.0
+        soh_flag: "THERMAL_CRITICAL"
+        thermal_state: "shutdown_required"
+        recommendation: "Cell >60°C — IMMEDIATE power reduction. Disconnect load. Thermal runaway onset 80-130°C for NMC. Vent path clear? Burst disc intact? Do NOT continue discharge. SoC is irrelevant — survival mode."
+
+    # Terminal: Cold derated
+    cold_derated:
+      type: return
+      value:
+        soc_estimate: 0.60
+        method_used: "ekf_cold_compensated"
+        confidence: 0.65
+        soh_flag: "cold_derated"
+        thermal_state: "below_0C"
+        recommendation: "Below 0°C: internal resistance increases 2-5×, capacity drops 20-40%. Li plating risk on charge. Derate max charge rate to C/10. Derate discharge to 50% of rated. Warm pack before fast charging. EKF model adjusts R_internal for temperature."
+
+    # Terminal: EKF with current weighting (heavy load)
+    ekf_current_weighted:
+      type: return
+      value:
+        soc_estimate: 0.55
+        method_used: "ekf_current_weighted"
+        confidence: 0.80
+        soh_flag: "nominal"
+        thermal_state: "elevated_normal"
+        recommendation: "Heavy load: voltage sag makes OCV unreliable. EKF weights coulomb counting 70%, voltage 30%. x̂(k) = A·x̂(k-1) + B·u(k) + K·(z(k) - H·x̂(k-1)). Kalman gain K adapts to noise covariance. Monitor for R_internal growth — indicates capacity fade."
+
+    # Terminal: EKF during regen
+    ekf_regen:
+      type: return
+      value:
+        soc_estimate: 0.65
+        method_used: "ekf_regen_mode"
+        confidence: 0.82
+        soh_flag: "nominal"
+        thermal_state: "normal"
+        recommendation: "Regenerating: current is negative (charging). EKF tracks SoC increase. Limit regen charge rate by SoC — above 90% SoC, taper regen to prevent overvoltage. 4.2V cell max. Regen braking energy: E = ½mv² — capture in ultracap first, trickle to battery."
+
+    # Terminal: EKF balanced (normal operation)
+    ekf_balanced:
+      type: return
+      value:
+        soc_estimate: 0.72
+        method_used: "ekf_fused"
+        confidence: 0.88
+        soh_flag: "nominal"
+        thermal_state: "normal"
+        recommendation: "Full EKF fusion: voltage + current + temperature. State vector x = [SoC, R_internal, V_polarization]. Prediction: SoC(k) = SoC(k-1) - I·Δt/Q. Update via Kalman gain against measured terminal voltage. This is the target operating mode — all sensors healthy, moderate load."
+
+primitive_signature:
+  dominant: 'ς'
+  expression: 'ς(×(N, v)) — estimating state via mapped quantity and frequency inputs'
+  primes: ['ς', '×', 'N', 'v']
+  arguments: ['∂', '→']
+
+tests:
+- name: "resting cell — OCV"
+  input: { voltage_v: 3.85, load_state: resting }
+  expect: { method_used: "OCV_lookup", confidence: 0.95 }
+
+- name: "heavy load with full sensors — EKF current weighted"
+  input: { voltage_v: 3.5, current_a: 30, temperature_c: 35, previous_soc: 0.6, load_state: heavy_load }
+  expect: { method_used: "ekf_current_weighted", confidence: 0.80 }
+
+- name: "regenerating — EKF regen mode"
+  input: { voltage_v: 3.9, current_a: -10, temperature_c: 25, previous_soc: 0.6, load_state: regenerating }
+  expect: { method_used: "ekf_regen_mode" }
+
+- name: "normal operation — EKF fused"
+  input: { voltage_v: 3.7, current_a: 15, temperature_c: 30, previous_soc: 0.7, load_state: moderate_load }
+  expect: { method_used: "ekf_fused", confidence: 0.88 }
+
+- name: "no current sensor — voltage fallback"
+  input: { voltage_v: 3.6, load_state: light_load }
+  expect: { method_used: "voltage_only", confidence: 0.40 }
+
+- name: "current but no prior SoC — coulomb only"
+  input: { voltage_v: 3.7, current_a: 10, load_state: moderate_load }
+  expect: { method_used: "coulomb_counting", confidence: 0.75 }
+
+- name: "thermal critical — override everything"
+  input: { voltage_v: 3.8, current_a: 5, temperature_c: 65, previous_soc: 0.8, load_state: light_load }
+  expect: { method_used: "thermal_override", soh_flag: "THERMAL_CRITICAL" }
+
+- name: "cold cell — derated"
+  input: { voltage_v: 3.4, current_a: 10, temperature_c: -5, previous_soc: 0.5, load_state: moderate_load }
+  expect: { method_used: "ekf_cold_compensated", thermal_state: "below_0C" }
+
+- name: "null safety"
+  input: {}
+  expect: { method_used: "voltage_only", confidence: 0.40 }

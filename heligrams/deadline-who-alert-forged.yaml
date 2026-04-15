@@ -1,0 +1,206 @@
+name: deadline-who-alert-helix
+description: 'Forged from microgram ''deadline-who-alert''. Domain: SystemHealth. 2 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regulatory_compliant: falsified
+sense:
+  tree:
+    start: validate_event
+    nodes:
+      deadline_unknown:
+        type: return
+        value:
+          notification_type: null
+          who_notification_required: null
+          public_communication_required: null
+          regulatory_compliant: false
+          notification_deadline_hours: null
+      routine_notification:
+        type: return
+        value:
+          notification_deadline_hours: 240
+          regulatory_compliant: true
+          public_communication_required: false
+          notification_type: routine_safety_update
+          who_notification_required: false
+      important_alert:
+        type: return
+        value:
+          notification_deadline_hours: 72
+          public_communication_required: false
+          regulatory_compliant: true
+          who_notification_required: true
+          notification_type: important_safety_notification
+      check_public_health_impact:
+        type: condition
+        variable: public_health_impact
+        operator: eq
+        value: high
+        true_next: urgent_alert
+        false_next: check_signal_strength
+      check_signal_strength:
+        type: condition
+        variable: signal_strength
+        operator: eq
+        value: significant
+        true_next: important_alert
+        false_next: routine_notification
+      validate_event:
+        type: condition
+        variable: event_description
+        operator: is_not_null
+        value: null
+        true_next: check_public_health_impact
+        false_next: deadline_unknown
+      urgent_alert:
+        type: return
+        value:
+          notification_deadline_hours: 24
+          public_communication_required: true
+          notification_type: urgent_safety_alert
+          who_notification_required: true
+          regulatory_compliant: true
+antisense:
+  tree:
+    start: null_guard_measurement_stale
+    nodes:
+      check_single_source:
+        type: condition
+        variable: probe_count
+        operator: lt
+        value: 2
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_measurement_stale:
+        type: condition
+        variable: measurement_age_minutes
+        operator: gt
+        value: 60
+        true_next: falsified
+        false_next: null_guard_single_source
+      null_guard_measurement_stale:
+        type: condition
+        variable: measurement_age_minutes
+        operator: is_null
+        value: null
+        true_next: null_guard_single_source
+        false_next: check_measurement_stale
+      null_guard_single_source:
+        type: condition
+        variable: probe_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_single_source
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      regulatory_compliant: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      regulatory_compliant: true
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      falsified: false
+      regulatory_compliant: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when:
+      regulatory_compliant: false
+      falsified: true
+    default: null
+    emit:
+      verdict: refuted
+      confidence_score: 0.42
+      confidence: medium
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      measurement_age_minutes:
+        type: integer
+        required: false
+      probe_count:
+        type: integer
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    event_description: serious drug contamination
+    measurement_age_minutes: 50
+    public_health_impact: high
+    probe_count: 12
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, measurement_stale active'
+  input:
+    event_description: serious drug contamination
+    measurement_age_minutes: 61
+    public_health_impact: high
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — system-health with 2 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: system-health. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,157 @@
+name: escalation-router-helix
+description: 'Forged from microgram ''escalation-router''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    sla_minutes: falsified
+sense:
+  tree:
+    start: escalate_check
+    nodes:
+      immediate:
+        type: return
+        value:
+          sla_minutes: 15
+          channel: pager
+          route: IMMEDIATE
+      priority_check:
+        type: condition
+        variable: priority
+        operator: lte
+        value: 1
+        true_next: immediate
+        false_next: urgent
+      escalate_check:
+        type: condition
+        variable: escalate
+        operator: eq
+        value: true
+        true_next: priority_check
+        false_next: queue
+      urgent:
+        type: return
+        value:
+          sla_minutes: 60
+          route: URGENT
+          channel: slack
+      queue:
+        type: return
+        value:
+          route: QUEUE
+          sla_minutes: 1440
+          channel: backlog
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: priority
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: priority
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      escalate:
+        type: bool
+        required: false
+      priority:
+        type: string
+        required: false
+    outputs:
+      sla_minutes:
+        type: int
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      channel:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      route:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    priority: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    priority: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

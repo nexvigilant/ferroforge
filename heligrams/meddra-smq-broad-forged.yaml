@@ -1,0 +1,174 @@
+name: meddra-smq-broad-helix
+description: 'Forged from microgram ''meddra-smq-broad''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    smq_compliant: falsified
+sense:
+  tree:
+    start: validate_pt
+    nodes:
+      smq_match_unknown:
+        type: return
+        value:
+          smq_scope: broad
+          smq_code: null
+          included_pt: null
+          smq_compliant: false
+          hierarchical_level: null
+          smq_name: null
+      broad_smq_no_match:
+        type: return
+        value:
+          hierarchical_level: null
+          smq_code: null
+          smq_name: null
+          smq_scope: broad
+          included_pt: false
+          smq_compliant: true
+      validate_pt:
+        type: condition
+        variable: meddra_pt_code
+        operator: is_not_null
+        value: null
+        true_next: check_broad_smq_inclusion
+        false_next: smq_match_unknown
+      check_broad_smq_inclusion:
+        type: condition
+        variable: is_smq_included_broad
+        operator: eq
+        value: true
+        true_next: broad_smq_match_found
+        false_next: broad_smq_no_match
+      broad_smq_match_found:
+        type: return
+        value:
+          smq_compliant: true
+          smq_name: Cardiac arrhythmias
+          smq_scope: broad
+          included_pt: true
+          hierarchical_level: hlgt
+          smq_code: '20000001'
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: meddra_pt_code
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: meddra_pt_code
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      smq_compliant: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      smq_compliant: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when:
+      smq_compliant: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: absent
+  - when:
+      smq_compliant: false
+      falsified: true
+    default: null
+    emit:
+      verdict: refuted
+      confidence: medium
+      confidence_score: 0.42
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      meddra_pt_code:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    meddra_pt_code: null
+    is_smq_included_broad: true
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    meddra_pt_code: '10007585'
+    is_smq_included_broad: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

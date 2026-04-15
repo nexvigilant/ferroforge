@@ -1,0 +1,42 @@
+name: anti-vector-pipeline
+description: 'Signal-to-prescription pipeline: detect signal strength → classify harm type → route to anti-vector strategy. Completes the sentence: from "there is a signal" to "here is what to do about it."'
+version: 1.0.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - prr-signal
+  - anti-vector-classify
+tests:
+  - name: "Strong signal gets mechanistic anti-vector for acute harm"
+    input:
+      prr: 3.5
+      harm_type: "A"
+      signal_magnitude: 0.7
+    expect:
+      primary_class: mechanistic
+      signal_detected: true
+
+  - name: "Weak PRR still routes through classification"
+    input:
+      prr: 1.5
+      harm_type: "C"
+      signal_magnitude: 0.3
+    expect:
+      primary_class: mechanistic
+      signal_detected: false
+
+  - name: "Population harm gets epistemic strategy"
+    input:
+      prr: 2.8
+      harm_type: "H"
+      signal_magnitude: 0.5
+    expect:
+      primary_class: epistemic
+      signal_detected: true
+
+  - name: "Null harm type defaults safely"
+    input:
+      prr: 4.0
+    expect:
+      primary_class: architectural
+      signal_detected: true

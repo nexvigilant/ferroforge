@@ -1,0 +1,196 @@
+name: outcome-persistence-helix
+description: 'Forged from microgram ''outcome-persistence''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    ich_reference: falsified
+sense:
+  tree:
+    start: check_permanent
+    nodes:
+      classify_by_days:
+        type: condition
+        variable: days_to_resolution
+        operator: lte
+        value: 7
+        true_next: return_transient
+        false_next: check_30_days
+      return_transient:
+        type: return
+        value:
+          ich_reference: ICH E2A Section 3.3 — mild outcomes with rapid resolution
+          chemistry_analog: Short half-life decay (T_half < 12 hours)
+          persistence_primitive: π — does the outcome endure
+          persistence_class: TRANSIENT
+          action: Brief outcome resolved within 1 week. Low regulatory priority unless serious.
+      return_medium_term:
+        type: return
+        value:
+          chemistry_analog: Long half-life decay (T_half 7–30 days)
+          ich_reference: ICH E2A Section 3.1 — persistent effects indicate seriousness
+          persistence_class: MEDIUM_TERM
+          persistence_primitive: π — does the outcome endure
+          action: Outcome resolved within 3 months. High clinical significance — escalate for further review.
+      check_resolved:
+        type: condition
+        variable: outcome_resolved
+        operator: eq
+        value: true
+        true_next: classify_by_days
+        false_next: return_ongoing
+      check_30_days:
+        type: condition
+        variable: days_to_resolution
+        operator: lte
+        value: 30
+        true_next: return_short_term
+        false_next: check_90_days
+      check_90_days:
+        type: condition
+        variable: days_to_resolution
+        operator: lte
+        value: 90
+        true_next: return_medium_term
+        false_next: return_chronic
+      return_short_term:
+        type: return
+        value:
+          action: Outcome resolved within 1 month. Moderate clinical significance.
+          chemistry_analog: Intermediate half-life decay (T_half 1–7 days)
+          persistence_primitive: π — does the outcome endure
+          persistence_class: SHORT_TERM
+          ich_reference: ICH E2A Section 3.1 — duration is a modifier of seriousness
+      return_chronic:
+        type: return
+        value:
+          ich_reference: ICH E2A Section 3.1 — prolonged course suggests causality strength
+          persistence_primitive: π — does the outcome endure
+          persistence_class: CHRONIC
+          chemistry_analog: Very long half-life decay (T_half > 30 days)
+          action: Outcome took >3 months to resolve. Severe persistence — likely serious or unexpected.
+      return_ongoing:
+        type: return
+        value:
+          persistence_class: ONGOING
+          chemistry_analog: Intermediate reaction (substrate still converting)
+          persistence_primitive: π — does the outcome endure
+          action: Outcome still unresolved. Continue monitoring. Persistence timeline unknown.
+          ich_reference: ICH E2A Section 3.2 — life-threatening events require ongoing assessment
+      check_permanent:
+        type: condition
+        variable: is_permanent
+        operator: eq
+        value: true
+        true_next: return_irreversible
+        false_next: check_resolved
+      return_irreversible:
+        type: return
+        value:
+          ich_reference: ICH E2A Section 3.1 — persistent or significant disability
+          action: Permanent outcome — regulatory notification required. No recovery expected.
+          persistence_class: IRREVERSIBLE
+          persistence_primitive: π — does the outcome endure
+          chemistry_analog: Covalent bond (permanent modification of tissue/organ function)
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: days_to_resolution
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: days_to_resolution
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      days_to_resolution:
+        type: bool
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    days_to_resolution: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    days_to_resolution: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,162 @@
+name: station-ich-pipeline-helix
+description: 'Forged from microgram ''station-ich-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    priority: falsified
+sense:
+  tree:
+    start: check_topic
+    nodes:
+      efficacy_route:
+        type: condition
+        variable: pv_relevant
+        operator: eq
+        value: true
+        true_next: pv_guideline
+        false_next: clinical_guideline
+      safety_route:
+        type: return
+        value:
+          priority: moderate
+          reason: ICH S/M-series — nonclinical safety or multidisciplinary, check PV implications
+          action: apply
+          route: compliance_check
+      pv_guideline:
+        type: return
+        value:
+          route: compliance_check
+          priority: high
+          action: apply
+          reason: ICH E-series PV guideline — directly applicable to signal management
+      quality_route:
+        type: return
+        value:
+          priority: low
+          reason: ICH Q-series quality guideline — CMC/manufacturing context
+          route: archive
+          action: reference
+      clinical_guideline:
+        type: return
+        value:
+          action: reference
+          route: archive
+          priority: low
+          reason: ICH E-series clinical guideline — reference for trial safety context
+      check_quality:
+        type: condition
+        variable: guideline_prefix
+        operator: eq
+        value: Q
+        true_next: quality_route
+        false_next: safety_route
+      check_topic:
+        type: condition
+        variable: guideline_prefix
+        operator: eq
+        value: E
+        true_next: efficacy_route
+        false_next: check_quality
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: pv_relevant
+        operator: neq
+        value: E
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: pv_relevant
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      pv_relevant:
+        type: string
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    pv_relevant: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    pv_relevant: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

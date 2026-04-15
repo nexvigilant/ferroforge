@@ -1,0 +1,147 @@
+name: station-edit-distance-pipeline-helix
+description: 'Forged from microgram ''station-edit-distance-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    priority: falsified
+sense:
+  tree:
+    start: check_distance
+    nodes:
+      distinct:
+        type: return
+        value:
+          priority: low
+          reason: Edit distance >30% — distinct entities
+          route: archive
+          action: pass
+      check_similar:
+        type: condition
+        variable: normalized_distance
+        operator: lte
+        value: 0.3
+        true_next: similar
+        false_next: distinct
+      similar:
+        type: return
+        value:
+          action: flag
+          reason: Edit distance 10-30% — similar entities, potential merge candidate
+          priority: moderate
+          route: similarity_review
+      duplicate:
+        type: return
+        value:
+          reason: Edit distance ≤10% — near-duplicate detected
+          route: dedup_review
+          action: deduplicate
+          priority: high
+      check_distance:
+        type: condition
+        variable: normalized_distance
+        operator: lte
+        value: 0.1
+        true_next: duplicate
+        false_next: check_similar
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: normalized_distance
+        operator: gt
+        value: 0.1
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: normalized_distance
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      normalized_distance:
+        type: float
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    normalized_distance: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

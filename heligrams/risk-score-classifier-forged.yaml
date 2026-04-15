@@ -1,0 +1,185 @@
+name: risk-score-classifier-helix
+description: 'Forged from microgram ''risk-score-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    escalate: falsified
+sense:
+  tree:
+    start: check_critical
+    nodes:
+      check_high:
+        type: condition
+        variable: risk_score
+        operator: gte
+        value: 60
+        true_next: high
+        false_next: check_moderate
+      low:
+        type: return
+        value:
+          level: LOW
+          action: routine_monitoring
+          escalate: false
+      check_critical:
+        type: condition
+        variable: risk_score
+        operator: gte
+        value: 80
+        true_next: critical
+        false_next: check_high
+      high:
+        type: return
+        value:
+          level: HIGH
+          action: priority_review
+          escalate: true
+      moderate:
+        type: return
+        value:
+          escalate: false
+          action: scheduled_review
+          level: MODERATE
+      critical:
+        type: return
+        value:
+          escalate: true
+          action: immediate_review
+          level: CRITICAL
+      check_moderate:
+        type: condition
+        variable: risk_score
+        operator: gte
+        value: 30
+        true_next: moderate
+        false_next: low
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: risk_score
+        operator: lt
+        value: 80
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: risk_score
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      escalate: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      escalate: true
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when:
+      escalate: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: absent
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      escalate: false
+    default: null
+    emit:
+      verdict: refuted
+      confidence: medium
+      confidence_score: 0.42
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      risk_score:
+        type: int
+        required: false
+    outputs:
+      action:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      escalate:
+        type: bool
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      level:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    risk_score: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    risk_score: 95
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

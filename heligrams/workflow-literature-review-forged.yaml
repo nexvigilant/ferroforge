@@ -1,0 +1,145 @@
+name: workflow-literature-review-helix
+description: 'Forged from microgram ''workflow-literature-review''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    strategy: falsified
+sense:
+  tree:
+    start: check_type
+    nodes:
+      exploratory_chain:
+        type: return
+        value:
+          strategy: exploratory_search
+          chain: pubmed → wikipedia → drugbank
+          query_type: broad
+      check_type:
+        type: condition
+        variable: question_type
+        operator: eq
+        value: case_report
+        true_next: case_chain
+        false_next: check_systematic
+      check_systematic:
+        type: condition
+        variable: question_type
+        operator: eq
+        value: systematic
+        true_next: systematic_chain
+        false_next: exploratory_chain
+      case_chain:
+        type: return
+        value:
+          query_type: case_report
+          strategy: case_report_mining
+          chain: pubmed → meddra → who-umc
+      systematic_chain:
+        type: return
+        value:
+          query_type: review
+          strategy: systematic_review
+          chain: pubmed → clinicaltrials → epidemiology → ich
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: question_type
+        operator: neq
+        value: case_report
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: question_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      question_type:
+        type: string
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    question_type: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    question_type: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,268 @@
+name: case-lifecycle-router-helix
+description: 'Forged from microgram ''case-lifecycle-router''. Domain: CausalityAssessment. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    action: falsified
+sense:
+  tree:
+    start: check_new
+    nodes:
+      move_to_reporting:
+        type: return
+        value:
+          action: MOVE_TO_REPORTING
+          description: Causality assessed - advance to regulatory reporting
+      reporting_deadline:
+        type: condition
+        variable: deadline_met
+        operator: eq
+        value: true
+        true_next: move_to_closed
+        false_next: file_report
+      check_new:
+        type: condition
+        variable: current_state
+        operator: eq
+        value: new
+        true_next: move_to_triage
+        false_next: check_triage
+      check_assessment:
+        type: condition
+        variable: current_state
+        operator: eq
+        value: assessment
+        true_next: assessment_causality
+        false_next: check_reporting
+      triage_seriousness:
+        type: condition
+        variable: has_seriousness
+        operator: eq
+        value: true
+        true_next: move_to_assessment
+        false_next: assess_seriousness
+      file_report:
+        type: return
+        value:
+          action: FILE_REPORT
+          description: Report deadline not yet met - file regulatory report
+      assessment_causality:
+        type: condition
+        variable: has_causality
+        operator: eq
+        value: true
+        true_next: move_to_reporting
+        false_next: assess_causality
+      unknown_state:
+        type: return
+        value:
+          description: Unrecognized case state - manual review required
+          action: ERROR_UNKNOWN_STATE
+      move_to_triage:
+        type: return
+        value:
+          description: New case received - advance to triage for seriousness assessment
+          action: MOVE_TO_TRIAGE
+      move_to_closed:
+        type: return
+        value:
+          action: MOVE_TO_CLOSED
+          description: Reporting deadline met - close the case
+      assess_causality:
+        type: return
+        value:
+          action: ASSESS_CAUSALITY
+          description: Case in assessment requires causality evaluation before advancing
+      check_closed:
+        type: condition
+        variable: current_state
+        operator: eq
+        value: closed
+        true_next: already_closed
+        false_next: unknown_state
+      move_to_assessment:
+        type: return
+        value:
+          description: Seriousness classified - advance to causality assessment
+          action: MOVE_TO_ASSESSMENT
+      check_triage:
+        type: condition
+        variable: current_state
+        operator: eq
+        value: triage
+        true_next: triage_seriousness
+        false_next: check_assessment
+      assess_seriousness:
+        type: return
+        value:
+          action: ASSESS_SERIOUSNESS
+          description: Case in triage requires seriousness classification before advancing
+      check_reporting:
+        type: condition
+        variable: current_state
+        operator: eq
+        value: reporting
+        true_next: reporting_deadline
+        false_next: check_closed
+      already_closed:
+        type: return
+        value:
+          action: NO_ACTION
+          description: Case is already closed - no further action required
+antisense:
+  tree:
+    start: null_guard_alternative_cause
+    nodes:
+      check_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: eq
+        value: likely
+        true_next: falsified
+        false_next: null_guard_temporal_implausible
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: is_null
+        value: null
+        true_next: null_guard_no_dechallenge
+        false_next: check_temporal_implausible
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_no_dechallenge
+      check_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      check_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_no_dechallenge
+      null_guard_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: is_null
+        value: null
+        true_next: null_guard_temporal_implausible
+        false_next: check_alternative_cause
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      temporal_plausible:
+        type: bool
+        required: false
+      current_state:
+        type: string
+        required: false
+      has_causality:
+        type: bool
+        required: false
+      alternative_causes:
+        type: string
+        required: false
+      deadline_met:
+        type: bool
+        required: false
+      dechallenge_positive:
+        type: bool
+        required: false
+      has_seriousness:
+        type: bool
+        required: false
+    outputs:
+      action:
+        type: string
+        required: false
+      description:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    dechallenge_positive: true
+    alternative_causes: none
+    temporal_plausible: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, alternative_cause active'
+  input:
+    alternative_causes: likely
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — causality-assessment with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: causality-assessment. Chains as dual-strand verifier before downstream consumers.'

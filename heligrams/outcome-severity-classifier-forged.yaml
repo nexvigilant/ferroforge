@@ -1,0 +1,398 @@
+name: outcome-severity-classifier-helix
+description: 'Forged from microgram ''outcome-severity-classifier''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    expedited_reporting: falsified
+sense:
+  tree:
+    start: check_batch_mode
+    nodes:
+      check_serious_batch:
+        type: condition
+        variable: serious_count
+        operator: is_not_null
+        value: null
+        true_next: check_serious_high
+        false_next: batch_non_serious
+      check_batch_mode:
+        type: condition
+        variable: death_count
+        operator: is_not_null
+        value: null
+        true_next: check_batch_total
+        false_next: check_outcome
+      outcome_disability:
+        type: return
+        value:
+          expedited_reporting: true
+          ich_criterion: persistent_disability
+          priority: 2
+          reporting_timeframe_days: 15
+          seriousness: SERIOUS
+      check_other:
+        type: condition
+        variable: outcome
+        operator: matches
+        value: (?i)^(OT|other)$
+        true_next: outcome_other
+        false_next: unknown_outcome
+      outcome_intervention:
+        type: return
+        value:
+          seriousness: MEDICALLY_IMPORTANT
+          priority: 3
+          reporting_timeframe_days: 15
+          expedited_reporting: true
+          ich_criterion: required_intervention
+      check_death:
+        type: condition
+        variable: outcome
+        operator: matches
+        value: (?i)^(DE|death|fatal)$
+        true_next: outcome_death
+        false_next: check_life_threatening
+      unknown_outcome:
+        type: return
+        value:
+          priority: 5
+          seriousness: UNKNOWN
+          expedited_reporting: false
+          ich_criterion: null
+          reporting_timeframe_days: 90
+      outcome_death:
+        type: return
+        value:
+          reporting_timeframe_days: 7
+          seriousness: FATAL
+          expedited_reporting: true
+          priority: 1
+          ich_criterion: results_in_death
+      check_intervention:
+        type: condition
+        variable: outcome
+        operator: matches
+        value: (?i)^(RI|required.intervention|intervention)$
+        true_next: outcome_intervention
+        false_next: check_other
+      check_death_cluster:
+        type: condition
+        variable: death_count
+        operator: gte
+        value: 3
+        true_next: batch_fatal_cluster
+        false_next: batch_fatal_isolated
+      check_life_threatening:
+        type: condition
+        variable: outcome
+        operator: matches
+        value: (?i)^(LT|life.threatening)$
+        true_next: outcome_life_threatening
+        false_next: check_hospitalization
+      batch_fatal_cluster:
+        type: return
+        value:
+          ich_criterion: results_in_death
+          priority: 1
+          expedited_reporting: true
+          seriousness: FATAL_CLUSTER
+          reporting_timeframe_days: 7
+      batch_non_serious:
+        type: return
+        value:
+          ich_criterion: other
+          expedited_reporting: false
+          priority: 4
+          reporting_timeframe_days: 90
+          seriousness: BATCH_NON_SERIOUS
+      batch_serious_low:
+        type: return
+        value:
+          reporting_timeframe_days: 15
+          expedited_reporting: true
+          priority: 3
+          ich_criterion: multiple_serious
+          seriousness: BATCH_SERIOUS_LOW
+      check_deaths_present:
+        type: condition
+        variable: death_count
+        operator: gte
+        value: 1
+        true_next: check_death_cluster
+        false_next: check_serious_batch
+      outcome_other:
+        type: return
+        value:
+          expedited_reporting: false
+          seriousness: NON_SERIOUS
+          reporting_timeframe_days: 90
+          ich_criterion: other
+          priority: 4
+      check_outcome:
+        type: condition
+        variable: outcome
+        operator: is_not_null
+        value: null
+        true_next: check_death
+        false_next: unknown_outcome
+      batch_fatal_isolated:
+        type: return
+        value:
+          seriousness: FATAL_ISOLATED
+          expedited_reporting: true
+          reporting_timeframe_days: 7
+          priority: 1
+          ich_criterion: results_in_death
+      missing_batch:
+        type: return
+        value:
+          ich_criterion: null
+          reporting_timeframe_days: 90
+          priority: 5
+          expedited_reporting: false
+          seriousness: UNKNOWN
+      check_batch_total:
+        type: condition
+        variable: total_count
+        operator: is_not_null
+        value: null
+        true_next: check_deaths_present
+        false_next: missing_batch
+      outcome_congenital:
+        type: return
+        value:
+          priority: 2
+          ich_criterion: congenital_anomaly
+          seriousness: SERIOUS
+          reporting_timeframe_days: 15
+          expedited_reporting: true
+      check_congenital:
+        type: condition
+        variable: outcome
+        operator: matches
+        value: (?i)^(CA|congenital.anomaly|birth.defect)$
+        true_next: outcome_congenital
+        false_next: check_intervention
+      batch_serious_high:
+        type: return
+        value:
+          reporting_timeframe_days: 15
+          expedited_reporting: true
+          ich_criterion: multiple_serious
+          priority: 2
+          seriousness: BATCH_SERIOUS_HIGH
+      check_disability:
+        type: condition
+        variable: outcome
+        operator: matches
+        value: (?i)^(DS|disability|disabling)$
+        true_next: outcome_disability
+        false_next: check_congenital
+      check_serious_high:
+        type: condition
+        variable: serious_count
+        operator: gte
+        value: 10
+        true_next: batch_serious_high
+        false_next: batch_serious_low
+      check_hospitalization:
+        type: condition
+        variable: outcome
+        operator: matches
+        value: (?i)^(HO|hospitalization|hospital)$
+        true_next: outcome_hospitalization
+        false_next: check_disability
+      outcome_life_threatening:
+        type: return
+        value:
+          priority: 1
+          reporting_timeframe_days: 7
+          ich_criterion: life_threatening
+          seriousness: LIFE_THREATENING
+          expedited_reporting: true
+      outcome_hospitalization:
+        type: return
+        value:
+          expedited_reporting: true
+          ich_criterion: requires_hospitalization
+          seriousness: SERIOUS
+          priority: 2
+          reporting_timeframe_days: 15
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      expedited_reporting: true
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      expedited_reporting: true
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when:
+      falsified: false
+      expedited_reporting: false
+    default: null
+    emit:
+      verdict: absent
+      confidence_score: 0.7
+      confidence: high
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      death_count:
+        type: int
+        required: false
+      coding_verified:
+        type: bool
+        required: false
+      follow_up_complete:
+        type: bool
+        required: false
+      serious_count:
+        type: int
+        required: false
+      total_count:
+        type: int
+        required: false
+      outcome:
+        type: string
+        required: false
+      comorbidity_explains:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      expedited_reporting:
+        type: bool
+        required: false
+      priority:
+        type: int
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      seriousness:
+        type: string
+        required: false
+      ich_criterion:
+        type: string
+        required: false
+      reporting_timeframe_days:
+        type: int
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    outcome: DE
+    coding_verified: true
+    comorbidity_explains: false
+    follow_up_complete: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    outcome: DE
+    follow_up_complete: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

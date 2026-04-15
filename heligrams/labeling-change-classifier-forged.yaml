@@ -1,0 +1,215 @@
+name: labeling-change-classifier-helix
+description: 'Forged from microgram ''labeling-change-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    requires_dhpc: falsified
+sense:
+  tree:
+    start: validate_change_type
+    nodes:
+      check_adverse_reaction:
+        type: condition
+        variable: change_type
+        operator: matches
+        value: (?i)^adverse_reaction$
+        true_next: change_adverse_reaction
+        false_next: unknown_type
+      missing_input:
+        type: return
+        value:
+          severity_rank: null
+          regulatory_action: null
+          requires_dhpc: false
+      change_boxed_warning:
+        type: return
+        value:
+          requires_dhpc: true
+          regulatory_action: black_box_warning_addition
+          severity_rank: 5
+      change_contraindication:
+        type: return
+        value:
+          severity_rank: 5
+          requires_dhpc: true
+          regulatory_action: contraindication_addition
+      change_precaution:
+        type: return
+        value:
+          requires_dhpc: false
+          severity_rank: 2
+          regulatory_action: precaution_update
+      unknown_type:
+        type: return
+        value:
+          requires_dhpc: false
+          regulatory_action: null
+          severity_rank: null
+      classify_change:
+        type: condition
+        variable: change_type
+        operator: matches
+        value: (?i)^boxed_warning$
+        true_next: change_boxed_warning
+        false_next: check_contraindication
+      change_adverse_reaction:
+        type: return
+        value:
+          severity_rank: 3
+          requires_dhpc: false
+          regulatory_action: adverse_reaction_update
+      check_warning:
+        type: condition
+        variable: change_type
+        operator: matches
+        value: (?i)^warning$
+        true_next: change_warning
+        false_next: check_precaution
+      check_contraindication:
+        type: condition
+        variable: change_type
+        operator: matches
+        value: (?i)^contraindication$
+        true_next: change_contraindication
+        false_next: check_warning
+      change_warning:
+        type: return
+        value:
+          regulatory_action: warning_addition
+          requires_dhpc: true
+          severity_rank: 4
+      check_precaution:
+        type: condition
+        variable: change_type
+        operator: matches
+        value: (?i)^precaution$
+        true_next: change_precaution
+        false_next: check_adverse_reaction
+      validate_change_type:
+        type: condition
+        variable: change_type
+        operator: is_not_null
+        value: null
+        true_next: classify_change
+        false_next: missing_input
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: change_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: change_type
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      requires_dhpc: true
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      requires_dhpc: true
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      falsified: false
+      requires_dhpc: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when:
+      falsified: true
+      requires_dhpc: false
+    default: null
+    emit:
+      confidence_score: 0.42
+      confidence: medium
+      verdict: refuted
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      change_type:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    change_type: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    change_type: boxed_warning
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

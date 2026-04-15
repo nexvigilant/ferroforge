@@ -1,0 +1,256 @@
+name: maxsprt-gate-helix
+description: 'Forged from microgram ''maxsprt-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    signal_confirmed: falsified
+sense:
+  tree:
+    start: check_observed
+    nodes:
+      check_observed:
+        type: condition
+        variable: observed_count
+        operator: is_not_null
+        value: true
+        true_next: check_expected_positive
+        false_next: insufficient_data
+      insufficient_data:
+        type: return
+        value:
+          action: Missing or invalid input data. Cannot evaluate sequential test.
+          signal_confirmed: false
+          verdict: INSUFFICIENT_DATA
+      check_expected_positive:
+        type: condition
+        variable: expected_count
+        operator: gt
+        value: 0
+        true_next: check_ratio_high
+        false_next: insufficient_data
+      check_ratio_high:
+        type: condition
+        variable: observed_count
+        operator: gte
+        value: 300
+        true_next: check_expected_for_ratio
+        false_next: check_moderate_ratio
+      check_if_max_is_low:
+        type: condition
+        variable: max_looks
+        operator: lte
+        value: 10
+        true_next: study_complete
+        false_next: continue_monitoring
+      check_max_reached:
+        type: condition
+        variable: max_looks
+        operator: gt
+        value: 0
+        true_next: compare_looks
+        false_next: continue_monitoring
+      check_look_limit:
+        type: condition
+        variable: current_look
+        operator: gte
+        value: 0
+        true_next: check_max_reached
+        false_next: continue_monitoring
+      signal_detected:
+        type: return
+        value:
+          verdict: SIGNAL_DETECTED
+          signal_confirmed: true
+          action: Observed-to-expected ratio exceeds critical value. Signal confirmed — escalate to formal assessment.
+      check_expected_for_ratio:
+        type: condition
+        variable: expected_count
+        operator: lte
+        value: 100
+        true_next: signal_detected
+        false_next: check_moderate_ratio
+      check_moderate_ratio:
+        type: condition
+        variable: observed_count
+        operator: gte
+        value: 200
+        true_next: check_expected_moderate
+        false_next: check_look_limit
+      compare_looks:
+        type: condition
+        variable: current_look
+        operator: gte
+        value: 10
+        true_next: check_if_max_is_low
+        false_next: continue_monitoring
+      study_complete:
+        type: return
+        value:
+          signal_confirmed: false
+          verdict: STUDY_COMPLETE_NO_SIGNAL
+          action: Maximum planned looks reached without signal detection. Close sequential analysis.
+      continue_monitoring:
+        type: return
+        value:
+          signal_confirmed: false
+          verdict: CONTINUE_MONITORING
+          action: Ratio below threshold and looks remaining. Continue sequential surveillance at next interval.
+      check_expected_moderate:
+        type: condition
+        variable: expected_count
+        operator: lte
+        value: 100
+        true_next: signal_detected
+        false_next: check_look_limit
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: observed_count
+        operator: is_null
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: observed_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      signal_confirmed: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      signal_confirmed: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      falsified: false
+      signal_confirmed: false
+    default: null
+    emit:
+      verdict: absent
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      signal_confirmed: false
+      falsified: true
+    default: null
+    emit:
+      confidence: medium
+      verdict: refuted
+      confidence_score: 0.42
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      expected_count:
+        type: int
+        required: false
+      observed_count:
+        type: int
+        required: false
+      max_looks:
+        type: int
+        required: false
+      critical_value:
+        type: int
+        required: false
+      current_look:
+        type: int
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      signal_confirmed:
+        type: bool
+        required: false
+      confidence:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    expected_count: 100
+    observed_count: null
+    critical_value: 300
+    current_look: 3
+    max_looks: 10
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input:
+    expected_count: 100
+    observed_count: 450
+    critical_value: 300
+    current_look: 3
+    max_looks: 10
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - observed_count
+  - expected_count
+  - current_look
+  - max_looks
+  - critical_value
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

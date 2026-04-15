@@ -1,0 +1,229 @@
+name: traffic-prediction-model
+description: >
+  Predicts next-action priority for NexVigilant external traffic growth.
+  Measures current state across 7 dimensions, classifies the bottleneck,
+  and returns the highest-leverage action. Run weekly or before strategy sessions.
+version: 0.1.0
+primitive_signature:
+  dominant: 'σ'
+  expression: 'σ(→(∂₁, ∂₂, ∂₃, ∂₄, ∂₅, ∂₆, ∂₇)) — sequential bottleneck chain where first failing gate determines action'
+  primes: ['σ', '→', '∂', 'ν', 'N', '∅']
+  arguments: ['repo_public', 'descriptions_current', 'directory_listings', 'hop_default', 'example_published', 'calls_per_day', 'framework_count']
+  chain_prediction: 'Traffic growth follows a strict dependency chain. Visibility → Credibility → Discovery → Friction → Proof → Volume → Revenue.'
+interface:
+  inputs:
+    repo_public:
+      type: bool
+      required: true
+      description: 'Is the Station source repo publicly accessible on GitHub?'
+    descriptions_current:
+      type: bool
+      required: true
+      description: 'Do all public repo descriptions match actual tool count (1958)?'
+    directory_listings:
+      type: int
+      required: true
+      description: 'Number of MCP directories where Station is listed'
+    hop_default:
+      type: bool
+      required: true
+      description: 'Does chart_course recommend hop engine as primary onboarding path?'
+    example_published:
+      type: bool
+      required: true
+      description: 'Is a public worked example with real unlabeled signal finding live?'
+    calls_per_day:
+      type: float
+      required: true
+      description: 'Average daily external tool calls (not internal sessions)'
+    framework_count:
+      type: int
+      required: true
+      description: 'Number of agent frameworks with NexVigilant integration examples'
+  outputs:
+    bottleneck:
+      type: string
+    phase:
+      type: string
+    action:
+      type: string
+    priority:
+      type: string
+    prediction:
+      type: string
+    leverage:
+      type: float
+tree:
+  start: check_repo
+  nodes:
+    check_repo:
+      type: condition
+      variable: repo_public
+      operator: eq
+      value: true
+      true_next: check_descriptions
+      false_next: blocked_visibility
+    blocked_visibility:
+      type: return
+      value:
+        bottleneck: visibility
+        phase: blocked
+        action: 'Make ferroforge public OR update nexvigilant-station repo with current source and README'
+        priority: P0
+        prediction: 'Zero external traffic possible until repo is accessible. All directory submissions point to it.'
+        leverage: 1.0
+    check_descriptions:
+      type: condition
+      variable: descriptions_current
+      operator: eq
+      value: true
+      true_next: check_directories
+      false_next: blocked_credibility
+    blocked_credibility:
+      type: return
+      value:
+        bottleneck: credibility
+        phase: blocked
+        action: 'Update all stale GitHub repo descriptions — 151/347 must become 1958'
+        priority: P0
+        prediction: 'Inconsistent counts signal neglect. Developers check repos before integrating.'
+        leverage: 0.9
+    check_directories:
+      type: condition
+      variable: directory_listings
+      operator: gt
+      value: 0
+      true_next: check_hop
+      false_next: pre_launch
+    pre_launch:
+      type: return
+      value:
+        bottleneck: discovery
+        phase: pre_launch
+        action: 'Submit to Smithery + 5 web directories. Copy-paste kit ready.'
+        priority: P1
+        prediction: 'First external call within 3-14 days. Expect 10-50 calls/day within 30 days.'
+        leverage: 0.8
+    check_hop:
+      type: condition
+      variable: hop_default
+      operator: eq
+      value: true
+      true_next: check_example
+      false_next: optimize_onboarding
+    optimize_onboarding:
+      type: return
+      value:
+        bottleneck: onboarding_friction
+        phase: pre_optimization
+        action: 'Make hop engine the first recommendation in chart_course response'
+        priority: P1
+        prediction: 'Bounce rate >80% with manual 6-step chain. <40% with single hop returning full result.'
+        leverage: 0.85
+    check_example:
+      type: condition
+      variable: example_published
+      operator: eq
+      value: true
+      true_next: check_volume
+      false_next: pre_viral
+    pre_viral:
+      type: return
+      value:
+        bottleneck: proof
+        phase: pre_viral
+        action: 'Publish semaglutide muscle atrophy signal as worked example — unlabeled, ROR=2.39, trending drug'
+        priority: P2
+        prediction: 'Worked examples drive 10x more adoption than tool listings. Emerging unlabeled signal = shareable story.'
+        leverage: 0.95
+    check_volume:
+      type: condition
+      variable: calls_per_day
+      operator: gte
+      value: 500
+      true_next: revenue
+      false_next: scaling
+    scaling:
+      type: return
+      value:
+        bottleneck: volume
+        phase: scaling
+        action: 'Publish framework integration examples (CrewAI, LangChain). Launch competitive intel product.'
+        priority: P2
+        prediction: '500 calls/day = breakeven. Each framework integration = new user segment.'
+        leverage: 0.7
+    revenue:
+      type: return
+      value:
+        bottleneck: none
+        phase: revenue
+        action: 'Enable toll billing, add premium tiers, measure conversion rates'
+        priority: P3
+        prediction: 'Revenue phase. Shift from growth to monetization and retention.'
+        leverage: 0.5
+test_cases:
+  - name: current_state_blocked
+    input:
+      repo_public: false
+      descriptions_current: false
+      directory_listings: 0
+      hop_default: false
+      example_published: false
+      calls_per_day: 0
+      framework_count: 0
+    expected_output:
+      bottleneck: visibility
+      phase: blocked
+      priority: P0
+  - name: post_repo_fix
+    input:
+      repo_public: true
+      descriptions_current: true
+      directory_listings: 0
+      hop_default: false
+      example_published: false
+      calls_per_day: 0
+      framework_count: 0
+    expected_output:
+      bottleneck: discovery
+      phase: pre_launch
+      priority: P1
+  - name: post_listings_no_hop
+    input:
+      repo_public: true
+      descriptions_current: true
+      directory_listings: 6
+      hop_default: false
+      example_published: false
+      calls_per_day: 15
+      framework_count: 0
+    expected_output:
+      bottleneck: onboarding_friction
+      phase: pre_optimization
+      priority: P1
+  - name: post_optimization
+    input:
+      repo_public: true
+      descriptions_current: true
+      directory_listings: 6
+      hop_default: true
+      example_published: false
+      calls_per_day: 30
+      framework_count: 0
+    expected_output:
+      bottleneck: proof
+      phase: pre_viral
+      priority: P2
+  - name: revenue_ready
+    input:
+      repo_public: true
+      descriptions_current: true
+      directory_listings: 8
+      hop_default: true
+      example_published: true
+      calls_per_day: 600
+      framework_count: 3
+    expected_output:
+      bottleneck: none
+      phase: revenue
+      priority: P3

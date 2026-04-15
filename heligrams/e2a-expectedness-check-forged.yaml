@@ -1,0 +1,230 @@
+name: e2a-expectedness-check-helix
+description: 'Forged from microgram ''e2a-expectedness-check''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    is_unexpected: falsified
+sense:
+  tree:
+    start: check_rsi_available
+    nodes:
+      nature_mismatch_unexpected:
+        type: return
+        value:
+          rationale: Reaction nature does not match RSI description — unexpected per ICH E2A
+          is_unexpected: true
+          expectedness: UNEXPECTED
+          regulatory_reference: ICH E2A Section II.C - Nature inconsistent with RSI = unexpected
+      check_nature_matches:
+        type: condition
+        variable: nature_matches
+        operator: eq
+        value: true
+        true_next: check_severity_exceeds
+        false_next: nature_mismatch_unexpected
+      check_listed_smpc:
+        type: condition
+        variable: listed_in_smpc
+        operator: eq
+        value: true
+        true_next: check_nature_matches
+        false_next: not_listed_unexpected
+      check_rsi_available:
+        type: condition
+        variable: rsi_available
+        operator: eq
+        value: true
+        true_next: check_listed_ib
+        false_next: no_rsi_unexpected
+      check_severity_exceeds:
+        type: condition
+        variable: severity_exceeds_listed
+        operator: eq
+        value: true
+        true_next: severity_upgrade_unexpected
+        false_next: listed_expected
+      severity_upgrade_unexpected:
+        type: return
+        value:
+          rationale: Reaction is listed but severity exceeds what is described in RSI — upgrade to unexpected per ICH E2A
+          regulatory_reference: ICH E2A Section II.C - Severity exceeding RSI description = unexpected
+          expectedness: UNEXPECTED
+          is_unexpected: true
+      no_rsi_unexpected:
+        type: return
+        value:
+          rationale: No RSI available — reaction classified as unexpected by default
+          is_unexpected: true
+          regulatory_reference: ICH E2A Section II.C - No RSI = unexpected by default
+          expectedness: UNEXPECTED
+      not_listed_unexpected:
+        type: return
+        value:
+          expectedness: UNEXPECTED
+          is_unexpected: true
+          rationale: Reaction not listed in IB or SmPC — unexpected per ICH E2A
+          regulatory_reference: ICH E2A Section II.C - Not listed in RSI = unexpected
+      listed_expected:
+        type: return
+        value:
+          expectedness: EXPECTED
+          rationale: Reaction is listed in RSI with matching nature and non-exceeding severity
+          is_unexpected: false
+          regulatory_reference: ICH E2A Section II.C - Listed in RSI = expected
+      check_listed_ib:
+        type: condition
+        variable: listed_in_ib
+        operator: eq
+        value: true
+        true_next: check_nature_matches
+        false_next: check_listed_smpc
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: nature_matches
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: nature_matches
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      is_unexpected: true
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+      is_unexpected: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when:
+      is_unexpected: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: absent
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      rsi_available:
+        type: bool
+        required: false
+      severity_exceeds_listed:
+        type: bool
+        required: false
+      nature_matches:
+        type: bool
+        required: false
+      listed_in_smpc:
+        type: bool
+        required: false
+      listed_in_ib:
+        type: bool
+        required: false
+    outputs:
+      expectedness:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      rationale:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      is_unexpected:
+        type: bool
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    listed_in_smpc: false
+    listed_in_ib: true
+    rsi_available: true
+    nature_matches: null
+    severity_exceeds_listed: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    listed_in_smpc: false
+    listed_in_ib: true
+    rsi_available: true
+    nature_matches: false
+    severity_exceeds_listed: true
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - listed_in_ib
+  - listed_in_smpc
+  - rsi_available
+  - nature_matches
+  - severity_exceeds_listed
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

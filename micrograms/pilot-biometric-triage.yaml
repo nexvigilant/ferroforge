@@ -1,0 +1,141 @@
+name: pilot-biometric-triage
+description: 'Triage pilot physiological state from biometric readings. Routes to NORMAL, WARNING, or CRITICAL with action guidance.'
+version: 0.1.0
+interface:
+  inputs:
+    heart_rate_bpm:
+      type: number
+      required: true
+      description: 'Heart rate in beats per minute'
+    spo2_pct:
+      type: number
+      required: true
+      description: 'Blood oxygen saturation percentage'
+    core_temp_c:
+      type: number
+      required: true
+      description: 'Core body temperature in Celsius'
+  outputs:
+    status:
+      type: string
+    priority:
+      type: number
+    action:
+      type: string
+tree:
+  start: check_spo2
+  nodes:
+    check_spo2:
+      type: condition
+      variable: spo2_pct
+      operator: lt
+      value: 90
+      true_next: hypoxia_critical
+      false_next: check_hyperthermia
+    check_hyperthermia:
+      type: condition
+      variable: core_temp_c
+      operator: gt
+      value: 39.5
+      true_next: hyperthermia_critical
+      false_next: check_hypothermia
+    check_hypothermia:
+      type: condition
+      variable: core_temp_c
+      operator: lt
+      value: 35.0
+      true_next: hypothermia_critical
+      false_next: check_tachycardia
+    check_tachycardia:
+      type: condition
+      variable: heart_rate_bpm
+      operator: gt
+      value: 180
+      true_next: tachycardia_critical
+      false_next: check_bradycardia
+    check_bradycardia:
+      type: condition
+      variable: heart_rate_bpm
+      operator: lt
+      value: 40
+      true_next: bradycardia_critical
+      false_next: check_hr_warning
+    check_hr_warning:
+      type: condition
+      variable: heart_rate_bpm
+      operator: gt
+      value: 160
+      true_next: elevated_hr
+      false_next: check_spo2_warning
+    check_spo2_warning:
+      type: condition
+      variable: spo2_pct
+      operator: lt
+      value: 94
+      true_next: low_spo2_warning
+      false_next: normal
+    hypoxia_critical:
+      type: return
+      value:
+        status: 'CRITICAL'
+        priority: 1
+        action: 'SpO2 < 90% — initiate supplemental oxygen, descend altitude'
+    hyperthermia_critical:
+      type: return
+      value:
+        status: 'CRITICAL'
+        priority: 1
+        action: 'Core temp > 39.5°C — activate cooling, reduce exertion'
+    hypothermia_critical:
+      type: return
+      value:
+        status: 'CRITICAL'
+        priority: 1
+        action: 'Core temp < 35°C — activate heating, seek shelter'
+    tachycardia_critical:
+      type: return
+      value:
+        status: 'CRITICAL'
+        priority: 2
+        action: 'HR > 180 bpm — cease exertion, assess cardiac status'
+    bradycardia_critical:
+      type: return
+      value:
+        status: 'CRITICAL'
+        priority: 2
+        action: 'HR < 40 bpm — assess consciousness, prepare for medical intervention'
+    elevated_hr:
+      type: return
+      value:
+        status: 'WARNING'
+        priority: 3
+        action: 'HR 160-180 bpm — reduce exertion, monitor trend'
+    low_spo2_warning:
+      type: return
+      value:
+        status: 'WARNING'
+        priority: 3
+        action: 'SpO2 90-94% — monitor closely, consider altitude or ventilation'
+    normal:
+      type: return
+      value:
+        status: 'NORMAL'
+        priority: 5
+        action: 'All vitals within normal range'
+tests:
+- input: { heart_rate_bpm: 72, spo2_pct: 98, core_temp_c: 37.0 }
+  expect: { status: 'NORMAL', priority: 5 }
+- input: { heart_rate_bpm: 72, spo2_pct: 85, core_temp_c: 37.0 }
+  expect: { status: 'CRITICAL', priority: 1 }
+- input: { heart_rate_bpm: 72, spo2_pct: 98, core_temp_c: 40.0 }
+  expect: { status: 'CRITICAL', priority: 1 }
+- input: { heart_rate_bpm: 190, spo2_pct: 98, core_temp_c: 37.0 }
+  expect: { status: 'CRITICAL', priority: 2 }
+- input: { heart_rate_bpm: 170, spo2_pct: 98, core_temp_c: 37.0 }
+  expect: { status: 'WARNING', priority: 3 }
+- input: { heart_rate_bpm: 72, spo2_pct: 92, core_temp_c: 37.0 }
+  expect: { status: 'WARNING', priority: 3 }
+- input: { heart_rate_bpm: 35, spo2_pct: 98, core_temp_c: 37.0 }
+  expect: { status: 'CRITICAL', priority: 2 }
+- input: { heart_rate_bpm: 72, spo2_pct: 98, core_temp_c: 34.0 }
+  expect: { status: 'CRITICAL', priority: 1 }

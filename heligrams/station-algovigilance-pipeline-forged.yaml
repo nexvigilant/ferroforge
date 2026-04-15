@@ -1,0 +1,162 @@
+name: station-algovigilance-pipeline-helix
+description: 'Forged from microgram ''station-algovigilance-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    action: falsified
+sense:
+  tree:
+    start: check_drift
+    nodes:
+      bias_alert:
+        type: return
+        value:
+          action: investigate
+          reason: Algorithmic bias detected — fairness audit required before continued use
+          route: bias_audit
+          priority: high
+      healthy:
+        type: return
+        value:
+          priority: low
+          reason: No drift or bias detected — algorithm performing within parameters
+          route: archive
+          action: certify
+      mild_drift:
+        type: return
+        value:
+          priority: moderate
+          action: monitor
+          route: drift_monitoring
+          reason: Drift detected but PSI<0.25 — monitor for acceleration
+      check_drift:
+        type: condition
+        variable: drift_detected
+        operator: eq
+        value: true
+        true_next: drift_severity
+        false_next: check_bias
+      severe_drift:
+        type: return
+        value:
+          reason: PSI≥0.25 — significant distribution shift, model output unreliable
+          route: model_retrain
+          priority: critical
+          action: halt
+      drift_severity:
+        type: condition
+        variable: drift_psi
+        operator: gte
+        value: 0.25
+        true_next: severe_drift
+        false_next: mild_drift
+      check_bias:
+        type: condition
+        variable: bias_detected
+        operator: eq
+        value: true
+        true_next: bias_alert
+        false_next: healthy
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: drift_detected
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: drift_detected
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      drift_detected:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    drift_detected: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    drift_detected: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

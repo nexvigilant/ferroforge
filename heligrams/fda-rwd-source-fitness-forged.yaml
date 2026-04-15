@@ -1,0 +1,270 @@
+name: fda-rwd-source-fitness-helix
+description: 'Forged from microgram ''fda-rwd-source-fitness''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regulatory_reference: falsified
+sense:
+  tree:
+    start: check_completeness
+    nodes:
+      linked_high:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: RWD Assessing EHR and Claims (2024), Section V — Data Linkage'
+          source_fitness: HIGH
+          key_limitation: Linked data provides broad capture but linkage quality must be validated
+          validation_needed: Validate linkage algorithm (PPV, sensitivity). Assess linkage bias.
+      check_source_type:
+        type: condition
+        variable: data_source_type
+        operator: eq
+        value: linked_ehr_claims
+        true_next: linked_check
+        false_next: check_ehr
+      claims_icd_only:
+        type: return
+        value:
+          validation_needed: Conduct validation study with chart review. Use multiple code algorithms with sensitivity analysis.
+          source_fitness: MODERATE
+          key_limitation: ICD codes alone have variable PPV — outcome misclassification is primary concern
+          regulatory_reference: 'FDA Guidance: RWD Assessing EHR and Claims (2024), Section III.B'
+      check_registry:
+        type: condition
+        variable: data_source_type
+        operator: eq
+        value: disease_registry
+        true_next: registry_path
+        false_next: product_registry_path
+      claims_outcome_check:
+        type: condition
+        variable: outcome_ascertainment
+        operator: eq
+        value: validated_algorithm
+        true_next: claims_validated
+        false_next: claims_icd_only
+      ehr_validated:
+        type: return
+        value:
+          key_limitation: EHR captures clinical detail but may miss out-of-network care
+          source_fitness: MODERATE_HIGH
+          validation_needed: Assess care fragmentation. Validate that key outcomes are captured within the EHR network.
+          regulatory_reference: 'FDA Guidance: RWD Assessing EHR and Claims (2024), Section III.A'
+      ehr_moderate:
+        type: return
+        value:
+          validation_needed: Chart review to validate outcome definitions. Quantify outcome misclassification.
+          regulatory_reference: 'FDA Guidance: RWD Assessing EHR and Claims (2024), Section III.A'
+          key_limitation: EHR without validated outcome algorithm — needs outcome validation study
+          source_fitness: MODERATE
+      check_claims:
+        type: condition
+        variable: data_source_type
+        operator: eq
+        value: medical_claims
+        true_next: claims_outcome_check
+        false_next: check_registry
+      claims_validated:
+        type: return
+        value:
+          source_fitness: MODERATE_HIGH
+          key_limitation: Claims capture broad population but lack clinical detail (labs, vitals, notes)
+          regulatory_reference: 'FDA Guidance: RWD Assessing EHR and Claims (2024), Section III.B'
+          validation_needed: Validate claims algorithm against chart review. Assess confounding by unmeasured clinical variables.
+      product_registry_path:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: RWD Assessing Registries (2023), Section V'
+          key_limitation: Product registries track specific drug users but may lack comparator data
+          validation_needed: Assess availability of comparator group. Consider external control arm from claims/EHR.
+          source_fitness: MODERATE_HIGH
+      registry_path:
+        type: return
+        value:
+          key_limitation: Disease registries have curated data but may have selection bias (voluntary enrollment)
+          validation_needed: Assess representativeness vs general population. Document enrollment criteria and completeness.
+          regulatory_reference: 'FDA Guidance: RWD Assessing Registries (2023), Sections III-IV'
+          source_fitness: HIGH
+      ehr_outcome_check:
+        type: condition
+        variable: outcome_ascertainment
+        operator: eq
+        value: validated_algorithm
+        true_next: ehr_validated
+        false_next: ehr_longitudinal_check
+      check_completeness:
+        type: condition
+        variable: completeness
+        operator: eq
+        value: low
+        true_next: low_completeness
+        false_next: check_source_type
+      ehr_low:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: RWD Assessing EHR and Claims (2024), Section III.A'
+          validation_needed: Assess follow-up duration. Consider claims linkage for completeness.
+          source_fitness: LOW_MODERATE
+          key_limitation: EHR without validated outcomes and inadequate follow-up
+      linked_check:
+        type: condition
+        variable: outcome_ascertainment
+        operator: eq
+        value: validated_algorithm
+        true_next: linked_high
+        false_next: linked_moderate
+      linked_moderate:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: RWD Assessing EHR and Claims (2024), Sections IV-V'
+          validation_needed: Develop and validate outcome algorithm. Chart review for PPV estimation.
+          source_fitness: MODERATE_HIGH
+          key_limitation: Linked data without validated outcome algorithm — outcome misclassification risk
+      ehr_longitudinal_check:
+        type: condition
+        variable: longitudinal_followup
+        operator: eq
+        value: true
+        true_next: ehr_moderate
+        false_next: ehr_low
+      low_completeness:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: RWD Assessing EHR and Claims (2024), Section IV.A — Data Completeness'
+          validation_needed: Conduct data completeness audit. Quantify missing data patterns. Consider alternative data sources.
+          source_fitness: NOT_FIT
+          key_limitation: Low data completeness — missing variables, fragmented records, or selective capture
+      check_ehr:
+        type: condition
+        variable: data_source_type
+        operator: eq
+        value: ehr
+        true_next: ehr_outcome_check
+        false_next: check_claims
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: data_source_type
+        operator: neq
+        value: low
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: data_source_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      completeness:
+        type: string
+        required: true
+      data_source_type:
+        type: string
+        required: true
+      outcome_ascertainment:
+        type: string
+        required: false
+      longitudinal_followup:
+        type: bool
+        required: false
+    outputs:
+      validation_needed:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      source_fitness:
+        type: string
+        required: false
+      key_limitation:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    data_source_type: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    data_source_type: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - data_source_type
+  - completeness
+  - outcome_ascertainment
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

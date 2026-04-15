@@ -1,0 +1,182 @@
+name: expectedness-check-helix
+description: 'Forged from microgram ''expectedness-check''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    description: falsified
+sense:
+  tree:
+    start: check_event_listed
+    nodes:
+      check_event_listed:
+        type: condition
+        variable: event_in_label
+        operator: eq
+        value: true
+        true_next: check_severity_listed
+        false_next: check_class_listed
+      check_severity_listed:
+        type: condition
+        variable: severity_in_label
+        operator: eq
+        value: true
+        true_next: expected_listed
+        false_next: unexpected_severity
+      expected_listed:
+        type: return
+        value:
+          description: Specific adverse event and its observed severity are listed in product labeling
+          regulatory_reference: ICH E2A Section II.C
+          expectedness: EXPECTED_LISTED
+          regulatory_impact: Periodic reporting only - no expedited submission required
+      check_class_listed:
+        type: condition
+        variable: event_class_in_label
+        operator: eq
+        value: true
+        true_next: expected_class
+        false_next: unexpected_nature
+      expected_class:
+        type: return
+        value:
+          regulatory_reference: ICH E2A Section II.C
+          expectedness: EXPECTED_CLASS
+          description: Event class is labeled but specific event not listed - borderline expectedness
+          regulatory_impact: Medical review required to confirm expectedness determination
+      unexpected_severity:
+        type: return
+        value:
+          description: Adverse event nature is listed but observed severity exceeds labeling
+          regulatory_impact: Expedited reporting required - event unexpected by severity per ICH E2A
+          expectedness: UNEXPECTED_SEVERITY
+          regulatory_reference: ICH E2A Section II.C
+      unexpected_nature:
+        type: return
+        value:
+          expectedness: UNEXPECTED_NATURE
+          description: Adverse event not listed in product labeling - unexpected by nature
+          regulatory_impact: Expedited reporting required if case is serious per ICH E2A
+          regulatory_reference: ICH E2A Section II.C
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: event_in_label
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: event_in_label
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      event_in_label:
+        type: bool
+        required: false
+      event_class_in_label:
+        type: bool
+        required: false
+      severity_in_label:
+        type: bool
+        required: false
+    outputs:
+      regulatory_impact:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      description:
+        type: string
+        required: false
+      expectedness:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    event_class_in_label: false
+    event_in_label: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    event_class_in_label: false
+    event_in_label: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,190 @@
+name: portfolio-risk-rank-helix
+description: 'Forged from microgram ''portfolio-risk-rank''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    reason: falsified
+sense:
+  tree:
+    start: check_critical_count
+    nodes:
+      critical:
+        type: return
+        value:
+          reason: High signal count or signal ratio exceeds 60%
+          tier: critical
+      check_medium_reports:
+        type: condition
+        variable: total_reports
+        operator: gt
+        value: 50000
+        true_next: medium
+        false_next: low
+      check_critical_ratio:
+        type: condition
+        variable: signal_ratio
+        operator: gt
+        value: 0.6
+        true_next: critical
+        false_next: check_high_count
+      check_high_count:
+        type: condition
+        variable: signal_count
+        operator: gte
+        value: 5
+        true_next: high
+        false_next: check_high_ratio
+      medium:
+        type: return
+        value:
+          tier: medium
+          reason: Multiple signals detected or high report volume
+      check_high_ratio:
+        type: condition
+        variable: signal_ratio
+        operator: gt
+        value: 0.4
+        true_next: high
+        false_next: check_medium_count
+      check_medium_count:
+        type: condition
+        variable: signal_count
+        operator: gte
+        value: 2
+        true_next: medium
+        false_next: check_medium_reports
+      high:
+        type: return
+        value:
+          reason: Elevated signal count or signal ratio exceeds 40%
+          tier: high
+      check_critical_count:
+        type: condition
+        variable: signal_count
+        operator: gte
+        value: 10
+        true_next: critical
+        false_next: check_critical_ratio
+      low:
+        type: return
+        value:
+          tier: low
+          reason: Minimal signal activity
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: total_reports
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: total_reports
+        operator: lt
+        value: 10
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      event_count:
+        type: number
+        required: true
+      signal_ratio:
+        type: number
+        required: true
+      signal_count:
+        type: number
+        required: true
+      total_reports:
+        type: number
+        required: true
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      tier:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      reason:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    total_reports: 20
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    total_reports: 9
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

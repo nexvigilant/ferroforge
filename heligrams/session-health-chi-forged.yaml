@@ -1,0 +1,174 @@
+name: session-health-chi-helix
+description: 'Forged from microgram ''session-health-chi''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    band: falsified
+sense:
+  tree:
+    start: check_critical
+    nodes:
+      depleting:
+        type: return
+        value:
+          band: Depleting
+          severity: warning
+          action: 'WARNING: χ above equilibrium band (0.27). System outputting more than sustainable. Monitor for drift toward critical.'
+          equilibrium_distance: -1.0
+      spinning_up:
+        type: return
+        value:
+          equilibrium_distance: -1.0
+          action: 'INFO: χ below equilibrium band (0.02). System consuming more than outputting. Normal during startup or heavy input phase.'
+          severity: info
+          band: SpinningUp
+      check_healthy:
+        type: condition
+        variable: chi
+        operator: gte
+        value: 0.02
+        true_next: healthy
+        false_next: spinning_up
+      check_depleting:
+        type: condition
+        variable: chi
+        operator: gt
+        value: 0.27
+        true_next: depleting
+        false_next: check_healthy
+      healthy:
+        type: return
+        value:
+          severity: ok
+          band: Healthy
+          action: System operating within equilibrium band [0.02, 0.27]. No action required.
+          equilibrium_distance: 0.0
+      check_critical:
+        type: condition
+        variable: chi
+        operator: gt
+        value: 0.6
+        true_next: critical
+        false_next: check_depleting
+      critical:
+        type: return
+        value:
+          action: 'ALERT: χ exceeds APSW thermodynamic limit (0.60). Output rate unsustainable. Investigate output flooding or input starvation.'
+          band: Critical
+          equilibrium_distance: -1.0
+          severity: critical
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: chi
+        operator: lte
+        value: 0.6
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: chi
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      chi:
+        type: float
+        required: true
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      action:
+        type: string
+        required: false
+      band:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      severity:
+        type: string
+        required: false
+      equilibrium_distance:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    chi: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    chi: 0.6
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

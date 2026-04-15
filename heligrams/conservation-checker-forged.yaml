@@ -1,0 +1,244 @@
+name: conservation-checker-helix
+description: 'Forged from microgram ''conservation-checker''. Domain: SystemHealth. 2 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    recommendation: falsified
+sense:
+  tree:
+    start: check_existence
+    nodes:
+      check_state:
+        type: condition
+        variable: has_state
+        operator: eq
+        value: true
+        true_next: check_void
+        false_next: missing_state
+      missing_void:
+        type: return
+        value:
+          recommendation: Add a void primitive. ×(ς, ∅) requires ∅ as the absence that defines presence.
+          missing_terms: ∅ (Void)
+          verdict: Conservation law violated — no void. Without ∅, state has no contrast.
+          completeness: incomplete
+          conservation_status: VIOLATED
+      missing_state:
+        type: return
+        value:
+          missing_terms: ς (State)
+          recommendation: Add a state primitive. ×(ς, ∅) requires ς as the variable that ∂ fixes.
+          verdict: Conservation law violated — no state. Nothing changes, so nothing can exist.
+          conservation_status: VIOLATED
+          completeness: incomplete
+      check_existence:
+        type: condition
+        variable: has_existence
+        operator: eq
+        value: true
+        true_next: check_boundary
+        false_next: missing_existence
+      missing_existence:
+        type: return
+        value:
+          recommendation: Add an existence-producing primitive. Without ∃, ∂(×(ς, ∅)) has no output.
+          missing_terms: ∃ (Existence)
+          completeness: incomplete
+          verdict: Conservation law violated — no existence term. The composition produces nothing.
+          conservation_status: VIOLATED
+      missing_boundary:
+        type: return
+        value:
+          verdict: Conservation law violated — no boundary. The composition has no identity function.
+          recommendation: Add a boundary primitive. ∂ is the function that creates identity from ×(ς, ∅).
+          conservation_status: VIOLATED
+          missing_terms: ∂ (Boundary)
+          completeness: incomplete
+      check_tier:
+        type: condition
+        variable: primitive_count
+        operator: gte
+        value: 8
+        true_next: full_conservation
+        false_next: minimal_conservation
+      check_boundary:
+        type: condition
+        variable: has_boundary
+        operator: eq
+        value: true
+        true_next: check_state
+        false_next: missing_boundary
+      check_void:
+        type: condition
+        variable: has_void
+        operator: eq
+        value: true
+        true_next: check_tier
+        false_next: missing_void
+      full_conservation:
+        type: return
+        value:
+          missing_terms: none
+          verdict: Conservation law satisfied with rich composition. All four terms present with 8+ primitives.
+          completeness: rich
+          conservation_status: CONSERVED
+          recommendation: Composition is conservation-complete and expressively rich. Ready for deployment.
+      minimal_conservation:
+        type: return
+        value:
+          recommendation: Composition conserves identity. Consider adding more primitives for expressive power.
+          conservation_status: CONSERVED
+          missing_terms: none
+          verdict: Conservation law satisfied. All four terms present.
+          completeness: minimal
+antisense:
+  tree:
+    start: null_guard_measurement_stale
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_measurement_stale:
+        type: condition
+        variable: measurement_age_minutes
+        operator: is_null
+        value: null
+        true_next: null_guard_single_source
+        false_next: check_measurement_stale
+      null_guard_single_source:
+        type: condition
+        variable: probe_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_single_source
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_measurement_stale:
+        type: condition
+        variable: measurement_age_minutes
+        operator: gt
+        value: 60
+        true_next: falsified
+        false_next: null_guard_single_source
+      check_single_source:
+        type: condition
+        variable: probe_count
+        operator: lt
+        value: 2
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_void:
+        type: bool
+        required: true
+      composition_tier:
+        type: string
+        required: false
+      measurement_age_minutes:
+        type: integer
+        required: false
+      has_state:
+        type: bool
+        required: true
+      has_existence:
+        type: bool
+        required: true
+      primitive_count:
+        type: int
+        required: false
+      has_boundary:
+        type: bool
+        required: true
+      probe_count:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      completeness:
+        type: string
+        required: false
+      missing_terms:
+        type: string
+        required: false
+      conservation_status:
+        type: string
+        required: false
+      recommendation:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    measurement_age_minutes: 50
+    probe_count: 12
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, measurement_stale active'
+  input:
+    measurement_age_minutes: 61
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — system-health with 2 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: system-health. Chains as dual-strand verifier before downstream consumers.'

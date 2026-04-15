@@ -1,0 +1,176 @@
+name: station-ema-pipeline-helix
+description: 'Forged from microgram ''station-ema-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    action: falsified
+sense:
+  tree:
+    start: check_source
+    nodes:
+      psur_path:
+        type: condition
+        variable: benefit_risk_changed
+        operator: eq
+        value: true
+        true_next: psur_urgent
+        false_next: psur_routine
+      unconfirmed_signal:
+        type: return
+        value:
+          action: validate
+          reason: EMA unconfirmed signal — run disproportionality analysis
+          route: signal_validation
+          priority: moderate
+      signal_path:
+        type: condition
+        variable: signal_confirmed
+        operator: eq
+        value: true
+        true_next: confirmed_signal
+        false_next: unconfirmed_signal
+      epar_path:
+        type: return
+        value:
+          reason: EPAR data — extract safety section for baseline comparison
+          priority: low
+          route: label_comparison
+          action: review
+      confirmed_signal:
+        type: return
+        value:
+          reason: EMA confirmed signal — cross-reference with FAERS and VigiBase
+          priority: high
+          action: investigate
+          route: signal_investigation
+      check_source:
+        type: condition
+        variable: source_type
+        operator: eq
+        value: signal
+        true_next: signal_path
+        false_next: check_psur
+      check_psur:
+        type: condition
+        variable: source_type
+        operator: eq
+        value: psur
+        true_next: psur_path
+        false_next: epar_path
+      psur_routine:
+        type: return
+        value:
+          reason: PSUR routine — no benefit-risk change detected
+          action: review
+          route: periodic_review
+          priority: low
+      psur_urgent:
+        type: return
+        value:
+          route: benefit_risk_assessment
+          reason: PSUR shows changed benefit-risk — immediate regulatory review
+          action: escalate
+          priority: critical
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: benefit_risk_changed
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: benefit_risk_changed
+        operator: neq
+        value: signal
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      benefit_risk_changed:
+        type: string
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    benefit_risk_changed: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    benefit_risk_changed: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

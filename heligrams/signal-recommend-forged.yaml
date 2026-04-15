@@ -1,0 +1,222 @@
+name: signal-recommend-helix
+description: 'Forged from microgram ''signal-recommend''. Domain: CausalityAssessment. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    recommendation_compliant: falsified
+sense:
+  tree:
+    start: validate_evaluation
+    nodes:
+      check_causality_type:
+        type: condition
+        variable: causality_category
+        operator: eq
+        value: probable
+        true_next: probable_recommendation
+        false_next: check_possible
+      probable_recommendation:
+        type: return
+        value:
+          recommendation: label_update_required
+          recommendation_compliant: true
+          communication_plan: healthcare_provider_letter
+          risk_minimization_needed: true
+          action_type: urgent
+      validate_evaluation:
+        type: condition
+        variable: causality_category
+        operator: is_not_null
+        value: null
+        true_next: check_causality_type
+        false_next: recommendation_unknown
+      check_possible:
+        type: condition
+        variable: causality_category
+        operator: eq
+        value: possible
+        true_next: possible_recommendation
+        false_next: unrelated_recommendation
+      unrelated_recommendation:
+        type: return
+        value:
+          risk_minimization_needed: false
+          communication_plan: null
+          recommendation_compliant: true
+          action_type: none
+          recommendation: no_regulatory_action
+      recommendation_unknown:
+        type: return
+        value:
+          risk_minimization_needed: null
+          communication_plan: null
+          recommendation_compliant: false
+          recommendation: null
+          action_type: null
+      possible_recommendation:
+        type: return
+        value:
+          recommendation: consider_label_update
+          communication_plan: product_information_update
+          recommendation_compliant: true
+          risk_minimization_needed: true
+          action_type: routine
+antisense:
+  tree:
+    start: null_guard_alternative_cause
+    nodes:
+      check_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_no_dechallenge
+      check_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_no_dechallenge:
+        type: condition
+        variable: dechallenge_positive
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_no_dechallenge
+      check_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: eq
+        value: likely
+        true_next: falsified
+        false_next: null_guard_temporal_implausible
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_alternative_cause:
+        type: condition
+        variable: alternative_causes
+        operator: is_null
+        value: null
+        true_next: null_guard_temporal_implausible
+        false_next: check_alternative_cause
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_temporal_implausible:
+        type: condition
+        variable: temporal_plausible
+        operator: is_null
+        value: null
+        true_next: null_guard_no_dechallenge
+        false_next: check_temporal_implausible
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      recommendation_compliant: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      recommendation_compliant: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when:
+      recommendation_compliant: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when:
+      recommendation_compliant: false
+      falsified: true
+    default: null
+    emit:
+      confidence: medium
+      confidence_score: 0.42
+      verdict: refuted
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      temporal_plausible:
+        type: bool
+        required: false
+      alternative_causes:
+        type: string
+        required: false
+      dechallenge_positive:
+        type: bool
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    causality_category: probable
+    temporal_plausible: true
+    dechallenge_positive: true
+    alternative_causes: none
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, alternative_cause active'
+  input:
+    alternative_causes: likely
+    causality_category: probable
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — causality-assessment with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: causality-assessment. Chains as dual-strand verifier before downstream consumers.'

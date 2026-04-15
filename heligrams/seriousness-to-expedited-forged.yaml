@@ -1,0 +1,218 @@
+name: seriousness-to-expedited-helix
+description: 'Forged from microgram ''seriousness-to-expedited''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    requires_expedited: falsified
+sense:
+  tree:
+    start: check_seriousness
+    nodes:
+      check_hospitalization:
+        type: condition
+        variable: seriousness_level
+        operator: eq
+        value: hospitalization
+        true_next: hospitalization_path
+        false_next: standard_reporting
+      check_seriousness:
+        type: condition
+        variable: seriousness_level
+        operator: eq
+        value: fatal
+        true_next: fatal_path
+        false_next: check_life_threatening
+      fatal_path:
+        type: return
+        value:
+          requires_expedited: true
+          reporting_window_days: 7
+          rationale: Fatal cases require expedited reporting within 7 days
+      life_threatening_path:
+        type: return
+        value:
+          requires_expedited: true
+          reporting_window_days: 7
+          rationale: Life-threatening cases require expedited reporting within 7 days
+      hospitalization_path:
+        type: return
+        value:
+          requires_expedited: true
+          reporting_window_days: 15
+          rationale: Hospitalization cases require reporting within 15 days
+      standard_reporting:
+        type: return
+        value:
+          requires_expedited: false
+          rationale: Non-serious cases follow standard reporting timelines of 90 days
+          reporting_window_days: 90
+      check_life_threatening:
+        type: condition
+        variable: seriousness_level
+        operator: eq
+        value: life_threatening
+        true_next: life_threatening_path
+        false_next: check_hospitalization
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      requires_expedited: true
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      requires_expedited: true
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when:
+      falsified: false
+      requires_expedited: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      follow_up_complete:
+        type: bool
+        required: false
+      seriousness_level:
+        type: string
+        required: true
+      comorbidity_explains:
+        type: bool
+        required: false
+      coding_verified:
+        type: bool
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      reporting_window_days:
+        type: integer
+        required: false
+      rationale:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      requires_expedited:
+        type: boolean
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    comorbidity_explains: false
+    coding_verified: true
+    seriousness_level: fatal
+    follow_up_complete: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    seriousness_level: fatal
+    follow_up_complete: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

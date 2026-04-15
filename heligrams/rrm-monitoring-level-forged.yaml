@@ -1,0 +1,230 @@
+name: rrm-monitoring-level-helix
+description: 'Forged from microgram ''rrm-monitoring-level''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    level_name: falsified
+sense:
+  tree:
+    start: check_predictive
+    nodes:
+      level_0:
+        type: return
+        value:
+          level_name: Time Interval
+          railway_equivalent: Pre-signaling era (1830s) — trains depart at time intervals with no track state knowledge
+          capacity_multiplier: 1x (baseline)
+          etcs_level: 0
+          pv_equivalent: Spontaneous reporting only — no systematic monitoring, signals discovered by chance
+          detection_capability: Reactive only — events detected after harm occurs
+      level_2:
+        type: return
+        value:
+          railway_equivalent: ETCS L2 — Radio Block Centre streams movement authority continuously
+          capacity_multiplier: 1.2-1.5x
+          pv_equivalent: Real-time FAERS monitoring — continuous analysis of adverse event reports as they arrive
+          etcs_level: 2
+          detection_capability: Continuous detection — signals found as data arrives
+          level_name: Continuous Supervision
+      check_continuous:
+        type: condition
+        variable: is_continuous
+        operator: eq
+        value: true
+        true_next: check_position
+        false_next: check_frequency
+      check_latency:
+        type: condition
+        variable: detection_latency_hours
+        operator: lte
+        value: 24
+        true_next: level_1
+        false_next: check_latency_slow
+      check_predictive:
+        type: condition
+        variable: is_predictive
+        operator: eq
+        value: true
+        true_next: level_3
+        false_next: check_continuous
+      level_1:
+        type: return
+        value:
+          capacity_multiplier: 1.0-1.2x
+          pv_equivalent: Periodic safety reporting (PSUR/PBRER) — state snapshots at regulatory intervals
+          detection_capability: Periodic detection — signals found at scheduled review points
+          etcs_level: 1
+          railway_equivalent: ETCS L1 — Eurobalises provide movement authority at discrete track points
+          level_name: Spot Transmission
+      level_3:
+        type: return
+        value:
+          level_name: Moving Block
+          railway_equivalent: ETCS L3 — train reports position continuously, blocks shrink to braking distance
+          pv_equivalent: Predictive PV — ML models dynamically adjust thresholds, signals detected before reports accumulate
+          capacity_multiplier: 1.3-1.5x
+          etcs_level: 3
+          detection_capability: Predictive detection — signals anticipated from emerging patterns
+      check_latency_slow:
+        type: condition
+        variable: detection_latency_hours
+        operator: lte
+        value: 720
+        true_next: level_0
+        false_next: level_0
+      check_position:
+        type: condition
+        variable: has_position_reporting
+        operator: eq
+        value: true
+        true_next: level_3
+        false_next: level_2
+      check_moderate_frequency:
+        type: condition
+        variable: update_frequency_per_hour
+        operator: gte
+        value: 1
+        true_next: level_1
+        false_next: check_latency
+      check_frequency:
+        type: condition
+        variable: update_frequency_per_hour
+        operator: gte
+        value: 60
+        true_next: level_2
+        false_next: check_moderate_frequency
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: is_continuous
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: is_continuous
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_predictive:
+        type: bool
+        required: false
+      has_position_reporting:
+        type: bool
+        required: false
+      is_continuous:
+        type: bool
+        required: false
+      detection_latency_hours:
+        type: int
+        required: false
+      update_frequency_per_hour:
+        type: int
+        required: false
+    outputs:
+      railway_equivalent:
+        type: string
+        required: false
+      level_name:
+        type: string
+        required: false
+      etcs_level:
+        type: int
+        required: false
+      detection_capability:
+        type: string
+        required: false
+      pv_equivalent:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      capacity_multiplier:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    is_continuous: null
+    is_predictive: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    is_continuous: false
+    is_predictive: true
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

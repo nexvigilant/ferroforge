@@ -1,0 +1,337 @@
+name: session-behavior-classifier-helix
+description: 'Forged from microgram ''session-behavior-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    failure_expected: falsified
+sense:
+  tree:
+    start: route_activity
+    nodes:
+      hook_behavior:
+        type: return
+        value:
+          risk_level: medium
+          behavior_type: boundary_crossing
+          session_contribution: capability
+          failure_expected: true
+          primitive_profile: partial(arrow(varsigma))
+      microgram_behavior:
+        type: condition
+        variable: test_count
+        operator: gte
+        value: 10
+        true_next: tested_microgram
+        false_next: untested_microgram
+      commit_behavior:
+        type: condition
+        variable: changed_infrastructure
+        operator: eq
+        value: true
+        true_next: infra_commit
+        false_next: code_commit
+      infra_commit:
+        type: return
+        value:
+          risk_level: low
+          failure_expected: false
+          primitive_profile: proportional(pi(varsigma))
+          behavior_type: persistence
+          session_contribution: irreversible_progress
+      tested_microgram:
+        type: return
+        value:
+          primitive_profile: arrow(varsigma) [tested]
+          failure_expected: false
+          behavior_type: transformation
+          session_contribution: validated_capability
+          risk_level: low
+      check_visualize:
+        type: condition
+        variable: activity
+        operator: eq
+        value: visualize
+        true_next: viz_behavior
+        false_next: check_research
+      route_activity:
+        type: condition
+        variable: activity
+        operator: eq
+        value: audit
+        true_next: audit_behavior
+        false_next: check_commit
+      audit_behavior:
+        type: return
+        value:
+          primitive_profile: varsigma(partial(system))
+          failure_expected: false
+          behavior_type: measurement
+          risk_level: none
+          session_contribution: observation
+      test_behavior:
+        type: return
+        value:
+          behavior_type: comparison
+          risk_level: none
+          failure_expected: false
+          primitive_profile: kappa(varsigma_actual, varsigma_expected)
+          session_contribution: verification
+      chain_behavior:
+        type: return
+        value:
+          session_contribution: compound_capability
+          primitive_profile: rho(pi(chain(mcg_a, mcg_b)))
+          risk_level: medium
+          behavior_type: convergence
+          failure_expected: true
+      signal_behavior:
+        type: return
+        value:
+          risk_level: none
+          behavior_type: measurement
+          failure_expected: false
+          primitive_profile: varsigma(N(events)/N(exposure))
+          session_contribution: intelligence
+      check_diagnose:
+        type: condition
+        variable: activity
+        operator: eq
+        value: diagnose
+        true_next: diagnose_behavior
+        false_next: unknown_activity
+      viz_behavior:
+        type: return
+        value:
+          primitive_profile: sigma(varsigma) [visual encoding]
+          behavior_type: state_change
+          session_contribution: communication
+          risk_level: none
+          failure_expected: false
+      check_chain:
+        type: condition
+        variable: activity
+        operator: eq
+        value: chain
+        true_next: chain_behavior
+        false_next: check_diagnose
+      research_behavior:
+        type: return
+        value:
+          session_contribution: knowledge
+          behavior_type: accumulation
+          failure_expected: false
+          risk_level: none
+          primitive_profile: N(kappa(sources))
+      untested_microgram:
+        type: return
+        value:
+          failure_expected: true
+          risk_level: high
+          behavior_type: transformation
+          primitive_profile: arrow(varsigma) [untested]
+          session_contribution: speculative_capability
+      unknown_activity:
+        type: return
+        value:
+          risk_level: high
+          primitive_profile: emptyset
+          failure_expected: true
+          session_contribution: unknown
+          behavior_type: convergence
+      code_commit:
+        type: return
+        value:
+          risk_level: none
+          primitive_profile: pi(varsigma)
+          session_contribution: progress
+          failure_expected: false
+          behavior_type: persistence
+      check_commit:
+        type: condition
+        variable: activity
+        operator: eq
+        value: commit
+        true_next: commit_behavior
+        false_next: check_build_hook
+      check_build_mcg:
+        type: condition
+        variable: activity
+        operator: eq
+        value: build_microgram
+        true_next: microgram_behavior
+        false_next: check_test
+      check_research:
+        type: condition
+        variable: activity
+        operator: eq
+        value: research
+        true_next: research_behavior
+        false_next: check_chain
+      diagnose_behavior:
+        type: return
+        value:
+          behavior_type: boundary_crossing
+          risk_level: low
+          failure_expected: false
+          primitive_profile: partial(kappa(varsigma_observed, varsigma_expected))
+          session_contribution: root_cause
+      check_signal:
+        type: condition
+        variable: activity
+        operator: eq
+        value: signal_detect
+        true_next: signal_behavior
+        false_next: check_visualize
+      check_build_hook:
+        type: condition
+        variable: activity
+        operator: eq
+        value: build_hook
+        true_next: hook_behavior
+        false_next: check_build_mcg
+      check_test:
+        type: condition
+        variable: activity
+        operator: eq
+        value: test
+        true_next: test_behavior
+        false_next: check_signal
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: test_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: test_count
+        operator: neq
+        value: audit
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      failure_expected: true
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      failure_expected: true
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when:
+      failure_expected: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: absent
+      confidence_score: 0.7
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      changed_infrastructure:
+        type: bool
+        required: false
+      produced_artifact:
+        type: bool
+        required: false
+      test_count:
+        type: int
+        required: false
+      activity:
+        type: string
+        required: true
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      risk_level:
+        type: string
+        required: false
+      primitive_profile:
+        type: string
+        required: false
+      failure_expected:
+        type: bool
+        required: false
+      verdict:
+        type: string
+        required: false
+      behavior_type:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      session_contribution:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    test_count: null
+    activity: build_hook
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    test_count: __negated__
+    activity: build_hook
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

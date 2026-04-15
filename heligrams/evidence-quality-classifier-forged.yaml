@@ -1,0 +1,244 @@
+name: evidence-quality-classifier-helix
+description: 'Forged from microgram ''evidence-quality-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    achieved_target: falsified
+sense:
+  tree:
+    start: check_default
+    nodes:
+      check_warning:
+        type: condition
+        variable: state
+        operator: eq
+        value: warning
+        true_next: moderate
+        false_next: check_margin_strong
+      check_failure_stalled:
+        type: condition
+        variable: state
+        operator: eq
+        value: stalled
+        true_next: strong_failure
+        false_next: check_failure_gimbal
+      check_failure_fatigue:
+        type: condition
+        variable: state
+        operator: eq
+        value: fatigue_failure_imminent
+        true_next: strong_failure
+        false_next: check_weak_critical
+      check_failure_disintegrated:
+        type: condition
+        variable: state
+        operator: eq
+        value: disintegrated
+        true_next: strong_failure
+        false_next: check_failure_stalled
+      moderate:
+        type: return
+        value:
+          achieved_target: true
+          score: 0.66
+          quality: moderate
+      check_weak_nostability:
+        type: condition
+        variable: state
+        operator: eq
+        value: no_stability
+        true_next: weak
+        false_next: check_warning
+      check_margin_strong:
+        type: condition
+        variable: margin_ratio
+        operator: gte
+        value: 50
+        true_next: strong_healthy
+        false_next: check_margin_moderate
+      none:
+        type: return
+        value:
+          quality: none
+          score: 0
+          achieved_target: false
+      check_weak_low:
+        type: condition
+        variable: state
+        operator: eq
+        value: low
+        true_next: weak
+        false_next: check_weak_nostability
+      check_weak_critical:
+        type: condition
+        variable: state
+        operator: eq
+        value: critical
+        true_next: weak
+        false_next: check_weak_low
+      weak:
+        type: return
+        value:
+          score: 0.33
+          quality: weak
+          achieved_target: false
+      moderate_healthy:
+        type: return
+        value:
+          score: 0.66
+          achieved_target: true
+          quality: moderate
+      strong_failure:
+        type: return
+        value:
+          quality: strong
+          score: 1.0
+          achieved_target: false
+      check_failure_gimbal:
+        type: condition
+        variable: state
+        operator: eq
+        value: gimbal_lock
+        true_next: strong_failure
+        false_next: check_failure_fatigue
+      check_default:
+        type: condition
+        variable: state
+        operator: eq
+        value: default
+        true_next: none
+        false_next: check_failure_disintegrated
+      weak_healthy:
+        type: return
+        value:
+          score: 0.33
+          quality: weak
+          achieved_target: true
+      check_margin_moderate:
+        type: condition
+        variable: margin_ratio
+        operator: gte
+        value: 10
+        true_next: moderate_healthy
+        false_next: weak_healthy
+      strong_healthy:
+        type: return
+        value:
+          quality: strong
+          score: 1.0
+          achieved_target: true
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: state
+        operator: neq
+        value: default
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: state
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      achieved_target: true
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+      achieved_target: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      falsified: false
+      achieved_target: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      state:
+        type: string
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    state: null
+    margin_ratio: 30
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    state: __negated__
+    margin_ratio: 30
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

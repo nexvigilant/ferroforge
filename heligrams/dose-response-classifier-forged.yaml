@@ -1,0 +1,263 @@
+name: dose-response-classifier-helix
+description: 'Forged from microgram ''dose-response-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    pattern: falsified
+sense:
+  tree:
+    start: check_low_vs_mid
+    nodes:
+      flat_start_check_high:
+        type: condition
+        variable: high_dose_rate
+        operator: gt
+        value: '{{mid_dose_rate}}'
+        true_next: late_threshold
+        false_next: check_flat_high_eq
+      mid_gt_low_check_high:
+        type: condition
+        variable: high_dose_rate
+        operator: gt
+        value: '{{mid_dose_rate}}'
+        true_next: monotonic_increase
+        false_next: check_high_eq_mid
+      check_flat_high_eq:
+        type: condition
+        variable: high_dose_rate
+        operator: eq
+        value: '{{mid_dose_rate}}'
+        true_next: flat_response
+        false_next: late_inverse
+      check_low_vs_mid:
+        type: condition
+        variable: mid_dose_rate
+        operator: gt
+        value: '{{low_dose_rate}}'
+        true_next: mid_gt_low_check_high
+        false_next: check_mid_eq_low
+      check_high_eq_mid:
+        type: condition
+        variable: high_dose_rate
+        operator: eq
+        value: '{{mid_dose_rate}}'
+        true_next: threshold_effect
+        false_next: bell_curve
+      inverse_plateau:
+        type: return
+        value:
+          pattern: INVERSE
+          interpretation: Inverse dose-response with plateau. Rate decreases then stabilizes. May indicate adaptation or hormesis.
+          dose_response_met: no
+          confidence: MEDIUM
+      full_inverse:
+        type: return
+        value:
+          interpretation: Monotonic decrease in adverse event rate with dose. Contradicts expected causality. Consider protective mechanism or reporting bias.
+          dose_response_met: no
+          confidence: MEDIUM
+          pattern: INVERSE
+      check_mid_eq_low:
+        type: condition
+        variable: mid_dose_rate
+        operator: eq
+        value: '{{low_dose_rate}}'
+        true_next: flat_start_check_high
+        false_next: mid_lt_low_check_high
+      check_inverse_flat:
+        type: condition
+        variable: high_dose_rate
+        operator: eq
+        value: '{{mid_dose_rate}}'
+        true_next: inverse_plateau
+        false_next: full_inverse
+      monotonic_increase:
+        type: return
+        value:
+          pattern: MONOTONIC_INCREASE
+          confidence: HIGH
+          dose_response_met: yes
+          interpretation: Clear dose-response gradient — adverse event rate increases with each dose level. Strongest support for Bradford Hill dose-response criterion.
+      irregular_partial:
+        type: return
+        value:
+          dose_response_met: no
+          interpretation: Non-monotonic response. Rate decreases then partially recovers. Data quality or confounding likely.
+          pattern: IRREGULAR
+          confidence: LOW
+      late_threshold:
+        type: return
+        value:
+          confidence: LOW
+          dose_response_met: yes
+          pattern: THRESHOLD_EFFECT
+          interpretation: No effect at low-to-mid dose, then increase at high dose. Threshold effect — dose-response criterion weakly supported.
+      threshold_effect:
+        type: return
+        value:
+          pattern: THRESHOLD_EFFECT
+          confidence: MEDIUM
+          interpretation: Dose-response plateaus at mid dose. Suggests saturation — receptor occupancy or metabolic capacity reached.
+          dose_response_met: yes
+      mid_lt_low_check_high:
+        type: condition
+        variable: high_dose_rate
+        operator: gt
+        value: '{{mid_dose_rate}}'
+        true_next: check_high_vs_low_irregular
+        false_next: check_inverse_flat
+      flat_response:
+        type: return
+        value:
+          pattern: FLAT
+          interpretation: No dose-response relationship. Equal rates across all dose levels suggests the event is unrelated to dose.
+          confidence: HIGH
+          dose_response_met: no
+      check_high_vs_low_irregular:
+        type: condition
+        variable: high_dose_rate
+        operator: gt
+        value: '{{low_dose_rate}}'
+        true_next: irregular_u_shape
+        false_next: irregular_partial
+      late_inverse:
+        type: return
+        value:
+          dose_response_met: no
+          interpretation: Flat at low-mid then decreasing at high dose. May indicate protective effect or data quality issues.
+          confidence: LOW
+          pattern: IRREGULAR
+      irregular_u_shape:
+        type: return
+        value:
+          interpretation: U-shaped response — rate dips at mid dose then exceeds low dose at high dose. May indicate two competing mechanisms.
+          pattern: IRREGULAR
+          dose_response_met: no
+          confidence: LOW
+      bell_curve:
+        type: return
+        value:
+          dose_response_met: no
+          pattern: BELL_CURVE
+          interpretation: Rate peaks at mid dose then decreases. May indicate competing mechanisms, tolerance, or survivor bias at high dose.
+          confidence: MEDIUM
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: high_dose_rate
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: high_dose_rate
+        operator: lte
+        value: '{{low_dose_rate}}'
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      high_dose_rate:
+        type: float
+        required: true
+      low_dose_rate:
+        type: float
+        required: true
+      mid_dose_rate:
+        type: float
+        required: true
+    outputs:
+      verdict:
+        type: string
+        required: false
+      dose_response_met:
+        type: string
+        required: false
+      interpretation:
+        type: string
+        required: false
+      pattern:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    high_dose_rate: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - low_dose_rate
+  - mid_dose_rate
+  - high_dose_rate
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

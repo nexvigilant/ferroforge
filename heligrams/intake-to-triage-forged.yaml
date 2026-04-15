@@ -1,0 +1,218 @@
+name: intake-to-triage-helix
+description: 'Forged from microgram ''intake-to-triage''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    route: falsified
+sense:
+  tree:
+    start: check_valid
+    nodes:
+      merge:
+        type: return
+        value:
+          route: MERGE
+          action: merge_with_primary
+          next_mg: duplicate-gate
+          priority: STANDARD
+      manual_dedup:
+        type: return
+        value:
+          next_mg: duplicate-gate
+          action: reviewer_dedup_check
+          route: MANUAL_DEDUP
+          priority: STANDARD
+      triage_expedited:
+        type: return
+        value:
+          next_mg: case-seriousness
+          route: TRIAGE_EXPEDITED
+          priority: CRITICAL
+          action: case-seriousness
+      check_duplicate_probable:
+        type: condition
+        variable: duplicate_status
+        operator: eq
+        value: PROBABLE
+        true_next: manual_dedup
+        false_next: check_serious_complete
+      followup_first:
+        type: return
+        value:
+          route: FOLLOWUP_FIRST
+          action: collect_data
+          next_mg: followup-prioritizer
+          priority: LOW
+      check_completeness_standard:
+        type: condition
+        variable: completeness_pct
+        operator: gte
+        value: 60
+        true_next: triage_standard
+        false_next: followup_first
+      triage_standard:
+        type: return
+        value:
+          next_mg: case-seriousness
+          action: case-seriousness
+          route: TRIAGE_STANDARD
+          priority: STANDARD
+      check_duplicate_confirmed:
+        type: condition
+        variable: duplicate_status
+        operator: eq
+        value: CONFIRMED
+        true_next: merge
+        false_next: check_duplicate_probable
+      check_valid:
+        type: condition
+        variable: valid
+        operator: eq
+        value: true
+        true_next: check_duplicate_confirmed
+        false_next: return_to_intake
+      check_completeness_expedited:
+        type: condition
+        variable: completeness_pct
+        operator: gte
+        value: 80
+        true_next: triage_expedited
+        false_next: check_completeness_standard
+      check_serious_complete:
+        type: condition
+        variable: serious_suspected
+        operator: eq
+        value: true
+        true_next: check_completeness_expedited
+        false_next: check_completeness_standard
+      return_to_intake:
+        type: return
+        value:
+          action: request_missing_fields
+          route: RETURN_TO_INTAKE
+          priority: HIGH
+          next_mg: case-validity
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: duplicate_status
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: duplicate_status
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      completeness_pct:
+        type: int
+        required: false
+      serious_suspected:
+        type: bool
+        required: false
+      valid:
+        type: bool
+        required: false
+      duplicate_status:
+        type: string
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      priority:
+        type: string
+        required: false
+      next_mg:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      route:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    duplicate_status: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    duplicate_status: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

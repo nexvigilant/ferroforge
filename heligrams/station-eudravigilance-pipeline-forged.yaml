@@ -1,0 +1,162 @@
+name: station-eudravigilance-pipeline-helix
+description: 'Forged from microgram ''station-eudravigilance-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    route: falsified
+sense:
+  tree:
+    start: check_case_count
+    nodes:
+      multi_region:
+        type: return
+        value:
+          route: signal_investigation
+          priority: high
+          reason: Reports across 3+ EU regions — geographically distributed signal
+          action: investigate
+      low_volume:
+        type: return
+        value:
+          reason: Fewer than 50 EV cases — insufficient for disproportionality analysis
+          action: monitor
+          priority: low
+          route: periodic_review
+      check_fatal_pct:
+        type: condition
+        variable: fatal_percentage
+        operator: gte
+        value: 5
+        true_next: high_fatality
+        false_next: check_geographic
+      high_fatality:
+        type: return
+        value:
+          reason: Fatal outcome ≥5% in EudraVigilance — immediate signal investigation
+          route: signal_detection
+          action: escalate
+          priority: critical
+      single_region:
+        type: return
+        value:
+          route: signal_validation
+          action: validate
+          reason: Reports concentrated in 1-2 regions — may be reporting artifact
+          priority: moderate
+      check_case_count:
+        type: condition
+        variable: case_count
+        operator: gte
+        value: 50
+        true_next: check_fatal_pct
+        false_next: low_volume
+      check_geographic:
+        type: condition
+        variable: region_count
+        operator: gte
+        value: 3
+        true_next: multi_region
+        false_next: single_region
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: fatal_percentage
+        operator: lt
+        value: 50
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: fatal_percentage
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      fatal_percentage:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    fatal_percentage: 60
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    fatal_percentage: 49
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

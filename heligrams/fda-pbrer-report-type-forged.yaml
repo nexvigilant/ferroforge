@@ -1,0 +1,242 @@
+name: fda-pbrer-report-type-helix
+description: 'Forged from microgram ''fda-pbrer-report-type''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    frequency: falsified
+sense:
+  tree:
+    start: check_stage
+    nodes:
+      check_ibd_years_initial:
+        type: condition
+        variable: international_birth_date_years
+        operator: lte
+        value: 2
+        true_next: pbrer_6month
+        false_next: pbrer_annual
+      pbrer_6month:
+        type: return
+        value:
+          frequency: Every 6 months (first 2 years post-IBD)
+          content_requirements: Interval and cumulative safety data, signal evaluation, benefit-risk analysis, summary of safety concerns
+          regulatory_reference: 'FDA Guidance: Providing Postmarket Periodic Safety Reports in ICH E2C(R2) Format (2016), Section III'
+          report_type: PBRER
+          report_format: ICH E2C(R2) Periodic Benefit-Risk Evaluation Report
+      check_preapproval:
+        type: condition
+        variable: lifecycle_stage
+        operator: eq
+        value: preapproval_nda
+        true_next: dsur_required
+        false_next: check_postapproval_initial
+      check_postapproval_initial:
+        type: condition
+        variable: lifecycle_stage
+        operator: eq
+        value: postapproval_initial
+        true_next: check_ibd_years_initial
+        false_next: check_postapproval_mature
+      check_postapproval_mature:
+        type: condition
+        variable: lifecycle_stage
+        operator: eq
+        value: postapproval_mature
+        true_next: check_rems_mature
+        false_next: check_generic
+      pbrer_annual:
+        type: return
+        value:
+          report_format: ICH E2C(R2) Periodic Benefit-Risk Evaluation Report
+          content_requirements: Interval and cumulative safety data, signal evaluation, benefit-risk analysis, summary of safety concerns
+          regulatory_reference: 'FDA Guidance: Providing Postmarket Periodic Safety Reports in ICH E2C(R2) Format (2016), Section III'
+          frequency: Annually (years 3-5 post-IBD)
+          report_type: PBRER
+      check_rems_mature:
+        type: condition
+        variable: has_rems
+        operator: eq
+        value: true
+        true_next: pbrer_with_rems
+        false_next: pbrer_triennial
+      generic_reporting:
+        type: return
+        value:
+          report_format: ANDA Annual Report
+          report_type: ANDA_ANNUAL
+          regulatory_reference: 21 CFR 314.98(a); 21 CFR 314.81(b)(2)
+          frequency: Annually
+          content_requirements: Adverse event field reports received; no PBRER required unless FDA requests
+      pbrer_triennial:
+        type: return
+        value:
+          frequency: Every 3 years (beyond 5 years post-IBD)
+          regulatory_reference: 'FDA Guidance: Providing Postmarket Periodic Safety Reports in ICH E2C(R2) Format (2016), Section III'
+          report_format: ICH E2C(R2) Periodic Benefit-Risk Evaluation Report
+          content_requirements: Interval and cumulative safety data, signal evaluation, benefit-risk analysis
+          report_type: PBRER
+      check_stage:
+        type: condition
+        variable: lifecycle_stage
+        operator: eq
+        value: premarket_ind
+        true_next: dsur_required
+        false_next: check_preapproval
+      default_pbrer:
+        type: return
+        value:
+          report_type: PBRER
+          report_format: ICH E2C(R2) Periodic Benefit-Risk Evaluation Report
+          frequency: Per applicable schedule
+          content_requirements: Standard PBRER content per E2C(R2)
+          regulatory_reference: 'FDA Guidance: Providing Postmarket Periodic Safety Reports in ICH E2C(R2) Format (2016)'
+      check_generic:
+        type: condition
+        variable: lifecycle_stage
+        operator: eq
+        value: generic_anda
+        true_next: generic_reporting
+        false_next: default_pbrer
+      dsur_required:
+        type: return
+        value:
+          report_format: ICH E2F Development Safety Update Report
+          frequency: Annually from DIBD (Development International Birth Date)
+          regulatory_reference: 'ICH E2F; 21 CFR 312.33; FDA Guidance: E2F Development Safety Update Report (2011)'
+          report_type: DSUR
+          content_requirements: Cumulative safety data, line listings of SAEs, changes to Reference Safety Information, benefit-risk evaluation for ongoing trials
+      pbrer_with_rems:
+        type: return
+        value:
+          content_requirements: 'PBRER content plus REMS assessment: goal achievement, compliance metrics, outcome data, proposed modifications'
+          report_format: ICH E2C(R2) + REMS Assessment Report
+          frequency: Per REMS assessment schedule (typically annually or as specified)
+          regulatory_reference: 'FDA Guidance: E2C(R2) (2016); REMS Modifications and Revisions (2019)'
+          report_type: PBRER + REMS_ASSESSMENT
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: international_birth_date_years
+        operator: neq
+        value: premarket_ind
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: international_birth_date_years
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_rems:
+        type: bool
+        required: false
+      lifecycle_stage:
+        type: string
+        required: true
+      international_birth_date_years:
+        type: int
+        required: false
+    outputs:
+      report_format:
+        type: string
+        required: false
+      frequency:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      content_requirements:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      report_type:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    international_birth_date_years: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    international_birth_date_years: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - lifecycle_stage
+  - international_birth_date_years
+  - has_rems
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

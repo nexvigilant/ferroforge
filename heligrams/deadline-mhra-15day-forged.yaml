@@ -1,0 +1,188 @@
+name: deadline-mhra-15day-helix
+description: 'Forged from microgram ''deadline-mhra-15day''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regulatory_compliant: falsified
+sense:
+  tree:
+    start: validate_event
+    nodes:
+      validate_event:
+        type: condition
+        variable: event_date
+        operator: is_not_null
+        value: null
+        true_next: check_seriousness
+        false_next: deadline_unknown
+      deadline_unknown:
+        type: return
+        value:
+          reporting_deadline_days: null
+          regulatory_compliant: false
+          regulatory_requirement: null
+          urgent_submission: null
+          event_category: null
+      check_unexpectedness:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: serious_unexpected_deadline
+        false_next: serious_expected_deadline
+      routine_deadline:
+        type: return
+        value:
+          regulatory_requirement: MHRA_Yellow_Card
+          reporting_deadline_days: 30
+          urgent_submission: false
+          regulatory_compliant: true
+          event_category: non_serious
+      check_seriousness:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_unexpectedness
+        false_next: routine_deadline
+      serious_unexpected_deadline:
+        type: return
+        value:
+          event_category: serious_unexpected_adverse_reaction
+          urgent_submission: true
+          regulatory_compliant: true
+          regulatory_requirement: MHRA_Yellow_Card
+          reporting_deadline_days: 15
+      serious_expected_deadline:
+        type: return
+        value:
+          reporting_deadline_days: 30
+          event_category: serious_expected_adverse_reaction
+          regulatory_compliant: true
+          urgent_submission: false
+          regulatory_requirement: MHRA_Yellow_Card
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: event_date
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: event_date
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      regulatory_compliant: true
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+      regulatory_compliant: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      regulatory_compliant: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when:
+      falsified: true
+      regulatory_compliant: false
+    default: null
+    emit:
+      verdict: refuted
+      confidence: medium
+      confidence_score: 0.42
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      event_date:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    is_serious: true
+    event_date: null
+    is_unexpected: true
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    event_date: 2024-01-15
+    is_serious: true
+    is_unexpected: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

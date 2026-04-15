@@ -1,0 +1,227 @@
+name: drug-safety-profile-helix
+description: 'Forged from microgram ''drug-safety-profile''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    monitoring_level: falsified
+sense:
+  tree:
+    start: check_fatal
+    nodes:
+      low_risk:
+        type: return
+        value:
+          monitoring_level: routine
+          risk_tier: low_risk
+          regulatory_status_summary: Signals detected but within expected safety profile. Routine pharmacovigilance monitoring
+      check_rems:
+        type: condition
+        variable: has_rems
+        operator: eq
+        value: true
+        true_next: elevated_risk_rems
+        false_next: check_serious_high
+      check_boxed_warning_fatal:
+        type: condition
+        variable: has_boxed_warning
+        operator: eq
+        value: true
+        true_next: high_risk
+        false_next: check_rems
+      baseline_risk:
+        type: return
+        value:
+          monitoring_level: routine
+          risk_tier: baseline
+          regulatory_status_summary: No safety signals detected. Standard post-marketing surveillance
+      elevated_risk_serious:
+        type: return
+        value:
+          monitoring_level: enhanced
+          risk_tier: elevated_risk
+          regulatory_status_summary: Majority of reports are serious. Enhanced monitoring and benefit-risk reassessment recommended
+      check_signal_count_high:
+        type: condition
+        variable: signal_count
+        operator: gt
+        value: 5
+        true_next: check_serious_moderate
+        false_next: check_any_signals
+      check_serious_moderate:
+        type: condition
+        variable: serious_proportion
+        operator: gt
+        value: 0.3
+        true_next: moderate_risk
+        false_next: check_any_signals
+      check_fatal:
+        type: condition
+        variable: fatal_count
+        operator: gt
+        value: 0
+        true_next: check_boxed_warning_fatal
+        false_next: check_rems
+      check_any_signals:
+        type: condition
+        variable: signal_count
+        operator: gt
+        value: 0
+        true_next: low_risk
+        false_next: baseline_risk
+      elevated_risk_rems:
+        type: return
+        value:
+          risk_tier: elevated_risk
+          monitoring_level: enhanced
+          regulatory_status_summary: REMS program active. Enhanced monitoring with restricted distribution or use requirements
+      high_risk:
+        type: return
+        value:
+          regulatory_status_summary: Fatal cases with boxed warning. Intensive monitoring and potential market action required
+          monitoring_level: intensive
+          risk_tier: high_risk
+      check_serious_high:
+        type: condition
+        variable: serious_proportion
+        operator: gt
+        value: 0.5
+        true_next: elevated_risk_serious
+        false_next: check_signal_count_high
+      moderate_risk:
+        type: return
+        value:
+          monitoring_level: active
+          regulatory_status_summary: Multiple signals with notable serious proportion. Active surveillance and periodic safety review
+          risk_tier: moderate_risk
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: has_rems
+        operator: lte
+        value: 0
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: has_rems
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_boxed_warning:
+        type: bool
+        required: false
+      signal_count:
+        type: int
+        required: false
+      serious_proportion:
+        type: float
+        required: false
+      fatal_count:
+        type: int
+        required: false
+      has_rems:
+        type: bool
+        required: false
+    outputs:
+      monitoring_level:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      risk_tier:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      regulatory_status_summary:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    fatal_count: 0
+    serious_proportion: 0.31
+    signal_count: 6
+    has_rems: 10
+    has_boxed_warning: false
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    fatal_count: 0
+    serious_proportion: 0.31
+    signal_count: 6
+    has_rems: 0
+    has_boxed_warning: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,218 @@
+name: seriousness-to-deadline-helix
+description: 'Forged from microgram ''seriousness-to-deadline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    report_category: falsified
+sense:
+  tree:
+    start: check_fatal
+    nodes:
+      fifteen_day_expedited:
+        type: return
+        value:
+          report_category: expedited
+          regulatory_basis: ICH E2B - serious unexpected reaction requires 15-day expedited report
+          deadline_days: 15
+          deadline_type: 15_DAY_EXPEDITED
+      periodic_standard:
+        type: return
+        value:
+          deadline_days: 180
+          regulatory_basis: ICH E2B - non-serious reaction included in standard periodic reporting
+          report_category: periodic
+          deadline_type: PERIODIC_STANDARD
+      periodic_psur:
+        type: return
+        value:
+          deadline_type: PERIODIC_PSUR
+          report_category: periodic
+          regulatory_basis: ICH E2B - serious expected reaction included in PSUR/PBRER cycle
+          deadline_days: 90
+      check_serious_expected_fatal:
+        type: return
+        value:
+          deadline_type: PERIODIC_PSUR
+          regulatory_basis: ICH E2B - fatal but expected reaction included in periodic safety update
+          deadline_days: 90
+          report_category: periodic
+      seven_day_expedited:
+        type: return
+        value:
+          deadline_type: 7_DAY_EXPEDITED
+          report_category: expedited
+          regulatory_basis: ICH E2B - fatal/life-threatening unexpected reaction requires 7-day expedited report
+          deadline_days: 7
+      check_lt_unexpected:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: seven_day_expedited
+        false_next: check_serious_expected_lt
+      check_serious:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_serious_unexpected
+        false_next: periodic_standard
+      check_serious_unexpected:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: fifteen_day_expedited
+        false_next: periodic_psur
+      check_fatal_unexpected:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: seven_day_expedited
+        false_next: check_serious_expected_fatal
+      check_serious_expected_lt:
+        type: return
+        value:
+          report_category: periodic
+          regulatory_basis: ICH E2B - life-threatening but expected reaction included in periodic safety update
+          deadline_days: 90
+          deadline_type: PERIODIC_PSUR
+      check_fatal:
+        type: condition
+        variable: is_fatal
+        operator: eq
+        value: true
+        true_next: check_fatal_unexpected
+        false_next: check_life_threatening
+      check_life_threatening:
+        type: condition
+        variable: is_life_threatening
+        operator: eq
+        value: true
+        true_next: check_lt_unexpected
+        false_next: check_serious
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: is_unexpected
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: is_unexpected
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_serious:
+        type: bool
+        required: false
+      is_fatal:
+        type: bool
+        required: false
+      is_life_threatening:
+        type: bool
+        required: false
+      is_unexpected:
+        type: bool
+        required: false
+    outputs:
+      deadline_days:
+        type: int
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      regulatory_basis:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      deadline_type:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      report_category:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    is_unexpected: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    is_unexpected: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

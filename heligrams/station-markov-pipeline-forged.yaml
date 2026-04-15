@@ -1,0 +1,148 @@
+name: station-markov-pipeline-helix
+description: 'Forged from microgram ''station-markov-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    reason: falsified
+sense:
+  tree:
+    start: check_stationary
+    nodes:
+      check_stationary:
+        type: condition
+        variable: is_stationary
+        operator: eq
+        value: true
+        true_next: check_absorbing
+        false_next: non_stationary
+      check_absorbing:
+        type: condition
+        variable: has_absorbing_state
+        operator: eq
+        value: true
+        true_next: absorbing
+        false_next: ergodic
+      absorbing:
+        type: return
+        value:
+          reason: Absorbing states present — compute absorption probabilities and expected times
+          action: analyze
+          route: absorption_analysis
+          priority: moderate
+      non_stationary:
+        type: return
+        value:
+          reason: Non-stationary Markov chain — transition probabilities shifting over time
+          action: flag
+          priority: high
+          route: drift_monitoring
+      ergodic:
+        type: return
+        value:
+          reason: Ergodic chain — compute steady-state distribution
+          route: steady_state
+          priority: low
+          action: compute
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: is_stationary
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: is_stationary
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_stationary:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    is_stationary: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    is_stationary: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,263 @@
+name: e2a-reporting-timeline-helix
+description: 'Forged from microgram ''e2a-reporting-timeline''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    expedited_required: falsified
+sense:
+  tree:
+    start: check_serious
+    nodes:
+      check_fatal_or_lt:
+        type: condition
+        variable: is_fatal
+        operator: eq
+        value: true
+        true_next: seven_day
+        false_next: check_life_threatening
+      check_serious:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_unexpected
+        false_next: not_expedited
+      check_unexpected:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: check_fatal_or_lt
+        false_next: serious_expected
+      check_life_threatening:
+        type: condition
+        variable: is_life_threatening
+        operator: eq
+        value: true
+        true_next: seven_day
+        false_next: fifteen_day
+      serious_expected:
+        type: return
+        value:
+          expedited_required: false
+          timeline_category: PERIODIC
+          deadline_days: 90
+          report_type: PERIODIC_SAFETY_UPDATE
+          regulatory_reference: ICH E2A Section III.B.3 - Serious expected reactions reported in periodic updates
+      seven_day:
+        type: return
+        value:
+          timeline_category: 7_DAY_EXPEDITED
+          expedited_required: true
+          report_type: EXPEDITED_SAFETY_REPORT
+          deadline_days: 7
+          regulatory_reference: ICH E2A Section III.B.1 - Fatal or life-threatening unexpected SUSAR requires 7-day initial report
+      fifteen_day:
+        type: return
+        value:
+          regulatory_reference: ICH E2A Section III.B.2 - Serious unexpected non-fatal/non-life-threatening requires 15-day expedited report
+          expedited_required: true
+          timeline_category: 15_DAY_EXPEDITED
+          deadline_days: 15
+          report_type: EXPEDITED_SAFETY_REPORT
+      not_expedited:
+        type: return
+        value:
+          deadline_days: 90
+          expedited_required: false
+          timeline_category: PERIODIC
+          regulatory_reference: ICH E2A Section III.B.3 - Non-serious reactions reported in periodic updates
+          report_type: PERIODIC_SAFETY_UPDATE
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      expedited_required: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      expedited_required: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when:
+      expedited_required: false
+      falsified: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_fatal:
+        type: bool
+        required: false
+      is_unexpected:
+        type: bool
+        required: false
+      is_life_threatening:
+        type: bool
+        required: false
+      study_phase:
+        type: string
+        required: false
+      follow_up_complete:
+        type: bool
+        required: false
+      is_serious:
+        type: bool
+        required: false
+      comorbidity_explains:
+        type: bool
+        required: false
+      coding_verified:
+        type: bool
+        required: false
+    outputs:
+      report_type:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      deadline_days:
+        type: int
+        required: false
+      expedited_required:
+        type: bool
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      timeline_category:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    follow_up_complete: true
+    comorbidity_explains: false
+    study_phase: phase_3
+    is_fatal: true
+    is_serious: true
+    is_life_threatening: false
+    is_unexpected: true
+    coding_verified: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    is_serious: true
+    follow_up_complete: false
+    study_phase: phase_3
+    is_fatal: true
+    is_life_threatening: false
+    is_unexpected: true
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - is_serious
+  - is_unexpected
+  - is_fatal
+  - is_life_threatening
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

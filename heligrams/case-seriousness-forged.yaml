@@ -1,0 +1,331 @@
+name: case-seriousness-helix
+description: 'Forged from microgram ''case-seriousness''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    is_serious: falsified
+sense:
+  tree:
+    start: death_check
+    nodes:
+      death_check:
+        type: condition
+        variable: death
+        operator: eq
+        value: true
+        true_next: serious_death
+        false_next: hosp_check
+      serious_hosp:
+        type: return
+        value:
+          criterion: HOSPITALIZATION
+          regulatory_reference: ICH E2A Section II.B
+          is_fatal: false
+          is_serious: true
+          reportable: true
+          is_life_threatening: false
+          expedited: true
+          seriousness: SERIOUS
+      hosp_check:
+        type: condition
+        variable: hospitalization
+        operator: eq
+        value: true
+        true_next: serious_hosp
+        false_next: disability_check
+      medically_important_check:
+        type: condition
+        variable: medically_important
+        operator: eq
+        value: true
+        true_next: serious_medically_important
+        false_next: not_serious
+      life_threatening_check:
+        type: condition
+        variable: life_threatening
+        operator: eq
+        value: true
+        true_next: serious_life_threatening
+        false_next: congenital_anomaly_check
+      congenital_anomaly_check:
+        type: condition
+        variable: congenital_anomaly
+        operator: eq
+        value: true
+        true_next: serious_congenital
+        false_next: medically_important_check
+      serious_disability:
+        type: return
+        value:
+          seriousness: SERIOUS
+          is_serious: true
+          is_fatal: false
+          is_life_threatening: false
+          criterion: DISABILITY
+          reportable: true
+          regulatory_reference: ICH E2A Section II.B
+          expedited: true
+      serious_life_threatening:
+        type: return
+        value:
+          reportable: true
+          regulatory_reference: ICH E2A Section II.B
+          expedited: true
+          criterion: LIFE_THREATENING
+          is_fatal: false
+          is_serious: true
+          is_life_threatening: true
+          seriousness: SERIOUS
+      serious_medically_important:
+        type: return
+        value:
+          seriousness: SERIOUS
+          reportable: true
+          regulatory_reference: ICH E2A Section II.A.4
+          expedited: true
+          criterion: MEDICALLY_IMPORTANT
+          is_fatal: false
+          is_serious: true
+          is_life_threatening: false
+      serious_congenital:
+        type: return
+        value:
+          seriousness: SERIOUS
+          reportable: true
+          is_serious: true
+          criterion: CONGENITAL_ANOMALY
+          expedited: true
+          regulatory_reference: ICH E2A Section II.B
+          is_fatal: false
+          is_life_threatening: false
+      disability_check:
+        type: condition
+        variable: disability
+        operator: eq
+        value: true
+        true_next: serious_disability
+        false_next: life_threatening_check
+      not_serious:
+        type: return
+        value:
+          is_fatal: false
+          expedited: false
+          reportable: false
+          is_life_threatening: false
+          seriousness: NON-SERIOUS
+          regulatory_reference: ICH E2A Section II.B
+          is_serious: false
+      serious_death:
+        type: return
+        value:
+          seriousness: SERIOUS
+          regulatory_reference: ICH E2A Section II.B
+          expedited: true
+          reportable: true
+          is_fatal: true
+          is_life_threatening: false
+          is_serious: true
+          criterion: DEATH
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      is_serious: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+      is_serious: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when:
+      is_serious: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      congenital_anomaly:
+        type: bool
+        required: false
+      follow_up_complete:
+        type: bool
+        required: false
+      medically_important:
+        type: bool
+        required: false
+      comorbidity_explains:
+        type: bool
+        required: false
+      disability:
+        type: bool
+        required: false
+      life_threatening:
+        type: bool
+        required: false
+      coding_verified:
+        type: bool
+        required: false
+      death:
+        type: bool
+        required: false
+      hospitalization:
+        type: bool
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      expedited:
+        type: bool
+        required: false
+      is_life_threatening:
+        type: bool
+        required: false
+      is_serious:
+        type: bool
+        required: false
+      reportable:
+        type: bool
+        required: false
+      criterion:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      seriousness:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      is_fatal:
+        type: bool
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    congenital_anomaly: false
+    follow_up_complete: true
+    hospitalization: false
+    medically_important: false
+    comorbidity_explains: false
+    coding_verified: true
+    disability: false
+    death: true
+    life_threatening: false
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    medically_important: false
+    congenital_anomaly: false
+    follow_up_complete: false
+    disability: false
+    death: true
+    hospitalization: false
+    life_threatening: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,297 @@
+name: fda-drug-interaction-study-helix
+description: 'Forged from microgram ''fda-drug-interaction-study''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    study_requirement: falsified
+sense:
+  tree:
+    start: check_mechanism
+    nodes:
+      weak_inducer:
+        type: return
+        value:
+          study_requirement: IN_VITRO_SUFFICIENT
+          clinical_recommendation: Weak or no induction — no dose adjustment expected
+          labeling_section: Clinical Pharmacology
+          regulatory_reference: ICH M12 (2024), Section 4.2
+      cyp_ind_moderate_check:
+        type: condition
+        variable: auc_fold_change
+        operator: lte
+        value: 0.5
+        true_next: moderate_inducer
+        false_next: weak_inducer
+      check_transporter:
+        type: condition
+        variable: mechanism
+        operator: eq
+        value: transporter
+        true_next: transporter_magnitude
+        false_next: check_ph
+      cyp_inh_weak_check:
+        type: condition
+        variable: auc_fold_change
+        operator: gte
+        value: 1.25
+        true_next: weak_inhibitor
+        false_next: no_inhibition
+      check_mechanism:
+        type: condition
+        variable: mechanism
+        operator: eq
+        value: cyp_inhibition
+        true_next: cyp_inhibition_magnitude
+        false_next: check_induction
+      moderate_inducer:
+        type: return
+        value:
+          clinical_recommendation: Moderate induction (AUC decrease 50-80%) — dose increase may be needed for CYP substrates
+          labeling_section: Drug Interactions
+          study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+          regulatory_reference: ICH M12 (2024), Section 4.2
+      transporter_magnitude:
+        type: condition
+        variable: auc_fold_change
+        operator: gte
+        value: 2.0
+        true_next: transporter_significant
+        false_next: transporter_minor
+      cyp_inh_moderate_check:
+        type: condition
+        variable: auc_fold_change
+        operator: gte
+        value: 2.0
+        true_next: moderate_inhibitor
+        false_next: cyp_inh_weak_check
+      protein_binding_path:
+        type: return
+        value:
+          labeling_section: Clinical Pharmacology
+          study_requirement: NO_FURTHER_STUDY
+          clinical_recommendation: Protein binding displacement alone rarely clinically significant
+          regulatory_reference: ICH M12 (2024), Section 6
+      transporter_significant:
+        type: return
+        value:
+          labeling_section: Drug Interactions
+          study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+          clinical_recommendation: Clinically significant transporter interaction — evaluate dose adjustment for transporter substrates
+          regulatory_reference: ICH M12 (2024), Section 5
+      strong_standard:
+        type: return
+        value:
+          labeling_section: Drug Interactions + Dosage and Administration
+          regulatory_reference: ICH M12 (2024), Section 4.1; FDA DDI Guidance
+          study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+          clinical_recommendation: Strong inhibition (AUC >= 5-fold) — dose adjustment or avoidance with sensitive CYP substrates
+      strong_inhibitor:
+        type: condition
+        variable: victim_narrow_ti
+        operator: eq
+        value: true
+        true_next: strong_narrow_ti
+        false_next: strong_standard
+      transporter_minor:
+        type: return
+        value:
+          study_requirement: IN_VITRO_SUFFICIENT
+          labeling_section: Clinical Pharmacology
+          regulatory_reference: ICH M12 (2024), Section 5
+          clinical_recommendation: Minor transporter interaction — note in Clinical Pharmacology
+      strong_narrow_ti:
+        type: return
+        value:
+          labeling_section: Contraindications + Drug Interactions + Dosage
+          study_requirement: CONTRAINDICATION_OR_DOSE_ADJUSTMENT
+          clinical_recommendation: Contraindicate concomitant use with narrow TI CYP substrates or require significant dose reduction with TDM
+          regulatory_reference: ICH M12 (2024), Section 4.1; FDA DDI Guidance
+      check_ph:
+        type: condition
+        variable: mechanism
+        operator: eq
+        value: ph_dependent
+        true_next: ph_study
+        false_next: protein_binding_path
+      cyp_induction_magnitude:
+        type: condition
+        variable: auc_fold_change
+        operator: lte
+        value: 0.2
+        true_next: strong_inducer
+        false_next: cyp_ind_moderate_check
+      moderate_inhibitor:
+        type: return
+        value:
+          labeling_section: Drug Interactions
+          regulatory_reference: ICH M12 (2024), Section 4.1
+          study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+          clinical_recommendation: Moderate inhibition (AUC 2-5 fold) — caution with CYP substrates; dose adjustment may be needed
+      cyp_inhibition_magnitude:
+        type: condition
+        variable: auc_fold_change
+        operator: gte
+        value: 5.0
+        true_next: strong_inhibitor
+        false_next: cyp_inh_moderate_check
+      check_induction:
+        type: condition
+        variable: mechanism
+        operator: eq
+        value: cyp_induction
+        true_next: cyp_induction_magnitude
+        false_next: check_transporter
+      strong_inducer:
+        type: return
+        value:
+          labeling_section: Drug Interactions + Warnings
+          regulatory_reference: ICH M12 (2024), Section 4.2
+          clinical_recommendation: Strong induction (AUC decrease >= 80%) — avoid with sensitive CYP substrates; efficacy loss expected
+          study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+      no_inhibition:
+        type: return
+        value:
+          regulatory_reference: ICH M12 (2024), Section 4.1
+          labeling_section: Clinical Pharmacology (state negative finding)
+          study_requirement: NO_FURTHER_STUDY
+          clinical_recommendation: No clinically meaningful CYP inhibition
+      weak_inhibitor:
+        type: return
+        value:
+          regulatory_reference: ICH M12 (2024), Section 4.1
+          study_requirement: IN_VITRO_SUFFICIENT
+          clinical_recommendation: Weak inhibition (AUC 1.25-2 fold) — note in labeling; no dose adjustment typically needed
+          labeling_section: Clinical Pharmacology
+      ph_study:
+        type: return
+        value:
+          labeling_section: Drug Interactions + Dosage
+          study_requirement: DEDICATED_DDI_STUDY_REQUIRED
+          regulatory_reference: 'FDA Guidance: Evaluation of Gastric pH-Dependent Drug Interactions (2023)'
+          clinical_recommendation: pH-dependent absorption — evaluate with acid-reducing agents (PPI, H2RA, antacid)
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: auc_fold_change
+        operator: neq
+        value: cyp_inhibition
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: auc_fold_change
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      victim_narrow_ti:
+        type: bool
+        required: false
+      mechanism:
+        type: string
+        required: true
+      auc_fold_change:
+        type: float
+        required: true
+    outputs:
+      regulatory_reference:
+        type: string
+        required: false
+      labeling_section:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      clinical_recommendation:
+        type: string
+        required: false
+      study_requirement:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    mechanism: transporter
+    auc_fold_change: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    mechanism: transporter
+    auc_fold_change: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - mechanism
+  - auc_fold_change
+  - victim_narrow_ti
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

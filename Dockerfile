@@ -29,6 +29,14 @@ COPY scripts/ /app/scripts/
 COPY micrograms/ /app/micrograms/
 COPY chains/ /app/chains/
 
+# Heligrams — dual-strand decision programs (sense + antisense + resolution).
+# The station heligram handler resolves HELIGRAM_DIR="rsk/heligrams" relative
+# to WORKDIR /app, so files must land at /app/rsk/heligrams/ for the handler
+# to find them. Source staged from ~/Projects/rsk-core/rsk/heligrams into
+# ferroforge/heligrams pre-build. Without this COPY, all 673 heligram tools
+# return "heligram not found" on Cloud Run (verified 2026-04-15).
+COPY heligrams/ /app/rsk/heligrams/
+
 # Relay chain definitions for the hopper engine
 COPY relays/ /app/relays/
 

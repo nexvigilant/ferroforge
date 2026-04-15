@@ -1,0 +1,186 @@
+name: ml-signal-threshold
+description: 'Classifies ML model signal probability into actionable tiers: confirmed signal, probable signal, borderline, probable noise, confirmed noise'
+version: 0.1.0
+family: ml-pipeline
+interface:
+  inputs:
+    signal_probability:
+      type: float
+      required: true
+    model_auc:
+      type: float
+      required: false
+    prr:
+      type: float
+      required: false
+  outputs:
+    tier:
+      type: string
+    action:
+      type: string
+    confidence:
+      type: string
+tree:
+  start: check_model_quality
+  nodes:
+    check_model_quality:
+      type: condition
+      variable: model_auc
+      operator: gte
+      value: 0.7
+      true_next: classify_probability
+      false_next: low_quality_model
+
+    low_quality_model:
+      type: condition
+      variable: signal_probability
+      operator: gte
+      value: 0.8
+      true_next: weak_model_high_prob
+      false_next: weak_model_defer
+
+    weak_model_high_prob:
+      type: return
+      value:
+        tier: borderline
+        action: 'Model AUC < 0.7 — high probability but low model confidence. Verify with statistical methods.'
+        confidence: low
+
+    weak_model_defer:
+      type: return
+      value:
+        tier: inconclusive
+        action: 'Model AUC < 0.7 — defer to PRR/ROR statistical baseline. Retrain with more data.'
+        confidence: low
+
+    classify_probability:
+      type: condition
+      variable: signal_probability
+      operator: gte
+      value: 0.9
+      true_next: confirmed_signal
+      false_next: check_probable_signal
+
+    confirmed_signal:
+      type: return
+      value:
+        tier: confirmed_signal
+        action: 'Escalate to signal committee. Initiate causality assessment (Naranjo/WHO-UMC).'
+        confidence: high
+
+    check_probable_signal:
+      type: condition
+      variable: signal_probability
+      operator: gte
+      value: 0.7
+      true_next: probable_signal
+      false_next: check_borderline
+
+    probable_signal:
+      type: return
+      value:
+        tier: probable_signal
+        action: 'Flag for review. Cross-reference with DailyMed labeling and PubMed literature.'
+        confidence: moderate
+
+    check_borderline:
+      type: condition
+      variable: signal_probability
+      operator: gte
+      value: 0.4
+      true_next: borderline
+      false_next: check_probable_noise
+
+    borderline:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: borderline_with_prr
+      false_next: borderline_no_prr
+
+    borderline_with_prr:
+      type: return
+      value:
+        tier: borderline
+        action: 'ML borderline but PRR >= 2.0 — statistical signal present. Monitor and re-evaluate next quarter.'
+        confidence: moderate
+
+    borderline_no_prr:
+      type: return
+      value:
+        tier: borderline
+        action: 'ML and statistical both borderline. Add to watchlist. Re-evaluate with next data refresh.'
+        confidence: low
+
+    check_probable_noise:
+      type: condition
+      variable: signal_probability
+      operator: gte
+      value: 0.15
+      true_next: probable_noise
+      false_next: confirmed_noise
+
+    probable_noise:
+      type: return
+      value:
+        tier: probable_noise
+        action: 'Low signal probability. Deprioritize unless new case reports emerge.'
+        confidence: moderate
+
+    confirmed_noise:
+      type: return
+      value:
+        tier: confirmed_noise
+        action: 'No ML signal detected. Archive — no further action needed.'
+        confidence: high
+
+tests:
+  - name: high_probability_good_model
+    input:
+      signal_probability: 0.95
+      model_auc: 0.88
+    expect:
+      tier: confirmed_signal
+      confidence: high
+
+  - name: moderate_probability
+    input:
+      signal_probability: 0.75
+      model_auc: 0.85
+    expect:
+      tier: probable_signal
+      confidence: moderate
+
+  - name: borderline_with_prr_support
+    input:
+      signal_probability: 0.5
+      model_auc: 0.82
+      prr: 3.5
+    expect:
+      tier: borderline
+      confidence: moderate
+
+  - name: low_probability
+    input:
+      signal_probability: 0.08
+      model_auc: 0.9
+    expect:
+      tier: confirmed_noise
+      confidence: high
+
+  - name: weak_model_high_prob
+    input:
+      signal_probability: 0.85
+      model_auc: 0.55
+    expect:
+      tier: borderline
+      confidence: low
+
+  - name: weak_model_low_prob
+    input:
+      signal_probability: 0.3
+      model_auc: 0.6
+    expect:
+      tier: inconclusive
+      confidence: low

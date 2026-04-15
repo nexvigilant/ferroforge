@@ -1,0 +1,157 @@
+name: workflow-signal-investigation-helix
+description: 'Forged from microgram ''workflow-signal-investigation''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    chain: falsified
+sense:
+  tree:
+    start: check_source
+    nodes:
+      check_eu:
+        type: condition
+        variable: source
+        operator: eq
+        value: eudravigilance
+        true_next: eu_path
+        false_next: global_path
+      check_source:
+        type: condition
+        variable: source
+        operator: eq
+        value: faers
+        true_next: faers_path
+        false_next: check_eu
+      eu_path:
+        type: return
+        value:
+          chain: ema → eudravigilance → compliance → benefit-risk
+          steps:
+          - station-ema-pipeline
+          - station-eudravigilance-pipeline
+          - station-compliance-pipeline
+          - station-benefit-risk-pipeline
+          hop_count: 4
+      global_path:
+        type: return
+        value:
+          hop_count: 4
+          chain: vigiaccess → who-umc → harm-taxonomy → preemptive-pv
+          steps:
+          - station-vigiaccess-pipeline
+          - station-who-umc-pipeline
+          - station-harm-taxonomy-pipeline
+          - station-preemptive-pv-pipeline
+      faers_path:
+        type: return
+        value:
+          chain: openfda → calculation → signal-theory → vigilance
+          hop_count: 4
+          steps:
+          - station-openfda-pipeline
+          - station-calculation-pipeline
+          - station-signal-theory-pipeline
+          - station-vigilance-pipeline
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: source
+        operator: neq
+        value: faers
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: source
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      source:
+        type: string
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    source: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    source: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

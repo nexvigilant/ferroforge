@@ -1,0 +1,191 @@
+name: reporter-qualification-helix
+description: 'Forged from microgram ''reporter-qualification''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    can_submit_medwatch: falsified
+sense:
+  tree:
+    start: type_check
+    nodes:
+      other_result:
+        type: return
+        value:
+          can_submit_medwatch: true
+          qualification_level: other
+          regulatory_reference: ICH E2A Section III.A.1 (Other)
+          weight_in_causality: 0.3
+      consumer_check:
+        type: condition
+        variable: reporter_type
+        operator: eq
+        value: consumer
+        true_next: consumer_result
+        false_next: lawyer_check
+      type_check:
+        type: condition
+        variable: reporter_type
+        operator: eq
+        value: physician
+        true_next: healthcare_professional_result
+        false_next: pharmacist_check
+      consumer_result:
+        type: return
+        value:
+          can_submit_medwatch: true
+          weight_in_causality: 0.5
+          regulatory_reference: ICH E2A Section III.A.1 (Consumer)
+          qualification_level: consumer
+      lawyer_check:
+        type: condition
+        variable: reporter_type
+        operator: eq
+        value: lawyer
+        true_next: other_result
+        false_next: other_result
+      pharmacist_check:
+        type: condition
+        variable: reporter_type
+        operator: eq
+        value: pharmacist
+        true_next: healthcare_professional_result
+        false_next: nurse_check
+      nurse_check:
+        type: condition
+        variable: reporter_type
+        operator: eq
+        value: nurse
+        true_next: healthcare_professional_result
+        false_next: consumer_check
+      healthcare_professional_result:
+        type: return
+        value:
+          qualification_level: healthcare_professional
+          can_submit_medwatch: true
+          regulatory_reference: ICH E2A Section III.A.1 (Healthcare Professional)
+          weight_in_causality: 1.0
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: reporter_type
+        operator: neq
+        value: physician
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: reporter_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      can_submit_medwatch: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      can_submit_medwatch: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      can_submit_medwatch: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      reporter_type:
+        type: string
+        required: true
+    outputs:
+      can_submit_medwatch:
+        type: bool
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      weight_in_causality:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      qualification_level:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    reporter_type: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    reporter_type: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,183 @@
+name: loop-governor-helix
+description: 'Forged from microgram ''loop-governor''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    prescription: falsified
+sense:
+  tree:
+    start: check_governor
+    nodes:
+      parse_consolidate:
+        type: condition
+        variable: governor_signal
+        operator: contains
+        value: CONSOLIDATE
+        true_next: consolidate_action
+        false_next: continue_action
+      continue_action:
+        type: return
+        value:
+          prescription: Maintain current cadence. Clear remaining sparks between production sessions.
+          loop_action: CONTINUE
+          reason: Governor signal is CONTINUE — shipping is happening
+      consolidate_action:
+        type: return
+        value:
+          prescription: One consolidation session per two production sessions. Commit sparks before starting new chains.
+          reason: Governor signal is CONSOLIDATE — persistence ratio below 0.5
+          loop_action: CONTINUE
+      parse_halt:
+        type: condition
+        variable: governor_signal
+        operator: contains
+        value: HALT
+        true_next: halt_action
+        false_next: parse_consolidate
+      no_governor:
+        type: return
+        value:
+          prescription: Feed session data to produce a governor signal
+          loop_action: CONTINUE
+          reason: No governor signal present — no basis to halt
+      check_governor:
+        type: condition
+        variable: governor_signal
+        operator: is_not_null
+        value: ''
+        true_next: parse_halt
+        false_next: no_governor
+      halt_action:
+        type: return
+        value:
+          loop_action: HALT
+          reason: Governor signal is HALT — heat accumulation detected
+          prescription: Stop new work. Commit existing uncommitted changes. Every session is producing sparks (L3). The flywheel is generating heat, not momentum.
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: governor_signal
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: governor_signal
+        operator: is_null
+        value: ''
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      persistence_ratio:
+        type: float
+        required: false
+      iteration:
+        type: int
+        required: false
+      governor_signal:
+        type: string
+        required: false
+      compound_verdict:
+        type: string
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      prescription:
+        type: string
+        required: false
+      reason:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      loop_action:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    iteration: 3
+    compound_verdict: heat_accumulation
+    persistence_ratio: 0.0
+    governor_signal: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input:
+    iteration: 3
+    compound_verdict: heat_accumulation
+    persistence_ratio: 0.0
+    governor_signal: HALT — every session is producing sparks. Stop new work.
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - governor_signal
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

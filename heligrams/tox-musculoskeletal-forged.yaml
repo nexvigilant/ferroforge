@@ -1,0 +1,148 @@
+name: tox-musculoskeletal-helix
+description: 'Forged from microgram ''tox-musculoskeletal''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    target: falsified
+sense:
+  tree:
+    start: check_severe
+    nodes:
+      mild:
+        type: return
+        value:
+          target: bone
+          organ: musculoskeletal
+          action: monitor_closely
+          severity: mild
+      severe:
+        type: return
+        value:
+          action: discontinue
+          severity: severe
+          organ: musculoskeletal
+          target: bone
+      normal:
+        type: return
+        value:
+          target: bone
+          severity: normal
+          organ: musculoskeletal
+          action: continue
+      check_mild:
+        type: condition
+        variable: cpk_ratio
+        operator: gte
+        value: 5
+        true_next: mild
+        false_next: normal
+      check_severe:
+        type: condition
+        variable: cpk_ratio
+        operator: gte
+        value: 10
+        true_next: severe
+        false_next: check_mild
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: cpk_ratio
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: cpk_ratio
+        operator: lt
+        value: 10
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      cpk_ratio:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    cpk_ratio: 20
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    cpk_ratio: 9
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

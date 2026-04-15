@@ -1,0 +1,264 @@
+name: fda-e19-selective-safety-helix
+description: 'Forged from microgram ''fda-e19-selective-safety''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    collection_scope: falsified
+sense:
+  tree:
+    start: check_phase
+    nodes:
+      check_phase:
+        type: condition
+        variable: trial_phase
+        operator: eq
+        value: late_phase3
+        true_next: late_phase3_check
+        false_next: check_phase3b
+      commitment_db_check:
+        type: condition
+        variable: prior_safety_database
+        operator: eq
+        value: large_adequate
+        true_next: selective_commitment
+        false_next: enhanced_collection
+      post_commitment_check:
+        type: condition
+        variable: well_characterized_safety
+        operator: eq
+        value: true
+        true_next: commitment_db_check
+        false_next: full_collection
+      selective_commitment:
+        type: return
+        value:
+          collection_scope: SELECTIVE_E19
+          lab_monitoring: Per commitment protocol; generally targeted
+          ae_collection: Focus on SAEs and predefined AESIs relevant to commitment objective. Minimize routine AE collection.
+          rationale: Post-approval commitment with established safety — selective collection aligned with commitment objectives
+          regulatory_reference: ICH E19 (2022), Section 3.3
+      full_collection:
+        type: return
+        value:
+          regulatory_reference: ICH E2A; ICH E19 (2022), Section 2 (exclusion criteria)
+          rationale: E19 selective approach NOT applicable — safety profile not well-characterized or database insufficient
+          ae_collection: Collect all AEs (serious and non-serious), regardless of causality. Standard comprehensive approach per ICH E2A.
+          lab_monitoring: Full safety laboratory panel at protocol-specified intervals
+          collection_scope: FULL_COMPREHENSIVE
+      postapproval_db_check:
+        type: condition
+        variable: prior_safety_database
+        operator: eq
+        value: large_adequate
+        true_next: postapproval_population
+        false_next: postapproval_moderate_db
+      selective_postapproval:
+        type: return
+        value:
+          collection_scope: SELECTIVE_E19
+          ae_collection: Collect SAEs, AESIs, and AEs leading to discontinuation. Non-serious AE collection limited to predefined list of known risks.
+          regulatory_reference: ICH E19 (2022), Section 3.2
+          lab_monitoring: Safety labs only for identified risks; no routine comprehensive panels
+          rationale: Post-approval with well-characterized safety and adequate database — selective E19 approach appropriate
+      late_phase3_check:
+        type: condition
+        variable: well_characterized_safety
+        operator: eq
+        value: true
+        true_next: late3_database_check
+        false_next: full_collection
+      postapproval_check:
+        type: condition
+        variable: well_characterized_safety
+        operator: eq
+        value: true
+        true_next: postapproval_db_check
+        false_next: enhanced_collection
+      late3_database_check:
+        type: condition
+        variable: prior_safety_database
+        operator: eq
+        value: large_adequate
+        true_next: late3_population_check
+        false_next: full_collection
+      postapproval_population:
+        type: condition
+        variable: population_differs
+        operator: eq
+        value: true
+        true_next: enhanced_collection
+        false_next: selective_postapproval
+      enhanced_collection:
+        type: return
+        value:
+          collection_scope: ENHANCED_TARGETED
+          ae_collection: Collect all SAEs plus targeted non-serious AEs for known and potential risks. Enhanced monitoring for new population.
+          rationale: Some prior data exists but either safety not fully characterized, database moderate, or new population — enhanced approach
+          lab_monitoring: Full safety labs plus additional targeted monitoring for identified risks
+          regulatory_reference: ICH E19 (2022), Section 2; ICH E2A
+      check_phase4:
+        type: condition
+        variable: trial_phase
+        operator: eq
+        value: phase4
+        true_next: postapproval_check
+        false_next: post_commitment_check
+      check_phase3b:
+        type: condition
+        variable: trial_phase
+        operator: eq
+        value: phase3b
+        true_next: postapproval_check
+        false_next: check_phase4
+      selective_late3:
+        type: return
+        value:
+          regulatory_reference: ICH E19 (2022), Section 3.1; FDA Implementation Guidance
+          lab_monitoring: Targeted labs for known risks only; routine comprehensive labs may be reduced
+          rationale: 'E19 criteria met: well-characterized safety, large prior database, similar population — selective collection justified'
+          collection_scope: SELECTIVE_E19
+          ae_collection: Collect only SAEs, AESIs (adverse events of special interest), and AEs leading to discontinuation. Routine non-serious AE collection may be omitted.
+      postapproval_moderate_db:
+        type: condition
+        variable: prior_safety_database
+        operator: eq
+        value: moderate
+        true_next: postapproval_population
+        false_next: enhanced_collection
+      late3_population_check:
+        type: condition
+        variable: population_differs
+        operator: eq
+        value: true
+        true_next: full_collection
+        false_next: selective_late3
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: trial_phase
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: trial_phase
+        operator: neq
+        value: late_phase3
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      population_differs:
+        type: bool
+        required: false
+      prior_safety_database:
+        type: string
+        required: true
+      well_characterized_safety:
+        type: bool
+        required: true
+      trial_phase:
+        type: string
+        required: true
+    outputs:
+      lab_monitoring:
+        type: string
+        required: false
+      collection_scope:
+        type: string
+        required: false
+      ae_collection:
+        type: string
+        required: false
+      rationale:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    trial_phase: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    trial_phase: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - trial_phase
+  - prior_safety_database
+  - well_characterized_safety
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

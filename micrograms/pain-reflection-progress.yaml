@@ -1,0 +1,103 @@
+name: pain-reflection-progress
+version: "1.0.0"
+description: "Dalio's Pain + Reflection = Progress loop. Routes reality-audit findings through believability assessment to belief updates."
+family: dalio
+chain: dalio-learning
+
+inputs:
+  - name: finding
+    type: string
+    description: "A pain point surfaced by reality-audit or radical-transparency probe"
+  - name: evidence_source
+    type: string
+    description: "Where the finding came from (compiler, test, probe, human, model)"
+
+outputs:
+  - name: action
+    type: string
+    description: "update_belief | new_correction | escalate | dismiss"
+  - name: believability
+    type: number
+    description: "Believability score for the finding (0.0-1.0)"
+  - name: target
+    type: string
+    description: "Which belief or correction to update"
+
+tree:
+  - id: source_check
+    question: "What is the evidence source?"
+    branches:
+      - condition: "evidence_source == 'compiler'"
+        result:
+          believability: 1.0
+          next: action_route
+      - condition: "evidence_source == 'test'"
+        result:
+          believability: 0.95
+          next: action_route
+      - condition: "evidence_source == 'human'"
+        result:
+          believability: 0.90
+          next: action_route
+      - condition: "evidence_source == 'hook'"
+        result:
+          believability: 0.85
+          next: action_route
+      - condition: "evidence_source == 'probe'"
+        result:
+          believability: 0.70
+          next: action_route
+      - condition: "evidence_source == 'model'"
+        result:
+          believability: 0.50
+          next: action_route
+      - condition: "true"
+        result:
+          believability: 0.30
+          next: action_route
+
+  - id: action_route
+    question: "Does the finding contradict an existing belief?"
+    branches:
+      - condition: "contradicts_belief == true AND believability > existing_believability"
+        result:
+          action: update_belief
+          target: "{{contradicted_belief_id}}"
+      - condition: "contradicts_belief == true AND believability <= existing_believability"
+        result:
+          action: escalate
+          target: "Conflict: new finding (bel={{believability}}) vs existing belief (bel={{existing_believability}})"
+      - condition: "is_repeated_mistake == true"
+        result:
+          action: new_correction
+          target: "{{mistake_pattern}}"
+      - condition: "believability >= 0.7"
+        result:
+          action: new_correction
+          target: "{{finding}}"
+      - condition: "true"
+        result:
+          action: dismiss
+          target: "Low believability finding — needs stronger evidence"
+
+tests:
+  - name: compiler_finding_updates_belief
+    inputs:
+      finding: "unwrap() causes panic in production"
+      evidence_source: "compiler"
+    expect:
+      believability: 1.0
+
+  - name: model_guess_gets_low_weight
+    inputs:
+      finding: "this pattern might cause issues"
+      evidence_source: "model"
+    expect:
+      believability: 0.50
+
+  - name: probe_finding_moderate_weight
+    inputs:
+      finding: "proxy returns empty array"
+      evidence_source: "probe"
+    expect:
+      believability: 0.70

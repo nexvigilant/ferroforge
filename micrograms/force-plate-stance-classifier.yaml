@@ -1,0 +1,79 @@
+name: force-plate-stance-classifier
+description: 'Classify gait phase from bilateral force plate vertical forces. Detects stance, swing, double support, and airborne.'
+version: 0.1.0
+interface:
+  inputs:
+    left_force_z:
+      type: number
+      required: true
+      description: 'Left foot vertical ground reaction force in Newtons'
+    right_force_z:
+      type: number
+      required: true
+      description: 'Right foot vertical ground reaction force in Newtons'
+  outputs:
+    phase:
+      type: string
+    weight_distribution:
+      type: number
+    symmetry:
+      type: string
+tree:
+  start: check_left
+  nodes:
+    check_left:
+      type: condition
+      variable: left_force_z
+      operator: gt
+      value: 20
+      true_next: check_right_with_left
+      false_next: check_right_no_left
+    check_right_with_left:
+      type: condition
+      variable: right_force_z
+      operator: gt
+      value: 20
+      true_next: double_support
+      false_next: left_stance
+    check_right_no_left:
+      type: condition
+      variable: right_force_z
+      operator: gt
+      value: 20
+      true_next: right_stance
+      false_next: airborne
+    double_support:
+      type: return
+      value:
+        phase: 'DOUBLE_SUPPORT'
+        weight_distribution: 0.5
+        symmetry: 'BILATERAL'
+    left_stance:
+      type: return
+      value:
+        phase: 'LEFT_STANCE'
+        weight_distribution: 0.0
+        symmetry: 'UNILATERAL_LEFT'
+    right_stance:
+      type: return
+      value:
+        phase: 'RIGHT_STANCE'
+        weight_distribution: 1.0
+        symmetry: 'UNILATERAL_RIGHT'
+    airborne:
+      type: return
+      value:
+        phase: 'AIRBORNE'
+        weight_distribution: 0.5
+        symmetry: 'NONE'
+tests:
+- input: { left_force_z: 400, right_force_z: 400 }
+  expect: { phase: 'DOUBLE_SUPPORT' }
+- input: { left_force_z: 700, right_force_z: 5 }
+  expect: { phase: 'LEFT_STANCE' }
+- input: { left_force_z: 5, right_force_z: 700 }
+  expect: { phase: 'RIGHT_STANCE' }
+- input: { left_force_z: 0, right_force_z: 0 }
+  expect: { phase: 'AIRBORNE' }
+- input: {}
+  expect: { phase: 'AIRBORNE' }

@@ -1,0 +1,286 @@
+name: fda-sponsor-ind-safety-helix
+description: 'Forged from microgram ''fda-sponsor-ind-safety''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    reporting_required: falsified
+sense:
+  tree:
+    start: check_sar
+    nodes:
+      susar_study_type_check:
+        type: condition
+        variable: study_type
+        operator: eq
+        value: ba_be_ind_exempt
+        true_next: susar_ba_be_exempt
+        false_next: susar_15day
+      check_sar:
+        type: condition
+        variable: suspected_adverse_reaction
+        operator: eq
+        value: true
+        true_next: sar_serious_check
+        false_next: not_sar
+      sar_serious_check:
+        type: condition
+        variable: serious
+        operator: eq
+        value: true
+        true_next: serious_unexpected_check
+        false_next: nonserious_sar
+      serious_expected:
+        type: return
+        value:
+          regulatory_reference: 21 CFR 312.32(c) - serious expected SARs reported in annual report; FDA Guidance (2025), Section III.B
+          notification_recipients: Include in IND Annual Report; update IB if frequency changes
+          reporting_required: false
+          timeline_days: 365
+          report_type: ANNUAL_REPORT
+      susar_7day:
+        type: return
+        value:
+          timeline_days: 7
+          regulatory_reference: '21 CFR 312.32(c)(2); FDA Guidance: Sponsor Responsibilities (2025), Section IV.A'
+          reporting_required: true
+          notification_recipients: FDA + all participating investigators + IRBs
+          report_type: IND_SAFETY_7DAY
+      susar_15day:
+        type: return
+        value:
+          notification_recipients: FDA + all participating investigators + IRBs
+          report_type: IND_SAFETY_15DAY
+          regulatory_reference: '21 CFR 312.32(c)(1); FDA Guidance: Sponsor Responsibilities (2025), Section IV.B'
+          reporting_required: true
+          timeline_days: 15
+      serious_unexpected_check:
+        type: condition
+        variable: unexpected
+        operator: eq
+        value: true
+        true_next: susar_fatal_check
+        false_next: serious_expected
+      susar_ba_be_exempt:
+        type: return
+        value:
+          timeline_days: 15
+          report_type: BA_BE_EXEMPT_SAFETY
+          reporting_required: true
+          regulatory_reference: 'FDA Guidance: Electronic Submission of Expedited Safety Reports From IND-Exempt BA/BE Studies (2024)'
+          notification_recipients: FDA via ESG electronic submission
+      not_sar:
+        type: return
+        value:
+          timeline_days: 0
+          regulatory_reference: 21 CFR 312.32(c) - only suspected adverse reactions require IND safety reports
+          report_type: NONE
+          reporting_required: false
+          notification_recipients: N/A
+      nonserious_sar:
+        type: return
+        value:
+          reporting_required: false
+          timeline_days: 365
+          regulatory_reference: '21 CFR 312.33; FDA Guidance: Sponsor Responsibilities (2025), Section III.A'
+          notification_recipients: Include in IND Annual Report (21 CFR 312.33)
+          report_type: ANNUAL_REPORT
+      susar_fatal_check:
+        type: condition
+        variable: fatal_or_life_threatening
+        operator: eq
+        value: true
+        true_next: susar_7day
+        false_next: susar_study_type_check
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      reporting_required: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      reporting_required: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when:
+      falsified: false
+      reporting_required: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      comorbidity_explains:
+        type: bool
+        required: false
+      serious:
+        type: bool
+        required: true
+      fatal_or_life_threatening:
+        type: bool
+        required: false
+      unexpected:
+        type: bool
+        required: true
+      follow_up_complete:
+        type: bool
+        required: false
+      study_type:
+        type: string
+        required: false
+      coding_verified:
+        type: bool
+        required: false
+      suspected_adverse_reaction:
+        type: bool
+        required: true
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      report_type:
+        type: string
+        required: false
+      reporting_required:
+        type: bool
+        required: false
+      verdict:
+        type: string
+        required: false
+      timeline_days:
+        type: int
+        required: false
+      notification_recipients:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    unexpected: true
+    suspected_adverse_reaction: true
+    serious: true
+    comorbidity_explains: false
+    study_type: ind
+    fatal_or_life_threatening: true
+    coding_verified: true
+    follow_up_complete: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    study_type: ind
+    unexpected: true
+    suspected_adverse_reaction: true
+    fatal_or_life_threatening: true
+    serious: true
+    follow_up_complete: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - suspected_adverse_reaction
+  - serious
+  - unexpected
+  - fatal_or_life_threatening
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

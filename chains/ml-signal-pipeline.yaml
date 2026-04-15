@@ -1,0 +1,63 @@
+name: ml-signal-pipeline
+description: 'ML signal detection workflow: validate training data → classify ML prediction into action tier → compare ML vs statistical baseline → route to action'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - ml-train-gate
+  - ml-signal-threshold
+  - ml-vs-statistical-comparator
+tests:
+- name: sufficient data, high probability signal, both methods agree
+  input:
+    n_samples: 200
+    n_signal: 80
+    n_features: 12
+    signal_ratio: 0.4
+    signal_probability: 0.92
+    model_auc: 0.88
+    prr: 4.5
+    ror: 5.0
+    case_count: 200
+    ml_signal_probability: 0.92
+    ml_auc: 0.88
+  expect:
+    gate_decision: pass
+    recommended_n_trees: 100
+    tier: confirmed_signal
+    winner: both
+    agreement: strong_agreement
+
+- name: small dataset, borderline prediction, PRR supports
+  input:
+    n_samples: 30
+    n_signal: 12
+    n_features: 12
+    signal_ratio: 0.4
+    signal_probability: 0.5
+    model_auc: 0.82
+    prr: 3.5
+    ror: 3.0
+    case_count: 50
+    ml_signal_probability: 0.5
+    ml_auc: 0.82
+  expect:
+    gate_decision: pass
+    recommended_n_trees: 50
+    tier: borderline
+    winner: both
+
+- name: insufficient data blocks training
+  input:
+    n_samples: 8
+    n_signal: 4
+    n_features: 12
+    signal_ratio: 0.5
+    signal_probability: 0.9
+    model_auc: 0.5
+    prr: 1.0
+    ml_signal_probability: 0.9
+    ml_auc: 0.5
+    case_count: 8
+  expect:
+    gate_decision: fail

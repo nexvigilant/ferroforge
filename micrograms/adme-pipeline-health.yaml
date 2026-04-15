@@ -1,0 +1,189 @@
+name: adme-pipeline-health
+description: "Diagnose PV signal pipeline health using ADME pharmacokinetic primitives. Maps Absorb (intake), Distribute (triage), Metabolize (computation), Excrete (action) to pipeline stages and returns the failing primitive with fix guidance."
+version: 0.1.0
+interface:
+  inputs:
+    absorb_ok:
+      type: bool
+      required: true
+      description: "Data sources responding and returning results"
+    distribute_ok:
+      type: bool
+      required: true
+      description: "Triage/routing classifying cases to correct queues"
+    metabolize_ok:
+      type: bool
+      required: true
+      description: "Signal detection producing correct disproportionality scores"
+    excrete_ok:
+      type: bool
+      required: true
+      description: "Regulatory actions being generated from confirmed signals"
+  outputs:
+    pipeline_health:
+      type: string
+    failing_primitive:
+      type: string
+    adme_stage:
+      type: string
+    recommendation:
+      type: string
+    healthy_count:
+      type: int
+tree:
+  start: check_absorb
+  nodes:
+    check_absorb:
+      type: condition
+      variable: absorb_ok
+      operator: neq
+      value: true
+      true_next: absorb_failure
+      false_next: check_distribute
+
+    absorb_failure:
+      type: return
+      value:
+        pipeline_health: IMPAIRED
+        failing_primitive: Absorb
+        adme_stage: absorption
+        recommendation: "Data intake boundary failure — check FAERS/DailyMed/PubMed connectivity and query parameters"
+        healthy_count: 0
+
+    check_distribute:
+      type: condition
+      variable: distribute_ok
+      operator: neq
+      value: true
+      true_next: distribute_failure
+      false_next: check_metabolize
+
+    distribute_failure:
+      type: return
+      value:
+        pipeline_health: IMPAIRED
+        failing_primitive: Distribute
+        adme_stage: distribution
+        recommendation: "Triage routing failure — cases not reaching correct analysis queues. Check case-validity and triage classifiers"
+        healthy_count: 1
+
+    check_metabolize:
+      type: condition
+      variable: metabolize_ok
+      operator: neq
+      value: true
+      true_next: metabolize_failure
+      false_next: check_excrete
+
+    metabolize_failure:
+      type: return
+      value:
+        pipeline_health: IMPAIRED
+        failing_primitive: Metabolize
+        adme_stage: metabolism
+        recommendation: "Signal computation failure — PRR/ROR/IC/EBGM producing incorrect results. Check 2x2 table inputs and statistical thresholds"
+        healthy_count: 2
+
+    check_excrete:
+      type: condition
+      variable: excrete_ok
+      operator: neq
+      value: true
+      true_next: excrete_failure
+      false_next: all_healthy
+
+    excrete_failure:
+      type: return
+      value:
+        pipeline_health: IMPAIRED
+        failing_primitive: Excrete
+        adme_stage: excretion
+        recommendation: "Regulatory action generation failure — confirmed signals not producing actions. Check causality-to-action routing and deadline computation"
+        healthy_count: 3
+
+    all_healthy:
+      type: return
+      value:
+        pipeline_health: HEALTHY
+        failing_primitive: none
+        adme_stage: all
+        recommendation: "All ADME stages operational"
+        healthy_count: 4
+
+tests:
+- name: all healthy
+  input:
+    absorb_ok: true
+    distribute_ok: true
+    metabolize_ok: true
+    excrete_ok: true
+  expect:
+    pipeline_health: HEALTHY
+    failing_primitive: none
+    healthy_count: 4
+
+- name: absorb failure — data sources down
+  input:
+    absorb_ok: false
+    distribute_ok: true
+    metabolize_ok: true
+    excrete_ok: true
+  expect:
+    pipeline_health: IMPAIRED
+    failing_primitive: Absorb
+    adme_stage: absorption
+    healthy_count: 0
+
+- name: distribute failure — triage broken
+  input:
+    absorb_ok: true
+    distribute_ok: false
+    metabolize_ok: true
+    excrete_ok: true
+  expect:
+    pipeline_health: IMPAIRED
+    failing_primitive: Distribute
+    adme_stage: distribution
+    healthy_count: 1
+
+- name: metabolize failure — computation wrong
+  input:
+    absorb_ok: true
+    distribute_ok: true
+    metabolize_ok: false
+    excrete_ok: true
+  expect:
+    pipeline_health: IMPAIRED
+    failing_primitive: Metabolize
+    adme_stage: metabolism
+    healthy_count: 2
+
+- name: excrete failure — no actions generated
+  input:
+    absorb_ok: true
+    distribute_ok: true
+    metabolize_ok: true
+    excrete_ok: false
+  expect:
+    pipeline_health: IMPAIRED
+    failing_primitive: Excrete
+    adme_stage: excretion
+    healthy_count: 3
+
+- name: first failure wins — absorb blocks everything
+  input:
+    absorb_ok: false
+    distribute_ok: false
+    metabolize_ok: false
+    excrete_ok: false
+  expect:
+    pipeline_health: IMPAIRED
+    failing_primitive: Absorb
+    healthy_count: 0
+
+- name: null safety — missing inputs treated as failure
+  input: {}
+  expect:
+    pipeline_health: IMPAIRED
+    failing_primitive: Absorb
+    healthy_count: 0

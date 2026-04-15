@@ -1,0 +1,232 @@
+name: duplicate-gate-helix
+description: 'Forged from microgram ''duplicate-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    duplicate: falsified
+sense:
+  tree:
+    start: check_same_patient
+    nodes:
+      check_same_event_for_confirmed:
+        type: condition
+        variable: same_event
+        operator: eq
+        value: true
+        true_next: check_reporter_for_confirmed
+        false_next: check_time_possible
+      return_possible:
+        type: return
+        value:
+          duplicate: POSSIBLE
+          confidence: LOW
+          action: flag_for_review
+          review_rationale: Same patient and drug within 90-day window but event differs — may represent follow-up report
+      check_same_drug:
+        type: condition
+        variable: same_drug
+        operator: eq
+        value: true
+        true_next: check_same_event_for_confirmed
+        false_next: check_same_event_diff_drug
+      check_same_event_diff_drug:
+        type: condition
+        variable: same_event
+        operator: eq
+        value: true
+        true_next: check_time_possible_diff_drug
+        false_next: return_unlikely
+      return_confirmed:
+        type: return
+        value:
+          duplicate: CONFIRMED
+          confidence: HIGH
+          action: merge_cases
+          review_rationale: All four matching criteria met within 7-day window — same patient, drug, event, and reporter
+      return_possible_different_drug:
+        type: return
+        value:
+          duplicate: POSSIBLE_DIFFERENT_DRUG
+          review_rationale: Same patient and event but different drug within 30 days — review concomitant medications for misattribution
+          confidence: LOW
+          action: review_concomitants
+      check_time_confirmed:
+        type: condition
+        variable: time_window_days
+        operator: lte
+        value: 7
+        true_next: return_confirmed
+        false_next: check_time_probable
+      check_same_patient:
+        type: condition
+        variable: same_patient
+        operator: eq
+        value: true
+        true_next: check_same_drug
+        false_next: return_unlikely
+      check_reporter_for_confirmed:
+        type: condition
+        variable: same_reporter
+        operator: eq
+        value: true
+        true_next: check_time_confirmed
+        false_next: check_time_probable
+      check_time_possible_diff_drug:
+        type: condition
+        variable: time_window_days
+        operator: lte
+        value: 30
+        true_next: return_possible_different_drug
+        false_next: return_unlikely
+      return_probable:
+        type: return
+        value:
+          confidence: MODERATE
+          duplicate: PROBABLE
+          review_rationale: Same patient, drug, and event within 30-day window — reporter differs or time window 8-30 days
+          action: manual_review
+      return_unlikely:
+        type: return
+        value:
+          action: process_as_new
+          confidence: HIGH
+          review_rationale: Insufficient matching criteria to classify as duplicate
+          duplicate: UNLIKELY
+      check_time_possible:
+        type: condition
+        variable: time_window_days
+        operator: lte
+        value: 90
+        true_next: return_possible
+        false_next: return_unlikely
+      check_time_probable:
+        type: condition
+        variable: time_window_days
+        operator: lte
+        value: 30
+        true_next: return_probable
+        false_next: return_unlikely
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: same_event
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: same_event
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      same_patient:
+        type: bool
+        required: false
+      same_event:
+        type: bool
+        required: false
+      time_window_days:
+        type: int
+        required: false
+      same_reporter:
+        type: bool
+        required: false
+      same_drug:
+        type: bool
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      duplicate:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      review_rationale:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    same_event: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    same_event: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,219 @@
+name: e2e-risk-categorization-helix
+description: 'Forged from microgram ''e2e-risk-categorization''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    action: falsified
+sense:
+  tree:
+    start: check_refuted
+    nodes:
+      result_identified:
+        type: return
+        value:
+          action: characterize_and_minimize
+          risk_category: IDENTIFIED_RISK
+          regulatory_reference: ICH E2E Section 3 - Safety Specification
+      result_none:
+        type: return
+        value:
+          risk_category: NONE
+          action: close_signal
+          regulatory_reference: ICH E2E Section 3 - Safety Specification
+      check_nonclinical:
+        type: condition
+        variable: evidence_level
+        operator: eq
+        value: nonclinical_signal
+        true_next: result_potential
+        false_next: check_no_data
+      result_identified_no_cases:
+        type: return
+        value:
+          risk_category: IDENTIFIED_RISK
+          regulatory_reference: ICH E2E Section 3 - Safety Specification
+          action: characterize_and_minimize
+      result_potential:
+        type: return
+        value:
+          risk_category: POTENTIAL_RISK
+          action: investigate_further
+          regulatory_reference: ICH E2E Section 3 - Safety Specification
+      check_refuted:
+        type: condition
+        variable: evidence_level
+        operator: eq
+        value: refuted
+        true_next: result_none
+        false_next: check_confirmed
+      check_theoretical:
+        type: condition
+        variable: evidence_level
+        operator: eq
+        value: theoretical
+        true_next: result_potential
+        false_next: check_nonclinical
+      result_missing_collect:
+        type: return
+        value:
+          risk_category: MISSING_INFORMATION
+          action: collect_data
+          regulatory_reference: ICH E2E Section 3 - Safety Specification
+      result_missing_plan:
+        type: return
+        value:
+          regulatory_reference: ICH E2E Section 3 - Safety Specification
+          risk_category: MISSING_INFORMATION
+          action: plan_study
+      result_unknown:
+        type: return
+        value:
+          risk_category: NONE
+          action: close_signal
+          regulatory_reference: ICH E2E Section 3 - Safety Specification
+      check_confirmed:
+        type: condition
+        variable: evidence_level
+        operator: eq
+        value: confirmed
+        true_next: check_cases
+        false_next: check_theoretical
+      check_population_exposed:
+        type: condition
+        variable: population_exposed
+        operator: eq
+        value: true
+        true_next: result_missing_collect
+        false_next: result_missing_plan
+      check_no_data:
+        type: condition
+        variable: evidence_level
+        operator: eq
+        value: no_data
+        true_next: check_population_exposed
+        false_next: result_unknown
+      check_cases:
+        type: condition
+        variable: cases
+        operator: gt
+        value: 0
+        true_next: result_identified
+        false_next: result_identified_no_cases
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: evidence_level
+        operator: neq
+        value: refuted
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: evidence_level
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      population_exposed:
+        type: bool
+        required: false
+      cases:
+        type: integer
+        required: false
+      evidence_level:
+        type: string
+        required: true
+    outputs:
+      confidence:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      risk_category:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    evidence_level: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    evidence_level: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

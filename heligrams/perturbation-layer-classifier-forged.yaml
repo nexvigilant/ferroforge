@@ -1,0 +1,315 @@
+name: perturbation-layer-classifier-helix
+description: 'Forged from microgram ''perturbation-layer-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    layer_number: falsified
+sense:
+  tree:
+    start: route_evidence
+    nodes:
+      check_unknown_systemic:
+        type: condition
+        variable: is_systemic_feedback
+        operator: eq
+        value: true
+        true_next: classify_systemic
+        false_next: default_organ
+      classify_pathway:
+        type: return
+        value:
+          layer_number: '3'
+          reconstruction_difficulty: HIGH — biological networks are deeply interconnected; complexity explodes here
+          layer: L3 — Network Propagation
+          primitive: → (Causality)
+          recommendation: This is where perturbation fans out. Suppress one enzyme → inflammation + gastric protection + renal flow + platelets + uterine contractility. Map ALL downstream paths, not just the expected one.
+          information_content: MODERATE — captures cascade but may miss parallel paths
+      classify_cellular:
+        type: return
+        value:
+          primitive: Σ (Sum)
+          layer_number: '4'
+          layer: L4 — Cellular Response
+          information_content: MODERATE — cell-type-dependent; same upstream perturbation produces different responses per cell type
+          recommendation: Record cell type explicitly. A cellular response without cell-type context is ambiguous — the same perturbation pattern diverges at this layer.
+          reconstruction_difficulty: HIGH — hepatocytes vs cardiomyocytes vs neurons vs immune cells respond differently to identical biochemical perturbation
+      check_unknown_functional:
+        type: condition
+        variable: is_functional_assay
+        operator: eq
+        value: true
+        true_next: classify_functional
+        false_next: check_unknown_pathway
+      classify_unknown:
+        type: condition
+        variable: is_binding_data
+        operator: eq
+        value: true
+        true_next: classify_binding
+        false_next: check_unknown_functional
+      check_unknown_pathway:
+        type: condition
+        variable: is_pathway_level
+        operator: eq
+        value: true
+        true_next: classify_pathway
+        false_next: check_unknown_cellular
+      default_organ:
+        type: return
+        value:
+          layer: L5 — Organ Manifestation (assumed)
+          reconstruction_difficulty: VERY HIGH — insufficient information to determine perturbation layer
+          recommendation: Classify the evidence source. Without knowing which layer this observation represents, you cannot determine how much mechanistic information it carries.
+          information_content: LOW — no evidence source specified; defaulting to organ-level (most PV data lives here)
+          layer_number: '5'
+          primitive: ∂ (Boundary)
+      check_cellular:
+        type: condition
+        variable: evidence_source
+        operator: eq
+        value: cell_assay
+        true_next: classify_cellular
+        false_next: check_organ
+      classify_organ_without_mechanism:
+        type: return
+        value:
+          layer_number: '5'
+          primitive: ∂ (Boundary)
+          information_content: LOW — this is where most AE reports live; one shadow of a 3D object
+          reconstruction_difficulty: VERY HIGH — multiple distinct perturbation patterns produce identical organ-level readings
+          recommendation: This is the pharmacovigilance data poverty zone. 'Patient developed hepatotoxicity' tells you almost nothing about WHICH perturbation pattern caused it. Seek lower-layer evidence to disambiguate.
+          layer: L5 — Organ Manifestation (boundary reading only)
+      check_unknown_cellular:
+        type: condition
+        variable: is_cellular_response
+        operator: eq
+        value: true
+        true_next: classify_cellular
+        false_next: check_unknown_organ
+      route_evidence:
+        type: condition
+        variable: evidence_source
+        operator: eq
+        value: binding_assay
+        true_next: classify_binding
+        false_next: check_functional
+      classify_organ_with_mechanism:
+        type: return
+        value:
+          layer: L5 — Organ Manifestation (mechanistically informed)
+          information_content: MODERATE — boundary reading with causal chain to lower layers
+          primitive: ∂ (Boundary)
+          reconstruction_difficulty: MODERATE — mechanistic detail constrains which perturbation patterns could produce this observation
+          recommendation: Use mechanistic detail to disambiguate. Mitochondrial toxicity vs reactive metabolite vs BSEP inhibition vs immune-mediated injury all present as hepatotoxicity but are completely different perturbation patterns.
+          layer_number: '5'
+      classify_binding:
+        type: return
+        value:
+          layer: L1 — Binding Profile
+          recommendation: Highest-value perturbation data. Predict downstream layers via network propagation from this binding profile.
+          layer_number: '1'
+          primitive: μ (Mapping)
+          information_content: HIGH — direct measurement of molecule-target selectivity landscape
+          reconstruction_difficulty: LOW — binding is a property of the molecule, largely context-independent
+      classify_functional:
+        type: return
+        value:
+          recommendation: Context-dependent layer. Record system state (saturation, desensitization, stress) alongside functional measurement.
+          layer: L2 — Functional Perturbation
+          information_content: HIGH — captures what each binding event functionally does to local biochemistry
+          layer_number: '2'
+          reconstruction_difficulty: MODERATE — same binding can produce different functional consequences depending on system context
+          primitive: ς (State)
+      check_organ:
+        type: condition
+        variable: evidence_source
+        operator: eq
+        value: clinical_observation
+        true_next: check_has_mechanism
+        false_next: check_systemic
+      check_has_mechanism:
+        type: condition
+        variable: has_mechanistic_detail
+        operator: eq
+        value: true
+        true_next: classify_organ_with_mechanism
+        false_next: classify_organ_without_mechanism
+      classify_systemic:
+        type: return
+        value:
+          layer_number: '6'
+          information_content: LOW — highest abstraction, most confounded by feedback loops
+          primitive: ρ (Recursion)
+          reconstruction_difficulty: VERY HIGH — liver dysfunction changes metabolism changes exposure changes the perturbation pattern itself
+          layer: L6 — Systemic Feedback
+          recommendation: 'Systemic observations are self-referential — the perturbation modifies the system that modifies the perturbation. Model as recursive: P(t+1) = f(P(t), S(t)) where S itself depends on P.'
+      check_pathway:
+        type: condition
+        variable: evidence_source
+        operator: eq
+        value: pathway_analysis
+        true_next: classify_pathway
+        false_next: check_cellular
+      check_functional:
+        type: condition
+        variable: evidence_source
+        operator: eq
+        value: functional_assay
+        true_next: classify_functional
+        false_next: check_pathway
+      check_systemic:
+        type: condition
+        variable: evidence_source
+        operator: eq
+        value: systemic_observation
+        true_next: classify_systemic
+        false_next: classify_unknown
+      check_unknown_organ:
+        type: condition
+        variable: is_organ_manifestation
+        operator: eq
+        value: true
+        true_next: classify_organ_without_mechanism
+        false_next: check_unknown_systemic
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: is_systemic_feedback
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: is_systemic_feedback
+        operator: neq
+        value: binding_assay
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_mechanistic_detail:
+        type: bool
+        required: false
+      is_binding_data:
+        type: bool
+        required: false
+      is_cellular_response:
+        type: bool
+        required: false
+      is_systemic_feedback:
+        type: bool
+        required: false
+      is_pathway_level:
+        type: bool
+        required: false
+      is_organ_manifestation:
+        type: bool
+        required: false
+      is_functional_assay:
+        type: bool
+        required: false
+      evidence_source:
+        type: string
+        required: true
+    outputs:
+      reconstruction_difficulty:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      layer:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      information_content:
+        type: string
+        required: false
+      layer_number:
+        type: string
+        required: false
+      recommendation:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      primitive:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    is_systemic_feedback: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    is_systemic_feedback: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

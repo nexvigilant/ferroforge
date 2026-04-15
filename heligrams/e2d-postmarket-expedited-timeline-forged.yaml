@@ -1,0 +1,279 @@
+name: e2d-postmarket-expedited-timeline-helix
+description: 'Forged from microgram ''e2d-postmarket-expedited-timeline''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    action_required: falsified
+sense:
+  tree:
+    start: check_serious
+    nodes:
+      return_15_day_study:
+        type: return
+        value:
+          deadline_days: 15
+          regulatory_reference: ICH E2D Section 4.3 - Post-Approval Study Reporting
+          action_required: true
+          reporting_category: post_approval_study_expedited
+          report_type: EXPEDITED_15_DAY_STUDY
+      check_unexpected:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: check_fatal
+        false_next: return_serious_expected
+      return_non_serious:
+        type: return
+        value:
+          report_type: PERIODIC_LINE_LISTING
+          action_required: false
+          deadline_days: 90
+          reporting_category: periodic
+          regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+      check_serious:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_unexpected
+        false_next: return_non_serious
+      return_15_day_spontaneous:
+        type: return
+        value:
+          action_required: true
+          report_type: EXPEDITED_15_DAY
+          regulatory_reference: ICH E2D Section 4.1 - Expedited Reporting Requirements
+          reporting_category: post_approval_expedited
+          deadline_days: 15
+      check_life_threatening:
+        type: condition
+        variable: is_life_threatening
+        operator: eq
+        value: true
+        true_next: return_7_day
+        false_next: check_study_postapproval
+      return_7_day:
+        type: return
+        value:
+          reporting_category: post_approval_expedited
+          regulatory_reference: ICH E2D Section 4.1 - Expedited Reporting Requirements
+          action_required: true
+          report_type: EXPEDITED_7_DAY
+          deadline_days: 7
+      check_study_postapproval:
+        type: condition
+        variable: study_type
+        operator: eq
+        value: postapproval_study
+        true_next: return_15_day_study
+        false_next: return_15_day_spontaneous
+      check_fatal:
+        type: condition
+        variable: is_fatal
+        operator: eq
+        value: true
+        true_next: return_7_day
+        false_next: check_life_threatening
+      return_serious_expected:
+        type: return
+        value:
+          regulatory_reference: ICH E2D Section 6 - Periodic Safety Update Reports
+          deadline_days: 90
+          report_type: PERIODIC_PSUR
+          action_required: false
+          reporting_category: periodic
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      action_required: true
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      action_required: true
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      action_required: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: absent
+      confidence_score: 0.7
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_serious:
+        type: bool
+        required: false
+      is_fatal:
+        type: bool
+        required: false
+      comorbidity_explains:
+        type: bool
+        required: false
+      coding_verified:
+        type: bool
+        required: false
+      follow_up_complete:
+        type: bool
+        required: false
+      study_type:
+        type: string
+        required: false
+      is_unexpected:
+        type: bool
+        required: false
+      is_life_threatening:
+        type: bool
+        required: false
+    outputs:
+      action_required:
+        type: bool
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      reporting_category:
+        type: string
+        required: false
+      deadline_days:
+        type: int
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      report_type:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    follow_up_complete: true
+    is_unexpected: true
+    is_serious: true
+    is_fatal: true
+    is_life_threatening: false
+    study_type: spontaneous
+    comorbidity_explains: false
+    coding_verified: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    follow_up_complete: false
+    is_unexpected: true
+    is_serious: true
+    is_fatal: true
+    is_life_threatening: false
+    study_type: spontaneous
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - is_serious
+  - is_unexpected
+  - is_fatal
+  - is_life_threatening
+  - study_type
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

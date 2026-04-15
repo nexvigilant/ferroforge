@@ -1,0 +1,44 @@
+name: comms-transmit-pipeline
+description: 'Select optimal link → validate security → transmit decision. Routes communication through link selection and security gate before allowing transmission.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - comms-link-router
+  - comms-security-gate
+tests:
+- name: airborne ATC — VHF selected, security passes (unencrypted by regulation)
+  input:
+    range_km: 5.0
+    data_rate_required: telemetry_only
+    criticality: atc_mandatory
+    airborne: true
+    link_type: vhf_radio
+  expect:
+    selected_link: vhf_radio
+    verdict: pass
+    security_level: "unencrypted_regulated"
+- name: ground Wi-Fi video with full security
+  input:
+    range_km: 0.05
+    data_rate_required: video
+    wifi_available: true
+    link_type: wifi_6e
+    mtls_active: true
+    firmware_signed: true
+    replay_nonce_valid: true
+    certificate_pinned: true
+  expect:
+    selected_link: wifi_6e
+    verdict: pass
+    security_level: "full_mtls_pinned"
+- name: 5G with no mTLS — link selected but transmission blocked
+  input:
+    range_km: 10.0
+    data_rate_required: medium_bandwidth
+    primary_5g_status: connected
+    link_type: fiveg_modem
+    mtls_active: false
+  expect:
+    selected_link: fiveg_modem
+    verdict: block

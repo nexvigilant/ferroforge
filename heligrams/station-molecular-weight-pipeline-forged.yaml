@@ -1,0 +1,148 @@
+name: station-molecular-weight-pipeline-helix
+description: 'Forged from microgram ''station-molecular-weight-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    route: falsified
+sense:
+  tree:
+    start: check_mw
+    nodes:
+      check_mw:
+        type: condition
+        variable: molecular_weight
+        operator: gte
+        value: 500
+        true_next: lipinski_fail
+        false_next: check_low
+      normal:
+        type: return
+        value:
+          route: archive
+          action: pass
+          reason: MW 100-500 Da — within drug-like range
+          priority: low
+      lipinski_fail:
+        type: return
+        value:
+          priority: moderate
+          reason: MW≥500 Da — Lipinski Rule of 5 violation, oral bioavailability concern
+          route: admet_review
+          action: flag
+      fragment:
+        type: return
+        value:
+          priority: low
+          route: archive
+          reason: MW≤100 Da — molecular fragment, not drug-like
+          action: classify
+      check_low:
+        type: condition
+        variable: molecular_weight
+        operator: lte
+        value: 100
+        true_next: fragment
+        false_next: normal
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: molecular_weight
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: molecular_weight
+        operator: lt
+        value: 500
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      molecular_weight:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    molecular_weight: 510
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    molecular_weight: 499
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

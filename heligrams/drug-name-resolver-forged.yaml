@@ -1,0 +1,186 @@
+name: drug-name-resolver-helix
+description: 'Forged from microgram ''drug-name-resolver''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    needs_resolution: falsified
+sense:
+  tree:
+    start: check_generic
+    nodes:
+      check_inn:
+        type: condition
+        variable: name_type
+        operator: eq
+        value: inn
+        true_next: inn_route
+        false_next: unknown_route
+      brand_route:
+        type: return
+        value:
+          resolution_source: dailymed
+          needs_resolution: false
+          confidence: high
+          normalized_name: brand
+      inn_route:
+        type: return
+        value:
+          confidence: high
+          resolution_source: who_dd
+          normalized_name: inn
+          needs_resolution: false
+      unknown_route:
+        type: return
+        value:
+          confidence: low
+          resolution_source: multi_source
+          needs_resolution: true
+          normalized_name: unknown
+      check_brand:
+        type: condition
+        variable: name_type
+        operator: eq
+        value: brand
+        true_next: brand_route
+        false_next: check_inn
+      check_generic:
+        type: condition
+        variable: name_type
+        operator: eq
+        value: generic
+        true_next: generic_route
+        false_next: check_brand
+      generic_route:
+        type: return
+        value:
+          normalized_name: generic
+          needs_resolution: false
+          resolution_source: rxnorm
+          confidence: high
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: name_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: name_type
+        operator: neq
+        value: generic
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      needs_resolution: true
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      needs_resolution: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      falsified: false
+      needs_resolution: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      drug_name:
+        type: string
+        required: false
+      name_type:
+        type: string
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      resolution_source:
+        type: string
+        required: false
+      normalized_name:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      needs_resolution:
+        type: bool
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    drug_name: mystery_drug
+    name_type: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    drug_name: mystery_drug
+    name_type: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

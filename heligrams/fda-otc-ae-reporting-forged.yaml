@@ -1,0 +1,302 @@
+name: fda-otc-ae-reporting-helix
+description: 'Forged from microgram ''fda-otc-ae-reporting''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    reporting_required: falsified
+sense:
+  tree:
+    start: check_product_status
+    nodes:
+      check_dietary:
+        type: condition
+        variable: product_status
+        operator: eq
+        value: dietary_supplement
+        true_next: dietary_serious_check
+        false_next: unapproved_serious_check
+      dietary_serious_check:
+        type: condition
+        variable: serious
+        operator: eq
+        value: true
+        true_next: dietary_serious
+        false_next: dietary_nonserious
+      nda_serious:
+        type: return
+        value:
+          timeline_days: 15
+          reporting_required: true
+          report_type: 15-DAY_EXPEDITED
+          submission_method: E2B(R3) via FDA ESG or MedWatch 3500A
+          regulatory_reference: '21 CFR 314.80(c)(1); FDA Guidance: Postmarketing AE Reporting for Nonprescription Products (2009)'
+      monograph_nonserious:
+        type: return
+        value:
+          report_type: VOLUNTARY
+          timeline_days: 0
+          submission_method: MedWatch 3500B voluntary reporting encouraged
+          regulatory_reference: 'FDA Guidance: Postmarketing AE Reporting for Nonprescription Products (2009), Section III.C'
+          reporting_required: false
+      dietary_nonserious:
+        type: return
+        value:
+          report_type: VOLUNTARY
+          timeline_days: 0
+          submission_method: MedWatch 3500B voluntary reporting encouraged
+          regulatory_reference: Dietary Supplement and Nonprescription Drug Consumer Protection Act (2006)
+          reporting_required: false
+      check_product_status:
+        type: condition
+        variable: product_status
+        operator: eq
+        value: approved_nda
+        true_next: nda_serious_check
+        false_next: check_monograph
+      unapproved_serious_check:
+        type: condition
+        variable: serious
+        operator: eq
+        value: true
+        true_next: unapproved_serious
+        false_next: unapproved_nonserious
+      dietary_serious:
+        type: return
+        value:
+          timeline_days: 15
+          submission_method: MedWatch 3500A to FDA
+          reporting_required: true
+          report_type: MANDATORY_SERIOUS
+          regulatory_reference: Dietary Supplement and Nonprescription Drug Consumer Protection Act (2006), Section 761
+      nda_serious_check:
+        type: condition
+        variable: serious
+        operator: eq
+        value: true
+        true_next: nda_serious
+        false_next: nda_nonserious
+      monograph_serious:
+        type: return
+        value:
+          reporting_required: true
+          regulatory_reference: Dietary Supplement and Nonprescription Drug Consumer Protection Act (2006); FDA Guidance (2009), Section III.B
+          report_type: MANDATORY_SERIOUS
+          timeline_days: 15
+          submission_method: MedWatch 3500A to FDA
+      unapproved_serious:
+        type: return
+        value:
+          submission_method: MedWatch 3500A to FDA
+          regulatory_reference: Dietary Supplement and Nonprescription Drug Consumer Protection Act (2006); FDA Guidance (2009), Section IV
+          report_type: MANDATORY_SERIOUS
+          reporting_required: true
+          timeline_days: 15
+      nda_nonserious:
+        type: return
+        value:
+          submission_method: NDA Periodic Safety Report or MedWatch 3500A
+          report_type: PERIODIC
+          reporting_required: true
+          timeline_days: 90
+          regulatory_reference: '21 CFR 314.80(c)(2); FDA Guidance: Postmarketing AE Reporting for Nonprescription Products (2009)'
+      unapproved_nonserious:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: Postmarketing AE Reporting for Nonprescription Products (2009), Section IV'
+          timeline_days: 0
+          submission_method: MedWatch 3500B voluntary reporting encouraged
+          reporting_required: false
+          report_type: VOLUNTARY
+      monograph_serious_check:
+        type: condition
+        variable: serious
+        operator: eq
+        value: true
+        true_next: monograph_serious
+        false_next: monograph_nonserious
+      check_monograph:
+        type: condition
+        variable: product_status
+        operator: eq
+        value: otc_monograph
+        true_next: monograph_serious_check
+        false_next: check_dietary
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      reporting_required: true
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+      reporting_required: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      reporting_required: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: absent
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      follow_up_complete:
+        type: bool
+        required: false
+      comorbidity_explains:
+        type: bool
+        required: false
+      serious:
+        type: bool
+        required: true
+      coding_verified:
+        type: bool
+        required: false
+      product_status:
+        type: string
+        required: true
+      reporter_type:
+        type: string
+        required: false
+    outputs:
+      submission_method:
+        type: string
+        required: false
+      timeline_days:
+        type: int
+        required: false
+      confidence:
+        type: string
+        required: false
+      report_type:
+        type: string
+        required: false
+      reporting_required:
+        type: bool
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    product_status: approved_nda
+    follow_up_complete: true
+    comorbidity_explains: false
+    coding_verified: true
+    serious: true
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    product_status: approved_nda
+    follow_up_complete: false
+    serious: true
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - product_status
+  - serious
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

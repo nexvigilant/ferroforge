@@ -1,0 +1,325 @@
+name: nexcore-pipeline-helix
+description: 'Forged from microgram ''nexcore-pipeline''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    publishable: falsified
+sense:
+  tree:
+    start: check_streams
+    nodes:
+      check_ledger:
+        type: condition
+        variable: is_transaction_ledger
+        operator: eq
+        value: true
+        true_next: check_reconciled
+        false_next: estimated_high
+      faers_grade:
+        type: return
+        value:
+          nexcore_stamp: NV-REJECTED
+          denominator_class: unknown
+          verification_level: none
+          publishable: false
+          regulatory_submittable: false
+          pipeline_summary: 'Rejected: <30% capture. This is FAERS-class unknown denominator. NexCore cannot verify. Acquire counted data.'
+      hypothesis_grade:
+        type: return
+        value:
+          pipeline_summary: 'Hypothesis only: 30-60% capture. Denominator is modeled. Use only for hypothesis generation.'
+          publishable: false
+          denominator_class: modeled
+          regulatory_submittable: false
+          nexcore_stamp: NV-HYPOTHESIS
+          verification_level: minimal
+      check_streams:
+        type: condition
+        variable: stream_count
+        operator: gte
+        value: 1
+        true_next: check_capture_high
+        false_next: pipeline_rejected
+      check_multi_stream_verified:
+        type: condition
+        variable: stream_count
+        operator: gte
+        value: 2
+        true_next: verified_multi
+        false_next: verified_single
+      check_boundary_for_verified:
+        type: condition
+        variable: boundary_type
+        operator: eq
+        value: pharmacy
+        true_next: gold_standard
+        false_next: check_multi_stream_verified
+      screening_grade:
+        type: return
+        value:
+          pipeline_summary: 'Screening only: 60-90% capture. Use for internal signal detection. Do not cite as verified incidence.'
+          denominator_class: estimated
+          verification_level: low
+          publishable: false
+          regulatory_submittable: false
+          nexcore_stamp: NV-SCREENING
+      estimated_deduped:
+        type: return
+        value:
+          regulatory_submittable: false
+          verification_level: moderate
+          publishable: true
+          nexcore_stamp: NV-ESTIMATED-HIGH
+          pipeline_summary: 'High-confidence estimate: >90% capture, deduplicated, not a ledger. Suitable for signal detection and publication with caveats.'
+          denominator_class: estimated
+      check_reconciled:
+        type: condition
+        variable: has_reconciliation
+        operator: eq
+        value: true
+        true_next: check_boundary_for_verified
+        false_next: counted_unreconciled
+      check_capture_high:
+        type: condition
+        variable: capture_pct
+        operator: gte
+        value: 90
+        true_next: check_ledger
+        false_next: check_capture_moderate
+      verified_multi:
+        type: return
+        value:
+          nexcore_stamp: NV-VERIFIED
+          verification_level: high
+          regulatory_submittable: true
+          pipeline_summary: 'Verified: census denominator, reconciled, multi-stream cross-verified. Publication and regulatory grade.'
+          denominator_class: counted
+          publishable: true
+      estimated_high:
+        type: condition
+        variable: has_dedup
+        operator: eq
+        value: true
+        true_next: estimated_deduped
+        false_next: estimated_raw
+      pipeline_rejected:
+        type: return
+        value:
+          publishable: false
+          regulatory_submittable: false
+          pipeline_summary: 'Pipeline blocked: no data streams. Cannot thread any boundary.'
+          denominator_class: absent
+          nexcore_stamp: NV-REJECTED
+          verification_level: none
+      check_capture_low:
+        type: condition
+        variable: capture_pct
+        operator: gte
+        value: 30
+        true_next: hypothesis_grade
+        false_next: faers_grade
+      gold_standard:
+        type: return
+        value:
+          verification_level: maximum
+          publishable: true
+          nexcore_stamp: NV-VERIFIED
+          pipeline_summary: 'Gold standard: pharmacy-level, transaction ledger, reconciled, multi-source verified. True incidence rate.'
+          regulatory_submittable: true
+          denominator_class: counted
+      estimated_raw:
+        type: return
+        value:
+          publishable: false
+          denominator_class: estimated
+          verification_level: moderate
+          pipeline_summary: 'Estimated: >90% capture but no dedup. Run deduplication before rate computation.'
+          nexcore_stamp: NV-ESTIMATED
+          regulatory_submittable: false
+      verified_single:
+        type: return
+        value:
+          regulatory_submittable: false
+          pipeline_summary: 'Counted: census denominator, reconciled, single stream. Add second stream for regulatory grade.'
+          publishable: true
+          nexcore_stamp: NV-COUNTED
+          verification_level: high
+          denominator_class: counted
+      check_capture_moderate:
+        type: condition
+        variable: capture_pct
+        operator: gte
+        value: 60
+        true_next: screening_grade
+        false_next: check_capture_low
+      counted_unreconciled:
+        type: return
+        value:
+          pipeline_summary: 'Counted but unreconciled: transaction ledger present. Run boundary reconciliation to upgrade to NV-VERIFIED.'
+          publishable: true
+          nexcore_stamp: NV-COUNTED
+          verification_level: high
+          regulatory_submittable: false
+          denominator_class: counted
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: is_transaction_ledger
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: is_transaction_ledger
+        operator: lt
+        value: 1
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      publishable: true
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      publishable: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when:
+      publishable: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: absent
+  - when:
+      publishable: false
+      falsified: true
+    default: null
+    emit:
+      verdict: refuted
+      confidence: medium
+      confidence_score: 0.42
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_transaction_ledger:
+        type: bool
+        required: false
+      stream_count:
+        type: int
+        required: true
+      has_dedup:
+        type: bool
+        required: false
+      has_reconciliation:
+        type: bool
+        required: false
+      capture_pct:
+        type: float
+        required: true
+      boundary_type:
+        type: string
+        required: true
+    outputs:
+      denominator_class:
+        type: string
+        required: false
+      nexcore_stamp:
+        type: string
+        required: false
+      publishable:
+        type: bool
+        required: false
+      confidence:
+        type: string
+        required: false
+      verification_level:
+        type: string
+        required: false
+      regulatory_submittable:
+        type: bool
+        required: false
+      pipeline_summary:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    boundary_type: pharmacy
+    stream_count: 3
+    capture_pct: 98
+    has_reconciliation: true
+    is_transaction_ledger: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    boundary_type: pharmacy
+    stream_count: 3
+    capture_pct: 98
+    has_reconciliation: true
+    is_transaction_ledger: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

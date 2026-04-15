@@ -1,0 +1,183 @@
+name: meddra-multiaxial-helix
+description: 'Forged from microgram ''meddra-multiaxial''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    multiaxial_compliant: falsified
+sense:
+  tree:
+    start: validate_pt_code
+    nodes:
+      check_anatomical_axis:
+        type: condition
+        variable: anatomical_system
+        operator: is_not_null
+        value: null
+        true_next: check_aetiological_axis
+        false_next: multiaxial_unknown
+      validate_pt_code:
+        type: condition
+        variable: meddra_pt_code
+        operator: is_not_null
+        value: null
+        true_next: check_anatomical_axis
+        false_next: multiaxial_unknown
+      multiaxial_complete:
+        type: return
+        value:
+          severity_classification: severe
+          pathophysiological_classification: arrhythmia
+          temporal_classification: acute
+          aetiological_classification: drug_induced
+          anatomical_classification: cardiac
+          multiaxial_compliant: true
+      check_aetiological_axis:
+        type: condition
+        variable: aetiology
+        operator: is_not_null
+        value: null
+        true_next: check_pathophysiological_axis
+        false_next: multiaxial_unknown
+      multiaxial_unknown:
+        type: return
+        value:
+          anatomical_classification: null
+          aetiological_classification: null
+          multiaxial_compliant: false
+          pathophysiological_classification: null
+          temporal_classification: null
+          severity_classification: null
+      check_pathophysiological_axis:
+        type: condition
+        variable: pathophysiological_axis
+        operator: is_not_null
+        value: null
+        true_next: multiaxial_complete
+        false_next: multiaxial_unknown
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: anatomical_system
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: anatomical_system
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      multiaxial_compliant: true
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+      multiaxial_compliant: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      multiaxial_compliant: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when:
+      multiaxial_compliant: false
+      falsified: true
+    default: null
+    emit:
+      verdict: refuted
+      confidence_score: 0.42
+      confidence: medium
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      anatomical_system:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    meddra_pt_code: '10007585'
+    pathophysiological_axis: arrhythmia
+    anatomical_system: null
+    aetiology: drug_induced
+  expect:
+    confidence: high
+    verdict: absent
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    meddra_pt_code: '10007585'
+    pathophysiological_axis: arrhythmia
+    anatomical_system: cardiac
+    aetiology: drug_induced
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,410 @@
+name: multi-signal-combiner-helix
+description: 'Forged from microgram ''multi-signal-combiner''. Domain: SignalDetection. 4 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    signal_detected: falsified
+sense:
+  tree:
+    start: check_prr_strong
+    nodes:
+      prr_mod_check_ror:
+        type: condition
+        variable: ror_signal
+        operator: eq
+        value: MODERATE
+        true_next: prr_ror_mod_check_ic
+        false_next: prr_mod_ror_none_check_ic
+      prr_mod_ror_none_check_ic:
+        type: condition
+        variable: ic_signal
+        operator: eq
+        value: MODERATE
+        true_next: prr_ic_mod_check_ebgm
+        false_next: prr_mod_only_check_ebgm
+      probable_three_moderate:
+        type: return
+        value:
+          signal_detected: true
+          overall: PROBABLE
+          priority: HIGH
+      ic_strong_check_ebgm:
+        type: condition
+        variable: ebgm_signal
+        operator: eq
+        value: STRONG
+        true_next: confirmed
+        false_next: probable_one_strong
+      no_strong_check_ebgm:
+        type: condition
+        variable: ebgm_signal
+        operator: eq
+        value: STRONG
+        true_next: probable_one_strong
+        false_next: count_moderate_prr
+      prr_not_strong_check_ror:
+        type: condition
+        variable: ror_signal
+        operator: eq
+        value: STRONG
+        true_next: ror_strong_check_ic
+        false_next: no_strong_check_ic
+      probable_one_strong:
+        type: return
+        value:
+          overall: PROBABLE
+          signal_detected: true
+          priority: HIGH
+      count_moderate_prr:
+        type: condition
+        variable: prr_signal
+        operator: eq
+        value: MODERATE
+        true_next: prr_mod_check_ror
+        false_next: prr_none_check_ror
+      prr_strong_check_ebgm:
+        type: condition
+        variable: ebgm_signal
+        operator: eq
+        value: STRONG
+        true_next: confirmed
+        false_next: probable_one_strong
+      ror_strong_check_ebgm:
+        type: condition
+        variable: ebgm_signal
+        operator: eq
+        value: STRONG
+        true_next: confirmed
+        false_next: probable_one_strong
+      prr_none_check_ror:
+        type: condition
+        variable: ror_signal
+        operator: eq
+        value: MODERATE
+        true_next: ror_mod_check_ic
+        false_next: ror_none_check_ic
+      suggestive_one_moderate:
+        type: return
+        value:
+          overall: SUGGESTIVE
+          priority: LOW
+          signal_detected: true
+      prr_strong_check_ror:
+        type: condition
+        variable: ror_signal
+        operator: eq
+        value: STRONG
+        true_next: confirmed
+        false_next: prr_strong_check_ic
+      possible_two_moderate:
+        type: return
+        value:
+          signal_detected: true
+          overall: POSSIBLE
+          priority: MEDIUM
+      no_signal:
+        type: return
+        value:
+          priority: NONE
+          signal_detected: false
+          overall: NO_SIGNAL
+      ror_ic_mod_check_ebgm:
+        type: condition
+        variable: ebgm_signal
+        operator: eq
+        value: MODERATE
+        true_next: probable_three_moderate
+        false_next: possible_two_moderate
+      check_prr_strong:
+        type: condition
+        variable: prr_signal
+        operator: eq
+        value: STRONG
+        true_next: prr_strong_check_ror
+        false_next: prr_not_strong_check_ror
+      ror_mod_check_ic:
+        type: condition
+        variable: ic_signal
+        operator: eq
+        value: MODERATE
+        true_next: ror_ic_mod_check_ebgm
+        false_next: ror_mod_only_check_ic_false
+      ror_none_check_ic:
+        type: condition
+        variable: ic_signal
+        operator: eq
+        value: MODERATE
+        true_next: ic_mod_check_ebgm
+        false_next: ic_none_check_ebgm
+      ic_mod_check_ebgm:
+        type: condition
+        variable: ebgm_signal
+        operator: eq
+        value: MODERATE
+        true_next: possible_two_moderate
+        false_next: suggestive_one_moderate
+      confirmed:
+        type: return
+        value:
+          overall: CONFIRMED
+          priority: CRITICAL
+          signal_detected: true
+      prr_strong_check_ic:
+        type: condition
+        variable: ic_signal
+        operator: eq
+        value: STRONG
+        true_next: confirmed
+        false_next: prr_strong_check_ebgm
+      prr_ror_mod_check_ic:
+        type: condition
+        variable: ic_signal
+        operator: eq
+        value: MODERATE
+        true_next: probable_three_moderate
+        false_next: prr_ror_mod_check_ebgm
+      ror_strong_check_ic:
+        type: condition
+        variable: ic_signal
+        operator: eq
+        value: STRONG
+        true_next: confirmed
+        false_next: ror_strong_check_ebgm
+      ic_none_check_ebgm:
+        type: condition
+        variable: ebgm_signal
+        operator: eq
+        value: MODERATE
+        true_next: suggestive_one_moderate
+        false_next: no_signal
+      prr_mod_only_check_ebgm:
+        type: condition
+        variable: ebgm_signal
+        operator: eq
+        value: MODERATE
+        true_next: possible_two_moderate
+        false_next: suggestive_one_moderate
+      prr_ic_mod_check_ebgm:
+        type: condition
+        variable: ebgm_signal
+        operator: eq
+        value: MODERATE
+        true_next: probable_three_moderate
+        false_next: possible_two_moderate
+      ror_mod_only_check_ic_false:
+        type: condition
+        variable: ebgm_signal
+        operator: eq
+        value: MODERATE
+        true_next: possible_two_moderate
+        false_next: suggestive_one_moderate
+      no_strong_check_ic:
+        type: condition
+        variable: ic_signal
+        operator: eq
+        value: STRONG
+        true_next: ic_strong_check_ebgm
+        false_next: no_strong_check_ebgm
+      prr_ror_mod_check_ebgm:
+        type: condition
+        variable: ebgm_signal
+        operator: eq
+        value: MODERATE
+        true_next: probable_three_moderate
+        false_next: possible_two_moderate
+antisense:
+  tree:
+    start: null_guard_insufficient_n
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_channeling_bias:
+        type: condition
+        variable: channeling_bias
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_channeling_bias
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_channeling_bias:
+        type: condition
+        variable: channeling_bias
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_notoriety_bias:
+        type: condition
+        variable: notoriety_bias
+        operator: is_null
+        value: null
+        true_next: null_guard_weber_effect
+        false_next: check_notoriety_bias
+      check_weber_effect:
+        type: condition
+        variable: years_on_market
+        operator: gt
+        value: 5
+        true_next: falsified
+        false_next: null_guard_channeling_bias
+      check_notoriety_bias:
+        type: condition
+        variable: notoriety_bias
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_weber_effect
+      check_insufficient_n:
+        type: condition
+        variable: case_count
+        operator: lt
+        value: 3
+        true_next: falsified
+        false_next: null_guard_notoriety_bias
+      null_guard_insufficient_n:
+        type: condition
+        variable: case_count
+        operator: is_null
+        value: null
+        true_next: null_guard_notoriety_bias
+        false_next: check_insufficient_n
+      null_guard_weber_effect:
+        type: condition
+        variable: years_on_market
+        operator: is_null
+        value: null
+        true_next: null_guard_channeling_bias
+        false_next: check_weber_effect
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      signal_detected: true
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7000000000000001
+      verdict: confirmed
+  - when:
+      signal_detected: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.28
+  - when:
+      signal_detected: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7000000000000001
+      confidence: high
+      verdict: absent
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      prr_signal:
+        type: string
+        required: false
+      ebgm_signal:
+        type: string
+        required: false
+      case_count:
+        type: integer
+        required: false
+      notoriety_bias:
+        type: bool
+        required: false
+      ror_signal:
+        type: string
+        required: false
+      ic_signal:
+        type: string
+        required: false
+      channeling_bias:
+        type: bool
+        required: false
+      years_on_market:
+        type: integer
+        required: false
+    outputs:
+      signal_detected:
+        type: bool
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      priority:
+        type: string
+        required: false
+      overall:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    prr_signal: STRONG
+    years_on_market: 0
+    ebgm_signal: NONE
+    ic_signal: MODERATE
+    ror_signal: STRONG
+    notoriety_bias: false
+    case_count: 13
+    channeling_bias: false
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, insufficient_n active'
+  input:
+    ebgm_signal: NONE
+    ic_signal: MODERATE
+    prr_signal: STRONG
+    ror_signal: STRONG
+    case_count: 2
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — signal-detection with 4 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: signal-detection. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,224 @@
+name: ndc-validator-helix
+description: 'Forged from microgram ''ndc-validator''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    valid_format: falsified
+sense:
+  tree:
+    start: validate_ndc_format
+    nodes:
+      missing_input:
+        type: return
+        value:
+          ndc_type: null
+          valid_format: false
+          needs_padding: false
+      invalid_ndc_type:
+        type: return
+        value:
+          ndc_type: null
+          needs_padding: false
+          valid_format: false
+      classify_ndc_format:
+        type: condition
+        variable: ndc_format
+        operator: matches
+        value: (?i)^4-4-2$
+        true_next: format_4_4_2
+        false_next: check_5_3_2
+      format_5_4_2:
+        type: return
+        value:
+          needs_padding: false
+          valid_format: true
+          ndc_type: 5-4-2
+      format_5_3_2:
+        type: return
+        value:
+          valid_format: true
+          ndc_type: 5-3-2
+          needs_padding: true
+      check_5_3_2:
+        type: condition
+        variable: ndc_format
+        operator: matches
+        value: (?i)^5-3-2$
+        true_next: format_5_3_2
+        false_next: check_5_4_1
+      check_5_4_1:
+        type: condition
+        variable: ndc_format
+        operator: matches
+        value: (?i)^5-4-1$
+        true_next: format_5_4_1
+        false_next: check_5_4_2
+      validate_digit_count:
+        type: condition
+        variable: digit_count
+        operator: gte
+        value: 10
+        true_next: check_digit_count_max
+        false_next: invalid_format
+      format_5_4_1:
+        type: return
+        value:
+          needs_padding: true
+          ndc_type: 5-4-1
+          valid_format: true
+      format_4_4_2:
+        type: return
+        value:
+          needs_padding: true
+          valid_format: true
+          ndc_type: 4-4-2
+      check_digit_count_max:
+        type: condition
+        variable: digit_count
+        operator: lte
+        value: 11
+        true_next: classify_ndc_format
+        false_next: invalid_format
+      validate_ndc_format:
+        type: condition
+        variable: ndc_format
+        operator: is_not_null
+        value: null
+        true_next: validate_digit_count
+        false_next: missing_input
+      check_5_4_2:
+        type: condition
+        variable: ndc_format
+        operator: matches
+        value: (?i)^5-4-2$
+        true_next: format_5_4_2
+        false_next: invalid_ndc_type
+      invalid_format:
+        type: return
+        value:
+          needs_padding: false
+          valid_format: false
+          ndc_type: null
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: ndc_format
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: ndc_format
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      valid_format: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      valid_format: true
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when:
+      falsified: false
+      valid_format: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when:
+      valid_format: false
+      falsified: true
+    default: null
+    emit:
+      verdict: refuted
+      confidence: medium
+      confidence_score: 0.42
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      ndc_format:
+        type: any
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    ndc_format: null
+    digit_count: 10
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    ndc_format: 4-4-2
+    digit_count: 10
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

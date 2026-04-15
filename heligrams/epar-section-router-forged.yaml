@@ -1,0 +1,183 @@
+name: epar-section-router-helix
+description: 'Forged from microgram ''epar-section-router''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    module_number: falsified
+sense:
+  tree:
+    start: validate_query_type
+    nodes:
+      route_efficacy:
+        type: return
+        value:
+          module_number: 2
+          epar_section: efficacy
+          relevance_to_pv: indirect
+      classify_query:
+        type: condition
+        variable: query_type
+        operator: matches
+        value: (?i)^efficacy$
+        true_next: route_efficacy
+        false_next: check_safety
+      check_rmp:
+        type: condition
+        variable: query_type
+        operator: matches
+        value: (?i)^rmp$
+        true_next: route_rmp
+        false_next: invalid_query
+      check_quality:
+        type: condition
+        variable: query_type
+        operator: matches
+        value: (?i)^quality$
+        true_next: route_quality
+        false_next: check_rmp
+      route_quality:
+        type: return
+        value:
+          relevance_to_pv: indirect
+          epar_section: quality
+          module_number: 3
+      missing_input:
+        type: return
+        value:
+          module_number: null
+          epar_section: null
+          relevance_to_pv: null
+      check_safety:
+        type: condition
+        variable: query_type
+        operator: matches
+        value: (?i)^safety$
+        true_next: route_safety
+        false_next: check_quality
+      route_safety:
+        type: return
+        value:
+          epar_section: safety
+          relevance_to_pv: direct
+          module_number: 2
+      validate_query_type:
+        type: condition
+        variable: query_type
+        operator: is_not_null
+        value: null
+        true_next: classify_query
+        false_next: missing_input
+      invalid_query:
+        type: return
+        value:
+          module_number: null
+          relevance_to_pv: null
+          epar_section: null
+      route_rmp:
+        type: return
+        value:
+          relevance_to_pv: direct
+          epar_section: risk_management_plan
+          module_number: 1
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: query_type
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: query_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      query_type:
+        type: any
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    query_type: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,147 @@
+name: station-bicone-pipeline-helix
+description: 'Forged from microgram ''station-bicone-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    priority: falsified
+sense:
+  tree:
+    start: check_hill
+    nodes:
+      normal:
+        type: return
+        value:
+          priority: low
+          reason: Hill coefficient 0.5-4 — normal dose-response range
+          action: pass
+          route: archive
+      ultrasensitive:
+        type: return
+        value:
+          action: flag
+          priority: high
+          reason: Hill coefficient ≥4 — ultrasensitive response, narrow therapeutic window likely
+          route: therapeutic_window_analysis
+      check_low:
+        type: condition
+        variable: hill_coefficient
+        operator: lte
+        value: 0.5
+        true_next: subsensitive
+        false_next: normal
+      subsensitive:
+        type: return
+        value:
+          route: mechanism_review
+          reason: Hill coefficient ≤0.5 — negative cooperativity or subsensitive response
+          priority: moderate
+          action: investigate
+      check_hill:
+        type: condition
+        variable: hill_coefficient
+        operator: gte
+        value: 4.0
+        true_next: ultrasensitive
+        false_next: check_low
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: hill_coefficient
+        operator: lt
+        value: 4.0
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: hill_coefficient
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      hill_coefficient:
+        type: float
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    hill_coefficient: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

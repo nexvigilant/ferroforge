@@ -1,0 +1,185 @@
+name: severity-tier-helix
+description: 'Forged from microgram ''severity-tier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    escalate: falsified
+sense:
+  tree:
+    start: critical_check
+    nodes:
+      high_check:
+        type: condition
+        variable: severity
+        operator: gte
+        value: 70
+        true_next: high
+        false_next: medium_check
+      critical:
+        type: return
+        value:
+          escalate: true
+          tier: CRITICAL
+          priority: 1
+      medium:
+        type: return
+        value:
+          priority: 3
+          tier: MEDIUM
+          escalate: false
+      critical_check:
+        type: condition
+        variable: severity
+        operator: gte
+        value: 90
+        true_next: critical
+        false_next: high_check
+      high:
+        type: return
+        value:
+          tier: HIGH
+          escalate: true
+          priority: 2
+      low:
+        type: return
+        value:
+          priority: 4
+          tier: LOW
+          escalate: false
+      medium_check:
+        type: condition
+        variable: severity
+        operator: gte
+        value: 40
+        true_next: medium
+        false_next: low
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: severity
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: severity
+        operator: lt
+        value: 90
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      escalate: true
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      escalate: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      falsified: false
+      escalate: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: absent
+  - when:
+      falsified: true
+      escalate: false
+    default: null
+    emit:
+      verdict: refuted
+      confidence_score: 0.42
+      confidence: medium
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      severity:
+        type: string
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      priority:
+        type: int
+        required: false
+      verdict:
+        type: string
+        required: false
+      tier:
+        type: string
+        required: false
+      escalate:
+        type: bool
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    severity: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    severity: 95
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

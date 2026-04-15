@@ -1,0 +1,267 @@
+name: fda-clinical-hold-criteria-helix
+description: 'Forged from microgram ''fda-clinical-hold-criteria''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    hold_type: falsified
+sense:
+  tree:
+    start: check_basis
+    nodes:
+      tox_later:
+        type: return
+        value:
+          hold_type: COMPLETE_CLINICAL_HOLD
+          sponsor_response_days: 30
+          fda_action: Nonclinical safety data insufficient for proposed phase/duration. Hold until adequate toxicology studies completed.
+          regulatory_reference: 21 CFR 312.42(b)(2)(iv); ICH M3(R2)
+      unreasonable_risk_phase:
+        type: condition
+        variable: study_phase
+        operator: eq
+        value: phase1
+        true_next: phase1_risk_hold
+        false_next: later_phase_risk_hold
+      phase1_risk_hold:
+        type: return
+        value:
+          regulatory_reference: 21 CFR 312.42(b)(1)(i); FDA must notify sponsor within 30 days of IND receipt
+          fda_action: 'No subjects may be exposed. Phase 1: subjects would be exposed to unreasonable and significant risk of illness or injury.'
+          hold_type: COMPLETE_CLINICAL_HOLD
+          sponsor_response_days: 30
+      check_basis:
+        type: condition
+        variable: hold_basis
+        operator: eq
+        value: unreasonable_risk
+        true_next: unreasonable_risk_phase
+        false_next: check_investigators
+      later_phase_risk_hold:
+        type: condition
+        variable: prior_hold
+        operator: eq
+        value: true
+        true_next: repeat_hold
+        false_next: standard_risk_hold
+      full_hold_consent:
+        type: return
+        value:
+          hold_type: COMPLETE_CLINICAL_HOLD
+          fda_action: Informed consent form is deficient regarding 21 CFR 50 requirements. Hold until consent documents corrected.
+          regulatory_reference: 21 CFR 312.42(b)(2); 21 CFR 50
+          sponsor_response_days: 30
+      check_tox:
+        type: condition
+        variable: hold_basis
+        operator: eq
+        value: insufficient_toxicology
+        true_next: tox_phase_check
+        false_next: check_protocol
+      partial_hold:
+        type: return
+        value:
+          regulatory_reference: 21 CFR 312.42(b)(2)(ii); 21 CFR 312.42(c) — partial hold
+          sponsor_response_days: 30
+          hold_type: PARTIAL_CLINICAL_HOLD
+          fda_action: Hold applies only to specific investigators or clinical sites. Qualified sites may continue enrollment.
+      full_hold_protocol:
+        type: return
+        value:
+          sponsor_response_days: 30
+          hold_type: COMPLETE_CLINICAL_HOLD
+          regulatory_reference: 21 CFR 312.42(b)(2)(ii)
+          fda_action: Protocol design deficient — does not meet stated objectives or exposes subjects to unnecessary risk. Hold until protocol amended.
+      standard_risk_hold:
+        type: return
+        value:
+          hold_type: COMPLETE_CLINICAL_HOLD
+          sponsor_response_days: 30
+          fda_action: All clinical work under IND must stop. Sponsor has 30 days to respond to FDA deficiency letter.
+          regulatory_reference: 21 CFR 312.42(b)(2)(i); subjects would be exposed to unreasonable and significant risk
+      check_consent:
+        type: condition
+        variable: hold_basis
+        operator: eq
+        value: deficient_informed_consent
+        true_next: full_hold_consent
+        false_next: no_hold
+      check_protocol:
+        type: condition
+        variable: hold_basis
+        operator: eq
+        value: deficient_protocol
+        true_next: full_hold_protocol
+        false_next: check_consent
+      repeat_hold:
+        type: return
+        value:
+          sponsor_response_days: 30
+          fda_action: Repeat hold for same issue. FDA may consider IND withdrawal proceedings under 21 CFR 312.44 if sponsor fails to respond adequately.
+          hold_type: COMPLETE_CLINICAL_HOLD
+          regulatory_reference: 21 CFR 312.42(b); 21 CFR 312.44 (IND withdrawal)
+      check_investigators:
+        type: condition
+        variable: hold_basis
+        operator: eq
+        value: unqualified_investigators
+        true_next: partial_hold
+        false_next: check_brochure
+      check_brochure:
+        type: condition
+        variable: hold_basis
+        operator: eq
+        value: misleading_brochure
+        true_next: full_hold_brochure
+        false_next: check_tox
+      full_hold_brochure:
+        type: return
+        value:
+          regulatory_reference: 21 CFR 312.42(b)(2)(iii)
+          sponsor_response_days: 30
+          fda_action: Investigator Brochure is misleading, erroneous, or materially incomplete. Hold until corrected IB submitted and approved.
+          hold_type: COMPLETE_CLINICAL_HOLD
+      tox_phase1:
+        type: return
+        value:
+          sponsor_response_days: 30
+          hold_type: COMPLETE_CLINICAL_HOLD
+          fda_action: Preclinical data insufficient to assess risk to Phase 1 subjects. Hold until adequate nonclinical safety package provided.
+          regulatory_reference: 21 CFR 312.42(b)(1)(iv); ICH M3(R2)
+      no_hold:
+        type: return
+        value:
+          fda_action: No basis for clinical hold identified.
+          sponsor_response_days: 0
+          hold_type: NO_HOLD
+          regulatory_reference: 21 CFR 312.42
+      tox_phase_check:
+        type: condition
+        variable: study_phase
+        operator: eq
+        value: phase1
+        true_next: tox_phase1
+        false_next: tox_later
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: study_phase
+        operator: neq
+        value: unreasonable_risk
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: study_phase
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      study_phase:
+        type: string
+        required: false
+      hold_basis:
+        type: string
+        required: true
+      prior_hold:
+        type: bool
+        required: false
+    outputs:
+      hold_type:
+        type: string
+        required: false
+      fda_action:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      sponsor_response_days:
+        type: int
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    study_phase: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    study_phase: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - hold_basis
+  - study_phase
+  - prior_hold
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

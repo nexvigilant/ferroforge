@@ -1,0 +1,148 @@
+name: dna-similarity-classifier
+description: 'Classifies DNA strand similarity level between two encoded PV feature vectors based on Hamming distance and GC divergence'
+version: 0.1.0
+family: dna-ml
+primitive_signature:
+  dominant: comparison
+  expression: 'κ(hamming, gc_divergence) → similarity_level'
+  primes: [comparison, causality, boundary]
+interface:
+  inputs:
+    hamming_distance:
+      type: float
+      required: true
+    gc_divergence:
+      type: float
+      required: true
+    lcs_ratio:
+      type: float
+      required: false
+  outputs:
+    similarity_level:
+      type: string
+    interpretation:
+      type: string
+    same_class_likely:
+      type: bool
+tree:
+  start: check_identical
+  nodes:
+    check_identical:
+      type: condition
+      variable: hamming_distance
+      operator: lte
+      value: 0.05
+      true_next: identical
+      false_next: check_high_similarity
+
+    check_high_similarity:
+      type: condition
+      variable: hamming_distance
+      operator: lte
+      value: 0.2
+      true_next: check_gc_high
+      false_next: check_moderate
+
+    check_gc_high:
+      type: condition
+      variable: gc_divergence
+      operator: lte
+      value: 0.1
+      true_next: high_similarity
+      false_next: moderate_similarity
+
+    check_moderate:
+      type: condition
+      variable: hamming_distance
+      operator: lte
+      value: 0.5
+      true_next: moderate_similarity
+      false_next: check_divergent
+
+    check_divergent:
+      type: condition
+      variable: hamming_distance
+      operator: lte
+      value: 0.8
+      true_next: low_similarity
+      false_next: divergent
+
+    identical:
+      type: return
+      value:
+        similarity_level: identical
+        interpretation: 'Feature vectors encode to nearly identical DNA strands — same pharmacological fingerprint'
+        same_class_likely: true
+
+    high_similarity:
+      type: return
+      value:
+        similarity_level: high
+        interpretation: 'Similar DNA encoding with matching GC content — likely same signal/noise class'
+        same_class_likely: true
+
+    moderate_similarity:
+      type: return
+      value:
+        similarity_level: moderate
+        interpretation: 'Partial DNA similarity — pairs may or may not share class membership'
+        same_class_likely: false
+
+    low_similarity:
+      type: return
+      value:
+        similarity_level: low
+        interpretation: 'Substantial DNA divergence — different pharmacological profiles'
+        same_class_likely: false
+
+    divergent:
+      type: return
+      value:
+        similarity_level: divergent
+        interpretation: 'Maximally different DNA encoding — opposite signal/noise signatures'
+        same_class_likely: false
+
+tests:
+  - name: identical_strands
+    input:
+      hamming_distance: 0.0
+      gc_divergence: 0.0
+      lcs_ratio: 1.0
+    expect:
+      similarity_level: identical
+      same_class_likely: true
+
+  - name: high_similarity
+    input:
+      hamming_distance: 0.15
+      gc_divergence: 0.05
+    expect:
+      similarity_level: high
+      same_class_likely: true
+
+  - name: moderate_with_gc_divergence
+    input:
+      hamming_distance: 0.15
+      gc_divergence: 0.2
+    expect:
+      similarity_level: moderate
+
+  - name: low_similarity
+    input:
+      hamming_distance: 0.6
+      gc_divergence: 0.3
+    expect:
+      similarity_level: low
+      same_class_likely: false
+
+  - name: fully_divergent
+    input:
+      hamming_distance: 0.9
+      gc_divergence: 0.5
+    expect:
+      similarity_level: divergent
+
+  - name: null_safety
+    input: {}
+    expect:
+      similarity_level: divergent

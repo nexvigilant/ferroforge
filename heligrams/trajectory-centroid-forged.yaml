@@ -1,0 +1,243 @@
+name: trajectory-centroid-helix
+description: 'Forged from microgram ''trajectory-centroid''. Domain: SystemHealth. 2 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    trajectory_class: falsified
+sense:
+  tree:
+    start: check_velocity_not_null
+    nodes:
+      oscillating:
+        type: return
+        value:
+          trajectory_class: OSCILLATING
+          algorithm: ALG-2025-022 Trajectory Centroid Calculator — centroid_velocity <= 0 AND centroid_delta > 0 indicates oscillatory behavior
+          monitoring_action: Safety profile bouncing — velocity non-positive but centroid higher than previous. Investigate periodic or seasonal confounders.
+      check_delta_sign:
+        type: condition
+        variable: centroid_delta
+        operator: gt
+        value: 0
+        true_next: oscillating
+        false_next: stable_or_improving
+      stable_or_improving:
+        type: return
+        value:
+          monitoring_action: Safety profile stable or improving. Continue routine monitoring.
+          trajectory_class: STABLE_OR_IMPROVING
+          algorithm: ALG-2025-022 Trajectory Centroid Calculator — centroid_velocity <= 0 AND centroid not rising indicates stable or improving trajectory
+      insufficient_data:
+        type: return
+        value:
+          algorithm: ALG-2025-022 Trajectory Centroid Calculator — insufficient inputs for classification
+          monitoring_action: centroid_velocity and centroid_acceleration required for trajectory classification. Compute from centroid time series before calling.
+          trajectory_class: INSUFFICIENT_DATA
+      check_acceleration_not_null:
+        type: condition
+        variable: centroid_acceleration
+        operator: is_not_null
+        value: true
+        true_next: check_velocity_positive
+        false_next: insufficient_data
+      check_velocity_positive:
+        type: condition
+        variable: centroid_velocity
+        operator: gt
+        value: 0
+        true_next: check_accel_positive_for_drift
+        false_next: check_oscillating
+      accelerating_drift:
+        type: return
+        value:
+          trajectory_class: ACCELERATING_DRIFT
+          monitoring_action: Safety profile worsening at increasing rate. Escalate to immediate signal committee review.
+          algorithm: ALG-2025-022 Trajectory Centroid Calculator — centroid_velocity > 0 AND centroid_acceleration > 0 indicates centroid moving away from baseline at increasing speed
+      check_velocity_not_null:
+        type: condition
+        variable: centroid_velocity
+        operator: is_not_null
+        value: true
+        true_next: check_acceleration_not_null
+        false_next: insufficient_data
+      check_centroid_previous_for_oscillation:
+        type: condition
+        variable: centroid_previous
+        operator: is_not_null
+        value: true
+        true_next: check_centroid_delta_positive
+        false_next: stable_or_improving
+      check_accel_positive_for_drift:
+        type: condition
+        variable: centroid_acceleration
+        operator: gt
+        value: 0
+        true_next: accelerating_drift
+        false_next: decelerating_drift
+      check_centroid_delta_positive:
+        type: condition
+        variable: centroid_delta
+        operator: is_not_null
+        value: true
+        true_next: check_delta_sign
+        false_next: stable_or_improving
+      decelerating_drift:
+        type: return
+        value:
+          monitoring_action: Safety profile worsening but rate of change is slowing. May converge — schedule follow-up assessment at next reporting period.
+          trajectory_class: DECELERATING_DRIFT
+          algorithm: ALG-2025-022 Trajectory Centroid Calculator — centroid_velocity > 0 AND centroid_acceleration <= 0 indicates drift that may be converging
+      check_oscillating:
+        type: condition
+        variable: centroid_current
+        operator: is_not_null
+        value: true
+        true_next: check_centroid_previous_for_oscillation
+        false_next: stable_or_improving
+antisense:
+  tree:
+    start: null_guard_measurement_stale
+    nodes:
+      null_guard_measurement_stale:
+        type: condition
+        variable: measurement_age_minutes
+        operator: is_null
+        value: null
+        true_next: null_guard_single_source
+        false_next: check_measurement_stale
+      check_single_source:
+        type: condition
+        variable: probe_count
+        operator: lt
+        value: 2
+        true_next: falsified
+        false_next: not_falsified
+      check_measurement_stale:
+        type: condition
+        variable: measurement_age_minutes
+        operator: gt
+        value: 60
+        true_next: falsified
+        false_next: null_guard_single_source
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_single_source:
+        type: condition
+        variable: probe_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_single_source
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      centroid_velocity:
+        type: float
+        required: true
+      centroid_acceleration:
+        type: float
+        required: true
+      centroid_current:
+        type: float
+        required: false
+      probe_count:
+        type: integer
+        required: false
+      measurement_age_minutes:
+        type: integer
+        required: false
+      centroid_previous:
+        type: float
+        required: false
+      centroid_delta:
+        type: float
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      trajectory_class:
+        type: string
+        required: true
+      monitoring_action:
+        type: string
+        required: true
+      verdict:
+        type: string
+        required: false
+      algorithm:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    measurement_age_minutes: 50
+    probe_count: 12
+    centroid_acceleration: 0.5
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, measurement_stale active'
+  input:
+    measurement_age_minutes: 61
+    centroid_acceleration: 0.5
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — system-health with 2 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: system-health. Chains as dual-strand verifier before downstream consumers.'

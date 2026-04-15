@@ -1,0 +1,231 @@
+name: dossier-completeness-helix
+description: 'Forged from microgram ''dossier-completeness''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    score: falsified
+sense:
+  tree:
+    start: check_faers
+    nodes:
+      adequate_all:
+        type: return
+        value:
+          score: 75
+          gaps: Low FAERS report volume
+          completeness: adequate
+      empty_dossier:
+        type: return
+        value:
+          score: 0
+          gaps: All sections — FAERS, guidelines, and competitors
+          completeness: empty
+      minimal_faers_only:
+        type: return
+        value:
+          score: 35
+          gaps: Regulatory guidelines and competitive data
+          completeness: minimal
+      check_any_data:
+        type: condition
+        variable: guideline_hits
+        operator: gt
+        value: 0
+        true_next: minimal_guidelines_only
+        false_next: check_competitors_only
+      all_three_sections:
+        type: condition
+        variable: faers_report_count
+        operator: gte
+        value: 1000
+        true_next: comprehensive
+        false_next: adequate_all
+      adequate_faers_strong:
+        type: return
+        value:
+          gaps: Regulatory guidelines and competitive data
+          completeness: adequate
+          score: 55
+      minimal_competitors_only:
+        type: return
+        value:
+          completeness: minimal
+          score: 20
+          gaps: FAERS safety data and regulatory guidelines
+      minimal_guidelines_only:
+        type: return
+        value:
+          score: 25
+          gaps: FAERS safety data and competitive landscape
+          completeness: minimal
+      check_guidelines:
+        type: condition
+        variable: guideline_hits
+        operator: gt
+        value: 0
+        true_next: check_competitors
+        false_next: check_faers_only_quality
+      check_competitors_only:
+        type: condition
+        variable: competitor_count
+        operator: gt
+        value: 0
+        true_next: minimal_competitors_only
+        false_next: empty_dossier
+      check_faers:
+        type: condition
+        variable: has_faers
+        operator: eq
+        value: true
+        true_next: check_guidelines
+        false_next: check_any_data
+      check_competitors:
+        type: condition
+        variable: competitor_count
+        operator: gt
+        value: 0
+        true_next: all_three_sections
+        false_next: faers_and_guidelines
+      comprehensive:
+        type: return
+        value:
+          score: 95
+          gaps: none
+          completeness: comprehensive
+      faers_and_guidelines:
+        type: return
+        value:
+          score: 65
+          completeness: adequate
+          gaps: Competitive landscape data
+      check_faers_only_quality:
+        type: condition
+        variable: faers_report_count
+        operator: gte
+        value: 5000
+        true_next: adequate_faers_strong
+        false_next: minimal_faers_only
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: guideline_hits
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: guideline_hits
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      signal_count:
+        type: float
+        required: true
+      competitor_count:
+        type: float
+        required: true
+      has_faers:
+        type: bool
+        required: true
+      faers_report_count:
+        type: float
+        required: true
+      guideline_hits:
+        type: float
+        required: true
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      completeness:
+        type: string
+        required: false
+      gaps:
+        type: string
+        required: false
+      score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    guideline_hits: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    guideline_hits: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,193 @@
+name: risk-harm-classifier-helix
+description: 'Forged from microgram ''risk-harm-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    harm_level: falsified
+sense:
+  tree:
+    start: check_critical
+    nodes:
+      check_critical:
+        type: condition
+        variable: composite_score
+        operator: gte
+        value: 85
+        true_next: f_critical
+        false_next: check_serious
+      check_minor:
+        type: condition
+        variable: composite_score
+        operator: gte
+        value: 20
+        true_next: b_minor
+        false_next: a_negligible
+      check_serious:
+        type: condition
+        variable: composite_score
+        operator: gte
+        value: 70
+        true_next: e_serious
+        false_next: check_significant
+      b_minor:
+        type: return
+        value:
+          harm_level: B — Minor
+          harm_description: A faint signal exists but falls well below concern thresholds. Worth noting, not worth losing sleep over.
+          traffic_level: green
+      check_moderate:
+        type: condition
+        variable: composite_score
+        operator: gte
+        value: 40
+        true_next: c_moderate
+        false_next: check_minor
+      check_significant:
+        type: condition
+        variable: composite_score
+        operator: gte
+        value: 55
+        true_next: d_significant
+        false_next: check_moderate
+      f_critical:
+        type: return
+        value:
+          traffic_level: red
+          harm_description: All metrics point to a very strong drug-event association. Immediate safety review warranted.
+          harm_level: F — Critical
+      d_significant:
+        type: return
+        value:
+          traffic_level: yellow
+          harm_description: Multiple metrics cross concern thresholds. A formal signal evaluation is recommended.
+          harm_level: D — Significant
+      c_moderate:
+        type: return
+        value:
+          traffic_level: yellow
+          harm_level: C — Moderate
+          harm_description: Some metrics are elevated. This drug-event pair deserves periodic monitoring.
+      e_serious:
+        type: return
+        value:
+          harm_level: E — Serious
+          harm_description: Strong signal across most metrics. Escalate to your safety team and consider regulatory action.
+          traffic_level: red
+      a_negligible:
+        type: return
+        value:
+          traffic_level: green
+          harm_level: A — Negligible
+          harm_description: No meaningful risk signal detected. This drug-event pair looks unremarkable in the data.
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: composite_score
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: composite_score
+        operator: lt
+        value: 85
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      composite_score:
+        type: number
+        required: true
+    outputs:
+      traffic_level:
+        type: string
+        required: false
+      harm_description:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      harm_level:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    composite_score: 95
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    composite_score: 84
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

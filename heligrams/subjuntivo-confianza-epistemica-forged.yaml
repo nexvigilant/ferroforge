@@ -1,0 +1,187 @@
+name: subjuntivo-confianza-epistemica-helix
+description: 'Forged from microgram ''subjuntivo-confianza-epistemica''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    peso_senal: falsified
+sense:
+  tree:
+    start: check_modo_present
+    nodes:
+      reject_missing:
+        type: return
+        value:
+          peso_senal: 0
+          razon: Sin modo verbal no hay clasificación epistémica posible
+          confianza_epistemica: RECHAZADO
+          confidence_level: REJECTED
+          accion: 'RECHAZADO: modo_verbal es obligatorio'
+      check_modo_present:
+        type: condition
+        variable: modo_verbal
+        operator: is_null
+        value: null
+        true_next: reject_missing
+        false_next: check_indicativo
+      check_indicativo:
+        type: condition
+        variable: modo_verbal
+        operator: matches
+        value: ^(indicativo|tiene|presenta|muestra|causa|produce|desarrolla|sufre|padece|manifiesta|experimenta)$
+        true_next: classify_high
+        false_next: check_subjuntivo
+      classify_high:
+        type: return
+        value:
+          confianza_epistemica: ALTA
+          accion: 'PONDERAR ALTO: el reportante expresa certeza sobre la asociación fármaco-evento'
+          razon: |
+            Modo indicativo = el hablante presenta la información como factual. "El paciente TIENE hepatotoxicidad" — el reportante afirma, no duda. En farmacovigilancia, reportes con indicativo merecen mayor peso en la detección de señales porque el reportante se compromete con la veracidad.
+          confidence_level: HIGH
+          peso_senal: 85
+      classify_low:
+        type: return
+        value:
+          razon: |
+            Modo subjuntivo = el hablante presenta la información como incierta. "Es posible que TENGA hepatotoxicidad" — el reportante duda. No descartamos la señal, pero reducimos su peso. El subjuntivo es equivalente lingüístico de "possible" en escala Naranjo (confianza ~50%).
+          confianza_epistemica: BAJA
+          peso_senal: 40
+          confidence_level: LOW
+          accion: 'PONDERAR BAJO: el reportante expresa duda sobre la asociación fármaco-evento'
+      classify_indeterminate:
+        type: return
+        value:
+          razon: |
+            El modo verbal no fue reconocido como indicativo ni subjuntivo. Posibilidades: imperativo, condicional, infinitivo, o error de entrada. Se asigna peso neutro (60) pendiente de revisión humana.
+          confidence_level: INDETERMINATE
+          confianza_epistemica: INDETERMINADA
+          accion: 'REVISAR: modo verbal no clasificado — asignar confianza base'
+          peso_senal: 60
+      check_subjuntivo:
+        type: condition
+        variable: modo_verbal
+        operator: matches
+        value: ^(subjuntivo|tenga|presente|muestre|cause|produzca|desarrolle|sufra|padezca|manifieste|experimente)$
+        true_next: classify_low
+        false_next: classify_indeterminate
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: modo_verbal
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: modo_verbal
+        operator: is_not_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      verbo_contexto:
+        type: string
+        required: false
+      modo_verbal:
+        type: string
+        required: true
+    outputs:
+      verdict:
+        type: string
+        required: false
+      razon:
+        type: string
+        required: false
+      confianza_epistemica:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence_level:
+        type: string
+        required: false
+      accion:
+        type: string
+        required: false
+      peso_senal:
+        type: int
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    modo_verbal: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - modo_verbal
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

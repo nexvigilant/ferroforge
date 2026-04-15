@@ -1,0 +1,227 @@
+name: cytokine-storm-classifier-helix
+description: 'Forged from microgram ''cytokine-storm-classifier''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    action: falsified
+sense:
+  tree:
+    start: check_crs
+    nodes:
+      critical_crs:
+        type: return
+        value:
+          action: immediate_expedited_report
+          soc: Immune system disorders
+          crs_grade: 4
+          severity: critical
+      check_immune_reaction:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: IMMUNE
+        true_next: moderate
+        false_next: mild
+      check_vasopressors:
+        type: condition
+        variable: vasopressors_required
+        operator: eq
+        value: true
+        true_next: critical_crs
+        false_next: check_hypotension
+      moderate:
+        type: return
+        value:
+          soc: Immune system disorders
+          severity: moderate
+          action: monitor_and_assess
+          crs_grade: 0
+      critical_anaphylaxis:
+        type: return
+        value:
+          crs_grade: 0
+          severity: critical
+          soc: Immune system disorders
+          action: immediate_expedited_report
+      moderate_crs:
+        type: return
+        value:
+          action: monitor_and_assess
+          severity: moderate
+          crs_grade: 2
+          soc: Immune system disorders
+      check_crs:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: CYTOKINE
+        true_next: check_vasopressors
+        false_next: check_anaphylaxis
+      mild:
+        type: return
+        value:
+          action: routine_surveillance
+          crs_grade: 0
+          severity: mild
+          soc: Immune system disorders
+      check_fever:
+        type: condition
+        variable: fever_celsius
+        operator: gte
+        value: 39
+        true_next: moderate_crs
+        false_next: mild_crs
+      mild_crs:
+        type: return
+        value:
+          action: routine_surveillance
+          severity: mild
+          crs_grade: 1
+          soc: Immune system disorders
+      check_hypotension:
+        type: condition
+        variable: hypotension
+        operator: eq
+        value: true
+        true_next: serious_crs
+        false_next: check_fever
+      check_anaphylaxis:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: ANAPHYLAC
+        true_next: critical_anaphylaxis
+        false_next: check_immune_reaction
+      serious_crs:
+        type: return
+        value:
+          severity: serious
+          action: expedited_report
+          crs_grade: 3
+          soc: Immune system disorders
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: reaction_pt
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: reaction_pt
+        operator: not_contains
+        value: CYTOKINE
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      fever_celsius:
+        type: float
+        required: false
+      vasopressors_required:
+        type: bool
+        required: false
+      hypoxia:
+        type: bool
+        required: false
+      hypotension:
+        type: bool
+        required: false
+      reaction_pt:
+        type: string
+        required: true
+    outputs:
+      crs_grade:
+        type: int
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      action:
+        type: string
+        required: false
+      severity:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      soc:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    reaction_pt: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

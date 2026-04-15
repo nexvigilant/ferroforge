@@ -1,0 +1,235 @@
+name: risk-to-regulatory-helix
+description: 'Forged from microgram ''risk-to-regulatory''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    timeline: falsified
+sense:
+  tree:
+    start: check_withdrawal
+    nodes:
+      check_restriction:
+        type: condition
+        variable: market_action
+        operator: eq
+        value: restriction
+        true_next: market_restriction
+        false_next: check_negative_br
+      check_withdrawal:
+        type: condition
+        variable: market_action
+        operator: eq
+        value: withdrawal
+        true_next: market_withdrawal
+        false_next: check_restriction
+      check_negative_br:
+        type: condition
+        variable: benefit_risk_decision
+        operator: eq
+        value: NEGATIVE
+        true_next: safety_review
+        false_next: check_rems
+      check_labeling:
+        type: condition
+        variable: labeling_update_needed
+        operator: eq
+        value: true
+        true_next: labeling_update
+        false_next: check_conditional_br
+      check_rems:
+        type: condition
+        variable: rems_required
+        operator: eq
+        value: true
+        true_next: rems_submission
+        false_next: check_labeling
+      labeling_update:
+        type: return
+        value:
+          timeline: 90_days
+          regulatory_filing: CBE_supplement
+          route: LABELING_UPDATE
+          next_mg: cioms-frequency
+          submission_type: labeling
+      check_conditional_br:
+        type: condition
+        variable: benefit_risk_decision
+        operator: eq
+        value: CONDITIONAL
+        true_next: rmp_update
+        false_next: no_regulatory_action
+      no_regulatory_action:
+        type: return
+        value:
+          route: NO_REGULATORY_ACTION
+          regulatory_filing: none
+          timeline: periodic
+          next_mg: report-deadline
+          submission_type: none
+      rmp_update:
+        type: return
+        value:
+          next_mg: benefit-risk-gate
+          route: RMP_UPDATE
+          timeline: 120_days
+          submission_type: rmp
+          regulatory_filing: RMP_variation
+      market_withdrawal:
+        type: return
+        value:
+          submission_type: withdrawal
+          timeline: immediate
+          next_mg: expedited-reporting
+          regulatory_filing: FDA_Form_3580
+          route: MARKET_WITHDRAWAL
+      rems_submission:
+        type: return
+        value:
+          submission_type: rems
+          regulatory_filing: REMS_modification
+          timeline: 60_days
+          next_mg: rems-classifier
+          route: REMS_SUBMISSION
+      market_restriction:
+        type: return
+        value:
+          timeline: 30_days
+          next_mg: rems-classifier
+          submission_type: safety_supplement
+          route: MARKET_RESTRICTION
+          regulatory_filing: sNDA_safety
+      safety_review:
+        type: return
+        value:
+          next_mg: expedited-reporting
+          route: SAFETY_REVIEW
+          regulatory_filing: Type_II_Variation
+          timeline: urgent
+          submission_type: variation
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: market_action
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: market_action
+        operator: neq
+        value: withdrawal
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      labeling_update_needed:
+        type: bool
+        required: false
+      rems_required:
+        type: bool
+        required: false
+      market_action:
+        type: string
+        required: false
+      benefit_risk_decision:
+        type: string
+        required: false
+    outputs:
+      submission_type:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      next_mg:
+        type: string
+        required: false
+      route:
+        type: string
+        required: false
+      regulatory_filing:
+        type: string
+        required: false
+      timeline:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    market_action: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    market_action: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

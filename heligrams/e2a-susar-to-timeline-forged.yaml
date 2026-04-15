@@ -1,0 +1,179 @@
+name: e2a-susar-to-timeline-helix
+description: 'Forged from microgram ''e2a-susar-to-timeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    deadline_days: falsified
+sense:
+  tree:
+    start: check_susar
+    nodes:
+      check_fatal_lt:
+        type: condition
+        variable: is_fatal
+        operator: eq
+        value: true
+        true_next: seven_day_report
+        false_next: check_life_threatening
+      seven_day_report:
+        type: return
+        value:
+          deadline_days: 7
+          report_type: SUSAR_INITIAL_7DAY
+          regulatory_reference: 'ICH E2A Section III.B.1 - Fatal/life-threatening SUSAR: 7-day initial report required'
+          timeline_category: 7_DAY_EXPEDITED
+      no_susar_deadline:
+        type: return
+        value:
+          deadline_days: 90
+          regulatory_reference: ICH E2A Section III.B.3 - Non-SUSAR cases in annual safety reports/line listings
+          report_type: ANNUAL_SAFETY_REPORT
+          timeline_category: PERIODIC_OR_ANNUAL
+      check_susar:
+        type: condition
+        variable: report_as_susar
+        operator: eq
+        value: true
+        true_next: check_fatal_lt
+        false_next: no_susar_deadline
+      fifteen_day_report:
+        type: return
+        value:
+          deadline_days: 15
+          regulatory_reference: 'ICH E2A Section III.B.2 - Serious unexpected SUSAR (non-fatal/non-LT): 15-day initial report required'
+          timeline_category: 15_DAY_EXPEDITED
+          report_type: SUSAR_INITIAL_15DAY
+      check_life_threatening:
+        type: condition
+        variable: is_life_threatening
+        operator: eq
+        value: true
+        true_next: seven_day_report
+        false_next: fifteen_day_report
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: is_fatal
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_negation:
+        type: condition
+        variable: is_fatal
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      is_unexpected:
+        type: bool
+        required: false
+      report_as_susar:
+        type: bool
+        required: false
+      is_life_threatening:
+        type: bool
+        required: false
+      is_fatal:
+        type: bool
+        required: false
+    outputs:
+      deadline_days:
+        type: int
+        required: false
+      timeline_category:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      report_type:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    is_fatal: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    is_fatal: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - report_as_susar
+  - is_fatal
+  - is_life_threatening
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

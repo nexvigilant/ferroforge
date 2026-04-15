@@ -1,0 +1,214 @@
+name: fda-companion-dx-pathway-helix
+description: 'Forged from microgram ''fda-companion-dx-pathway''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    dx_requirement: falsified
+sense:
+  tree:
+    start: check_biomarker
+    nodes:
+      dx_approved:
+        type: return
+        value:
+          dx_requirement: Companion diagnostic approved — cross-reference in drug labeling
+          codevelopment_pathway: STANDARD_CODEVELOPMENT
+          regulatory_reference: 'FDA Guidance: Companion Diagnostics (2020), Section V; 21 CFR 809.10'
+          labeling_action: 'Drug Indications: specify approved companion diagnostic by name. Include in Dosage and Clinical Studies sections.'
+      check_oncology_class:
+        type: condition
+        variable: therapeutic_area
+        operator: eq
+        value: oncology
+        true_next: oncology_pilot
+        false_next: standard_codevelopment_needed
+      check_dx_status:
+        type: condition
+        variable: dx_approval_status
+        operator: eq
+        value: approved
+        true_next: dx_approved
+        false_next: check_class_specific
+      concurrent_review:
+        type: return
+        value:
+          codevelopment_pathway: CONCURRENT_REVIEW
+          labeling_action: Drug approval may be contingent on diagnostic approval. Conditional cross-labeling.
+          regulatory_reference: 'FDA Guidance: Companion Diagnostics (2020), Section V.B'
+          dx_requirement: Drug and diagnostic under simultaneous FDA review — coordinated review process
+      standard_codevelopment_needed:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: Companion Diagnostics (2020), Section III'
+          codevelopment_pathway: STANDARD_CODEVELOPMENT
+          dx_requirement: Drug-specific companion diagnostic PMA or 510(k) required for non-oncology class-specific claims
+          labeling_action: Drug labeling must reference specific approved companion diagnostic
+      dx_not_submitted:
+        type: return
+        value:
+          codevelopment_pathway: DX_SUBMISSION_REQUIRED
+          dx_requirement: Companion diagnostic must be submitted before or concurrent with drug NDA/BLA
+          regulatory_reference: 'FDA Guidance: Companion Diagnostics (2020), Section III.B'
+          labeling_action: Drug cannot be approved with biomarker-dependent indication without companion diagnostic pathway
+      oncology_pilot:
+        type: return
+        value:
+          labeling_action: Drug labeling references biomarker class (e.g., 'tumor mutational burden') rather than specific IVD device
+          regulatory_reference: 'FDA Guidance: Oncology Drug Products Used with Certain IVDs Pilot Program (2023)'
+          codevelopment_pathway: ONCOLOGY_PILOT_PROGRAM
+          dx_requirement: Under oncology pilot, FDA may accept class-level IVD rather than drug-specific companion diagnostic
+      check_class_specific:
+        type: condition
+        variable: dx_approval_status
+        operator: eq
+        value: class_specific
+        true_next: check_oncology_class
+        false_next: check_under_review
+      check_biomarker:
+        type: condition
+        variable: biomarker_validated
+        operator: eq
+        value: true
+        true_next: check_dx_status
+        false_next: biomarker_not_validated
+      check_under_review:
+        type: condition
+        variable: dx_approval_status
+        operator: eq
+        value: under_review
+        true_next: concurrent_review
+        false_next: dx_not_submitted
+      biomarker_not_validated:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: Companion Diagnostics (2020), Section IV.A'
+          dx_requirement: Analytical and clinical validation required before companion diagnostic submission
+          labeling_action: Drug labeling cannot reference companion diagnostic until biomarker validated
+          codevelopment_pathway: BIOMARKER_DEVELOPMENT
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: therapeutic_area
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: therapeutic_area
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      biomarker_validated:
+        type: bool
+        required: true
+      drug_approval_pathway:
+        type: string
+        required: false
+      dx_approval_status:
+        type: string
+        required: false
+      therapeutic_area:
+        type: string
+        required: true
+    outputs:
+      labeling_action:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      dx_requirement:
+        type: string
+        required: false
+      codevelopment_pathway:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    therapeutic_area: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    therapeutic_area: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - biomarker_validated
+  - dx_approval_status
+  - therapeutic_area
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

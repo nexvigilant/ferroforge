@@ -1,0 +1,240 @@
+name: signal-collapse-gate-helix
+description: 'Forged from microgram ''signal-collapse-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    algorithm: falsified
+sense:
+  tree:
+    start: check_rarity
+    nodes:
+      check_rarity:
+        type: condition
+        variable: rarity_score
+        operator: gte
+        value: 10
+        true_next: check_recognition
+        false_next: collapsed_rarity
+      collapsed_rarity:
+        type: return
+        value:
+          algorithm: ALG-2025-041
+          collapse_reason: rarity
+          campion_S: U→0 therefore S→0
+          signal_strength: COLLAPSED
+      check_moderate_recognition:
+        type: condition
+        variable: recognition_score
+        operator: gte
+        value: 40
+        true_next: check_moderate_temporal
+        false_next: weak
+      check_strong_temporal:
+        type: condition
+        variable: temporal_score
+        operator: gte
+        value: 70
+        true_next: strong
+        false_next: check_moderate
+      collapsed_temporal:
+        type: return
+        value:
+          collapse_reason: temporal
+          campion_S: T→0 therefore S→0
+          algorithm: ALG-2025-041
+          signal_strength: COLLAPSED
+      weak:
+        type: return
+        value:
+          collapse_reason: none
+          signal_strength: WEAK
+          campion_S: U×R×T present but low
+          algorithm: ALG-2025-041
+      check_strong:
+        type: condition
+        variable: rarity_score
+        operator: gte
+        value: 70
+        true_next: check_strong_recognition
+        false_next: check_moderate
+      check_strong_recognition:
+        type: condition
+        variable: recognition_score
+        operator: gte
+        value: 70
+        true_next: check_strong_temporal
+        false_next: check_moderate
+      collapsed_recognition:
+        type: return
+        value:
+          collapse_reason: recognition
+          algorithm: ALG-2025-041
+          signal_strength: COLLAPSED
+          campion_S: R→0 therefore S→0
+      check_recognition:
+        type: condition
+        variable: recognition_score
+        operator: gte
+        value: 10
+        true_next: check_temporal
+        false_next: collapsed_recognition
+      check_moderate_temporal:
+        type: condition
+        variable: temporal_score
+        operator: gte
+        value: 40
+        true_next: moderate
+        false_next: weak
+      check_temporal:
+        type: condition
+        variable: temporal_score
+        operator: gte
+        value: 10
+        true_next: check_strong
+        false_next: collapsed_temporal
+      moderate:
+        type: return
+        value:
+          collapse_reason: none
+          algorithm: ALG-2025-041
+          signal_strength: MODERATE
+          campion_S: U×R×T all adequate
+      strong:
+        type: return
+        value:
+          collapse_reason: none
+          algorithm: ALG-2025-041
+          campion_S: U×R×T all high
+          signal_strength: STRONG
+      check_moderate:
+        type: condition
+        variable: rarity_score
+        operator: gte
+        value: 40
+        true_next: check_moderate_recognition
+        false_next: weak
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: rarity_score
+        operator: lt
+        value: 10
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: rarity_score
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      recognition_score:
+        type: int
+        required: false
+      rarity_score:
+        type: int
+        required: false
+      temporal_score:
+        type: int
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      signal_strength:
+        type: string
+        required: false
+      campion_S:
+        type: string
+        required: false
+      algorithm:
+        type: string
+        required: false
+      collapse_reason:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    recognition_score: 50
+    rarity_score: 20
+    temporal_score: 50
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    recognition_score: 50
+    rarity_score: 9
+    temporal_score: 50
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

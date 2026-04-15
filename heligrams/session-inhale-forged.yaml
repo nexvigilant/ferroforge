@@ -1,0 +1,332 @@
+name: session-inhale-helix
+description: 'Forged from microgram ''session-inhale''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    arc_phase: falsified
+sense:
+  tree:
+    start: check_inputs
+    nodes:
+      law_v_exceeded:
+        type: condition
+        variable: last_verdict_score
+        operator: gte
+        value: 2
+        true_next: exceeded_productive
+        false_next: exceeded_stalled
+      arc_dream:
+        type: condition
+        variable: sessions_since_helix
+        operator: gte
+        value: 10
+        true_next: helix_due_dream
+        false_next: check_bonds_dream
+      dream_fresh:
+        type: return
+        value:
+          arc_phase: DREAM
+          tidal_volume: FULL
+          airway: CLEAR
+          recommendation: Clean slate. Decompose, measure, plan.
+          law_v: OK
+          helix_due: NO
+      clear_dream:
+        type: condition
+        variable: carry_forward_hours
+        operator: lte
+        value: 48
+        true_next: dream_with_carry
+        false_next: dream_fresh
+      exceeded_stalled:
+        type: return
+        value:
+          recommendation: Law V exceeded and last session underdelivered. Stop. Rest enables the next DREAM.
+          helix_due: NO
+          arc_phase: CRITIQUE
+          tidal_volume: SHALLOW
+          law_v: EXCEEDED
+          airway: OBSTRUCTED
+      realize_no_carry:
+        type: return
+        value:
+          airway: CLEAR
+          tidal_volume: PARTIAL
+          law_v: OK
+          arc_phase: REALIZE
+          recommendation: REALIZE phase but no recent carry-forward. Check what the DREAM session planned.
+          helix_due: NO
+      reject:
+        type: return
+        value:
+          arc_phase: UNKNOWN
+          airway: OBSTRUCTED
+          recommendation: All 5 inputs required.
+          helix_due: UNKNOWN
+          tidal_volume: SHALLOW
+          law_v: UNKNOWN
+      arc_dream_2:
+        type: return
+        value:
+          airway: CLEAR
+          helix_due: NO
+          tidal_volume: FULL
+          recommendation: New triplet arc begins. Decompose, measure, plan.
+          law_v: OK
+          arc_phase: DREAM
+      arc_mod_1:
+        type: condition
+        variable: sessions_today
+        operator: lte
+        value: 1
+        true_next: arc_realize
+        false_next: arc_mod_2
+      restricted_bonds_dream:
+        type: return
+        value:
+          helix_due: NO
+          tidal_volume: PARTIAL
+          recommendation: Active bonds need pairing before starting new DREAM work. Run /pair-bonds.
+          law_v: OK
+          arc_phase: DREAM
+          airway: RESTRICTED
+      arc_mod_check:
+        type: condition
+        variable: sessions_today
+        operator: gte
+        value: 6
+        true_next: law_v_exceeded
+        false_next: arc_mod_1
+      arc_mod_2:
+        type: condition
+        variable: sessions_today
+        operator: lte
+        value: 2
+        true_next: arc_critique
+        false_next: arc_dream_2
+      restricted_helix:
+        type: return
+        value:
+          tidal_volume: PARTIAL
+          airway: RESTRICTED
+          helix_due: YES
+          arc_phase: DREAM
+          recommendation: Helix turn overdue. Run /helix 5-point checklist before starting new work.
+          law_v: OK
+      realize_with_carry:
+        type: return
+        value:
+          helix_due: NO
+          tidal_volume: FULL
+          recommendation: REALIZE phase with carry-forward. Build, implement, wire.
+          law_v: OK
+          arc_phase: REALIZE
+          airway: CLEAR
+      arc_critique:
+        type: return
+        value:
+          law_v: OK
+          arc_phase: CRITIQUE
+          tidal_volume: PARTIAL
+          recommendation: CRITIQUE phase. Verify, exhale, close loops. Do not start new work.
+          helix_due: NO
+          airway: CLEAR
+      compute_arc:
+        type: condition
+        variable: sessions_today
+        operator: lte
+        value: 0
+        true_next: arc_dream
+        false_next: arc_mod_check
+      arc_realize:
+        type: condition
+        variable: carry_forward_hours
+        operator: lte
+        value: 48
+        true_next: realize_with_carry
+        false_next: realize_no_carry
+      dream_with_carry:
+        type: return
+        value:
+          law_v: OK
+          helix_due: NO
+          tidal_volume: FULL
+          airway: CLEAR
+          arc_phase: DREAM
+          recommendation: Fresh carry-forward available. Load it and continue the thread.
+      exceeded_productive:
+        type: return
+        value:
+          tidal_volume: SHALLOW
+          airway: RESTRICTED
+          helix_due: NO
+          recommendation: Law V exceeded but last session was productive. If continuing, make it a CRITIQUE — verify and close.
+          arc_phase: CRITIQUE
+          law_v: EXCEEDED
+      helix_due_dream:
+        type: condition
+        variable: active_bonds
+        operator: gte
+        value: 3
+        true_next: obstructed_helix_bonds
+        false_next: restricted_helix
+      obstructed_helix_bonds:
+        type: return
+        value:
+          airway: OBSTRUCTED
+          arc_phase: DREAM
+          law_v: OK
+          tidal_volume: SHALLOW
+          recommendation: Helix turn overdue AND active bonds. Run /helix first, then pair bonds. Do not start new work.
+          helix_due: YES
+      check_inputs:
+        type: condition
+        variable: sessions_today
+        operator: is_null
+        value: null
+        true_next: reject
+        false_next: compute_arc
+      check_bonds_dream:
+        type: condition
+        variable: active_bonds
+        operator: gte
+        value: 3
+        true_next: restricted_bonds_dream
+        false_next: clear_dream
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: last_verdict_score
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: last_verdict_score
+        operator: is_not_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      carry_forward_hours:
+        type: int
+        required: true
+      last_verdict_score:
+        type: int
+        required: true
+      active_bonds:
+        type: int
+        required: true
+      sessions_today:
+        type: int
+        required: true
+      sessions_since_helix:
+        type: int
+        required: true
+    outputs:
+      law_v:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      helix_due:
+        type: string
+        required: false
+      arc_phase:
+        type: string
+        required: false
+      recommendation:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      airway:
+        type: string
+        required: false
+      tidal_volume:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    last_verdict_score: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - sessions_today
+  - carry_forward_hours
+  - sessions_since_helix
+  - active_bonds
+  - last_verdict_score
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,315 @@
+name: narrative-phi-detector-helix
+description: 'Forged from microgram ''narrative-phi-detector''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    gate_pass: falsified
+sense:
+  tree:
+    start: check_ssn
+    nodes:
+      check_ssn:
+        type: condition
+        variable: has_ssn
+        operator: eq
+        value: true
+        true_next: critical_phi
+        false_next: check_mrn
+      check_email_alone:
+        type: condition
+        variable: has_email
+        operator: eq
+        value: true
+        true_next: moderate_phi_email
+        false_next: check_count
+      critical_phi:
+        type: return
+        value:
+          phi_severity: CRITICAL
+          gate_pass: false
+          action: BLOCK — direct identifiers detected, must redact before extraction
+          phi_detected: true
+          phi_categories: direct_identifier
+      check_dob_alone:
+        type: condition
+        variable: has_date_of_birth
+        operator: eq
+        value: true
+        true_next: check_address_with_dob
+        false_next: check_address_alone
+      check_address_with_dob:
+        type: condition
+        variable: has_address
+        operator: eq
+        value: true
+        true_next: critical_phi
+        false_next: moderate_phi_dob
+      check_phone_with_address:
+        type: condition
+        variable: has_phone
+        operator: eq
+        value: true
+        true_next: high_phi_contact
+        false_next: moderate_phi_address
+      check_count:
+        type: condition
+        variable: phi_field_count
+        operator: gt
+        value: 0
+        true_next: low_phi_indirect
+        false_next: no_phi
+      moderate_phi_email:
+        type: return
+        value:
+          phi_detected: true
+          phi_categories: email
+          action: BLOCK — email present, remove
+          phi_severity: MODERATE
+          gate_pass: false
+      high_phi_contact:
+        type: return
+        value:
+          action: BLOCK — contact information present, redact all contact fields
+          phi_severity: HIGH
+          gate_pass: false
+          phi_detected: true
+          phi_categories: contact_info
+      moderate_phi_dob:
+        type: return
+        value:
+          phi_detected: true
+          action: BLOCK — date of birth present, generalize to year only
+          phi_categories: date_of_birth
+          phi_severity: MODERATE
+          gate_pass: false
+      check_dob_with_name:
+        type: condition
+        variable: has_date_of_birth
+        operator: eq
+        value: true
+        true_next: critical_phi
+        false_next: high_phi_name
+      moderate_phi_phone:
+        type: return
+        value:
+          action: BLOCK — phone number present, remove
+          phi_severity: MODERATE
+          gate_pass: false
+          phi_detected: true
+          phi_categories: phone
+      check_mrn:
+        type: condition
+        variable: has_mrn
+        operator: eq
+        value: true
+        true_next: critical_phi
+        false_next: check_name
+      high_phi_name:
+        type: return
+        value:
+          phi_detected: true
+          phi_severity: HIGH
+          action: BLOCK — patient name present, redact or pseudonymize
+          gate_pass: false
+          phi_categories: patient_name
+      check_address_alone:
+        type: condition
+        variable: has_address
+        operator: eq
+        value: true
+        true_next: check_phone_with_address
+        false_next: check_phone_alone
+      check_name:
+        type: condition
+        variable: has_patient_name
+        operator: eq
+        value: true
+        true_next: check_dob_with_name
+        false_next: check_dob_alone
+      check_phone_alone:
+        type: condition
+        variable: has_phone
+        operator: eq
+        value: true
+        true_next: check_email_with_phone
+        false_next: check_email_alone
+      check_email_with_phone:
+        type: condition
+        variable: has_email
+        operator: eq
+        value: true
+        true_next: high_phi_contact
+        false_next: moderate_phi_phone
+      moderate_phi_address:
+        type: return
+        value:
+          phi_severity: MODERATE
+          gate_pass: false
+          phi_detected: true
+          action: BLOCK — address present, generalize to region/country
+          phi_categories: address
+      low_phi_indirect:
+        type: return
+        value:
+          phi_categories: indirect_identifiers
+          gate_pass: false
+          phi_severity: LOW
+          phi_detected: true
+          action: REVIEW — indirect identifiers detected, assess re-identification risk
+      no_phi:
+        type: return
+        value:
+          gate_pass: true
+          action: PASS — no PHI detected in narrative
+          phi_detected: false
+          phi_severity: NONE
+          phi_categories: none
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: has_ssn
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: has_ssn
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      gate_pass: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      gate_pass: true
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      falsified: false
+      gate_pass: false
+    default: null
+    emit:
+      verdict: absent
+      confidence_score: 0.7
+      confidence: high
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_mrn:
+        type: bool
+        required: false
+      phi_field_count:
+        type: int
+        required: false
+      has_phone:
+        type: bool
+        required: false
+      has_patient_name:
+        type: bool
+        required: false
+      has_email:
+        type: bool
+        required: false
+      has_ssn:
+        type: bool
+        required: false
+      has_date_of_birth:
+        type: bool
+        required: false
+      has_address:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      phi_detected:
+        type: bool
+        required: false
+      action:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      phi_categories:
+        type: string
+        required: false
+      phi_severity:
+        type: string
+        required: false
+      gate_pass:
+        type: bool
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    has_ssn: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    has_ssn: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

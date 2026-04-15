@@ -1,0 +1,148 @@
+name: station-science-hexim1-pipeline-helix
+description: 'Forged from microgram ''station-science-hexim1-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    reason: falsified
+sense:
+  tree:
+    start: check_evidence
+    nodes:
+      check_evidence:
+        type: condition
+        variable: evidence_score
+        operator: gte
+        value: 7
+        true_next: strong
+        false_next: check_medium
+      check_medium:
+        type: condition
+        variable: evidence_score
+        operator: gte
+        value: 4
+        true_next: medium
+        false_next: weak
+      weak:
+        type: return
+        value:
+          reason: Evidence <4 — hypothesis needs reformulation
+          route: hypothesis_revision
+          action: revise
+          priority: low
+      medium:
+        type: return
+        value:
+          action: experiment
+          route: experiment_design
+          reason: Evidence 4-7 — design confirmatory experiment
+          priority: moderate
+      strong:
+        type: return
+        value:
+          action: publish
+          route: publication_pipeline
+          reason: HEXIM1 hypothesis evidence score ≥7 — manuscript-ready
+          priority: high
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: evidence_score
+        operator: lt
+        value: 7
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: evidence_score
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      evidence_score:
+        type: integer
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    evidence_score: 17
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    evidence_score: 6
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

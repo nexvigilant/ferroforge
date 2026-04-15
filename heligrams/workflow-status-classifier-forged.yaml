@@ -1,0 +1,166 @@
+name: workflow-status-classifier-helix
+description: 'Forged from microgram ''workflow-status-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    status: falsified
+sense:
+  tree:
+    start: check_failure
+    nodes:
+      check_failure:
+        type: condition
+        variable: has_failure
+        operator: eq
+        value: true
+        true_next: failed
+        false_next: check_started
+      failed:
+        type: return
+        value:
+          status: FAILED
+          description: Workflow has a failed step - requires investigation and remediation
+      not_started:
+        type: return
+        value:
+          description: No steps completed - workflow has not begun execution
+          status: NOT_STARTED
+      in_progress:
+        type: return
+        value:
+          description: Workflow is executing - some steps complete, more remaining
+          status: IN_PROGRESS
+      completed:
+        type: return
+        value:
+          status: COMPLETED
+          description: All steps completed successfully - workflow is done
+      check_complete:
+        type: condition
+        variable: is_complete
+        operator: eq
+        value: true
+        true_next: completed
+        false_next: in_progress
+      check_started:
+        type: condition
+        variable: steps_completed
+        operator: gt
+        value: 0
+        true_next: check_complete
+        false_next: not_started
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: has_failure
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: has_failure
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_failure:
+        type: bool
+        required: false
+      is_complete:
+        type: bool
+        required: false
+      steps_completed:
+        type: int
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      description:
+        type: string
+        required: false
+      status:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    has_failure: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    has_failure: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

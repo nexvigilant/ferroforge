@@ -1,0 +1,170 @@
+name: rxcui-resolver-helix
+description: 'Forged from microgram ''rxcui-resolver''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    api_endpoint: falsified
+sense:
+  tree:
+    start: validate_name_type
+    nodes:
+      classify_name_type:
+        type: condition
+        variable: name_type
+        operator: matches
+        value: (?i)^brand$
+        true_next: strategy_brand
+        false_next: check_generic
+      check_generic:
+        type: condition
+        variable: name_type
+        operator: matches
+        value: (?i)^generic$
+        true_next: strategy_generic
+        false_next: check_ingredient
+      strategy_ingredient:
+        type: return
+        value:
+          api_endpoint: /REST/ingredients.json?rxcui=<rxcui>
+          expected_result_type: ingredient_drugs
+          search_strategy: search_by_ingredient
+      validate_name_type:
+        type: condition
+        variable: name_type
+        operator: is_not_null
+        value: null
+        true_next: classify_name_type
+        false_next: missing_input
+      missing_input:
+        type: return
+        value:
+          expected_result_type: null
+          api_endpoint: null
+          search_strategy: null
+      check_ingredient:
+        type: condition
+        variable: name_type
+        operator: matches
+        value: (?i)^ingredient$
+        true_next: strategy_ingredient
+        false_next: invalid_type
+      strategy_brand:
+        type: return
+        value:
+          search_strategy: search_by_brand_name
+          api_endpoint: /REST/rxcui.json?name=<name>&search=1
+          expected_result_type: branded_drugs
+      strategy_generic:
+        type: return
+        value:
+          api_endpoint: /REST/rxcui.json?name=<name>&search=2
+          search_strategy: search_by_generic_name
+          expected_result_type: generic_drugs
+      invalid_type:
+        type: return
+        value:
+          api_endpoint: null
+          expected_result_type: null
+          search_strategy: null
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: name_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: name_type
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      name_type:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    name_type: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

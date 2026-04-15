@@ -1,0 +1,178 @@
+name: ab-conservation-violation-helix
+description: 'Forged from microgram ''ab-conservation-violation''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    threat: falsified
+sense:
+  tree:
+    start: check_zero
+    nodes:
+      warn:
+        type: return
+        value:
+          threat: false
+          response: 'WARN: conservation drift detected — delta between 0.01 and 1.0'
+      check_zero:
+        type: condition
+        variable: absolute_delta
+        operator: eq
+        value: 0
+        true_next: clean
+        false_next: check_small
+      clean:
+        type: return
+        value:
+          response: PASS
+          threat: false
+      check_medium:
+        type: condition
+        variable: absolute_delta
+        operator: lte
+        value: 1.0
+        true_next: warn
+        false_next: violation
+      check_small:
+        type: condition
+        variable: absolute_delta
+        operator: lte
+        value: 0.01
+        true_next: clean
+        false_next: check_medium
+      violation:
+        type: return
+        value:
+          threat: true
+          response: 'BLOCK: conservation violated — delta > 1.0'
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: absolute_delta
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: absolute_delta
+        operator: neq
+        value: 0
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      threat: true
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      threat: true
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      threat: false
+      falsified: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      threat: false
+      falsified: true
+    default: null
+    emit:
+      verdict: refuted
+      confidence: medium
+      confidence_score: 0.42
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      absolute_delta:
+        type: number
+        required: true
+      tolerance:
+        type: number
+        required: true
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      threat:
+        type: boolean
+        required: false
+      response:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    tolerance: 0.01
+    absolute_delta: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    tolerance: 0.01
+    absolute_delta: 5.0
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

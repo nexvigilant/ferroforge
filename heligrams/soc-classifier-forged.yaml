@@ -1,0 +1,202 @@
+name: soc-classifier-helix
+description: 'Forged from microgram ''soc-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    is_serious_soc: falsified
+sense:
+  tree:
+    start: validate_term
+    nodes:
+      check_neuro:
+        type: condition
+        variable: event_term
+        operator: matches
+        value: (?i)(seizure|stroke|hemorrhage|encephalopathy|coma)
+        true_next: soc_neuro
+        false_next: soc_general
+      soc_cardiac:
+        type: return
+        value:
+          likely_soc: cardiac_disorders
+          hlgt_guess: cardiac_valve_disorders
+          is_serious_soc: true
+      check_hepatic:
+        type: condition
+        variable: event_term
+        operator: matches
+        value: (?i)(liver|hepatic|cirrhosis|hepatitis|jaundice)
+        true_next: soc_hepatic
+        false_next: check_renal
+      soc_neuro:
+        type: return
+        value:
+          likely_soc: nervous_system_disorders
+          hlgt_guess: central_nervous_system_injuries
+          is_serious_soc: true
+      soc_general:
+        type: return
+        value:
+          is_serious_soc: false
+          hlgt_guess: general_physical_condition
+          likely_soc: general_disorders
+      soc_hepatic:
+        type: return
+        value:
+          hlgt_guess: liver_injuries
+          likely_soc: hepatobiliary_disorders
+          is_serious_soc: true
+      validate_term:
+        type: condition
+        variable: event_term
+        operator: is_not_null
+        value: null
+        true_next: classify_soc
+        false_next: missing_input
+      classify_soc:
+        type: condition
+        variable: event_term
+        operator: matches
+        value: (?i)(cardiac|heart|arrhythmia|infarction|angina|heart failure)
+        true_next: soc_cardiac
+        false_next: check_hepatic
+      soc_renal:
+        type: return
+        value:
+          is_serious_soc: true
+          likely_soc: renal_urinary_disorders
+          hlgt_guess: renal_failure_disorders
+      missing_input:
+        type: return
+        value:
+          likely_soc: null
+          is_serious_soc: false
+          hlgt_guess: null
+      check_renal:
+        type: condition
+        variable: event_term
+        operator: matches
+        value: (?i)(kidney|renal|glomerulonephritis|nephrotic|dialysis)
+        true_next: soc_renal
+        false_next: check_neuro
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: event_term
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: event_term
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      is_serious_soc: true
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      is_serious_soc: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when:
+      falsified: false
+      is_serious_soc: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: absent
+  - when:
+      is_serious_soc: false
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.42
+      verdict: refuted
+      confidence: medium
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      event_term:
+        type: any
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    event_term: null
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    event_term: cardiac
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

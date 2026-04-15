@@ -1,0 +1,223 @@
+name: signal-intelligence-router-helix
+description: 'Forged from microgram ''signal-intelligence-router''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    priority: falsified
+sense:
+  tree:
+    start: check_signals
+    nodes:
+      no_signals:
+        type: return
+        value:
+          priority: LOW
+          recommended_tool: signal_detection
+          reason: No active signals in intelligence state. Continue routine signal detection.
+          action: continue_monitoring
+          recursion_depth: base_case
+      check_cross_drug:
+        type: condition
+        variable: cross_drug_signals
+        operator: gte
+        value: 3
+        true_next: cross_drug_review
+        false_next: check_insight_maturity
+      check_unassessed:
+        type: condition
+        variable: unassessed_count
+        operator: gte
+        value: 5
+        true_next: triage_backlog
+        false_next: check_class_effect
+      check_signals:
+        type: condition
+        variable: active_signal_count
+        operator: gte
+        value: 1
+        true_next: check_unassessed
+        false_next: no_signals
+      check_class_effect:
+        type: condition
+        variable: has_class_effect
+        operator: eq
+        value: true
+        true_next: class_effect_escalation
+        false_next: check_cross_drug
+      cross_drug_review:
+        type: return
+        value:
+          action: cross_drug_analysis
+          recursion_depth: cross_reference
+          priority: HIGH
+          recommended_tool: drug_comparator
+          reason: 3+ signals span multiple drugs. Cross-drug analysis may reveal shared mechanism.
+      class_effect_escalation:
+        type: return
+        value:
+          recommended_tool: drug_comparator
+          reason: Class effect detected across multiple drugs. Cross-drug comparison required.
+          priority: URGENT
+          recursion_depth: pattern_detected
+          action: class_effect_review
+      insight_synthesis:
+        type: return
+        value:
+          reason: 3+ insights accumulated. Synthesize into safety intelligence report.
+          recursion_depth: synthesis
+          recommended_tool: reporting
+          action: synthesize_insights
+          priority: STANDARD
+      standard_accumulation:
+        type: return
+        value:
+          recommended_tool: signal_detection
+          action: continue_accumulation
+          recursion_depth: accumulating
+          priority: STANDARD
+          reason: Active signals present but no escalation triggers met. Continue accumulation cycle.
+      triage_backlog:
+        type: return
+        value:
+          priority: URGENT
+          recursion_depth: accumulation_overflow
+          action: triage_unassessed
+          reason: 5+ unassessed signals accumulated. Triage backlog before further accumulation.
+          recommended_tool: causality_assessment
+      check_insight_maturity:
+        type: condition
+        variable: insight_count
+        operator: gte
+        value: 3
+        true_next: insight_synthesis
+        false_next: standard_accumulation
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: cross_drug_signals
+        operator: lt
+        value: 1
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: cross_drug_signals
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      unassessed_count:
+        type: int
+        required: false
+      has_class_effect:
+        type: bool
+        required: false
+      active_signal_count:
+        type: int
+        required: true
+      insight_count:
+        type: int
+        required: false
+      cross_drug_signals:
+        type: int
+        required: false
+    outputs:
+      priority:
+        type: string
+        required: false
+      recursion_depth:
+        type: string
+        required: false
+      recommended_tool:
+        type: string
+        required: false
+      reason:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      action:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    cross_drug_signals: 11
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    cross_drug_signals: 0
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

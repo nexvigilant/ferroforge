@@ -1,0 +1,285 @@
+name: smm-violation-classifier-helix
+description: 'Forged from microgram ''smm-violation-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    description: falsified
+sense:
+  tree:
+    start: check_fatal
+    nodes:
+      check_overclaim:
+        type: condition
+        variable: uses_proves_confirms
+        operator: eq
+        value: true
+        true_next: major
+        false_next: check_no_power
+      major:
+        type: return
+        value:
+          description: Methodological or vocabulary violation impairing reproducibility.
+          cs_effect: CS reduced by 0.07 per violation (floor 0.50)
+          chemistry_analog: Side reaction — product yield reduced
+          class: M
+          label: MAJOR
+      check_fabricated:
+        type: condition
+        variable: fabricated_data
+        operator: eq
+        value: true
+        true_next: fatal
+        false_next: check_undoc_deviation
+      check_suppressed:
+        type: condition
+        variable: suppressed_hypothesis
+        operator: eq
+        value: true
+        true_next: fatal
+        false_next: check_fabricated
+      check_undoc_deviation:
+        type: condition
+        variable: undocumented_deviation
+        operator: eq
+        value: true
+        true_next: fatal
+        false_next: check_post_hoc_criteria
+      compliant:
+        type: return
+        value:
+          class: none
+          description: No violations detected.
+          label: COMPLIANT
+          cs_effect: CS = 1.00
+          chemistry_analog: Clean reaction — full yield
+      fatal:
+        type: return
+        value:
+          label: FATAL
+          cs_effect: CS suspended (0.00)
+          chemistry_analog: Activation energy infinite — reaction impossible
+          description: Integrity of knowledge state threatened. Evidence excluded pending review.
+          class: F
+      check_no_power:
+        type: condition
+        variable: missing_power_calculation
+        operator: eq
+        value: true
+        true_next: major
+        false_next: check_imprecise_sig
+      check_criterion_drift:
+        type: condition
+        variable: criterion_drift
+        operator: eq
+        value: true
+        true_next: critical
+        false_next: check_overclaim
+      check_post_hoc_criteria:
+        type: condition
+        variable: post_hoc_analysis_criteria
+        operator: eq
+        value: true
+        true_next: fatal
+        false_next: check_missing_negative
+      check_imprecise_sig:
+        type: condition
+        variable: imprecise_significant
+        operator: eq
+        value: true
+        true_next: major
+        false_next: check_minor
+      check_minor:
+        type: condition
+        variable: has_minor_deficiency
+        operator: eq
+        value: true
+        true_next: minor
+        false_next: compliant
+      critical:
+        type: return
+        value:
+          class: C
+          label: CRITICAL
+          description: Significant structural deficiency introducing directional bias.
+          cs_effect: CS reduced by 0.20 per violation (floor 0.10)
+          chemistry_analog: Inhibition — reaction rate reduced by competitive binding
+      check_coi:
+        type: condition
+        variable: undisclosed_coi
+        operator: eq
+        value: true
+        true_next: critical
+        false_next: check_criterion_drift
+      check_fatal:
+        type: condition
+        variable: post_hoc_endpoint
+        operator: eq
+        value: true
+        true_next: fatal
+        false_next: check_suppressed
+      check_missing_negative:
+        type: condition
+        variable: missing_negative_results
+        operator: eq
+        value: true
+        true_next: critical
+        false_next: check_coi
+      minor:
+        type: return
+        value:
+          label: MINOR
+          class: m
+          chemistry_analog: Thermal noise — negligible perturbation
+          description: Presentational deficiency with limited epistemological impact.
+          cs_effect: CS reduced by 0.02 per violation (floor 0.85)
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: uses_proves_confirms
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: uses_proves_confirms
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      fabricated_data:
+        type: bool
+        required: true
+      undisclosed_coi:
+        type: bool
+        required: true
+      imprecise_significant:
+        type: bool
+        required: true
+      criterion_drift:
+        type: bool
+        required: true
+      has_minor_deficiency:
+        type: bool
+        required: true
+      suppressed_hypothesis:
+        type: bool
+        required: true
+      uses_proves_confirms:
+        type: bool
+        required: true
+      undocumented_deviation:
+        type: bool
+        required: true
+      missing_negative_results:
+        type: bool
+        required: true
+      missing_power_calculation:
+        type: bool
+        required: true
+      post_hoc_analysis_criteria:
+        type: bool
+        required: true
+      post_hoc_endpoint:
+        type: bool
+        required: true
+    outputs:
+      verdict:
+        type: string
+        required: false
+      chemistry_analog:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      class:
+        type: string
+        required: false
+      description:
+        type: string
+        required: false
+      label:
+        type: string
+        required: false
+      cs_effect:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    uses_proves_confirms: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    uses_proves_confirms: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

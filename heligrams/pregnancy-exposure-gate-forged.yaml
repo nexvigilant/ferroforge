@@ -1,0 +1,211 @@
+name: pregnancy-exposure-gate-helix
+description: 'Forged from microgram ''pregnancy-exposure-gate''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    regulatory_reference: falsified
+sense:
+  tree:
+    start: check_congenital
+    nodes:
+      serious:
+        type: return
+        value:
+          regulatory_reference: ICH S5(R3)
+          severity: serious
+          soc: Pregnancy, puerperium and perinatal conditions
+          action: expedited_report
+      serious_foetal:
+        type: return
+        value:
+          soc: Pregnancy, puerperium and perinatal conditions
+          regulatory_reference: ICH S5(R3)
+          severity: serious
+          action: expedited_report
+      check_foetal:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: FOETAL
+        true_next: serious_foetal
+        false_next: check_fertility
+      check_foetal_death:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: FOETAL DEATH
+        true_next: critical
+        false_next: check_spontaneous_abortion
+      mild:
+        type: return
+        value:
+          severity: mild
+          regulatory_reference: ICH S5(R3)
+          soc: Reproductive system and breast disorders
+          action: routine_surveillance
+      check_congenital:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: CONGENITAL
+        true_next: critical
+        false_next: check_foetal_death
+      critical:
+        type: return
+        value:
+          severity: critical
+          soc: Congenital, familial and genetic disorders
+          regulatory_reference: ICH S5(R3)
+          action: immediate_expedited_report
+      check_spontaneous_abortion:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: ABORTION SPONTANEOUS
+        true_next: serious
+        false_next: check_trimester1
+      serious_t1:
+        type: return
+        value:
+          action: expedited_report
+          soc: Pregnancy, puerperium and perinatal conditions
+          regulatory_reference: ICH S5(R3)
+          severity: serious
+      check_trimester1:
+        type: condition
+        variable: trimester
+        operator: eq
+        value: 1
+        true_next: serious_t1
+        false_next: check_foetal
+      moderate:
+        type: return
+        value:
+          action: monitor_and_assess
+          soc: Reproductive system and breast disorders
+          regulatory_reference: ICH S5(R3)
+          severity: moderate
+      check_fertility:
+        type: condition
+        variable: reaction_pt
+        operator: contains
+        value: FERTILITY
+        true_next: moderate
+        false_next: mild
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: reaction_pt
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: reaction_pt
+        operator: not_contains
+        value: CONGENITAL
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      trimester:
+        type: int
+        required: false
+      reaction_pt:
+        type: string
+        required: true
+    outputs:
+      soc:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      severity:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    reaction_pt: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

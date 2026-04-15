@@ -1,0 +1,84 @@
+name: ml-vs-statistical-comparator
+description: 'Classify ML vs PRR agreement for a drug-event pair. Returns BOTH_SIGNAL, BOTH_NOISE, ML_ONLY, or PRR_ONLY with action routing.'
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(prr, ml_prob) at ∂(thresholds) → agreement_class'
+  primes: ['κ', '∂', '→']
+interface:
+  inputs:
+    prr:
+      type: float
+      required: true
+    ml_probability:
+      type: float
+      required: true
+  outputs:
+    agreement:
+      type: string
+    action:
+      type: string
+defaults:
+  prr_threshold: 2.0
+  ml_threshold: 0.5
+tree:
+  start: check_prr
+  nodes:
+    check_prr:
+      type: condition
+      variable: prr
+      operator: gte
+      value: 2.0
+      true_next: prr_positive
+      false_next: prr_negative
+    prr_positive:
+      type: condition
+      variable: ml_probability
+      operator: gt
+      value: 0.5
+      true_next: both_signal
+      false_next: prr_only
+    prr_negative:
+      type: condition
+      variable: ml_probability
+      operator: gt
+      value: 0.5
+      true_next: ml_only
+      false_next: both_noise
+    both_signal:
+      type: return
+      value:
+        agreement: BOTH_SIGNAL
+        action: escalate
+        confidence: high
+    both_noise:
+      type: return
+      value:
+        agreement: BOTH_NOISE
+        action: archive
+        confidence: high
+    ml_only:
+      type: return
+      value:
+        agreement: ML_ONLY
+        action: review
+        confidence: medium
+    prr_only:
+      type: return
+      value:
+        agreement: PRR_ONLY
+        action: deprioritize
+        confidence: medium
+tests:
+  - name: both signal — metformin lactic acidosis
+    input: { prr: 71.6, ml_probability: 0.96 }
+    expect: { agreement: BOTH_SIGNAL, action: escalate }
+  - name: both noise — metformin nausea
+    input: { prr: 1.85, ml_probability: 0.07 }
+    expect: { agreement: BOTH_NOISE, action: archive }
+  - name: prr only — semaglutide nausea
+    input: { prr: 3.95, ml_probability: 0.43 }
+    expect: { agreement: PRR_ONLY, action: deprioritize }
+  - name: ml only — borderline case
+    input: { prr: 1.5, ml_probability: 0.72 }
+    expect: { agreement: ML_ONLY, action: review }

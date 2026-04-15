@@ -1,0 +1,230 @@
+name: sota-domain-classifier-helix
+description: 'Forged from microgram ''sota-domain-classifier''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    drift_velocity: falsified
+sense:
+  tree:
+    start: check_signal
+    nodes:
+      benefit_risk:
+        type: return
+        value:
+          drift_velocity: MODERATE — regulatory framework updates every 3-5 years, academic methods faster
+          comparison_method: Quantitative benefit-risk frameworks (MCDA, SMAA, QBR) validated against regulatory decision outcomes with concordance scoring
+          domain_label: Benefit-Risk Assessment
+          threshold_authority: EMA Benefit-Risk Methodology Project (PROTECT) + FDA Benefit-Risk Framework
+          current_frontier: IMI PROTECT multi-criteria frameworks, FDA structured benefit-risk (2013+), EMA PrOACT-URL, quantitative BRI scoring
+          authority_level: Regulatory framework (EMA + FDA parallel adoption)
+          detection_sources: EMA Science Medicines Health journal, FDA guidance documents, Value in Health journal, ISPOR publications
+      case_processing:
+        type: return
+        value:
+          threshold_authority: ICH E2B(R3) standard + EMA/FDA electronic submission requirements
+          comparison_method: ICSR completeness (VigiGrade), timeliness vs regulatory deadlines (7/15-day), MedDRA coding accuracy vs expert panel
+          current_frontier: E2B(R3) XML, automated MedDRA coding, NLP-assisted narrative extraction, duplicate detection algorithms
+          detection_sources: ICH E2B revisions, EudraVigilance technical documents, FDA FAERS updates, MedDRA version releases
+          drift_velocity: SLOW — ICH revision cycles 5-8 years, but MedDRA updates biannually
+          domain_label: Case Processing
+          authority_level: ICH technical standard (mandatory for market authorization holders)
+      check_causality:
+        type: condition
+        variable: domain
+        operator: eq
+        value: causality
+        true_next: causality_assessment
+        false_next: check_benefit_risk
+      regulatory_reporting:
+        type: return
+        value:
+          threshold_authority: ICH E2C(R2)/E2E + regional regulatory requirements (FDA 21 CFR 314.80, EMA GVP Module VII)
+          authority_level: ICH harmonized guideline + regional statutory requirements
+          detection_sources: ICH guideline updates, EMA GVP module revisions, FDA Federal Register, MHRA guidance
+          drift_velocity: VERY_SLOW — statutory/regulatory change cycles, 5-10 years between major revisions
+          comparison_method: Compliance rate (% reports meeting timeline), PSUR/PBRER assessment outcomes, inspection findings as quality proxy
+          current_frontier: PSUR/PBRER (ICH E2C R2), aggregate signal evaluation, risk management plans (EU-RMP), REMS (US), electronic PSUR submission
+          domain_label: Regulatory Reporting
+      unknown_domain:
+        type: return
+        value:
+          domain_label: UNKNOWN
+          current_frontier: N/A
+          drift_velocity: N/A
+          detection_sources: N/A
+          threshold_authority: Not classified
+          comparison_method: N/A
+          authority_level: N/A
+      signal_detection:
+        type: return
+        value:
+          current_frontier: Multi-item gamma Poisson shrinker (MGPS/EBGM), Bayesian IC with temporal pattern analysis, tree-based scan statistics
+          detection_sources: PubMed signal methodology, EMA PRAC minutes, FDA Sentinel publications, Drug Safety journal
+          drift_velocity: SLOW — regulatory-gated, 2-5 year adoption cycles for new methods
+          comparison_method: Disproportionality metrics (PRR/ROR/IC/EBGM) validated against known drug-event pairs with sensitivity/specificity benchmarks
+          domain_label: Signal Detection
+          threshold_authority: CIOMS VIII Working Group + EMA PRAC Signal Committee
+          authority_level: International consensus body + regulatory committee
+      check_signal:
+        type: condition
+        variable: domain
+        operator: eq
+        value: signal_detection
+        true_next: signal_detection
+        false_next: check_causality
+      check_regulatory:
+        type: condition
+        variable: domain
+        operator: eq
+        value: regulatory
+        true_next: regulatory_reporting
+        false_next: unknown_domain
+      check_benefit_risk:
+        type: condition
+        variable: domain
+        operator: eq
+        value: benefit_risk
+        true_next: benefit_risk
+        false_next: check_case
+      causality_assessment:
+        type: return
+        value:
+          comparison_method: Structured algorithms (Naranjo, WHO-UMC) scored against expert consensus panels with inter-rater reliability (kappa)
+          domain_label: Causality Assessment
+          current_frontier: WHO-UMC system (certain/probable/possible/unlikely), Naranjo algorithm, Bradford Hill criteria for population-level inference
+          drift_velocity: VERY_SLOW — WHO/ICH consensus cycles, 5-10 year revision intervals
+          detection_sources: WHO Drug Information, ICH guideline revisions, Pharmacoepidemiology & Drug Safety journal
+          authority_level: WHO programme + ICH tripartite harmonization
+          threshold_authority: WHO-UMC Causality Assessment Committee + ICH E2A/E2B guidelines
+      check_case:
+        type: condition
+        variable: domain
+        operator: eq
+        value: case_processing
+        true_next: case_processing
+        false_next: check_regulatory
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: domain
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: domain
+        operator: neq
+        value: signal_detection
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      domain:
+        type: string
+        required: true
+    outputs:
+      threshold_authority:
+        type: string
+        required: false
+      current_frontier:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      comparison_method:
+        type: string
+        required: false
+      detection_sources:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      domain_label:
+        type: string
+        required: false
+      authority_level:
+        type: string
+        required: false
+      drift_velocity:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    domain: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    domain: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - domain
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,276 @@
+name: e2d-followup-obligation-helix
+description: 'Forged from microgram ''e2d-followup-obligation''. Domain: SeriousnessClassification. 3 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 2
+  base_pairs:
+    followup_required: falsified
+sense:
+  tree:
+    start: check_serious
+    nodes:
+      check_serious:
+        type: condition
+        variable: is_serious
+        operator: eq
+        value: true
+        true_next: check_unexpected
+        false_next: return_no_followup
+      return_no_followup_expected:
+        type: return
+        value:
+          regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+          followup_required: false
+          followup_deadline_days: 0
+          followup_action: NONE_EXPECTED_REACTION
+      check_days_overdue:
+        type: condition
+        variable: days_since_initial
+        operator: gte
+        value: 90
+        true_next: return_close_incomplete
+        false_next: return_continue_followup
+      return_continue_followup:
+        type: return
+        value:
+          followup_deadline_days: 30
+          followup_action: CONTINUE_FOLLOWUP
+          followup_required: true
+          regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+      return_no_followup:
+        type: return
+        value:
+          followup_action: NONE_NON_SERIOUS
+          followup_deadline_days: 0
+          regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+          followup_required: false
+      return_initiate_followup:
+        type: return
+        value:
+          followup_required: true
+          followup_deadline_days: 30
+          followup_action: INITIATE_FOLLOWUP
+          regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+      check_unexpected:
+        type: condition
+        variable: is_unexpected
+        operator: eq
+        value: true
+        true_next: check_complete
+        false_next: return_no_followup_expected
+      check_complete:
+        type: condition
+        variable: report_complete
+        operator: eq
+        value: true
+        true_next: return_complete
+        false_next: check_followup_attempted
+      check_followup_attempted:
+        type: condition
+        variable: followup_attempted
+        operator: eq
+        value: true
+        true_next: check_days_overdue
+        false_next: return_initiate_followup
+      return_complete:
+        type: return
+        value:
+          followup_required: false
+          followup_action: NONE_REPORT_COMPLETE
+          followup_deadline_days: 0
+          regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+      return_close_incomplete:
+        type: return
+        value:
+          followup_deadline_days: 0
+          followup_required: false
+          followup_action: CLOSE_AS_INCOMPLETE
+          regulatory_reference: ICH E2D Section 5 - Follow-Up of Reports
+antisense:
+  tree:
+    start: null_guard_incomplete_info
+    nodes:
+      null_guard_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: is_null
+        value: null
+        true_next: null_guard_coding_error
+        false_next: check_comorbidity_confound
+      check_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: not_falsified
+      check_comorbidity_confound:
+        type: condition
+        variable: comorbidity_explains
+        operator: eq
+        value: true
+        true_next: falsified
+        false_next: null_guard_coding_error
+      null_guard_coding_error:
+        type: condition
+        variable: coding_verified
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_coding_error
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: is_null
+        value: null
+        true_next: null_guard_comorbidity_confound
+        false_next: check_incomplete_info
+      check_incomplete_info:
+        type: condition
+        variable: follow_up_complete
+        operator: eq
+        value: false
+        true_next: falsified
+        false_next: null_guard_comorbidity_confound
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      followup_required: true
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      followup_required: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when:
+      followup_required: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: absent
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      coding_verified:
+        type: bool
+        required: false
+      follow_up_complete:
+        type: bool
+        required: false
+      report_complete:
+        type: bool
+        required: false
+      followup_attempted:
+        type: bool
+        required: false
+      is_serious:
+        type: bool
+        required: false
+      comorbidity_explains:
+        type: bool
+        required: false
+      days_since_initial:
+        type: int
+        required: false
+      is_unexpected:
+        type: bool
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      followup_required:
+        type: bool
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      followup_action:
+        type: string
+        required: false
+      followup_deadline_days:
+        type: int
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    followup_attempted: false
+    follow_up_complete: true
+    comorbidity_explains: false
+    coding_verified: true
+    is_unexpected: true
+    is_serious: true
+    report_complete: false
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, incomplete_info active'
+  input:
+    followup_attempted: false
+    follow_up_complete: false
+    is_unexpected: true
+    is_serious: true
+    report_complete: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — seriousness-classification with 3 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - report_complete
+  - is_serious
+  - is_unexpected
+  - followup_attempted
+  - days_since_initial
+  chain_prediction: 'Forged heligram. Domain: seriousness-classification. Chains as dual-strand verifier before downstream consumers.'

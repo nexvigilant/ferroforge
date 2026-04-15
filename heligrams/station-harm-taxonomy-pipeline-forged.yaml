@@ -1,0 +1,162 @@
+name: station-harm-taxonomy-pipeline-helix
+description: 'Forged from microgram ''station-harm-taxonomy-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    route: falsified
+sense:
+  tree:
+    start: check_type
+    nodes:
+      other_type:
+        type: return
+        value:
+          route: specialist_review
+          action: classify
+          priority: moderate
+          reason: Type D-H harm — delayed/end-of-use/failure/genetic/hypersensitivity
+      check_b_d:
+        type: condition
+        variable: harm_type
+        operator: eq
+        value: B
+        true_next: type_b
+        false_next: check_c
+      type_c:
+        type: return
+        value:
+          action: monitor
+          priority: moderate
+          reason: Type C (chronic/cumulative) — long-term exposure effect, monitor over time
+          route: long_term_monitoring
+      type_a:
+        type: return
+        value:
+          reason: Type A (augmented pharmacology) — dose-dependent, predictable, high incidence
+          action: escalate
+          priority: critical
+          route: dose_adjustment
+      check_c:
+        type: condition
+        variable: harm_type
+        operator: eq
+        value: C
+        true_next: type_c
+        false_next: other_type
+      check_type:
+        type: condition
+        variable: harm_type
+        operator: eq
+        value: A
+        true_next: type_a
+        false_next: check_b_d
+      type_b:
+        type: return
+        value:
+          route: causality_assessment
+          reason: Type B (bizarre/idiosyncratic) — unpredictable, potentially fatal, needs genetic workup
+          priority: high
+          action: investigate
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: harm_type
+        operator: neq
+        value: A
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: harm_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      harm_type:
+        type: string
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    harm_type: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    harm_type: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

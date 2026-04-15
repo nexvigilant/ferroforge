@@ -1,0 +1,261 @@
+name: fda-biosimilar-safety-scope-helix
+description: 'Forged from microgram ''fda-biosimilar-safety-scope''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    clinical_trial_required: falsified
+sense:
+  tree:
+    start: check_analytical
+    nodes:
+      full_clinical:
+        type: return
+        value:
+          clinical_trial_required: true
+          switching_study_required: false
+          immunogenicity_assessment: Full comparative clinical program required. Functional dissimilarity necessitates clinical confirmation.
+          regulatory_reference: 'FDA Guidance: Biosimilar Comparative Analytical Assessment (2025), Section IV'
+          safety_study_scope: FULL_CLINICAL_PROGRAM
+      residual_uncertainty_path:
+        type: return
+        value:
+          clinical_trial_required: true
+          switching_study_required: false
+          immunogenicity_assessment: Full comparative clinical program including efficacy, safety, and immunogenicity. Standard BLA-level evidence.
+          safety_study_scope: FULL_CLINICAL_PROGRAM
+          regulatory_reference: 'FDA Guidance: Biosimilar Comparative Analytical Assessment (2025), Section IV'
+      reduced_with_immuno:
+        type: return
+        value:
+          clinical_trial_required: false
+          regulatory_reference: 'FDA Guidance: Biosimilar Comparative Analytical Assessment (2025); Immunogenicity Assessment (2014)'
+          switching_study_required: false
+          safety_study_scope: REDUCED_WITH_IMMUNOGENICITY
+          immunogenicity_assessment: Dedicated comparative immunogenicity study required due to high risk. 12-month duration with ADA testing.
+      interchangeable_standard:
+        type: return
+        value:
+          safety_study_scope: INTERCHANGEABLE_FULL
+          switching_study_required: true
+          regulatory_reference: 'FDA Guidance: Interchangeable Biosimilar Products (2019), Section V'
+          immunogenicity_assessment: Dedicated switching study with comparative immunogenicity. Multiple switch design required.
+          clinical_trial_required: true
+      highly_similar_functional:
+        type: condition
+        variable: functional_similarity
+        operator: eq
+        value: true
+        true_next: check_interchangeability_hs
+        false_next: reduced_clinical
+      check_immuno_hs:
+        type: condition
+        variable: immunogenicity_risk_level
+        operator: eq
+        value: high
+        true_next: reduced_with_immuno
+        false_next: streamlined_path
+      check_analytical:
+        type: condition
+        variable: analytical_similarity
+        operator: eq
+        value: highly_similar
+        true_next: highly_similar_functional
+        false_next: check_similar
+      check_similar:
+        type: condition
+        variable: analytical_similarity
+        operator: eq
+        value: similar
+        true_next: similar_functional
+        false_next: residual_uncertainty_path
+      streamlined_path:
+        type: return
+        value:
+          switching_study_required: false
+          regulatory_reference: 'FDA Guidance: Biosimilar Comparative Analytical Assessment (2025), Section VI — Totality of Evidence'
+          safety_study_scope: STREAMLINED
+          immunogenicity_assessment: Comparative PK/PD study with immunogenicity endpoints sufficient
+          clinical_trial_required: false
+      interchangeable_low_immuno:
+        type: return
+        value:
+          safety_study_scope: INTERCHANGEABLE_STREAMLINED
+          regulatory_reference: 'FDA Guidance: Interchangeable Biosimilar Products (2019); Comparative Analytical Assessment (2025)'
+          clinical_trial_required: true
+          switching_study_required: true
+          immunogenicity_assessment: Switching study with ADA endpoints. May use integrated PK/PD/immunogenicity design.
+      check_interchangeability_hs:
+        type: condition
+        variable: seeking_interchangeability
+        operator: eq
+        value: true
+        true_next: interchangeable_path
+        false_next: check_immuno_hs
+      similar_functional:
+        type: condition
+        variable: functional_similarity
+        operator: eq
+        value: true
+        true_next: reduced_clinical
+        false_next: full_clinical
+      reduced_clinical:
+        type: return
+        value:
+          immunogenicity_assessment: Comparative clinical study with safety and immunogenicity co-primary endpoints. Reduced sample size acceptable.
+          regulatory_reference: 'FDA Guidance: Biosimilar Comparative Analytical Assessment (2025), Section V'
+          safety_study_scope: REDUCED_CLINICAL
+          clinical_trial_required: true
+          switching_study_required: false
+      interchangeable_path:
+        type: condition
+        variable: immunogenicity_risk_level
+        operator: eq
+        value: low
+        true_next: interchangeable_low_immuno
+        false_next: interchangeable_standard
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: functional_similarity
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      check_negation:
+        type: condition
+        variable: functional_similarity
+        operator: neq
+        value: highly_similar
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      clinical_trial_required: true
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      clinical_trial_required: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      falsified: false
+      clinical_trial_required: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      immunogenicity_risk_level:
+        type: string
+        required: false
+      seeking_interchangeability:
+        type: bool
+        required: false
+      analytical_similarity:
+        type: string
+        required: true
+      functional_similarity:
+        type: bool
+        required: true
+    outputs:
+      immunogenicity_assessment:
+        type: string
+        required: false
+      clinical_trial_required:
+        type: bool
+        required: false
+      verdict:
+        type: string
+        required: false
+      switching_study_required:
+        type: bool
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      safety_study_scope:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    seeking_interchangeability: true
+    analytical_similarity: highly_similar
+    immunogenicity_risk_level: low
+    functional_similarity: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    seeking_interchangeability: true
+    analytical_similarity: highly_similar
+    immunogenicity_risk_level: low
+    functional_similarity: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - analytical_similarity
+  - functional_similarity
+  - seeking_interchangeability
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

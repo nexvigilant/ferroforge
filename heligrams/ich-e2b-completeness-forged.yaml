@@ -1,0 +1,221 @@
+name: ich-e2b-completeness-helix
+description: 'Forged from microgram ''ich-e2b-completeness''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    ich_e2b_compliant: falsified
+sense:
+  tree:
+    start: validate_reporter
+    nodes:
+      complete:
+        type: return
+        value:
+          data_completeness_level: 100
+          completeness_status: complete
+          ich_e2b_compliant: true
+          action_required: false
+      validate_reporter:
+        type: condition
+        variable: reporter_name
+        operator: is_not_null
+        value: null
+        true_next: validate_patient_age
+        false_next: incomplete_reporter
+      incomplete_event:
+        type: return
+        value:
+          completeness_status: incomplete
+          missing_element: adverse_event_term
+          data_completeness_level: 60
+          ich_e2b_compliant: false
+          action_required: true
+      validate_adverse_event:
+        type: condition
+        variable: adverse_event_term
+        operator: is_not_null
+        value: null
+        true_next: validate_suspect_drug
+        false_next: incomplete_event
+      incomplete_reporter:
+        type: return
+        value:
+          data_completeness_level: 20
+          action_required: true
+          completeness_status: incomplete
+          ich_e2b_compliant: false
+          missing_element: reporter_name
+      incomplete_patient:
+        type: return
+        value:
+          ich_e2b_compliant: false
+          action_required: true
+          completeness_status: incomplete
+          missing_element: patient_age
+          data_completeness_level: 40
+      validate_suspect_drug:
+        type: condition
+        variable: suspect_drug_name
+        operator: is_not_null
+        value: null
+        true_next: validate_date_received
+        false_next: incomplete_drug
+      validate_date_received:
+        type: condition
+        variable: date_received
+        operator: is_not_null
+        value: null
+        true_next: complete
+        false_next: incomplete_date
+      validate_patient_age:
+        type: condition
+        variable: patient_age
+        operator: is_not_null
+        value: null
+        true_next: validate_adverse_event
+        false_next: incomplete_patient
+      incomplete_date:
+        type: return
+        value:
+          ich_e2b_compliant: false
+          action_required: true
+          missing_element: date_received
+          data_completeness_level: 80
+          completeness_status: incomplete
+      incomplete_drug:
+        type: return
+        value:
+          missing_element: suspect_drug_name
+          data_completeness_level: 75
+          ich_e2b_compliant: false
+          completeness_status: incomplete
+          action_required: true
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_negation:
+        type: condition
+        variable: reporter_name
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: reporter_name
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      ich_e2b_compliant: true
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+      ich_e2b_compliant: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when:
+      ich_e2b_compliant: false
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: absent
+      confidence_score: 0.7
+  - when:
+      falsified: true
+      ich_e2b_compliant: false
+    default: null
+    emit:
+      confidence: medium
+      verdict: refuted
+      confidence_score: 0.42
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      reporter_name:
+        type: any
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    adverse_event_term: myocardial infarction
+    reporter_name: null
+    patient_age: 45
+    suspect_drug_name: aspirin
+    date_received: 2024-01-15
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    adverse_event_term: myocardial infarction
+    reporter_name: Dr. Smith
+    patient_age: 45
+    suspect_drug_name: aspirin
+    date_received: 2024-01-15
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,166 @@
+name: station-primitives-pipeline-helix
+description: 'Forged from microgram ''station-primitives-pipeline''. Domain: SystemHealth. 2 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    action: falsified
+sense:
+  tree:
+    start: check_coverage
+    nodes:
+      shallow:
+        type: return
+        value:
+          action: deepen
+          reason: Fewer than 5 primitives identified — decomposition too shallow
+          priority: moderate
+          route: decomposition_retry
+      check_conservation:
+        type: condition
+        variable: conservation_holds
+        operator: eq
+        value: true
+        true_next: conserved
+        false_next: broken
+      broken:
+        type: return
+        value:
+          action: repair
+          priority: high
+          reason: Conservation law violated — existence not conserved through boundaries
+          route: conservation_repair
+      conserved:
+        type: return
+        value:
+          priority: low
+          route: archive
+          reason: 5+ primitives, conservation holds — valid decomposition
+          action: certify
+      check_coverage:
+        type: condition
+        variable: primitives_identified
+        operator: gte
+        value: 5
+        true_next: check_conservation
+        false_next: shallow
+antisense:
+  tree:
+    start: null_guard_measurement_stale
+    nodes:
+      check_single_source:
+        type: condition
+        variable: probe_count
+        operator: lt
+        value: 2
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      null_guard_single_source:
+        type: condition
+        variable: probe_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_single_source
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_measurement_stale:
+        type: condition
+        variable: measurement_age_minutes
+        operator: is_null
+        value: null
+        true_next: null_guard_single_source
+        false_next: check_measurement_stale
+      check_measurement_stale:
+        type: condition
+        variable: measurement_age_minutes
+        operator: gt
+        value: 60
+        true_next: falsified
+        false_next: null_guard_single_source
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      measurement_age_minutes:
+        type: integer
+        required: false
+      probe_count:
+        type: integer
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    probe_count: 12
+    measurement_age_minutes: 50
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, measurement_stale active'
+  input:
+    measurement_age_minutes: 61
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — system-health with 2 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: system-health. Chains as dual-strand verifier before downstream consumers.'

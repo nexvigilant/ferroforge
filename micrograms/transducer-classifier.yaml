@@ -1,0 +1,412 @@
+name: transducer-classifier
+description: "Classifies physical transducers by energy domain mapping. Transducer = ∂(×(ς_input, ς_output)) — a boundary that converts one energy type to another while conserving total energy. Routes by input energy domain and output target."
+version: 0.1.0
+interface:
+  inputs:
+    input_energy:
+      type: string
+      required: true
+      enum: [mechanical, thermal, optical, chemical, electromagnetic, acoustic, nuclear]
+    output_energy:
+      type: string
+      required: true
+      enum: [electrical, mechanical, thermal, optical, acoustic]
+    scale:
+      type: string
+      required: false
+      enum: [nano, micro, macro, industrial]
+  outputs:
+    transducer_class:
+      type: string
+    device_examples:
+      type: string
+    primitive_formula:
+      type: string
+    efficiency_range:
+      type: string
+    conservation_note:
+      type: string
+tree:
+  start: check_output_electrical
+  nodes:
+    # Main branch: most transducers target electrical output
+    check_output_electrical:
+      type: condition
+      variable: output_energy
+      operator: eq
+      value: electrical
+      true_next: route_input_to_electrical
+      false_next: check_output_mechanical
+
+    # === ELECTRICAL OUTPUT BRANCH ===
+    route_input_to_electrical:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: mechanical
+      true_next: piezoelectric
+      false_next: check_thermal_to_elec
+
+    check_thermal_to_elec:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: thermal
+      true_next: thermoelectric
+      false_next: check_optical_to_elec
+
+    check_optical_to_elec:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: optical
+      true_next: photovoltaic
+      false_next: check_chemical_to_elec
+
+    check_chemical_to_elec:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: chemical
+      true_next: electrochemical
+      false_next: check_emag_to_elec
+
+    check_emag_to_elec:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: electromagnetic
+      true_next: electromagnetic_generator
+      false_next: check_acoustic_to_elec
+
+    check_acoustic_to_elec:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: acoustic
+      true_next: acoustic_electric
+      false_next: nuclear_to_elec
+
+    # === MECHANICAL OUTPUT BRANCH ===
+    check_output_mechanical:
+      type: condition
+      variable: output_energy
+      operator: eq
+      value: mechanical
+      true_next: route_input_to_mechanical
+      false_next: check_output_thermal
+
+    route_input_to_mechanical:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: electrical
+      true_next: electromechanical
+      false_next: check_thermal_to_mech
+
+    check_thermal_to_mech:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: thermal
+      true_next: thermomechanical
+      false_next: check_chemical_to_mech
+
+    check_chemical_to_mech:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: chemical
+      true_next: chemomechanical
+      false_next: generic_transducer
+
+    # === THERMAL OUTPUT BRANCH ===
+    check_output_thermal:
+      type: condition
+      variable: output_energy
+      operator: eq
+      value: thermal
+      true_next: route_input_to_thermal
+      false_next: check_output_optical
+
+    route_input_to_thermal:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: electrical
+      true_next: resistive_heater
+      false_next: check_emag_to_thermal
+
+    check_emag_to_thermal:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: electromagnetic
+      true_next: microwave_heater
+      false_next: generic_transducer
+
+    # === OPTICAL OUTPUT BRANCH ===
+    check_output_optical:
+      type: condition
+      variable: output_energy
+      operator: eq
+      value: optical
+      true_next: route_input_to_optical
+      false_next: check_output_acoustic
+
+    route_input_to_optical:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: electrical
+      true_next: electroluminescent
+      false_next: check_chemical_to_optical
+
+    check_chemical_to_optical:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: chemical
+      true_next: chemiluminescent
+      false_next: generic_transducer
+
+    # === ACOUSTIC OUTPUT BRANCH ===
+    check_output_acoustic:
+      type: condition
+      variable: output_energy
+      operator: eq
+      value: acoustic
+      true_next: route_input_to_acoustic
+      false_next: generic_transducer
+
+    route_input_to_acoustic:
+      type: condition
+      variable: input_energy
+      operator: eq
+      value: electrical
+      true_next: electroacoustic
+      false_next: generic_transducer
+
+    # === TERMINAL NODES ===
+    piezoelectric:
+      type: return
+      value:
+        transducer_class: piezoelectric
+        device_examples: "quartz crystal, PZT ceramic, PVDF film, piezo buzzer"
+        primitive_formula: "∂(×(ς_mechanical, ς_electrical)) — asymmetric crystal lattice deforms under stress, displacing charge"
+        efficiency_range: "10-50% (harvesting), 90%+ (sensing)"
+        conservation_note: "Mechanical work in = electrical energy out + heat dissipation. Reversible: voltage deforms crystal (inverse piezo)"
+
+    thermoelectric:
+      type: return
+      value:
+        transducer_class: thermoelectric
+        device_examples: "Seebeck element, Peltier device, thermocouple, BiTe module, RTG (spacecraft)"
+        primitive_formula: "∂(×(ς_thermal, ς_electrical)) — temperature gradient across dissimilar conductors drives charge carriers"
+        efficiency_range: "5-12% (Seebeck), Carnot-limited"
+        conservation_note: "Heat in = electrical energy out + waste heat. ZT figure of merit governs ceiling. Reversible (Peltier cooling)"
+
+    photovoltaic:
+      type: return
+      value:
+        transducer_class: photovoltaic
+        device_examples: "silicon solar cell, GaAs cell, perovskite, CdTe thin film, organic PV"
+        primitive_formula: "∂(×(ς_optical, ς_electrical)) — photon exceeds band gap, creates electron-hole pair across p-n junction"
+        efficiency_range: "15-47% (multi-junction), Shockley-Queisser limit 33.7% (single)"
+        conservation_note: "Photon energy in = electrical energy out + thermalization loss + reflection + recombination"
+
+    electrochemical:
+      type: return
+      value:
+        transducer_class: electrochemical
+        device_examples: "lithium-ion battery, fuel cell (PEMFC), zinc-air, flow battery, enzymatic biofuel cell"
+        primitive_formula: "∂(×(ς_chemical, ς_electrical)) — redox reaction at electrode-electrolyte boundary drives electron flow"
+        efficiency_range: "40-60% (fuel cells), 85-95% (Li-ion round-trip)"
+        conservation_note: "Gibbs free energy of reaction = electrical work + entropic heat. ΔG = -nFE"
+
+    electromagnetic_generator:
+      type: return
+      value:
+        transducer_class: electromagnetic_induction
+        device_examples: "dynamo, alternator, turbine generator, linear generator, regenerative brake"
+        primitive_formula: "∂(×(ς_electromagnetic, ς_electrical)) — changing magnetic flux through conductor induces EMF (Faraday's law)"
+        efficiency_range: "85-98% (large turbines), 60-80% (small generators)"
+        conservation_note: "Mechanical rotation energy = electrical energy + resistive loss + eddy currents + friction"
+
+    acoustic_electric:
+      type: return
+      value:
+        transducer_class: acoustic_to_electric
+        device_examples: "microphone (dynamic, condenser, MEMS), hydrophone, geophone"
+        primitive_formula: "∂(×(ς_acoustic, ς_electrical)) — pressure wave displaces membrane coupled to electrical element"
+        efficiency_range: "0.1-5% (harvesting), high fidelity (sensing)"
+        conservation_note: "Sound pressure level in = electrical signal out + membrane damping + air coupling loss"
+
+    nuclear_to_elec:
+      type: return
+      value:
+        transducer_class: nuclear_to_electric
+        device_examples: "RTG (Pu-238), betavoltaic cell, nuclear reactor + steam turbine"
+        primitive_formula: "∂(×(ς_nuclear, ς_electrical)) — decay/fission releases kinetic energy, cascades through thermal to electrical"
+        efficiency_range: "3-7% (RTG thermoelectric), 33% (reactor steam cycle)"
+        conservation_note: "E = mc² — mass deficit = kinetic energy of products. Multi-stage: nuclear → thermal → mechanical → electrical"
+
+    electromechanical:
+      type: return
+      value:
+        transducer_class: electromechanical
+        device_examples: "electric motor, solenoid, voice coil, linear actuator, MEMS actuator"
+        primitive_formula: "∂(×(ς_electrical, ς_mechanical)) — current in magnetic field produces Lorentz force"
+        efficiency_range: "85-97% (brushless DC), 60-80% (small motors)"
+        conservation_note: "Electrical power in = mechanical work out + I²R heat + hysteresis + windage"
+
+    thermomechanical:
+      type: return
+      value:
+        transducer_class: thermomechanical
+        device_examples: "steam turbine, Stirling engine, bimetallic strip, shape-memory alloy, steam piston"
+        primitive_formula: "∂(×(ς_thermal, ς_mechanical)) — thermal expansion or phase change drives mechanical displacement"
+        efficiency_range: "15-45% (Carnot-bounded: η ≤ 1 - T_cold/T_hot)"
+        conservation_note: "Heat in = mechanical work + rejected heat. Second law sets absolute ceiling via Carnot"
+
+    chemomechanical:
+      type: return
+      value:
+        transducer_class: chemomechanical
+        device_examples: "muscle fiber (ATP→actin-myosin), combustion engine, rocket motor, osmotic actuator"
+        primitive_formula: "∂(×(ς_chemical, ς_mechanical)) — bond energy release drives conformational or expansion work"
+        efficiency_range: "25% (muscle), 20-40% (combustion engine)"
+        conservation_note: "Chemical bond energy = mechanical work + heat + reaction byproducts"
+
+    resistive_heater:
+      type: return
+      value:
+        transducer_class: resistive_heating
+        device_examples: "heating element, nichrome wire, induction coil, heat pump (COP>1)"
+        primitive_formula: "∂(×(ς_electrical, ς_thermal)) — I²R dissipation converts current to heat (Joule heating)"
+        efficiency_range: "~100% (resistive), 200-500% (heat pump COP)"
+        conservation_note: "Electrical energy in = heat out. Perfectly efficient conversion. Heat pumps exceed 100% by moving existing heat"
+
+    microwave_heater:
+      type: return
+      value:
+        transducer_class: electromagnetic_to_thermal
+        device_examples: "microwave oven (magnetron), RF diathermy, induction heater"
+        primitive_formula: "∂(×(ς_electromagnetic, ς_thermal)) — EM field oscillates polar molecules, friction generates heat"
+        efficiency_range: "50-65% (magnetron wall-plug), ~85% (coupling to water)"
+        conservation_note: "EM field energy = molecular kinetic energy (heat) + reflected/leaked radiation"
+
+    electroluminescent:
+      type: return
+      value:
+        transducer_class: electroluminescent
+        device_examples: "LED, OLED, laser diode, plasma display, EL panel"
+        primitive_formula: "∂(×(ς_electrical, ς_optical)) — electron-hole recombination across band gap emits photon"
+        efficiency_range: "30-50% (white LED), 50-70% (monochrome LED), 25-80% (laser)"
+        conservation_note: "Electrical energy = photon energy + non-radiative recombination heat. Stokes shift limits wavelength efficiency"
+
+    chemiluminescent:
+      type: return
+      value:
+        transducer_class: chemiluminescent
+        device_examples: "glow stick, firefly luciferin-luciferase, luminol reaction"
+        primitive_formula: "∂(×(ς_chemical, ς_optical)) — exothermic reaction produces electronically excited product that emits photon"
+        efficiency_range: "25% (luminol), 41% (firefly — nature's record)"
+        conservation_note: "Reaction enthalpy = photon energy + thermal dissipation. No electrical intermediary"
+
+    electroacoustic:
+      type: return
+      value:
+        transducer_class: electroacoustic
+        device_examples: "loudspeaker, piezo buzzer, ultrasonic transducer, bone conduction speaker"
+        primitive_formula: "∂(×(ς_electrical, ς_acoustic)) — electrical signal drives membrane/element displacement, creating pressure waves"
+        efficiency_range: "0.5-5% (loudspeaker), 50%+ (ultrasonic)"
+        conservation_note: "Electrical energy = acoustic energy + voice coil heat + mechanical damping"
+
+    generic_transducer:
+      type: return
+      value:
+        transducer_class: unclassified
+        device_examples: "exotic or multi-stage transduction — may require intermediate conversion steps"
+        primitive_formula: "∂(×(ς_A, ς_B)) — no direct single-stage transducer known for this domain pair"
+        efficiency_range: "varies — multi-stage losses compound multiplicatively"
+        conservation_note: "Total efficiency = product of stage efficiencies. Each ∂ crossing incurs loss"
+
+primitive_signature:
+  dominant: '×'
+  expression: '×(∂, ς) — mapping across boundary with state conservation'
+  primes: ['×', '∂', 'ς']
+  arguments: ['N']
+
+tests:
+- name: "piezoelectric — mechanical to electrical"
+  input: { input_energy: mechanical, output_energy: electrical }
+  expect: { transducer_class: piezoelectric }
+
+- name: "solar cell — optical to electrical"
+  input: { input_energy: optical, output_energy: electrical }
+  expect: { transducer_class: photovoltaic }
+
+- name: "thermocouple — thermal to electrical"
+  input: { input_energy: thermal, output_energy: electrical }
+  expect: { transducer_class: thermoelectric }
+
+- name: "battery — chemical to electrical"
+  input: { input_energy: chemical, output_energy: electrical }
+  expect: { transducer_class: electrochemical }
+
+- name: "generator — electromagnetic to electrical"
+  input: { input_energy: electromagnetic, output_energy: electrical }
+  expect: { transducer_class: electromagnetic_induction }
+
+- name: "microphone — acoustic to electrical"
+  input: { input_energy: acoustic, output_energy: electrical }
+  expect: { transducer_class: acoustic_to_electric }
+
+- name: "RTG — nuclear to electrical"
+  input: { input_energy: nuclear, output_energy: electrical }
+  expect: { transducer_class: nuclear_to_electric }
+
+- name: "electric motor — electrical to mechanical"
+  input: { input_energy: electrical, output_energy: mechanical }
+  expect: { transducer_class: electromechanical }
+
+- name: "steam turbine — thermal to mechanical"
+  input: { input_energy: thermal, output_energy: mechanical }
+  expect: { transducer_class: thermomechanical }
+
+- name: "muscle — chemical to mechanical"
+  input: { input_energy: chemical, output_energy: mechanical }
+  expect: { transducer_class: chemomechanical }
+
+- name: "heater — electrical to thermal"
+  input: { input_energy: electrical, output_energy: thermal }
+  expect: { transducer_class: resistive_heating }
+
+- name: "LED — electrical to optical"
+  input: { input_energy: electrical, output_energy: optical }
+  expect: { transducer_class: electroluminescent }
+
+- name: "glow stick — chemical to optical"
+  input: { input_energy: chemical, output_energy: optical }
+  expect: { transducer_class: chemiluminescent }
+
+- name: "speaker — electrical to acoustic"
+  input: { input_energy: electrical, output_energy: acoustic }
+  expect: { transducer_class: electroacoustic }
+
+- name: "microwave — electromagnetic to thermal"
+  input: { input_energy: electromagnetic, output_energy: thermal }
+  expect: { transducer_class: electromagnetic_to_thermal }
+
+- name: "exotic pair — falls to generic"
+  input: { input_energy: acoustic, output_energy: optical }
+  expect: { transducer_class: unclassified }
+
+- name: "null safety — empty input"
+  input: {}
+  expect: { transducer_class: unclassified }
+
+- name: "with scale parameter"
+  input: { input_energy: optical, output_energy: electrical, scale: nano }
+  expect: { transducer_class: photovoltaic }

@@ -1,0 +1,209 @@
+name: thermal-runaway-detector
+description: "Detects thermal runaway precursors in battery cells. Routes by rate-of-rise, absolute temperature, and gas detection. Implements the 3-stage runaway model: Stage 1 (onset >80°C), Stage 2 (acceleration >130°C), Stage 3 (propagation >200°C)."
+version: 0.1.0
+interface:
+  inputs:
+    cell_temp_c:
+      type: float
+      required: true
+      description: "Current cell temperature in Celsius"
+    temp_rise_rate_c_per_min:
+      type: float
+      required: false
+      description: "Temperature rise rate in °C per minute"
+    gas_detected:
+      type: boolean
+      required: false
+      description: "Whether vent gas (electrolyte decomposition products) detected"
+    voltage_dropping:
+      type: boolean
+      required: false
+      description: "Whether cell voltage is dropping unexpectedly (internal short indicator)"
+    adjacent_cell_temp_c:
+      type: float
+      required: false
+      description: "Temperature of adjacent cell (propagation check)"
+  outputs:
+    stage:
+      type: string
+    time_to_runaway_s:
+      type: string
+    action:
+      type: string
+    propagation_risk:
+      type: string
+    rationale:
+      type: string
+tree:
+  start: check_stage3
+  nodes:
+    check_stage3:
+      type: condition
+      variable: cell_temp_c
+      operator: gt
+      value: 200
+      true_next: stage3_propagation
+      false_next: check_stage2
+
+    check_stage2:
+      type: condition
+      variable: cell_temp_c
+      operator: gt
+      value: 130
+      true_next: stage2_acceleration
+      false_next: check_stage1
+
+    check_stage1:
+      type: condition
+      variable: cell_temp_c
+      operator: gt
+      value: 80
+      true_next: check_gas
+      false_next: check_precursor
+
+    check_gas:
+      type: condition
+      variable: gas_detected
+      operator: eq
+      value: true
+      true_next: stage1_with_gas
+      false_next: check_voltage_drop
+
+    check_voltage_drop:
+      type: condition
+      variable: voltage_dropping
+      operator: eq
+      value: true
+      true_next: stage1_internal_short
+      false_next: stage1_onset
+
+    check_precursor:
+      type: condition
+      variable: temp_rise_rate_c_per_min
+      operator: gt
+      value: 5
+      true_next: precursor_fast_rise
+      false_next: check_adjacent
+
+    check_adjacent:
+      type: condition
+      variable: adjacent_cell_temp_c
+      operator: gt
+      value: 60
+      true_next: propagation_warning
+      false_next: normal
+
+    stage3_propagation:
+      type: return
+      value:
+        stage: "stage_3_propagation"
+        time_to_runaway_s: "0 — ACTIVE THERMAL RUNAWAY"
+        action: "PYRO DISCONNECT NOW. Jettison pack if airborne. Vent directed away from pilot. Cell is venting with flame. Adjacent cells will cascade in 10-60s without intervention."
+        propagation_risk: "CERTAIN — intumescent mat is the last barrier"
+        rationale: ">200°C: cathode decomposition releasing O₂, electrolyte combustion, cell casing rupture. Exothermic chain reaction is self-sustaining. No recovery possible."
+
+    stage2_acceleration:
+      type: return
+      value:
+        stage: "stage_2_acceleration"
+        time_to_runaway_s: "30-120s to Stage 3"
+        action: "IMMEDIATE pyro disconnect. Open burst disc. Activate fire suppression. Alert pilot. If airborne, prepare jettison."
+        propagation_risk: "HIGH — SEI layer fully decomposed, anode reacting with electrolyte"
+        rationale: ">130°C: separator melting (PE at 130°C, PP at 165°C). Internal short circuit forming. Cathode beginning to release oxygen. Point of no return approaching."
+
+    stage1_with_gas:
+      type: return
+      value:
+        stage: "stage_1_onset_with_gas"
+        time_to_runaway_s: "2-10 min to Stage 2"
+        action: "Disconnect cell/module. Open pressure relief. Gas = electrolyte decomposition confirmed. Isolate from adjacent cells. Cool aggressively."
+        propagation_risk: "MODERATE — gas confirms SEI decomposition has begun"
+        rationale: ">80°C with gas: SEI layer decomposing, releasing CO₂/ethylene/H₂. This is NOT a false alarm — chemical decomposition confirmed by gas sensor."
+
+    stage1_internal_short:
+      type: return
+      value:
+        stage: "stage_1_onset_internal_short"
+        time_to_runaway_s: "1-5 min to Stage 2 (faster due to I²R heating)"
+        action: "Disconnect cell/module IMMEDIATELY. Internal short accelerates heating via I²R. Do not attempt to cool — disconnect first, cool second."
+        propagation_risk: "HIGH — internal short provides continuous heat source"
+        rationale: ">80°C with voltage drop: internal short circuit (dendrite penetration or separator damage). Self-heating via short-circuit current. Faster progression than external heating."
+
+    stage1_onset:
+      type: return
+      value:
+        stage: "stage_1_onset"
+        time_to_runaway_s: "5-30 min to Stage 2 (if no intervention)"
+        action: "Reduce load to zero on affected module. Activate burst cooling. Monitor rate of rise. If >1°C/min, escalate to disconnect."
+        propagation_risk: "LOW-MODERATE — SEI beginning to decompose, still reversible with cooling"
+        rationale: ">80°C: SEI (Solid Electrolyte Interphase) layer begins decomposing. Exothermic reaction starts. Still recoverable if caught here — aggressive cooling can stabilize."
+
+    precursor_fast_rise:
+      type: return
+      value:
+        stage: "precursor_fast_rise"
+        time_to_runaway_s: "10-60 min at current rate"
+        action: "Alert: temperature rising >5°C/min. Reduce load. Increase cooling. If rate doesn't slow in 2 min, disconnect module."
+        propagation_risk: "LOW — but trajectory is concerning"
+        rationale: "<80°C but rising fast. Could be high C-rate discharge, environmental heat, or early internal failure. Rate of rise is the leading indicator — absolute temp is lagging."
+
+    propagation_warning:
+      type: return
+      value:
+        stage: "propagation_warning"
+        time_to_runaway_s: "N/A — monitoring adjacent cell"
+        action: "Adjacent cell >60°C — potential propagation from neighbor. Increase cooling to affected zone. Monitor for cascade."
+        propagation_risk: "MODERATE — heat transfer from neighbor detected"
+        rationale: "Cell is normal but neighbor is hot. Inter-cell thermal propagation through cell holder. Intumescent mat + Poron/G10 holders slow propagation but don't stop it indefinitely."
+
+    normal:
+      type: return
+      value:
+        stage: "normal"
+        time_to_runaway_s: "N/A"
+        action: "No intervention. Continue monitoring."
+        propagation_risk: "NONE"
+        rationale: "Cell <80°C, no fast rise, no gas, no adjacent heat. Normal operation."
+
+primitive_signature:
+  dominant: '→'
+  expression: '→(v(Δς_thermal)) — causal response to rate of thermal state change'
+  primes: ['→', 'v', 'ς', '∂']
+  arguments: ['N', 'l']
+
+tests:
+- name: "Stage 3 — active runaway"
+  input: { cell_temp_c: 220 }
+  expect: { stage: "stage_3_propagation" }
+
+- name: "Stage 2 — acceleration"
+  input: { cell_temp_c: 140 }
+  expect: { stage: "stage_2_acceleration" }
+
+- name: "Stage 1 with gas — confirmed decomposition"
+  input: { cell_temp_c: 90, gas_detected: true }
+  expect: { stage: "stage_1_onset_with_gas" }
+
+- name: "Stage 1 internal short — voltage dropping"
+  input: { cell_temp_c: 85, gas_detected: false, voltage_dropping: true }
+  expect: { stage: "stage_1_onset_internal_short" }
+
+- name: "Stage 1 onset — no secondary indicators"
+  input: { cell_temp_c: 85, gas_detected: false, voltage_dropping: false }
+  expect: { stage: "stage_1_onset" }
+
+- name: "precursor — fast temperature rise"
+  input: { cell_temp_c: 55, temp_rise_rate_c_per_min: 8 }
+  expect: { stage: "precursor_fast_rise" }
+
+- name: "propagation warning from adjacent cell"
+  input: { cell_temp_c: 35, temp_rise_rate_c_per_min: 1, adjacent_cell_temp_c: 65 }
+  expect: { stage: "propagation_warning" }
+
+- name: "normal"
+  input: { cell_temp_c: 30 }
+  expect: { stage: "normal" }
+
+- name: "null safety"
+  input: {}
+  expect: { stage: "normal" }

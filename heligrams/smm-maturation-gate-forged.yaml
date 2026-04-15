@@ -1,0 +1,188 @@
+name: smm-maturation-gate-helix
+description: 'Forged from microgram ''smm-maturation-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    integration_weight: falsified
+sense:
+  tree:
+    start: check_exemplary
+    nodes:
+      conditional_maturation:
+        type: return
+        value:
+          integration_weight: conditional
+          advancement_action: Eligible for exploratory protocol development with additional maturation. Address critical gaps first.
+          ms_range: 0.50-0.69
+          maturation_level: CONDITIONAL
+      immature:
+        type: return
+        value:
+          advancement_action: Not eligible for protocol development. Significant maturation work needed. Integrate at 0.10x with scrutiny flag.
+          ms_range: 0.30-0.49
+          integration_weight: low
+          maturation_level: IMMATURE
+      check_high:
+        type: condition
+        variable: severity_band
+        operator: eq
+        value: HIGH
+        true_next: developing
+        false_next: check_moderate
+      check_moderate:
+        type: condition
+        variable: severity_band
+        operator: eq
+        value: MODERATE
+        true_next: conditional_maturation
+        false_next: check_low
+      developing:
+        type: return
+        value:
+          maturation_level: DEVELOPING
+          integration_weight: high
+          ms_range: 0.70-0.89
+          advancement_action: Eligible for protocol development. Minor maturation gaps to address during protocol design.
+      check_low:
+        type: condition
+        variable: severity_band
+        operator: eq
+        value: LOW
+        true_next: immature
+        false_next: premature
+      premature:
+        type: return
+        value:
+          advancement_action: Framework structurally unprepared for testing. Return to workshop. Exclude from active K-state.
+          maturation_level: PREMATURE
+          ms_range: 0.00-0.29
+          integration_weight: exclude
+      check_exemplary:
+        type: condition
+        variable: severity_band
+        operator: eq
+        value: EXEMPLARY
+        true_next: mature
+        false_next: check_high
+      mature:
+        type: return
+        value:
+          integration_weight: full
+          advancement_action: Fully eligible for protocol development under SMM-001. Consider publishing maturation process.
+          ms_range: 0.90-1.00
+          maturation_level: MATURE
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_negation:
+        type: condition
+        variable: severity_band
+        operator: neq
+        value: EXEMPLARY
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: severity_band
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      severity_band:
+        type: string
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      ms_range:
+        type: string
+        required: false
+      advancement_action:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      integration_weight:
+        type: string
+        required: false
+      maturation_level:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    severity_band: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    severity_band: __negated__
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

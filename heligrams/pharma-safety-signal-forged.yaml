@@ -1,0 +1,158 @@
+name: pharma-safety-signal-helix
+description: 'Forged from microgram ''pharma-safety-signal''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    monitoring_frequency: falsified
+sense:
+  tree:
+    start: check_high_reports
+    nodes:
+      check_high_reactions:
+        type: condition
+        variable: top_reaction_count
+        operator: gte
+        value: 100000
+        true_next: return_high
+        false_next: return_moderate
+      return_moderate:
+        type: return
+        value:
+          monitoring_frequency: weekly
+          signal_tier: moderate_signal_volume
+      return_high:
+        type: return
+        value:
+          signal_tier: high_signal_volume
+          monitoring_frequency: continuous
+      check_high_reports:
+        type: condition
+        variable: total_faers_reports
+        operator: gte
+        value: 1000000
+        true_next: check_high_reactions
+        false_next: check_moderate_reports
+      return_low:
+        type: return
+        value:
+          monitoring_frequency: monthly
+          signal_tier: low_signal_volume
+      check_moderate_reports:
+        type: condition
+        variable: total_faers_reports
+        operator: gte
+        value: 100000
+        true_next: return_moderate
+        false_next: return_low
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: top_reaction_count
+        operator: lt
+        value: 1000000
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: top_reaction_count
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      top_reaction_count:
+        type: int
+        required: false
+      total_faers_reports:
+        type: int
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      signal_tier:
+        type: string
+        required: false
+      monitoring_frequency:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    top_reaction_count: 1000010
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    top_reaction_count: 999999
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

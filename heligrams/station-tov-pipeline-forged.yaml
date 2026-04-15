@@ -1,0 +1,148 @@
+name: station-tov-pipeline-helix
+description: 'Forged from microgram ''station-tov-pipeline''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    route: falsified
+sense:
+  tree:
+    start: check_stable
+    nodes:
+      trusted:
+        type: return
+        value:
+          route: archive
+          reason: ToV stable, epistemic trust ≥0.7 — operations nominal
+          action: proceed
+          priority: low
+      low_trust:
+        type: return
+        value:
+          priority: moderate
+          action: validate
+          reason: Epistemic trust <0.7 — increase evidence before acting on signals
+          route: evidence_gathering
+      check_stable:
+        type: condition
+        variable: stability_shell_intact
+        operator: eq
+        value: true
+        true_next: check_trust
+        false_next: shell_broken
+      shell_broken:
+        type: return
+        value:
+          action: halt
+          priority: critical
+          reason: ToV stability shell breached — safety manifold compromised
+          route: system_halt
+      check_trust:
+        type: condition
+        variable: epistemic_trust
+        operator: gte
+        value: 0.7
+        true_next: trusted
+        false_next: low_trust
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: stability_shell_intact
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: stability_shell_intact
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      stability_shell_intact:
+        type: bool
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    stability_shell_intact: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    stability_shell_intact: false
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,183 @@
+name: drug-search-router-helix
+description: 'Forged from microgram ''drug-search-router''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    query_format: falsified
+sense:
+  tree:
+    start: validate_search_type
+    nodes:
+      classify_search_type:
+        type: condition
+        variable: search_type
+        operator: matches
+        value: (?i)^brand$
+        true_next: route_brand
+        false_next: check_generic
+      route_brand:
+        type: return
+        value:
+          query_format: brand_name
+          result_type: branded_drugs
+          search_endpoint: /drugs?type=brand
+      route_ndc:
+        type: return
+        value:
+          query_format: ndc_code
+          search_endpoint: /drugs?type=ndc
+          result_type: drug_by_ndc
+      route_generic:
+        type: return
+        value:
+          query_format: generic_name
+          result_type: generic_drugs
+          search_endpoint: /drugs?type=generic
+      validate_search_type:
+        type: condition
+        variable: search_type
+        operator: is_not_null
+        value: null
+        true_next: classify_search_type
+        false_next: missing_input
+      check_generic:
+        type: condition
+        variable: search_type
+        operator: matches
+        value: (?i)^generic$
+        true_next: route_generic
+        false_next: check_ndc
+      check_ndc:
+        type: condition
+        variable: search_type
+        operator: matches
+        value: (?i)^ndc$
+        true_next: route_ndc
+        false_next: check_ingredient
+      check_ingredient:
+        type: condition
+        variable: search_type
+        operator: matches
+        value: (?i)^ingredient$
+        true_next: route_ingredient
+        false_next: invalid_type
+      route_ingredient:
+        type: return
+        value:
+          query_format: active_ingredient
+          result_type: drugs_with_ingredient
+          search_endpoint: /drugs?type=ingredient
+      missing_input:
+        type: return
+        value:
+          result_type: null
+          query_format: null
+          search_endpoint: null
+      invalid_type:
+        type: return
+        value:
+          query_format: null
+          result_type: null
+          search_endpoint: null
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: search_type
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: search_type
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence_score: 0.7
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      search_type:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    search_type: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

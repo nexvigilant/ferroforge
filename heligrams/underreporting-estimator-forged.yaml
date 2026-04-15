@@ -1,0 +1,174 @@
+name: underreporting-estimator-helix
+description: 'Forged from microgram ''underreporting-estimator''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    description: falsified
+sense:
+  tree:
+    start: check_severe
+    nodes:
+      acceptable_reporting:
+        type: return
+        value:
+          description: Reporting rate within acceptable range for spontaneous reporting systems
+          category: ACCEPTABLE_REPORTING
+          recommendation: Continue routine monitoring
+          estimated_reporting_pct: '>10%'
+      check_significant:
+        type: condition
+        variable: reporting_ratio
+        operator: lt
+        value: 0.05
+        true_next: significant_underreporting
+        false_next: check_moderate
+      check_moderate:
+        type: condition
+        variable: reporting_ratio
+        operator: lt
+        value: 0.1
+        true_next: moderate_underreporting
+        false_next: acceptable_reporting
+      significant_underreporting:
+        type: return
+        value:
+          description: Significant underreporting detected - estimated 5-10% of cases reported
+          recommendation: Enhance passive surveillance and educate reporters
+          category: SIGNIFICANT_UNDERREPORTING
+          estimated_reporting_pct: 5-10%
+      moderate_underreporting:
+        type: return
+        value:
+          recommendation: Monitor reporting trends and apply adjustment factors
+          category: MODERATE_UNDERREPORTING
+          estimated_reporting_pct: 10%
+          description: Moderate underreporting detected - estimated ~10% of cases reported
+      check_severe:
+        type: condition
+        variable: reporting_ratio
+        operator: lt
+        value: 0.01
+        true_next: severe_underreporting
+        false_next: check_significant
+      severe_underreporting:
+        type: return
+        value:
+          category: SEVERE_UNDERREPORTING
+          estimated_reporting_pct: 1-10%
+          description: Severe underreporting detected - estimated 1-10% of cases reported
+          recommendation: Initiate active surveillance and reporting system audit
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: reporting_ratio
+        operator: gte
+        value: 0.01
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: reporting_ratio
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      reporting_ratio:
+        type: float
+        required: false
+    outputs:
+      category:
+        type: string
+        required: false
+      description:
+        type: string
+        required: false
+      estimated_reporting_pct:
+        type: string
+        required: false
+      recommendation:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    reporting_ratio: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    reporting_ratio: 0.01
+  expect:
+    verdict: contested
+    confidence: low
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

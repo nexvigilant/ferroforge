@@ -1,0 +1,211 @@
+name: fda-medication-error-risk-helix
+description: 'Forged from microgram ''fda-medication-error-risk''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    mitigation_strategy: falsified
+sense:
+  tree:
+    start: check_severity
+    nodes:
+      serious_not_designable:
+        type: return
+        value:
+          mitigation_strategy: 'Implement administrative controls: Medication Guide, Patient Instructions for Use, healthcare provider communication plan.'
+          labeling_action: Mandatory Medication Guide distribution. Consider communication plan to prescribers.
+          regulatory_reference: 'FDA Guidance: Safety Considerations for Product Design (2016), Section V'
+          risk_level: HIGH
+      check_moderate:
+        type: condition
+        variable: severity_outcome
+        operator: eq
+        value: moderate_harm
+        true_next: moderate_error
+        false_next: check_mild
+      check_severity:
+        type: condition
+        variable: severity_outcome
+        operator: eq
+        value: fatal
+        true_next: fatal_error
+        false_next: check_serious
+      check_serious:
+        type: condition
+        variable: severity_outcome
+        operator: eq
+        value: serious_harm
+        true_next: serious_designable_check
+        false_next: check_moderate
+      mild_error:
+        type: return
+        value:
+          regulatory_reference: 'FDA Guidance: Safety Considerations for Product Design (2016), Section VI'
+          risk_level: LOW
+          mitigation_strategy: Standard label improvements and monitoring of error reports through MedWatch.
+          labeling_action: Include medication error prevention language in Patient Information.
+      serious_designable_check:
+        type: condition
+        variable: preventable_by_design
+        operator: eq
+        value: true
+        true_next: serious_designable
+        false_next: serious_not_designable
+      check_mild:
+        type: condition
+        variable: severity_outcome
+        operator: eq
+        value: mild_harm
+        true_next: mild_error
+        false_next: no_harm_error
+      no_harm_error:
+        type: return
+        value:
+          mitigation_strategy: Monitor through routine pharmacovigilance. No design changes required unless frequency increases.
+          labeling_action: No labeling changes required.
+          risk_level: MINIMAL
+          regulatory_reference: 'FDA Guidance: Safety Considerations for Product Design (2016), Section VI'
+      serious_designable:
+        type: return
+        value:
+          labeling_action: Update container labels and carton labeling per FDA container labeling guidance. Add prominent warnings.
+          risk_level: HIGH
+          regulatory_reference: 'FDA Guidance: Safety Considerations for Product Design (2016), Section IV; Container Labels Guidance (2022), Section III'
+          mitigation_strategy: 'Implement design controls: differentiated packaging, prominent strength display, auxiliary labels, oral syringe for liquids. Conduct simulated use study.'
+      moderate_error:
+        type: return
+        value:
+          mitigation_strategy: Evaluate packaging differentiation, label clarity improvements, and dosing device accuracy. Conduct label comprehension study.
+          risk_level: MODERATE
+          regulatory_reference: 'FDA Guidance: Safety Considerations for Product Design (2016), Section IV'
+          labeling_action: Review and improve label design per FDA readability guidelines.
+      fatal_error:
+        type: return
+        value:
+          risk_level: CRITICAL
+          labeling_action: Boxed warning for medication error risk. REMS with ETASS may be required.
+          mitigation_strategy: 'Mandatory product redesign: unique container shape, tall-man lettering, barcode verification, distinct color coding. Consider restricted distribution.'
+          regulatory_reference: 'FDA Guidance: Safety Considerations for Product Design to Minimize Medication Errors (2016), Section III; Container Labels Guidance (2022)'
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: severity_outcome
+        operator: neq
+        value: fatal
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: severity_outcome
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      preventable_by_design:
+        type: bool
+        required: false
+      severity_outcome:
+        type: string
+        required: true
+      error_type:
+        type: string
+        required: true
+    outputs:
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      risk_level:
+        type: string
+        required: false
+      regulatory_reference:
+        type: string
+        required: false
+      labeling_action:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      mitigation_strategy:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    severity_outcome: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    severity_outcome: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - severity_outcome
+  - error_type
+  - preventable_by_design
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

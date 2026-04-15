@@ -1,0 +1,148 @@
+name: tox-vascular-helix
+description: 'Forged from microgram ''tox-vascular''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    target: falsified
+sense:
+  tree:
+    start: check_severe
+    nodes:
+      check_mild:
+        type: condition
+        variable: thrombosis_risk
+        operator: gte
+        value: 2
+        true_next: mild
+        false_next: normal
+      mild:
+        type: return
+        value:
+          target: vessel
+          action: monitor_closely
+          organ: vascular
+          severity: mild
+      severe:
+        type: return
+        value:
+          severity: severe
+          organ: vascular
+          target: vessel
+          action: discontinue
+      check_severe:
+        type: condition
+        variable: thrombosis_risk
+        operator: gte
+        value: 5
+        true_next: severe
+        false_next: check_mild
+      normal:
+        type: return
+        value:
+          organ: vascular
+          action: continue
+          target: vessel
+          severity: normal
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: thrombosis_risk
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: thrombosis_risk
+        operator: lt
+        value: 5
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      thrombosis_risk:
+        type: integer
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    thrombosis_risk: 15
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    thrombosis_risk: 4
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

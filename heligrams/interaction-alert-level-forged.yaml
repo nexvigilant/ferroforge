@@ -1,0 +1,199 @@
+name: interaction-alert-level-helix
+description: 'Forged from microgram ''interaction-alert-level''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    alert_compliant: falsified
+sense:
+  tree:
+    start: validate_severity
+    nodes:
+      alert_unknown:
+        type: return
+        value:
+          alert_color: gray
+          alert_compliant: false
+          prescriber_action_required: null
+          alert_level: unknown
+          notification_urgency: null
+      check_critical_alert:
+        type: condition
+        variable: interaction_severity
+        operator: eq
+        value: contraindicated
+        true_next: critical_alert
+        false_next: check_major_alert
+      check_moderate_alert:
+        type: condition
+        variable: interaction_severity
+        operator: eq
+        value: moderate
+        true_next: moderate_alert
+        false_next: minor_alert
+      moderate_alert:
+        type: return
+        value:
+          alert_color: yellow
+          prescriber_action_required: false
+          alert_compliant: true
+          notification_urgency: routine
+          alert_level: moderate
+      validate_severity:
+        type: condition
+        variable: interaction_severity
+        operator: is_not_null
+        value: null
+        true_next: check_critical_alert
+        false_next: alert_unknown
+      critical_alert:
+        type: return
+        value:
+          alert_level: critical
+          alert_color: red
+          notification_urgency: immediate
+          prescriber_action_required: true
+          alert_compliant: true
+      minor_alert:
+        type: return
+        value:
+          alert_color: green
+          notification_urgency: informational
+          prescriber_action_required: false
+          alert_level: minor
+          alert_compliant: true
+      major_alert:
+        type: return
+        value:
+          alert_level: major
+          alert_color: orange
+          notification_urgency: urgent
+          alert_compliant: true
+          prescriber_action_required: true
+      check_major_alert:
+        type: condition
+        variable: interaction_severity
+        operator: eq
+        value: major
+        true_next: major_alert
+        false_next: check_moderate_alert
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      check_negation:
+        type: condition
+        variable: interaction_severity
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: interaction_severity
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      alert_compliant: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      alert_compliant: true
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when:
+      falsified: false
+      alert_compliant: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: absent
+      confidence: high
+  - when:
+      falsified: true
+      alert_compliant: false
+    default: null
+    emit:
+      verdict: refuted
+      confidence: medium
+      confidence_score: 0.42
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      interaction_severity:
+        type: any
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    interaction_severity: null
+  expect:
+    confidence: high
+    verdict: absent
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    interaction_severity: contraindicated
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,227 @@
+name: signal-comparator-helix
+description: 'Forged from microgram ''signal-comparator''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    stronger: falsified
+sense:
+  tree:
+    start: check_a_above
+    nodes:
+      check_a_above:
+        type: condition
+        variable: signal_a
+        operator: gte
+        value: 2.0
+        true_next: a_above_check_b
+        false_next: a_below_check_b
+      a_below_check_b:
+        type: condition
+        variable: signal_b
+        operator: gte
+        value: 2.0
+        true_next: only_b_above
+        false_next: both_below_compare
+      concordant_a_stronger:
+        type: return
+        value:
+          stronger: A
+          ratio: Both signals detected, A is stronger
+          agreement: CONCORDANT
+      only_b_above:
+        type: return
+        value:
+          ratio: Only signal B detected — investigate confounding in A
+          agreement: DISCORDANT
+          stronger: B
+      both_null_b_closer:
+        type: return
+        value:
+          agreement: BOTH_NULL
+          ratio: No signals detected, B closer to threshold
+          stronger: B
+      both_above_compare:
+        type: condition
+        variable: signal_a
+        operator: gt
+        value: '{{signal_b}}'
+        true_next: concordant_a_stronger
+        false_next: concordant_check_equal
+      both_null_a_closer:
+        type: return
+        value:
+          agreement: BOTH_NULL
+          stronger: A
+          ratio: No signals detected, A closer to threshold
+      only_a_above:
+        type: return
+        value:
+          stronger: A
+          ratio: Only signal A detected — investigate confounding in B
+          agreement: DISCORDANT
+      concordant_b_stronger:
+        type: return
+        value:
+          ratio: Both signals detected, B is stronger
+          agreement: CONCORDANT
+          stronger: B
+      concordant_check_equal:
+        type: condition
+        variable: signal_a
+        operator: eq
+        value: '{{signal_b}}'
+        true_next: concordant_equal
+        false_next: concordant_b_stronger
+      both_null_check_equal:
+        type: condition
+        variable: signal_a
+        operator: eq
+        value: '{{signal_b}}'
+        true_next: both_null_equal
+        false_next: both_null_b_closer
+      both_null_equal:
+        type: return
+        value:
+          ratio: No signals detected, equal sub-threshold values
+          stronger: EQUAL
+          agreement: BOTH_NULL
+      both_below_compare:
+        type: condition
+        variable: signal_a
+        operator: gt
+        value: '{{signal_b}}'
+        true_next: both_null_a_closer
+        false_next: both_null_check_equal
+      a_above_check_b:
+        type: condition
+        variable: signal_b
+        operator: gte
+        value: 2.0
+        true_next: both_above_compare
+        false_next: only_a_above
+      concordant_equal:
+        type: return
+        value:
+          agreement: CONCORDANT
+          ratio: Both signals detected at equal strength
+          stronger: EQUAL
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: signal_a
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: signal_a
+        operator: lt
+        value: 2.0
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      threshold:
+        type: float
+        required: false
+      signal_b:
+        type: float
+        required: true
+      signal_a:
+        type: float
+        required: true
+    outputs:
+      ratio:
+        type: string
+        required: false
+      stronger:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      agreement:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    signal_a: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - signal_a
+  - signal_b
+  - threshold
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

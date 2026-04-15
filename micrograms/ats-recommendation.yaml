@@ -1,0 +1,147 @@
+name: ats-recommendation
+description: 'Generate final ATS pass/fail verdict with prioritized fix recommendations based on upstream scores'
+version: 0.1.0
+primitive_signature:
+  dominant: Σ
+  expression: Σ(format_verdict, match_tier, gap_severity) → →(action_plan)
+  primes: [Σ, →, κ, N]
+  arguments: [sum, causality, comparison, quantity]
+  chain_prediction: terminal — receives from ats-gap-detector
+interface:
+  inputs:
+    format_verdict:
+      type: string
+      required: false
+    match_tier:
+      type: string
+      required: false
+    gap_severity:
+      type: string
+      required: false
+    format_score:
+      type: integer
+      required: false
+    ats_pass_likely:
+      type: bool
+      required: false
+  outputs:
+    overall_verdict:
+      type: string
+    pass_probability:
+      type: string
+    priority_fixes:
+      type: string
+    apply_recommendation:
+      type: string
+tree:
+  start: format_block
+  nodes:
+    format_block:
+      type: condition
+      variable: format_verdict
+      operator: eq
+      value: FAIL
+      true_next: blocked_by_format
+      false_next: gap_block
+    gap_block:
+      type: condition
+      variable: gap_severity
+      operator: eq
+      value: CRITICAL
+      true_next: blocked_by_gaps
+      false_next: match_check
+    match_check:
+      type: condition
+      variable: match_tier
+      operator: eq
+      value: STRONG
+      true_next: likely_pass
+      false_next: moderate_check
+    moderate_check:
+      type: condition
+      variable: match_tier
+      operator: eq
+      value: MODERATE
+      true_next: possible_pass
+      false_next: likely_fail
+    blocked_by_format:
+      type: return
+      value:
+        overall_verdict: REJECT
+        pass_probability: "<10%"
+        priority_fixes: "1. Convert to .docx or .pdf 2. Remove tables/columns/graphics 3. Use standard section headers 4. Re-run screening"
+        apply_recommendation: "Do not apply until format is fixed — ATS will not parse this resume"
+    blocked_by_gaps:
+      type: return
+      value:
+        overall_verdict: RECONSIDER
+        pass_probability: "<20%"
+        priority_fixes: "1. Acquire missing credentials or certifications 2. Target roles matching current qualifications 3. Reframe transferable experience"
+        apply_recommendation: "Consider alternative roles — critical qualification gaps cannot be solved by resume optimization alone"
+    likely_pass:
+      type: return
+      value:
+        overall_verdict: STRONG_MATCH
+        pass_probability: ">80%"
+        priority_fixes: "1. Verify exact keyword phrasing matches job listing 2. Quantify achievements (numbers, percentages, dollar amounts) 3. Front-load strongest matches in Summary section"
+        apply_recommendation: "Apply — strong alignment. Customize cover letter to reinforce top 3 matching qualifications"
+    possible_pass:
+      type: return
+      value:
+        overall_verdict: CONDITIONAL_MATCH
+        pass_probability: "50-70%"
+        priority_fixes: "1. Add missing keywords from job description verbatim 2. Expand Skills section with tool/technology names 3. Mirror the job listing's language in Experience bullets 4. Add industry-specific acronyms"
+        apply_recommendation: "Apply after optimization — moderate gaps are fixable with keyword tailoring"
+    likely_fail:
+      type: return
+      value:
+        overall_verdict: WEAK_MATCH
+        pass_probability: "<30%"
+        priority_fixes: "1. Rewrite Summary to mirror job description language 2. Add all missing keywords from listing 3. Restructure Experience bullets around required skills 4. Consider skills-based resume format 5. Add relevant projects or certifications"
+        apply_recommendation: "Significant rework needed before applying — current version will likely be filtered out"
+tests:
+- input:
+    format_verdict: FAIL
+    match_tier: STRONG
+    gap_severity: NONE
+  expect:
+    overall_verdict: REJECT
+    pass_probability: "<10%"
+- input:
+    format_verdict: PASS
+    match_tier: STRONG
+    gap_severity: NONE
+  expect:
+    overall_verdict: STRONG_MATCH
+    pass_probability: ">80%"
+- input:
+    format_verdict: PASS
+    match_tier: MODERATE
+    gap_severity: LOW
+  expect:
+    overall_verdict: CONDITIONAL_MATCH
+    pass_probability: "50-70%"
+- input:
+    format_verdict: PASS
+    match_tier: WEAK
+    gap_severity: MODERATE
+  expect:
+    overall_verdict: WEAK_MATCH
+    pass_probability: "<30%"
+- input:
+    format_verdict: PASS
+    match_tier: STRONG
+    gap_severity: CRITICAL
+  expect:
+    overall_verdict: RECONSIDER
+    pass_probability: "<20%"
+- input:
+    format_verdict: WARN
+    match_tier: MODERATE
+    gap_severity: NONE
+  expect:
+    overall_verdict: CONDITIONAL_MATCH
+- input: {}
+  expect:
+    overall_verdict: WEAK_MATCH
+    pass_probability: "<30%"

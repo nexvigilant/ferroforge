@@ -1,0 +1,68 @@
+name: power-system-design-advisor
+description: 'Full power system design pipeline: select voltage regime → classify transducer type → estimate battery state → route power demand. Answers "given this power need, what voltage, what transducer, what SoC, and where does the power come from?"'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - voltage-topology-tradeoff
+  - transducer-classifier
+  - soc-estimator
+  - power-load-router
+tests:
+- name: full suit design — 50V SELV with piezo harvesting at moderate load
+  input:
+    bus_voltage_v: 50.4
+    max_power_kw: 30
+    input_energy: mechanical
+    output_energy: electrical
+    voltage_v: 3.7
+    current_a: 15
+    temperature_c: 30
+    previous_soc: 0.7
+    load_state: moderate_load
+    demand_kw: 5.0
+    duration_s: 60
+    locality: distributed
+  expect:
+    verdict: recommended_for_mark_ii
+    transducer_class: piezoelectric
+    method_used: ekf_fused
+    source_tier: main_bus
+- name: 400V high-performance with photovoltaic and burst demand
+  input:
+    bus_voltage_v: 400
+    max_power_kw: 30
+    input_energy: optical
+    output_energy: electrical
+    voltage_v: 3.5
+    current_a: 30
+    temperature_c: 35
+    previous_soc: 0.6
+    load_state: heavy_load
+    demand_kw: 8.0
+    duration_s: 2.0
+    ultracap_soc: 0.8
+  expect:
+    verdict: maximum_efficiency_maximum_risk
+    transducer_class: photovoltaic
+    method_used: ekf_current_weighted
+    source_tier: ultracap_bank
+- name: thermal emergency overrides everything
+  input:
+    bus_voltage_v: 200
+    max_power_kw: 15
+    input_energy: chemical
+    output_energy: electrical
+    voltage_v: 3.8
+    current_a: 5
+    temperature_c: 65
+    previous_soc: 0.8
+    load_state: light_load
+    demand_kw: 1.0
+    duration_s: 10
+    main_bus_status: failed
+  expect:
+    verdict: weight_optimal_but_dangerous
+    transducer_class: electrochemical
+    method_used: thermal_override
+    source_tier: aux_lfp

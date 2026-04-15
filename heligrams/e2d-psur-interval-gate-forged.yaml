@@ -1,0 +1,219 @@
+name: e2d-psur-interval-gate-helix
+description: 'Forged from microgram ''e2d-psur-interval-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    regulatory_reference: falsified
+sense:
+  tree:
+    start: check_signal_identified
+    nodes:
+      check_additional_monitoring:
+        type: condition
+        variable: under_additional_monitoring
+        operator: eq
+        value: true
+        true_next: return_6_monthly
+        false_next: check_ibdd
+      return_6_monthly:
+        type: return
+        value:
+          regulatory_reference: ICH E2C(R2) Section 4 / ICH E2D Section 6
+          report_type: PSUR_PBRER
+          trigger: IBDD_EARLY_PHASE_OR_ADDITIONAL_MONITORING
+          submission_interval_months: 6
+      check_signal_identified:
+        type: condition
+        variable: signal_identified
+        operator: eq
+        value: true
+        true_next: return_signal_triggered
+        false_next: check_additional_monitoring
+      check_eu_registered:
+        type: condition
+        variable: eu_registered
+        operator: eq
+        value: true
+        true_next: return_annual_eu
+        false_next: return_annual
+      return_annual:
+        type: return
+        value:
+          regulatory_reference: ICH E2C(R2) Section 4 / ICH E2D Section 6
+          submission_interval_months: 12
+          report_type: PSUR_PBRER
+          trigger: IBDD_STANDARD_INTERVAL
+      return_signal_triggered:
+        type: return
+        value:
+          submission_interval_months: 0
+          trigger: SAFETY_SIGNAL_DETECTED
+          regulatory_reference: ICH E2D Section 6 / ICH E2C(R2) Appendix
+          report_type: SIGNAL_TRIGGERED_PSUR
+      check_years_5:
+        type: condition
+        variable: years_since_first_approval
+        operator: lte
+        value: 5
+        true_next: return_annual
+        false_next: return_triennial
+      check_ibdd:
+        type: condition
+        variable: ibdd_defined
+        operator: eq
+        value: true
+        true_next: check_years_since_approval
+        false_next: check_eu_registered
+      return_annual_eu:
+        type: return
+        value:
+          regulatory_reference: ICH E2C(R2) Section 4 / EU 726-2004 Article 107e
+          submission_interval_months: 12
+          report_type: PSUR_EU_SINGLE_ASSESSMENT
+          trigger: EU_EURD_LIST
+      return_triennial:
+        type: return
+        value:
+          submission_interval_months: 36
+          regulatory_reference: ICH E2C(R2) Section 4 / ICH E2D Section 6
+          report_type: PSUR_PBRER
+          trigger: IBDD_MATURE_PRODUCT
+      check_years_since_approval:
+        type: condition
+        variable: years_since_first_approval
+        operator: lte
+        value: 2
+        true_next: return_6_monthly
+        false_next: check_years_5
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: under_additional_monitoring
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: under_additional_monitoring
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence: low
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence_score: 0.5
+      confidence: medium
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      years_since_first_approval:
+        type: int
+        required: false
+      ibdd_defined:
+        type: bool
+        required: false
+      under_additional_monitoring:
+        type: bool
+        required: false
+      signal_identified:
+        type: bool
+        required: false
+      eu_registered:
+        type: bool
+        required: false
+    outputs:
+      regulatory_reference:
+        type: string
+        required: false
+      report_type:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      trigger:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      submission_interval_months:
+        type: int
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    under_additional_monitoring: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    under_additional_monitoring: false
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - years_since_first_approval
+  - ibdd_defined
+  - under_additional_monitoring
+  - eu_registered
+  - signal_identified
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

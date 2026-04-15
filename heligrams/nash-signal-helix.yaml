@@ -1,0 +1,260 @@
+name: nash-signal-helix
+description: >
+  Game-theoretic signal detection. Sense strand (statistical evidence) and
+  antisense strand (falsification) are modeled as players in a 2x2 game.
+  Resolution uses Nash equilibrium payoffs instead of boolean pairing.
+  Pure equilibria: (signal, clean)=confirmed, (noise, falsified)=closed.
+  Mixed equilibrium (p=2/3): the contested zone where neither player dominates.
+  Payoff asymmetry reveals which strand is more informative for a given input.
+version: 0.1.0
+type: heligram
+primitive_signature:
+  dominant: '∂'
+  expression: '∂(×(κ_sense, →_antisense)) at Nash equilibrium'
+  primes: ['∂', 'κ', '→', 'ς', '×', 'N']
+  arguments: ['prr', 'ror', 'total_reports', 'mechanism_known', 'confounders']
+  chain_prediction: >
+    Game-theoretic ∂. Payoff matrix determines verdict strength.
+    Pure equilibria (payoff 3) = high confidence.
+    Mixed equilibrium (payoff 2.33) = low confidence.
+    Off-equilibrium (payoff 1-2) = investigate.
+
+helix:
+  twist_rate: 2
+  base_pairs:
+    signal_strength: falsification_strength
+    evidence_class: confounder_class
+
+sense:
+  tree:
+    start: check_prr
+    nodes:
+      check_prr:
+        type: condition
+        variable: prr
+        operator: gte
+        value: 2
+        true_next: check_ror
+        false_next: weak_evidence
+      check_ror:
+        type: condition
+        variable: ror
+        operator: gte
+        value: 2
+        true_next: strong_evidence
+        false_next: moderate_evidence
+      strong_evidence:
+        type: return
+        value:
+          signal_strength: 3
+          evidence_class: dual_metric
+      moderate_evidence:
+        type: return
+        value:
+          signal_strength: 2
+          evidence_class: single_metric
+      weak_evidence:
+        type: return
+        value:
+          signal_strength: 1
+          evidence_class: subthreshold
+
+antisense:
+  tree:
+    start: check_n
+    nodes:
+      check_n:
+        type: condition
+        variable: total_reports
+        operator: lt
+        value: 5
+        true_next: strong_falsification
+        false_next: check_mechanism
+      check_mechanism:
+        type: condition
+        variable: mechanism_known
+        operator: eq
+        value: false
+        true_next: moderate_falsification
+        false_next: check_confounders
+      check_confounders:
+        type: condition
+        variable: confounders
+        operator: gt
+        value: 0
+        true_next: weak_falsification
+        false_next: no_falsification
+      strong_falsification:
+        type: return
+        value:
+          falsification_strength: 3
+          confounder_class: sample_size
+      moderate_falsification:
+        type: return
+        value:
+          falsification_strength: 2
+          confounder_class: no_mechanism
+      weak_falsification:
+        type: return
+        value:
+          falsification_strength: 1
+          confounder_class: confounders_present
+      no_falsification:
+        type: return
+        value:
+          falsification_strength: 0
+          confounder_class: clean
+
+resolution:
+  mode: base_pair
+  rules:
+    # Pure equilibrium 1: strong evidence + clean = confirmed (payoff 3,3)
+    - when:
+        signal_strength: 3
+        falsification_strength: 0
+      emit:
+        verdict: confirmed_signal
+        confidence: high
+        nash_payoff: 3
+        equilibrium: pure
+    # Pure equilibrium 2: weak evidence + strong falsification = closed (payoff 3,3)
+    - when:
+        signal_strength: 1
+        falsification_strength: 3
+      emit:
+        verdict: no_signal
+        confidence: high
+        nash_payoff: 3
+        equilibrium: pure
+    # Near-equilibrium: strong evidence + weak falsification (payoff 2)
+    - when:
+        signal_strength: 3
+        falsification_strength: 1
+      emit:
+        verdict: probable_signal
+        confidence: moderate
+        nash_payoff: 2
+        equilibrium: near
+    # Off-equilibrium: strong evidence + strong falsification = investigate (payoff 1)
+    - when:
+        signal_strength: 3
+        falsification_strength: 3
+      emit:
+        verdict: investigate
+        confidence: low
+        nash_payoff: 1
+        equilibrium: off
+    # Mixed zone: moderate evidence + moderate falsification (payoff ~2.33)
+    - when:
+        signal_strength: 2
+        falsification_strength: 2
+      emit:
+        verdict: contested_signal
+        confidence: low
+        nash_payoff: 2.33
+        equilibrium: mixed
+    # Default: anything else maps to the mixed equilibrium
+    - default:
+        verdict: contested_signal
+        confidence: low
+        nash_payoff: 2
+        equilibrium: mixed
+
+interface:
+  major_groove:
+    inputs:
+      prr: { type: float, required: true }
+      ror: { type: float, required: false }
+      total_reports: { type: int, required: false }
+      mechanism_known: { type: bool, required: false }
+      confounders: { type: int, required: false }
+    outputs:
+      verdict: { type: string }
+      confidence: { type: string }
+      nash_payoff: { type: float }
+      equilibrium: { type: string }
+  minor_groove:
+    inputs:
+      prr: { type: float, required: true }
+    outputs:
+      verdict: { type: string }
+
+tests:
+- name: pure equilibrium — strong evidence, no falsification
+  input:
+    prr: 4.0
+    ror: 3.5
+    total_reports: 100
+    mechanism_known: true
+    confounders: 0
+  expect:
+    verdict: confirmed_signal
+    confidence: high
+    nash_payoff: 3
+    equilibrium: pure
+- name: pure equilibrium — weak evidence, strong falsification
+  input:
+    prr: 1.0
+    ror: 0.5
+    total_reports: 2
+    mechanism_known: false
+    confounders: 0
+  expect:
+    verdict: no_signal
+    confidence: high
+    nash_payoff: 3
+    equilibrium: pure
+- name: off-equilibrium — strong evidence + strong falsification = investigate
+  input:
+    prr: 5.0
+    ror: 4.0
+    total_reports: 3
+    mechanism_known: true
+    confounders: 0
+  expect:
+    verdict: investigate
+    confidence: low
+    nash_payoff: 1
+    equilibrium: off
+- name: mixed equilibrium — moderate evidence + no mechanism
+  input:
+    prr: 2.5
+    ror: 1.5
+    total_reports: 50
+    mechanism_known: false
+    confounders: 0
+  expect:
+    verdict: contested_signal
+    confidence: low
+    equilibrium: mixed
+- name: near-equilibrium — strong evidence + confounders
+  input:
+    prr: 4.0
+    ror: 3.0
+    total_reports: 100
+    mechanism_known: true
+    confounders: 2
+  expect:
+    verdict: probable_signal
+    confidence: moderate
+    nash_payoff: 2
+    equilibrium: near
+- name: null safety
+  input: {}
+  expect:
+    verdict: contested_signal
+- name: PRR only — single metric
+  input:
+    prr: 3.5
+  expect:
+    verdict: contested_signal
+- name: dual metric confirmed with mechanism
+  input:
+    prr: 3.0
+    ror: 2.5
+    total_reports: 200
+    mechanism_known: true
+    confounders: 0
+  expect:
+    verdict: confirmed_signal
+    equilibrium: pure

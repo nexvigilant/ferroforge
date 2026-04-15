@@ -1,0 +1,256 @@
+name: molecular-safety-gate-helix
+description: 'Forged from microgram ''molecular-safety-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    lipinski_mw_pass: falsified
+sense:
+  tree:
+    start: check_mw_upper
+    nodes:
+      check_charge:
+        type: condition
+        variable: net_charge
+        operator: eq
+        value: 0
+        true_next: pass_neutral
+        false_next: check_high_charge
+      check_saturation:
+        type: condition
+        variable: aromatic_bond_count
+        operator: gt
+        value: 15
+        true_next: warn_aromatic
+        false_next: check_charge
+      warn_mw_high:
+        type: return
+        value:
+          lipinski_mw_pass: false
+          gate_result: WARN
+          risk_flags: MW 500-1000 — Lipinski Rule of 5 MW violation, poor oral bioavailability likely
+      warn_charged:
+        type: return
+        value:
+          gate_result: WARN
+          risk_flags: High net charge — poor membrane permeability expected
+          lipinski_mw_pass: true
+      warn_aromatic:
+        type: return
+        value:
+          gate_result: WARN
+          risk_flags: High aromaticity — potential mutagenicity, phototoxicity risk
+          lipinski_mw_pass: true
+      pass_neutral:
+        type: return
+        value:
+          risk_flags: No flags — neutral charge, acceptable MW and complexity
+          lipinski_mw_pass: true
+          gate_result: PASS
+      reject_biologic:
+        type: return
+        value:
+          gate_result: WARN
+          risk_flags: MW > 1000 — likely biologic (Lipinski not applicable to biologics)
+          lipinski_mw_pass: false
+      pass_minor_charge:
+        type: return
+        value:
+          lipinski_mw_pass: true
+          gate_result: PASS
+          risk_flags: Minor charge within acceptable range
+      check_heavy_atoms:
+        type: condition
+        variable: heavy_atom_count
+        operator: gt
+        value: 40
+        true_next: warn_complexity
+        false_next: check_saturation
+      check_high_charge:
+        type: condition
+        variable: net_charge
+        operator: gt
+        value: 2
+        true_next: warn_charged
+        false_next: check_neg_charge
+      reject_fragment:
+        type: return
+        value:
+          lipinski_mw_pass: true
+          risk_flags: MW < 100 — molecular fragment, not a viable drug candidate (Lipinski MW passes but too small for drug)
+          gate_result: WARN
+      check_mw_upper:
+        type: condition
+        variable: molecular_weight
+        operator: gt
+        value: 500
+        true_next: check_mw_extreme
+        false_next: check_mw_lower
+      warn_complexity:
+        type: return
+        value:
+          risk_flags: Heavy atom count > 40 — high molecular complexity, synthesis and formulation challenges
+          gate_result: WARN
+          lipinski_mw_pass: true
+      check_neg_charge:
+        type: condition
+        variable: net_charge
+        operator: lt
+        value: -2
+        true_next: warn_charged
+        false_next: pass_minor_charge
+      check_mw_lower:
+        type: condition
+        variable: molecular_weight
+        operator: lt
+        value: 100
+        true_next: reject_fragment
+        false_next: check_heavy_atoms
+      check_mw_extreme:
+        type: condition
+        variable: molecular_weight
+        operator: gt
+        value: 1000
+        true_next: reject_biologic
+        false_next: warn_mw_high
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: net_charge
+        operator: lte
+        value: 500
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      null_guard_negation:
+        type: condition
+        variable: net_charge
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      lipinski_mw_pass: true
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+      lipinski_mw_pass: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when:
+      falsified: false
+      lipinski_mw_pass: false
+    default: null
+    emit:
+      confidence: high
+      verdict: absent
+      confidence_score: 0.7
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      aromatic_bond_count:
+        type: number
+        required: true
+      heavy_atom_count:
+        type: number
+        required: true
+      bond_count:
+        type: number
+        required: true
+      molecular_weight:
+        type: number
+        required: true
+      net_charge:
+        type: number
+        required: true
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      verdict:
+        type: string
+        required: false
+      gate_result:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      lipinski_mw_pass:
+        type: boolean
+        required: false
+      risk_flags:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    molecular_weight: 50
+    bond_count: 2
+    net_charge: 510
+    aromatic_bond_count: 0
+    heavy_atom_count: 3
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    molecular_weight: 50
+    bond_count: 2
+    net_charge: 500
+    aromatic_bond_count: 0
+    heavy_atom_count: 3
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

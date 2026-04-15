@@ -1,0 +1,213 @@
+name: smm-study-type-router-helix
+description: 'Forged from microgram ''smm-study-type-router''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    routing_basis: falsified
+sense:
+  tree:
+    start: check_override
+    nodes:
+      pre_empirical_route:
+        type: return
+        value:
+          routing_basis: pre_empirical_default
+          study_type: pre_empirical
+          standard: NVG-SMM-002
+          phase_count: 6
+      check_hypothesis_only:
+        type: condition
+        variable: has_hypothesis
+        operator: eq
+        value: true
+        true_next: check_has_stats_no_data
+        false_next: pre_empirical_route
+      check_override:
+        type: condition
+        variable: study_type_override
+        operator: eq
+        value: empirical
+        true_next: empirical_route
+        false_next: check_override_pre
+      check_override_pre:
+        type: condition
+        variable: study_type_override
+        operator: eq
+        value: pre_empirical
+        true_next: pre_empirical_route
+        false_next: check_framework
+      check_hypothesis_with_data:
+        type: condition
+        variable: has_hypothesis
+        operator: eq
+        value: true
+        true_next: empirical_route
+        false_next: pre_empirical_route
+      check_has_stats_no_data:
+        type: condition
+        variable: has_statistical_analysis
+        operator: eq
+        value: true
+        true_next: empirical_route
+        false_next: pre_empirical_route
+      check_framework:
+        type: condition
+        variable: is_framework
+        operator: eq
+        value: true
+        true_next: pre_empirical_route
+        false_next: check_empirical_data
+      check_stats:
+        type: condition
+        variable: has_statistical_analysis
+        operator: eq
+        value: true
+        true_next: empirical_route
+        false_next: check_hypothesis_with_data
+      check_empirical_data:
+        type: condition
+        variable: has_empirical_data
+        operator: eq
+        value: true
+        true_next: check_stats
+        false_next: check_hypothesis_only
+      empirical_route:
+        type: return
+        value:
+          standard: NVG-SMM-001
+          routing_basis: empirical_signals_detected
+          study_type: empirical
+          phase_count: 10
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      check_negation:
+        type: condition
+        variable: has_hypothesis
+        operator: neq
+        value: empirical
+        true_next: falsified
+        false_next: not_falsified
+      null_guard_negation:
+        type: condition
+        variable: has_hypothesis
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      verdict: contested
+      confidence_score: 0.27999999999999997
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_empirical_data:
+        type: bool
+        required: false
+      has_hypothesis:
+        type: bool
+        required: false
+      study_type_override:
+        type: string
+        required: false
+      has_statistical_analysis:
+        type: bool
+        required: false
+      is_framework:
+        type: bool
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      phase_count:
+        type: int
+        required: false
+      study_type:
+        type: string
+        required: false
+      routing_basis:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      standard:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    study_type_override: unknown
+    has_statistical_analysis: true
+    has_empirical_data: true
+    has_hypothesis: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    study_type_override: unknown
+    has_statistical_analysis: true
+    has_empirical_data: true
+    has_hypothesis: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

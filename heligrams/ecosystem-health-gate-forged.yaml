@@ -1,0 +1,246 @@
+name: ecosystem-health-gate-helix
+description: 'Forged from microgram ''ecosystem-health-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    weakest_surface: falsified
+sense:
+  tree:
+    start: check_mcg_present
+    nodes:
+      check_wiring:
+        type: condition
+        variable: wiring_pct
+        operator: lt
+        value: 90
+        true_next: degraded_wiring
+        false_next: check_unwraps
+      check_mcg:
+        type: condition
+        variable: mcg_pass_rate
+        operator: lt
+        value: 0.99
+        true_next: critical
+        false_next: check_hlg
+      degraded_wiring:
+        type: return
+        value:
+          weakest_surface: nucleus_wiring
+          action: Nucleus wiring below 90% — wire remaining void components
+          health: DEGRADED
+          grade: C
+      healthy:
+        type: return
+        value:
+          health: HEALTHY
+          grade: A
+          weakest_surface: none
+          action: All surfaces green — continue building
+      critical:
+        type: return
+        value:
+          health: CRITICAL
+          weakest_surface: micrograms
+          action: Microgram pass rate below 99% — fix failing tests immediately
+          grade: F
+      degraded_lint:
+        type: return
+        value:
+          health: DEGRADED
+          grade: C
+          weakest_surface: lint
+          action: Clippy not clean — fix warnings
+      check_unwraps:
+        type: condition
+        variable: prod_unwraps
+        operator: gt
+        value: 10
+        true_next: degraded_safety
+        false_next: check_clippy
+      check_station:
+        type: condition
+        variable: station_tools
+        operator: lt
+        value: 1000
+        true_next: degraded_station
+        false_next: check_wiring
+      check_mcg_present:
+        type: condition
+        variable: mcg_pass_rate
+        operator: is_null
+        value: null
+        true_next: critical
+        false_next: check_mcg
+      degraded_hlg:
+        type: return
+        value:
+          grade: C
+          weakest_surface: heligrams
+          action: Heligram pass rate below 95% — fix forged test expectations
+          health: DEGRADED
+      check_hlg:
+        type: condition
+        variable: hlg_pass_rate
+        operator: lt
+        value: 0.95
+        true_next: degraded_hlg
+        false_next: check_station
+      check_clippy:
+        type: condition
+        variable: clippy_clean
+        operator: eq
+        value: false
+        true_next: degraded_lint
+        false_next: healthy
+      degraded_station:
+        type: return
+        value:
+          grade: C
+          health: DEGRADED
+          weakest_surface: station
+          action: Station tool count below 1000 — check config loading
+      degraded_safety:
+        type: return
+        value:
+          health: DEGRADED
+          grade: D
+          weakest_surface: production_safety
+          action: Production unwraps exceed 10 — eliminate unwrap/expect in production code
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: wiring_pct
+        operator: is_not_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: wiring_pct
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence: medium
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      clippy_clean:
+        type: bool
+        required: false
+      jest_pass_rate:
+        type: float
+        required: false
+      wiring_pct:
+        type: int
+        required: false
+      mcg_pass_rate:
+        type: float
+        required: true
+      prod_unwraps:
+        type: int
+        required: false
+      station_tools:
+        type: int
+        required: false
+      hlg_pass_rate:
+        type: float
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      grade:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+      weakest_surface:
+        type: string
+        required: false
+      health:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — null sense, no confounders'
+  input:
+    wiring_pct: null
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive'
+  input: {}
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments:
+  - mcg_pass_rate
+  - hlg_pass_rate
+  - station_tools
+  - wiring_pct
+  - prod_unwraps
+  - clippy_clean
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

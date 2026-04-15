@@ -1,0 +1,465 @@
+name: multi-omics-convergence-gate-helix
+description: 'Forged from microgram ''multi-omics-convergence-gate''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    recommendation: falsified
+sense:
+  tree:
+    start: count_active
+    nodes:
+      score_4dim_prot_strong:
+        type: condition
+        variable: literature_score
+        operator: gte
+        value: 0.7
+        true_next: converged_strong
+        false_next: converged_moderate
+      active_1c:
+        type: return
+        value:
+          recommendation: Only 1 dimension active. Need multi-omics evidence for convergence.
+          dimensions_active: 1
+          convergence_score: 0
+          weakest_dimension: multiple
+          verdict: INSUFFICIENT
+      score_4dim:
+        type: condition
+        variable: proteomics_score
+        operator: gte
+        value: 0.7
+        true_next: score_4dim_prot_strong
+        false_next: score_4dim_prot_weak
+      active_1d:
+        type: return
+        value:
+          weakest_dimension: multiple
+          recommendation: Only 1 dimension active. Need multi-omics evidence for convergence.
+          convergence_score: 0
+          dimensions_active: 1
+          verdict: INSUFFICIENT
+      count_l_t0g0:
+        type: condition
+        variable: literature_score
+        operator: gt
+        value: 0
+        true_next: count_p_1c
+        false_next: count_p_0
+      active_2f:
+        type: condition
+        variable: min_dimensions_required
+        operator: lte
+        value: 2
+        true_next: partial_2
+        false_next: insufficient_dims
+      active_2a:
+        type: condition
+        variable: min_dimensions_required
+        operator: lte
+        value: 2
+        true_next: partial_2
+        false_next: insufficient_dims
+      count_p_1c:
+        type: condition
+        variable: proteomics_score
+        operator: gt
+        value: 0
+        true_next: active_2c
+        false_next: active_1a
+      three_dim_moderate_no_prot:
+        type: return
+        value:
+          weakest_dimension: proteomics
+          dimensions_active: 3
+          recommendation: 3-way convergence with moderate transcriptomics. Prioritize protein-level confirmation.
+          verdict: PARTIAL_CONVERGENCE
+      count_p_2a:
+        type: condition
+        variable: proteomics_score
+        operator: gt
+        value: 0
+        true_next: active_3d
+        false_next: active_2d
+      converged_weak_multi:
+        type: return
+        value:
+          dimensions_active: 4
+          recommendation: Both proteomics and literature weak. Strengthen evidence base before development.
+          weakest_dimension: proteomics_and_literature
+          verdict: PARTIAL_CONVERGENCE
+      count_active:
+        type: condition
+        variable: transcriptomics_score
+        operator: gt
+        value: 0
+        true_next: count_g_t1
+        false_next: count_g_t0
+      active_1b:
+        type: return
+        value:
+          weakest_dimension: multiple
+          verdict: INSUFFICIENT
+          recommendation: Only 1 dimension active. Need multi-omics evidence for convergence.
+          convergence_score: 0
+          dimensions_active: 1
+      score_4dim_prot_weak:
+        type: condition
+        variable: literature_score
+        operator: gte
+        value: 0.7
+        true_next: converged_partial_prot
+        false_next: converged_weak_multi
+      count_p_0:
+        type: condition
+        variable: proteomics_score
+        operator: gt
+        value: 0
+        true_next: active_1b
+        false_next: active_0
+      count_l_t1g0:
+        type: condition
+        variable: literature_score
+        operator: gt
+        value: 0
+        true_next: count_p_2b
+        false_next: count_p_1a
+      score_3dim_no_lit:
+        type: return
+        value:
+          recommendation: 3-way convergence without literature support. Systematic review needed.
+          dimensions_active: 3
+          weakest_dimension: literature
+          verdict: PARTIAL_CONVERGENCE
+      active_4:
+        type: condition
+        variable: min_dimensions_required
+        operator: lte
+        value: 4
+        true_next: score_4dim
+        false_next: insufficient_dims
+      active_2d:
+        type: condition
+        variable: min_dimensions_required
+        operator: lte
+        value: 2
+        true_next: partial_2
+        false_next: insufficient_dims
+      insufficient_dims:
+        type: return
+        value:
+          convergence_score: 0
+          recommendation: Active dimensions below minimum required. Expand evidence base.
+          dimensions_active: 0
+          weakest_dimension: multiple
+          verdict: INSUFFICIENT
+      converged_strong:
+        type: return
+        value:
+          verdict: CONVERGED
+          recommendation: Full convergence across all 4 omics dimensions. Ready for clinical development.
+          weakest_dimension: none
+          dimensions_active: 4
+      active_3b:
+        type: condition
+        variable: min_dimensions_required
+        operator: lte
+        value: 3
+        true_next: score_3dim_no_gen
+        false_next: insufficient_dims
+      active_2c:
+        type: condition
+        variable: min_dimensions_required
+        operator: lte
+        value: 2
+        true_next: partial_2
+        false_next: insufficient_dims
+      count_l_t0g1:
+        type: condition
+        variable: literature_score
+        operator: gt
+        value: 0
+        true_next: count_p_2c
+        false_next: count_p_1b
+      converged_moderate:
+        type: return
+        value:
+          weakest_dimension: literature
+          recommendation: Strong convergence. Strengthen literature evidence for complete validation.
+          verdict: CONVERGED
+          dimensions_active: 4
+      count_p_1a:
+        type: condition
+        variable: proteomics_score
+        operator: gt
+        value: 0
+        true_next: active_2e
+        false_next: active_1c
+      count_p_1b:
+        type: condition
+        variable: proteomics_score
+        operator: gt
+        value: 0
+        true_next: active_2f
+        false_next: active_1d
+      count_l_t1g1:
+        type: condition
+        variable: literature_score
+        operator: gt
+        value: 0
+        true_next: count_p_3
+        false_next: count_p_2a
+      active_2e:
+        type: condition
+        variable: min_dimensions_required
+        operator: lte
+        value: 2
+        true_next: partial_2
+        false_next: insufficient_dims
+      score_3dim_no_trans:
+        type: return
+        value:
+          verdict: PARTIAL_CONVERGENCE
+          weakest_dimension: transcriptomics
+          recommendation: 3-way convergence without expression data. Mine GEO for treatment expression datasets.
+          dimensions_active: 3
+      converged_partial_prot:
+        type: return
+        value:
+          weakest_dimension: proteomics
+          dimensions_active: 4
+          verdict: PARTIAL_CONVERGENCE
+          recommendation: Proteomics evidence incomplete. Prioritize mass-spec validation (PRIDE datasets).
+      active_1a:
+        type: return
+        value:
+          weakest_dimension: multiple
+          recommendation: Only 1 dimension active. Need multi-omics evidence for convergence.
+          convergence_score: 0
+          dimensions_active: 1
+          verdict: INSUFFICIENT
+      active_3c:
+        type: condition
+        variable: min_dimensions_required
+        operator: lte
+        value: 3
+        true_next: score_3dim_no_trans
+        false_next: insufficient_dims
+      count_g_t1:
+        type: condition
+        variable: genomics_score
+        operator: gt
+        value: 0
+        true_next: count_l_t1g1
+        false_next: count_l_t1g0
+      active_3a:
+        type: condition
+        variable: min_dimensions_required
+        operator: lte
+        value: 3
+        true_next: score_3dim_no_prot
+        false_next: insufficient_dims
+      active_3d:
+        type: condition
+        variable: min_dimensions_required
+        operator: lte
+        value: 3
+        true_next: score_3dim_no_lit
+        false_next: insufficient_dims
+      active_2b:
+        type: condition
+        variable: min_dimensions_required
+        operator: lte
+        value: 2
+        true_next: partial_2
+        false_next: insufficient_dims
+      count_p_2b:
+        type: condition
+        variable: proteomics_score
+        operator: gt
+        value: 0
+        true_next: active_3b
+        false_next: active_2a
+      partial_2:
+        type: return
+        value:
+          weakest_dimension: multiple
+          recommendation: Only 2 dimensions active. Expand to 3+ for convergence assessment.
+          dimensions_active: 2
+          verdict: EMERGING
+      score_3dim_no_prot:
+        type: condition
+        variable: transcriptomics_score
+        operator: gte
+        value: 0.8
+        true_next: three_dim_strong_no_prot
+        false_next: three_dim_moderate_no_prot
+      count_g_t0:
+        type: condition
+        variable: genomics_score
+        operator: gt
+        value: 0
+        true_next: count_l_t0g1
+        false_next: count_l_t0g0
+      score_3dim_no_gen:
+        type: return
+        value:
+          recommendation: 3-way convergence without genomic binding data. CUT&RUN or ChIP-seq recommended.
+          dimensions_active: 3
+          weakest_dimension: genomics
+          verdict: PARTIAL_CONVERGENCE
+      active_0:
+        type: return
+        value:
+          dimensions_active: 0
+          weakest_dimension: all
+          convergence_score: 0
+          recommendation: No evidence in any dimension. Cannot assess convergence.
+          verdict: NO_DATA
+      three_dim_strong_no_prot:
+        type: return
+        value:
+          weakest_dimension: proteomics
+          dimensions_active: 3
+          recommendation: Strong 3-way convergence. Proteomics data needed to complete validation. Query PRIDE/ProteomeXchange.
+          verdict: PARTIAL_CONVERGENCE
+      count_p_3:
+        type: condition
+        variable: proteomics_score
+        operator: gt
+        value: 0
+        true_next: active_4
+        false_next: active_3a
+      count_p_2c:
+        type: condition
+        variable: proteomics_score
+        operator: gt
+        value: 0
+        true_next: active_3c
+        false_next: active_2b
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: literature_score
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: literature_score
+        operator: lte
+        value: 0
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      verdict: confirmed
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      verdict: contested
+      confidence: low
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      proteomics_score:
+        type: number
+        required: true
+      min_dimensions_required:
+        type: number
+        required: true
+      literature_score:
+        type: number
+        required: true
+      transcriptomics_score:
+        type: number
+        required: true
+      genomics_score:
+        type: number
+        required: true
+    outputs:
+      convergence_score:
+        type: number
+        required: false
+      recommendation:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      weakest_dimension:
+        type: string
+        required: false
+      dimensions_active:
+        type: number
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    literature_score: 10
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    literature_score: 0
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

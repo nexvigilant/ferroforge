@@ -1,0 +1,222 @@
+name: meddra-router-helix
+description: 'Forged from microgram ''meddra-router''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    description: falsified
+sense:
+  tree:
+    start: check_case_coding
+    nodes:
+      check_case_coding:
+        type: condition
+        variable: coding_purpose
+        operator: eq
+        value: case_coding
+        true_next: check_specificity
+        false_next: check_signal_detection
+      return_hlgt:
+        type: return
+        value:
+          description: High Level Group Term — aggregate for product labeling
+          coding_guidance: Group related PTs under HLGT for labeling sections covering multiple terms
+          level: HLGT
+          meddra_hierarchy_position: 4
+      check_multiple_terms:
+        type: condition
+        variable: multiple_terms
+        operator: eq
+        value: true
+        true_next: return_hlgt
+        false_next: return_hlt
+      check_signal_detection:
+        type: condition
+        variable: coding_purpose
+        operator: eq
+        value: signal_detection
+        true_next: return_pt_signal
+        false_next: check_labeling
+      return_pt_case:
+        type: return
+        value:
+          coding_guidance: Use the most clinically specific PT that captures the verbatim term
+          level: PT
+          meddra_hierarchy_position: 3
+          description: Preferred Term — most specific for individual case coding
+      check_aggregate:
+        type: condition
+        variable: coding_purpose
+        operator: eq
+        value: aggregate_analysis
+        true_next: return_soc
+        false_next: return_pt_default
+      return_pt_signal:
+        type: return
+        value:
+          coding_guidance: PRR and other disproportionality methods operate at PT level per ICH E2B
+          level: PT
+          meddra_hierarchy_position: 3
+          description: Preferred Term — standard for disproportionality analysis
+      return_llt:
+        type: return
+        value:
+          meddra_hierarchy_position: 1
+          level: LLT
+          description: Lowest Level Term — verbatim mapping when PT unclear
+          coding_guidance: Map verbatim term to LLT first, then link to parent PT for reporting
+      return_soc:
+        type: return
+        value:
+          description: System Organ Class — broadest level for trend analysis
+          coding_guidance: Aggregate by body system for periodic reports and population-level trend analysis
+          level: SOC
+          meddra_hierarchy_position: 5
+      check_specificity:
+        type: condition
+        variable: specificity_available
+        operator: eq
+        value: true
+        true_next: return_pt_case
+        false_next: return_llt
+      check_labeling:
+        type: condition
+        variable: coding_purpose
+        operator: eq
+        value: labeling
+        true_next: check_multiple_terms
+        false_next: check_aggregate
+      return_hlt:
+        type: return
+        value:
+          description: High Level Term — single-concept labeling
+          meddra_hierarchy_position: 3
+          coding_guidance: Use HLT when labeling addresses a single clinical concept across related PTs
+          level: HLT
+      return_pt_default:
+        type: return
+        value:
+          meddra_hierarchy_position: 3
+          coding_guidance: PT is the standard reporting level; consult Medical Dictionary for Drug Regulatory Activities guidance
+          level: PT
+          description: Preferred Term — default when purpose unclear
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: coding_purpose
+        operator: neq
+        value: case_coding
+        true_next: falsified
+        false_next: not_falsified
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+      null_guard_negation:
+        type: condition
+        variable: coding_purpose
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      verdict: confirmed
+      confidence_score: 0.7
+  - when:
+      falsified: true
+    default: null
+    emit:
+      confidence: low
+      confidence_score: 0.27999999999999997
+      verdict: contested
+  - when: null
+    default:
+      verdict: indeterminate
+      confidence_score: 0.5
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      multiple_terms:
+        type: bool
+        required: false
+      specificity_available:
+        type: bool
+        required: false
+      coding_purpose:
+        type: string
+        required: false
+    outputs:
+      confidence:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      description:
+        type: string
+        required: false
+      coding_guidance:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      meddra_hierarchy_position:
+        type: int
+        required: false
+      level:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    coding_purpose: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    coding_purpose: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

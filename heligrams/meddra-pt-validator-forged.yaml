@@ -1,0 +1,180 @@
+name: meddra-pt-validator-helix
+description: 'Forged from microgram ''meddra-pt-validator''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    meddra_compliant: falsified
+sense:
+  tree:
+    start: validate_term_input
+    nodes:
+      check_llt_match:
+        type: condition
+        variable: suggested_pt
+        operator: is_not_null
+        value: null
+        true_next: suggest_pt
+        false_next: validation_failed
+      suggest_pt:
+        type: return
+        value:
+          meddra_pt_code: '10033633'
+          meddra_pt_name: Bacterial infection
+          validation_status: mapped_from_llt
+          meddra_compliant: true
+          requires_mapping: true
+      validate_term_input:
+        type: condition
+        variable: adverse_event_term
+        operator: is_not_null
+        value: null
+        true_next: check_pt_match
+        false_next: validation_failed
+      check_pt_match:
+        type: condition
+        variable: is_valid_meddra_pt
+        operator: eq
+        value: true
+        true_next: validation_passed
+        false_next: check_llt_match
+      validation_passed:
+        type: return
+        value:
+          validation_status: valid_pt
+          requires_mapping: false
+          meddra_compliant: true
+          meddra_pt_name: Bacterial infection
+          meddra_pt_code: '10033633'
+      validation_failed:
+        type: return
+        value:
+          meddra_pt_code: null
+          validation_status: invalid_term
+          requires_mapping: null
+          meddra_compliant: false
+          meddra_pt_name: null
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: suggested_pt
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      falsified:
+        type: return
+        value:
+          falsified: true
+          confounder_count: 1
+      not_falsified:
+        type: return
+        value:
+          confounder_count: 0
+          falsified: false
+      check_negation:
+        type: condition
+        variable: suggested_pt
+        operator: is_null
+        value: null
+        true_next: falsified
+        false_next: not_falsified
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      meddra_compliant: true
+      falsified: false
+    default: null
+    emit:
+      confidence: high
+      confidence_score: 0.7
+      verdict: confirmed
+  - when:
+      meddra_compliant: true
+      falsified: true
+    default: null
+    emit:
+      confidence_score: 0.27999999999999997
+      confidence: low
+      verdict: contested
+  - when:
+      falsified: false
+      meddra_compliant: false
+    default: null
+    emit:
+      verdict: absent
+      confidence: high
+      confidence_score: 0.7
+  - when:
+      meddra_compliant: false
+      falsified: true
+    default: null
+    emit:
+      confidence: medium
+      confidence_score: 0.42
+      verdict: refuted
+  - when: null
+    default:
+      confidence_score: 0.5
+      verdict: indeterminate
+      confidence: medium
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      suggested_pt:
+        type: any
+        required: false
+    outputs:
+      verdict:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: absent — null sense, no confounders'
+  input:
+    suggested_pt: null
+    is_valid_meddra_pt: false
+    adverse_event_term: Infection bacterial
+  expect:
+    verdict: absent
+    confidence: high
+- name: 'Q2: confirmed — positive sense, negation inactive (mutually exclusive)'
+  input:
+    suggested_pt: Bacterial infection
+    adverse_event_term: Infection bacterial
+    is_valid_meddra_pt: false
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: absent
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,346 @@
+name: narrative-inference-risk-helix
+description: 'Forged from microgram ''narrative-inference-risk''. Domain: Generic. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 3
+  base_pairs:
+    gate_pass: falsified
+sense:
+  tree:
+    start: check_rare_disease
+    nodes:
+      low_inference_geo:
+        type: return
+        value:
+          mitigation: none
+          reidentification_probability: <5%
+          inference_risk: LOW
+          gate_pass: true
+          action: PASS — geographic detail alone is low risk for common conditions
+      critical_inference:
+        type: return
+        value:
+          inference_risk: CRITICAL
+          reidentification_probability: '>50%'
+          action: BLOCK — rare disease + exact age + geography = likely re-identifiable
+          gate_pass: false
+          mitigation: Generalize age to decade, remove sub-national geography
+      high_inference_common_trio:
+        type: return
+        value:
+          inference_risk: HIGH
+          reidentification_probability: 10-30%
+          action: BLOCK — age + geography + temporal detail narrows population significantly
+          gate_pass: false
+          mitigation: Remove temporal detail or generalize geography
+      no_inference_risk:
+        type: return
+        value:
+          mitigation: none
+          reidentification_probability: <1%
+          inference_risk: NONE
+          action: PASS — no significant re-identification risk
+          gate_pass: true
+      check_temporal_common:
+        type: condition
+        variable: has_temporal_detail
+        operator: eq
+        value: true
+        true_next: high_inference_common_trio
+        false_next: moderate_inference_age_geo
+      common_disease_path:
+        type: condition
+        variable: has_exact_age
+        operator: eq
+        value: true
+        true_next: common_with_age
+        false_next: check_geo_alone
+      check_quasi_count:
+        type: condition
+        variable: quasi_identifier_count
+        operator: gte
+        value: 3
+        true_next: moderate_inference_multi
+        false_next: check_quasi_two
+      low_inference_age:
+        type: return
+        value:
+          gate_pass: true
+          action: PASS — exact age alone is low risk for common conditions
+          inference_risk: LOW
+          mitigation: none
+          reidentification_probability: <5%
+      moderate_inference_rare:
+        type: return
+        value:
+          mitigation: Ensure no additional quasi-identifiers present
+          gate_pass: false
+          action: REVIEW — rare disease alone increases base re-identification risk
+          inference_risk: MODERATE
+          reidentification_probability: 5-20%
+      check_unique_drug:
+        type: condition
+        variable: unique_drug_combination
+        operator: eq
+        value: true
+        true_next: moderate_inference_drug_geo
+        false_next: low_inference_geo
+      check_quasi_two:
+        type: condition
+        variable: quasi_identifier_count
+        operator: gte
+        value: 2
+        true_next: low_inference_pair
+        false_next: no_inference_risk
+      rare_age_geo:
+        type: condition
+        variable: has_geographic_detail
+        operator: eq
+        value: true
+        true_next: critical_inference
+        false_next: high_inference_rare_age
+      check_occupation:
+        type: condition
+        variable: has_occupation
+        operator: eq
+        value: true
+        true_next: moderate_inference_age_occupation
+        false_next: low_inference_age
+      common_with_age:
+        type: condition
+        variable: has_geographic_detail
+        operator: eq
+        value: true
+        true_next: check_temporal_common
+        false_next: check_occupation
+      high_inference_rare_geo:
+        type: return
+        value:
+          gate_pass: false
+          reidentification_probability: 20-50%
+          action: BLOCK — rare disease + geographic detail enables regional identification
+          mitigation: Generalize geography to country level
+          inference_risk: HIGH
+      high_inference_rare_age:
+        type: return
+        value:
+          mitigation: Generalize age to decade range
+          reidentification_probability: 20-50%
+          action: BLOCK — rare disease + exact age enables narrowing to small cohort
+          gate_pass: false
+          inference_risk: HIGH
+      rare_no_age:
+        type: condition
+        variable: has_geographic_detail
+        operator: eq
+        value: true
+        true_next: high_inference_rare_geo
+        false_next: moderate_inference_rare
+      moderate_inference_age_occupation:
+        type: return
+        value:
+          inference_risk: MODERATE
+          mitigation: Remove occupation or generalize age
+          reidentification_probability: 5-15%
+          gate_pass: false
+          action: REVIEW — age + occupation combination may narrow population
+      moderate_inference_multi:
+        type: return
+        value:
+          inference_risk: MODERATE
+          gate_pass: false
+          action: REVIEW — 3+ quasi-identifiers present, cumulative risk
+          mitigation: Remove least informative quasi-identifier
+          reidentification_probability: 5-15%
+      check_rare_disease:
+        type: condition
+        variable: is_rare_disease
+        operator: eq
+        value: true
+        true_next: rare_with_age
+        false_next: common_disease_path
+      rare_with_age:
+        type: condition
+        variable: has_exact_age
+        operator: eq
+        value: true
+        true_next: rare_age_geo
+        false_next: rare_no_age
+      moderate_inference_age_geo:
+        type: return
+        value:
+          action: REVIEW — age + geography combination warrants generalization
+          inference_risk: MODERATE
+          mitigation: Generalize age to decade or geography to country
+          reidentification_probability: 5-15%
+          gate_pass: false
+      check_geo_alone:
+        type: condition
+        variable: has_geographic_detail
+        operator: eq
+        value: true
+        true_next: check_unique_drug
+        false_next: check_quasi_count
+      moderate_inference_drug_geo:
+        type: return
+        value:
+          inference_risk: MODERATE
+          action: REVIEW — unique drug combination + geography may enable inference
+          gate_pass: false
+          reidentification_probability: 5-10%
+          mitigation: Generalize geography to country level
+      low_inference_pair:
+        type: return
+        value:
+          reidentification_probability: <5%
+          gate_pass: true
+          action: PASS — 2 quasi-identifiers below cumulative threshold
+          inference_risk: LOW
+          mitigation: none
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      check_negation:
+        type: condition
+        variable: has_temporal_detail
+        operator: neq
+        value: true
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      null_guard_negation:
+        type: condition
+        variable: has_temporal_detail
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+      gate_pass: true
+    default: null
+    emit:
+      confidence_score: 0.7
+      verdict: confirmed
+      confidence: high
+  - when:
+      falsified: true
+      gate_pass: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when:
+      gate_pass: false
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: absent
+  - when: null
+    default:
+      confidence: medium
+      verdict: indeterminate
+      confidence_score: 0.5
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      has_occupation:
+        type: bool
+        required: false
+      has_temporal_detail:
+        type: bool
+        required: false
+      unique_drug_combination:
+        type: bool
+        required: false
+      is_rare_disease:
+        type: bool
+        required: false
+      has_exact_age:
+        type: bool
+        required: false
+      quasi_identifier_count:
+        type: int
+        required: false
+      has_geographic_detail:
+        type: bool
+        required: false
+    outputs:
+      mitigation:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+      action:
+        type: string
+        required: false
+      reidentification_probability:
+        type: string
+        required: false
+      gate_pass:
+        type: bool
+        required: false
+      inference_risk:
+        type: string
+        required: false
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    has_temporal_detail: null
+    has_geographic_detail: true
+  expect:
+    verdict: confirmed
+    confidence: high
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    has_temporal_detail: false
+    has_geographic_detail: true
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — generic with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: generic. Chains as dual-strand verifier before downstream consumers.'

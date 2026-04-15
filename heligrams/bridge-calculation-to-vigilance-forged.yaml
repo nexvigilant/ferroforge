@@ -1,0 +1,145 @@
+name: bridge-calculation-to-vigilance-helix
+description: 'Forged from microgram ''bridge-calculation-to-vigilance''. Domain: WorkflowRouting. 1 confounders. Confidence-weighted resolution.'
+version: 0.1.0
+type: heligram
+helix:
+  twist_rate: 5
+  base_pairs:
+    risk_score: falsified
+sense:
+  tree:
+    start: check_action
+    nodes:
+      critical_score:
+        type: return
+        value:
+          risk_score: 9.0
+          bridge: calculation-to-vigilance
+          source_priority: critical
+      check_action:
+        type: condition
+        variable: action
+        operator: eq
+        value: investigate
+        true_next: check_priority
+        false_next: archive_input
+      check_priority:
+        type: condition
+        variable: priority
+        operator: eq
+        value: critical
+        true_next: critical_score
+        false_next: high_score
+      archive_input:
+        type: return
+        value:
+          risk_score: 2.0
+          bridge: calculation-to-vigilance
+          source_priority: low
+      high_score:
+        type: return
+        value:
+          risk_score: 7.0
+          bridge: calculation-to-vigilance
+          source_priority: high
+antisense:
+  tree:
+    start: null_guard_negation
+    nodes:
+      null_guard_negation:
+        type: condition
+        variable: action
+        operator: is_null
+        value: null
+        true_next: not_falsified
+        false_next: check_negation
+      check_negation:
+        type: condition
+        variable: action
+        operator: neq
+        value: investigate
+        true_next: falsified
+        false_next: not_falsified
+      falsified:
+        type: return
+        value:
+          confounder_count: 1
+          falsified: true
+      not_falsified:
+        type: return
+        value:
+          falsified: false
+          confounder_count: 0
+resolution:
+  mode: base_pair
+  rules:
+  - when:
+      falsified: false
+    default: null
+    emit:
+      confidence_score: 0.7
+      confidence: high
+      verdict: confirmed
+  - when:
+      falsified: true
+    default: null
+    emit:
+      verdict: contested
+      confidence_score: 0.27999999999999997
+      confidence: low
+  - when: null
+    default:
+      confidence: medium
+      confidence_score: 0.5
+      verdict: indeterminate
+    emit: null
+interface:
+  major_groove:
+    inputs:
+      action:
+        type: string
+        required: false
+    outputs:
+      confidence_score:
+        type: float
+        required: false
+      confidence:
+        type: string
+        required: false
+      verdict:
+        type: string
+        required: false
+    aliases: {}
+  minor_groove: null
+tests:
+- name: 'Q1: confirmed — positive sense, no confounders'
+  input:
+    action: null
+  expect:
+    confidence: high
+    verdict: confirmed
+- name: 'Q2: contested — positive sense, negation active'
+  input:
+    action: __negated__
+  expect:
+    confidence: low
+    verdict: contested
+- name: 'Q3: default — empty input, no confounders'
+  input: {}
+  expect:
+    verdict: confirmed
+- name: 'Q4: null safety — graceful degradation'
+  input: {}
+  expect:
+    confidence: high
+primitive_signature:
+  dominant: ∂
+  expression: ∂(×(κ_sense, →_antisense)) — workflow-routing with 1 confounders
+  primes:
+  - ∂
+  - κ
+  - →
+  - ς
+  - ×
+  arguments: []
+  chain_prediction: 'Forged heligram. Domain: workflow-routing. Chains as dual-strand verifier before downstream consumers.'

@@ -1,0 +1,265 @@
+name: comms-link-router
+description: "Routes communication to the optimal link based on range, data rate, criticality, and link availability. 7 link types across 4 domains (short-range, long-range, air-band, emergency)."
+version: 0.1.0
+interface:
+  inputs:
+    range_km:
+      type: float
+      required: true
+      description: "Distance to destination in kilometers"
+    data_rate_required:
+      type: string
+      required: true
+      enum: [telemetry_only, low_bandwidth, medium_bandwidth, high_bandwidth, video]
+      description: "Required data throughput class"
+    criticality:
+      type: string
+      required: false
+      enum: [routine, priority, emergency, atc_mandatory]
+      description: "Message criticality level"
+    airborne:
+      type: boolean
+      required: false
+      description: "Whether the suit is currently in flight"
+    primary_5g_status:
+      type: string
+      required: false
+      enum: [connected, weak, unavailable]
+      description: "5G modem connection state"
+    wifi_available:
+      type: boolean
+      required: false
+      description: "Whether Wi-Fi 6E ground station is in range"
+  outputs:
+    selected_link:
+      type: string
+    domain:
+      type: string
+    max_data_rate:
+      type: string
+    latency_class:
+      type: string
+    fallback_link:
+      type: string
+    security_note:
+      type: string
+    rationale:
+      type: string
+tree:
+  start: check_atc_mandatory
+  nodes:
+    # Gate 0: ATC mandatory — VHF radio, no alternatives
+    check_atc_mandatory:
+      type: condition
+      variable: criticality
+      operator: eq
+      value: atc_mandatory
+      true_next: vhf_atc
+      false_next: check_airborne_adsb
+
+    # Gate 1: Airborne — ADS-B Out always active in flight
+    check_airborne_adsb:
+      type: condition
+      variable: airborne
+      operator: eq
+      value: true
+      true_next: check_airborne_data_need
+      false_next: check_wifi_available
+
+    check_airborne_data_need:
+      type: condition
+      variable: data_rate_required
+      operator: eq
+      value: telemetry_only
+      true_next: check_5g_air
+      false_next: check_5g_air
+
+    check_5g_air:
+      type: condition
+      variable: primary_5g_status
+      operator: eq
+      value: connected
+      true_next: fiveg_primary
+      false_next: check_5g_weak_air
+
+    check_5g_weak_air:
+      type: condition
+      variable: primary_5g_status
+      operator: eq
+      value: weak
+      true_next: check_satcom_need
+      false_next: check_satcom_need
+
+    check_satcom_need:
+      type: condition
+      variable: criticality
+      operator: eq
+      value: emergency
+      true_next: satcom_iridium
+      false_next: lora_fallback
+
+    # Gate 2: Ground — Wi-Fi available?
+    check_wifi_available:
+      type: condition
+      variable: wifi_available
+      operator: eq
+      value: true
+      true_next: check_wifi_data_need
+      false_next: check_5g_ground
+
+    check_wifi_data_need:
+      type: condition
+      variable: data_rate_required
+      operator: eq
+      value: video
+      true_next: wifi_6e
+      false_next: check_high_bw_wifi
+
+    check_high_bw_wifi:
+      type: condition
+      variable: data_rate_required
+      operator: eq
+      value: high_bandwidth
+      true_next: wifi_6e
+      false_next: check_5g_ground
+
+    # Gate 3: 5G available on ground?
+    check_5g_ground:
+      type: condition
+      variable: primary_5g_status
+      operator: eq
+      value: connected
+      true_next: fiveg_primary
+      false_next: check_ble_range
+
+    # Gate 4: BLE range (short-range controller pairing)
+    check_ble_range:
+      type: condition
+      variable: range_km
+      operator: lte
+      value: 0.1
+      true_next: ble_controller
+      false_next: check_lora_range
+
+    # Gate 5: LoRa range
+    check_lora_range:
+      type: condition
+      variable: range_km
+      operator: lte
+      value: 15
+      true_next: lora_fallback
+      false_next: satcom_iridium
+
+    # === TERMINAL NODES ===
+    vhf_atc:
+      type: return
+      value:
+        selected_link: vhf_radio
+        domain: air_band
+        max_data_rate: "voice only (8.33 kHz channel spacing)"
+        latency_class: "real-time (<50ms)"
+        fallback_link: none_atc_is_mandatory
+        security_note: "Unencrypted per aviation standards. Squawk code for identification. Do NOT encrypt ATC comms."
+        rationale: "ATC communication is legally mandatory when airborne in controlled airspace. VHF 118-137 MHz. No alternative link is acceptable."
+
+    wifi_6e:
+      type: return
+      value:
+        selected_link: wifi_6e
+        domain: short_range
+        max_data_rate: "up to 2.4 Gbps (Wi-Fi 6E, 6 GHz band)"
+        latency_class: "low (<10ms)"
+        fallback_link: fiveg_modem
+        security_note: "WPA3-Enterprise with mTLS to ground station. Certificate-pinned. No open networks."
+        rationale: "Ground station in range, high bandwidth needed. Wi-Fi 6E provides lowest latency and highest throughput for video/telemetry dump."
+
+    fiveg_primary:
+      type: return
+      value:
+        selected_link: fiveg_modem
+        domain: long_range
+        max_data_rate: "up to 1 Gbps (5G NR, depends on band)"
+        latency_class: "low (<20ms urban, <100ms rural)"
+        fallback_link: lora_telemetry
+        security_note: "mTLS over 5G. VPN tunnel to cloud backend. SIM-locked to operator. Signed firmware on modem."
+        rationale: "Primary cloud link for all data classes. Cellular coverage available. Fallback to LoRa if signal degrades."
+
+    ble_controller:
+      type: return
+      value:
+        selected_link: ble_5
+        domain: short_range
+        max_data_rate: "2 Mbps (BLE 5.0 PHY)"
+        latency_class: "low (<15ms)"
+        fallback_link: wifi_6e
+        security_note: "BLE Secure Connections (ECDH P-256). Paired controller only. Replay protection via nonce counter."
+        rationale: "Short range (<100m), controller pairing or wearable sensor sync. Low power, always-on."
+
+    lora_fallback:
+      type: return
+      value:
+        selected_link: lora_sx1276
+        domain: long_range
+        max_data_rate: "0.3-50 kbps (SF7-SF12, 125 kHz BW)"
+        latency_class: "high (1-10s per packet)"
+        fallback_link: satcom_iridium
+        security_note: "AES-128 encrypted payload. Device-specific session keys. No ACK on broadcast — fire-and-forget telemetry."
+        rationale: "All other links unavailable or insufficient. LoRa provides 10-15 km range for critical telemetry (GPS, battery SoC, fault codes). Not suitable for commands — telemetry only."
+
+    satcom_iridium:
+      type: return
+      value:
+        selected_link: iridium_certus
+        domain: long_range
+        max_data_rate: "up to 704 kbps (Certus 700)"
+        latency_class: "medium (200-600ms LEO orbital delay)"
+        fallback_link: none_last_resort
+        security_note: "Iridium network encryption + mTLS overlay. SBD messages signed. Position reporting may be legally required."
+        rationale: "Beyond terrestrial coverage — open ocean, remote wilderness, high altitude. Last-resort link. High cost per byte. Use for emergency beacons, position reports, and critical commands only."
+
+primitive_signature:
+  dominant: '→'
+  expression: '→(∂(l, ν)) — causal routing across boundary by location and frequency capacity'
+  primes: ['→', '∂', 'l', 'ν', 'N']
+  arguments: ['ς']
+
+tests:
+- name: "ATC mandatory — VHF radio, no choice"
+  input: { range_km: 5.0, data_rate_required: telemetry_only, criticality: atc_mandatory, airborne: true }
+  expect: { selected_link: vhf_radio, domain: air_band }
+
+- name: "airborne with 5G — primary cloud link"
+  input: { range_km: 50.0, data_rate_required: medium_bandwidth, airborne: true, primary_5g_status: connected }
+  expect: { selected_link: fiveg_modem }
+
+- name: "airborne, no 5G, emergency — satcom"
+  input: { range_km: 100.0, data_rate_required: telemetry_only, criticality: emergency, airborne: true, primary_5g_status: unavailable }
+  expect: { selected_link: iridium_certus }
+
+- name: "airborne, no 5G, routine — LoRa fallback"
+  input: { range_km: 50.0, data_rate_required: telemetry_only, criticality: routine, airborne: true, primary_5g_status: unavailable }
+  expect: { selected_link: lora_sx1276 }
+
+- name: "ground, Wi-Fi available, video — Wi-Fi 6E"
+  input: { range_km: 0.05, data_rate_required: video, wifi_available: true }
+  expect: { selected_link: wifi_6e, domain: short_range }
+
+- name: "ground, Wi-Fi available, low bandwidth — 5G preferred"
+  input: { range_km: 2.0, data_rate_required: low_bandwidth, wifi_available: true, primary_5g_status: connected }
+  expect: { selected_link: fiveg_modem }
+
+- name: "ground, close range, no Wi-Fi — BLE"
+  input: { range_km: 0.05, data_rate_required: low_bandwidth, wifi_available: false, primary_5g_status: unavailable }
+  expect: { selected_link: ble_5 }
+
+- name: "ground, medium range, no 5G — LoRa"
+  input: { range_km: 8.0, data_rate_required: telemetry_only, wifi_available: false, primary_5g_status: unavailable }
+  expect: { selected_link: lora_sx1276 }
+
+- name: "beyond all terrestrial — satcom"
+  input: { range_km: 50.0, data_rate_required: low_bandwidth, wifi_available: false, primary_5g_status: unavailable }
+  expect: { selected_link: iridium_certus }
+
+- name: "null safety — unknown range defaults to satcom (worst case)"
+  input: {}
+  expect: { selected_link: iridium_certus }
