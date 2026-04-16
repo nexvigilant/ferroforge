@@ -34,6 +34,8 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 | `crates/station/src/router.rs` | Tool dispatch |
 | `crates/station/src/server.rs` | Stdio MCP server loop |
 | `crates/station/src/telemetry.rs` | Per-tool-call metrics (timestamp, domain, duration_ms, status) |
+| `crates/station/src/meta_wire.rs` | Meta-tool bridge — one `station` tool when collapsed mode is active (LocalRouterClient adapter, collapsed tools/list branch) |
+| `crates/station-meta/` | Transport-agnostic meta-tool crate: discover/execute/explain + Ranker trait + optional HttpStationClient (`--features http`) |
 | `scripts/dispatch.py` | Unified proxy router — routes by domain prefix to per-domain proxy scripts |
 | `scripts/*_proxy.py` | Per-domain API proxy scripts (57 files — source: measured 2026-04-16) |
 | `scripts/forge.py` | Config generator from YAML specs |
@@ -120,6 +122,17 @@ Add as connector in Claude.ai Settings → Connectors:
 - **Tools visible:** 3,089 on Cloud Run = **3,082** from public configs + **7** runtime meta-tools injected by the station binary (`nexvigilant_chart_course`, `nexvigilant_capabilities`, `nexvigilant_directory`, `nexvigilant_station_health`, `nexvigilant_forge_diagnose`, `nexvigilant_hop`, `nexvigilant_ring_health`). `--exclude-private` filters configs marked `"private": true`. Source: `curl https://mcp.nexvigilant.com/tools` measured 2026-04-16.
 
 Source: `crates/station/src/server_streamable.rs`. Session-optional design: Claude.ai doesn't forward `Mcp-Session-Id` header, so all requests process statelessly.
+
+### Collapsed Mode (per-request, live on prod 2026-04-16)
+
+Any HTTP transport request carrying header `X-NexVigilant-Collapse: 1` receives a **single** `station` meta-tool instead of the full 3,089. Saves ~56k tokens/session for Claude Code sessions that opt in. Anonymous callers without the header still see the full product surface — no third-party regression.
+
+- **Implementation:** `crates/station-meta/` (transport-agnostic discover/execute/explain + `Ranker` trait with `JaccardRanker` default + opt-in `IdfRanker`) + `crates/station/src/meta_wire.rs` (LocalRouterClient adapter). Design doc: `docs/design/collapse-mode-header-switch.md`.
+- **Header parsing:** `crates/station/src/server.rs::parse_collapse_header` — truthy values (`1`, `true`, `yes`, `on`) → collapsed; any other value → full; absent → fall back to process default (`--collapse-tools` CLI flag, OFF on prod).
+- **Meta-tool modes:** `discover` ranks tool candidates by intent; `execute` routes to the underlying tool using `config=<domain>` (what `discover` returns); `explain` returns the token-budget taxonomy (regimes, waste classes, strategy tiers). Optional `ranker: "jaccard" | "idf"` on `discover`; default Jaccard is measurably better on 20 real PV intents (19/20 top-5 vs IDF's 17/20).
+- **Annotations:** the meta-tool deliberately OMITS `readOnlyHint` / `destructiveHint` — honest "unspecified" for a router over 3,089 heterogeneous tools (73 match mutating-verb patterns: `claude-fs-delete`, `fda-create-plan`, `gsheets-write-range`, etc.).
+
+Verified live: `curl -H "X-NexVigilant-Collapse: 1" https://mcp.nexvigilant.com/rpc -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'` returns exactly 1 tool. Without the header, 3,089. Same binary, same process, same URL.
 
 ### Public vs Private Configs
 
