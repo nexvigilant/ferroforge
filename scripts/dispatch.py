@@ -98,6 +98,13 @@ PARAMETER_ALIGNMENT: dict[str, dict[str, str]] = {
     "www_hsa_gov_sg_proxy.py":   {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
     "www_medsafe_govt_nz_proxy.py": {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
     "ctdbase_org_proxy.py":      {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    # --- EU regulators (batch 2026-04-16 — wiring audit) ---
+    "www_aemps_gob_es_proxy.py": {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "www_aifa_gov_it_proxy.py":  {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    "www_bfarm_de_proxy.py":     {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
+    # --- Generic regional regulator (10 domains: BPOM, CDSCO, FDA-PH, Thai FDA,
+    #     MFDS, NMPA, Roszdravnadzor, SAHPRA, SFDA, TFDA) ---
+    "generic_regulator_proxy.py": {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
     # --- Mesh linkage configs (2026-03-31) ---
     "multiregional_nexvigilant_com_proxy.py": {**_drug_alias_map("drug_name"), **_query_alias_map("drug_name")},
     "regulatory_mesh_nexvigilant_com_proxy.py": {},
@@ -243,48 +250,48 @@ _SORTED_ROUTES: list[tuple[str, str]] = sorted(
 # Core routing logic
 # ---------------------------------------------------------------------------
 
-def resolve_route(tool_name: str) -> tuple[str | None, str]:
+def resolve_route(tool_name: str) -> tuple[str | None, str, str]:
     """
-    Return (proxy_script_path, unprefixed_tool_name).
+    Return (proxy_script_path, unprefixed_tool_name, domain_string).
 
-    If no domain prefix matches, proxy_script_path is None and the original
-    tool name is returned unchanged.
-
-    The Rust binary preserves hyphens in domain prefixes (pv-engine_nexvigilant_com_)
-    while config discovery normalizes to underscores (pv_engine_nexvigilant_com_).
-    We try the original name first, then fall back to a hyphen→underscore normalized form.
+    domain_string is the config domain (dots restored from the prefix),
+    e.g. prefix "www_nmpa_gov_cn_" → domain "www.nmpa.gov.cn".
+    Empty string if no prefix matched.
     """
     for prefix, script_file in _SORTED_ROUTES:
         if tool_name.startswith(prefix):
             unprefixed = tool_name[len(prefix):].replace("_", "-")
             proxy_path = str(SCRIPTS_DIR / script_file)
-            return proxy_path, unprefixed
+            domain = prefix.rstrip("_").replace("_", ".")
+            return proxy_path, unprefixed, domain
 
-    # Fallback: normalize hyphens in the domain portion to underscores and retry
     normalized = tool_name.replace("-", "_")
     if normalized != tool_name:
         for prefix, script_file in _SORTED_ROUTES:
             if normalized.startswith(prefix):
                 unprefixed = normalized[len(prefix):].replace("_", "-")
                 proxy_path = str(SCRIPTS_DIR / script_file)
-                return proxy_path, unprefixed
+                domain = prefix.rstrip("_").replace("_", ".")
+                return proxy_path, unprefixed, domain
 
-    return None, tool_name
+    return None, tool_name, ""
 
 
-def call_proxy(proxy_path: str, tool_name: str, arguments: dict, request_id: str | None = None) -> dict:
+def call_proxy(proxy_path: str, tool_name: str, arguments: dict, request_id: str | None = None, *, domain: str = "") -> dict:
     """
     Invoke proxy_path as a subprocess, passing a JSON envelope on stdin.
     Returns the parsed JSON response dict.
 
     The proxy receives:
-        {"tool": "<unprefixed_tool_name>", "arguments": {...}, "request_id": "..."}
+        {"tool": "<unprefixed_tool_name>", "arguments": {...}, "request_id": "...", "_domain": "..."}
 
     The proxy must write a single JSON object to stdout and exit 0.
     """
     envelope = {"tool": tool_name, "arguments": arguments}
     if request_id:
         envelope["request_id"] = request_id
+    if domain:
+        envelope["_domain"] = domain
     payload = json.dumps(envelope)
     try:
         result = subprocess.run(
@@ -506,7 +513,7 @@ def dispatch(envelope: dict) -> dict:
             "error": "Envelope missing required field 'tool'",
         }
 
-    proxy_path, unprefixed = resolve_route(tool_name)
+    proxy_path, unprefixed, domain = resolve_route(tool_name)
 
     if proxy_path is None:
         return stub_response(tool_name, arguments)
@@ -555,7 +562,7 @@ def dispatch(envelope: dict) -> dict:
     if rejection is not None:
         return rejection
 
-    return call_proxy(proxy_path, unprefixed, aligned_args, request_id)
+    return call_proxy(proxy_path, unprefixed, aligned_args, request_id, domain=domain)
 
 
 def main_stdin() -> None:
@@ -684,7 +691,7 @@ def run_smoke_tests() -> None:
 
         # Resolve route without calling the proxy
         tool_name = envelope.get("tool", "")
-        proxy_path, unprefixed = resolve_route(tool_name)
+        proxy_path, unprefixed, _domain = resolve_route(tool_name)
 
         # Check alignment if test expects it
         expect_aligned_key = case.get("expect_aligned_key")
