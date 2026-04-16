@@ -1,0 +1,180 @@
+name: station-count-drift-gate
+description: >
+  Station-specific count drift gate. Wraps staleness-count-drift with
+  ferroforge config surface semantics: fires DRIFTED when the ratio of
+  (|measured - claimed| / claimed) exceeds the configured threshold.
+  Intended for SessionStart hook enforcement.
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(π(N), N_now) — pre-compute fractional drift for station surface'
+  primes: ['κ', 'π', 'N', '∂']
+  arguments: ['measured', 'claimed', 'threshold_pct']
+  chain_prediction: >
+    Pre-computer for the generic drift classifier. Caller passes raw measured
+    and claimed counts plus a fractional threshold (e.g. 0.05 = 5%). This gate
+    computes |measured - claimed|/claimed and routes to OK/DRIFTED/INVALID.
+    Pairs with staleness-count-drift for full chain: this → classifier → hook.
+interface:
+  inputs:
+    measured:
+      type: int
+      required: true
+      description: "Current measured count (e.g., ls ferroforge/configs/*.json | wc -l)"
+    claimed:
+      type: int
+      required: true
+      description: "Count claimed in CLAUDE.md or MEMORY.md"
+    threshold_pct:
+      type: float
+      required: false
+      description: "Fractional drift threshold (default 0.05 = 5%)"
+      default: 0.05
+    surface_name:
+      type: string
+      required: false
+      description: "Surface label for downstream reporting"
+      default: "station_configs"
+    drift_ratio:
+      type: float
+      required: true
+      description: "Caller pre-computes abs(measured-claimed)/max(claimed,1). Passed to gate for comparison."
+    threshold_exceeded:
+      type: bool
+      required: true
+      description: "Caller pre-computes (drift_ratio > threshold_pct). Microgram classifies."
+  outputs:
+    status:
+      type: string
+      description: "OK | DRIFTED | INVALID"
+    action:
+      type: string
+    surface:
+      type: string
+tree:
+  start: check_claimed_nonzero
+  nodes:
+    check_claimed_nonzero:
+      type: condition
+      variable: claimed
+      operator: lte
+      value: 0
+      true_next: invalid_claim
+      false_next: check_measured_nonneg
+
+    invalid_claim:
+      type: return
+      value:
+        status: INVALID
+        action: "INVALID: claimed count must be > 0 (got 0 or negative)"
+
+    check_measured_nonneg:
+      type: condition
+      variable: measured
+      operator: lt
+      value: 0
+      true_next: invalid_measure
+      false_next: check_drift_present
+
+    invalid_measure:
+      type: return
+      value:
+        status: INVALID
+        action: "INVALID: measured count must be >= 0"
+
+    check_drift_present:
+      type: condition
+      variable: threshold_exceeded
+      operator: is_null
+      value: null
+      true_next: invalid_drift
+      false_next: evaluate_drift
+
+    invalid_drift:
+      type: return
+      value:
+        status: INVALID
+        action: "INVALID: threshold_exceeded bool is required (caller pre-computes)"
+
+    evaluate_drift:
+      type: condition
+      variable: threshold_exceeded
+      operator: eq
+      value: true
+      true_next: drifted
+      false_next: ok
+
+    ok:
+      type: return
+      value:
+        status: OK
+        action: "Count within threshold — CLAUDE.md is consistent with disk"
+
+    drifted:
+      type: return
+      value:
+        status: DRIFTED
+        action: "Count drift exceeds threshold — update CLAUDE.md or investigate config churn"
+
+tests:
+- input:
+    measured: 274
+    claimed: 274
+    threshold_pct: 0.05
+    drift_ratio: 0.0
+    threshold_exceeded: false
+    surface_name: station_configs
+  expect:
+    status: OK
+
+- input:
+    measured: 274
+    claimed: 243
+    threshold_pct: 0.05
+    drift_ratio: 0.128
+    threshold_exceeded: true
+    surface_name: station_configs
+  expect:
+    status: DRIFTED
+
+- input:
+    measured: 280
+    claimed: 274
+    threshold_pct: 0.05
+    drift_ratio: 0.022
+    threshold_exceeded: false
+    surface_name: station_configs
+  expect:
+    status: OK
+
+- input:
+    measured: 0
+    claimed: 0
+    threshold_pct: 0.05
+    drift_ratio: 0.0
+    threshold_exceeded: false
+  expect:
+    status: INVALID
+
+- input:
+    measured: -1
+    claimed: 274
+    threshold_pct: 0.05
+    drift_ratio: 0.0
+    threshold_exceeded: false
+  expect:
+    status: INVALID
+
+- input:
+    measured: 1585
+    claimed: 464
+    threshold_pct: 0.05
+    drift_ratio: 2.416
+    threshold_exceeded: true
+    surface_name: micrograms
+  expect:
+    status: DRIFTED
+
+- input: {}
+  expect:
+    status: INVALID

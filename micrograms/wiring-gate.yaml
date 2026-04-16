@@ -1,0 +1,108 @@
+name: wiring-gate
+description: 'Session wiring quality gate — requires 3+ components wired across NexVigilant surfaces before session close'
+version: 0.2.0
+primitive_signature:
+  dominant: '∂'
+  expression: '∂(total >= threshold) → ς(verdict) — boundary gate on pre-computed component count'
+  primes: ['∂', 'N', 'ς']
+  arguments: ['total', 'surfaces', 'threshold']
+interface:
+  inputs:
+    total:
+      type: float
+      required: true
+      description: 'Total components wired (sum of all surfaces, computed by wrapper)'
+    surfaces:
+      type: float
+      required: true
+      description: 'Number of distinct surfaces with activity'
+    threshold:
+      type: float
+      required: false
+      description: 'Minimum components required (default 3)'
+  outputs:
+    verdict:
+      type: string
+    gate:
+      type: string
+    deficit:
+      type: float
+tree:
+  start: check_total
+  nodes:
+    check_total:
+      type: condition
+      variable: total
+      operator: gte
+      value: 3
+      true_next: check_multi_surface
+      false_next: fail
+    check_multi_surface:
+      type: condition
+      variable: surfaces
+      operator: gte
+      value: 2
+      true_next: pass_strong
+      false_next: pass_weak
+    pass_strong:
+      type: return
+      value:
+        verdict: PASS
+        gate: strong
+        deficit: 0
+    pass_weak:
+      type: return
+      value:
+        verdict: PASS
+        gate: weak
+        deficit: 0
+    fail:
+      type: return
+      value:
+        verdict: FAIL
+        gate: blocked
+        deficit: 1
+tests:
+  - name: 'pass_strong_3_across_2_surfaces'
+    input:
+      total: 5
+      surfaces: 2
+      threshold: 3
+    expect:
+      verdict: PASS
+      gate: strong
+  - name: 'pass_weak_3_on_1_surface'
+    input:
+      total: 3
+      surfaces: 1
+      threshold: 3
+    expect:
+      verdict: PASS
+      gate: weak
+  - name: 'fail_with_2_total'
+    input:
+      total: 2
+      surfaces: 2
+      threshold: 3
+    expect:
+      verdict: FAIL
+      gate: blocked
+  - name: 'fail_with_zero'
+    input:
+      total: 0
+      surfaces: 0
+      threshold: 3
+    expect:
+      verdict: FAIL
+  - name: 'pass_strong_many_components'
+    input:
+      total: 15
+      surfaces: 4
+      threshold: 3
+    expect:
+      verdict: PASS
+      gate: strong
+  - name: 'null_safety'
+    input: {}
+    expect:
+      verdict: FAIL

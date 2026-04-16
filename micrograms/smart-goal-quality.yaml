@@ -1,0 +1,343 @@
+name: smart-goal-quality
+description: Hierarchical gate-tree scoring of SMART goals across all 5 dimensions. First checkbox/vague pattern wins. Returns tier and the failing dimension. v0.3 expands vague-word vocabulary per dimension (scaffolding placeholders, empty strings, hedge words).
+version: 0.3.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(dim_i, checkbox_pattern) at ∂(priority_order) — cascading comparison gate across M/S/T/A/R'
+  primes: ['κ', '∂', '→', 'N']
+  arguments: ['measurable', 'specific', 'time_bound', 'achievable', 'relevant']
+  chain_prediction: 'Hierarchical κ — each dimension is a gate, priority encodes which failure mode hurts most. Measurable first (no metric = can''t verify done). Relevant last (inferable from context). First fail classifies.'
+interface:
+  inputs:
+    measurable:
+      type: string
+      required: true
+    specific:
+      type: string
+      required: true
+    time_bound:
+      type: string
+      required: true
+    achievable:
+      type: string
+      required: true
+    relevant:
+      type: string
+      required: true
+  outputs:
+    tier:
+      type: string
+    failing_dim:
+      type: string
+tree:
+  start: m_yes
+  nodes:
+    # ─── Measurable dimension (tier: checkbox) ───
+    m_yes:
+      type: condition
+      variable: measurable
+      operator: eq
+      value: "yes"
+      true_next: ret_checkbox_m
+      false_next: m_done
+    m_done:
+      type: condition
+      variable: measurable
+      operator: eq
+      value: "done"
+      true_next: ret_checkbox_m
+      false_next: m_works
+    m_works:
+      type: condition
+      variable: measurable
+      operator: eq
+      value: "works"
+      true_next: ret_checkbox_m
+      false_next: m_true
+    m_true:
+      type: condition
+      variable: measurable
+      operator: eq
+      value: "true"
+      true_next: ret_checkbox_m
+      false_next: m_complete
+    m_complete:
+      type: condition
+      variable: measurable
+      operator: eq
+      value: "complete"
+      true_next: ret_checkbox_m
+      false_next: m_ok
+    m_ok:
+      type: condition
+      variable: measurable
+      operator: eq
+      value: "ok"
+      true_next: ret_checkbox_m
+      false_next: m_finished
+    m_finished:
+      type: condition
+      variable: measurable
+      operator: eq
+      value: "finished"
+      true_next: ret_checkbox_m
+      false_next: s_yes
+
+    # ─── Specific dimension (tier: weak) ───
+    s_yes:
+      type: condition
+      variable: specific
+      operator: eq
+      value: "yes"
+      true_next: ret_weak_s
+      false_next: s_true
+    s_true:
+      type: condition
+      variable: specific
+      operator: eq
+      value: "true"
+      true_next: ret_weak_s
+      false_next: s_x
+    s_x:
+      type: condition
+      variable: specific
+      operator: eq
+      value: "x"
+      true_next: ret_weak_s
+      false_next: s_tbd
+    s_tbd:
+      type: condition
+      variable: specific
+      operator: eq
+      value: "tbd"
+      true_next: ret_weak_s
+      false_next: s_empty
+    s_empty:
+      type: condition
+      variable: specific
+      operator: eq
+      value: ""
+      true_next: ret_weak_s
+      false_next: t_soon
+
+    # ─── Time-bound dimension (tier: weak) ───
+    t_soon:
+      type: condition
+      variable: time_bound
+      operator: eq
+      value: "soon"
+      true_next: ret_weak_t
+      false_next: t_asap
+    t_asap:
+      type: condition
+      variable: time_bound
+      operator: eq
+      value: "asap"
+      true_next: ret_weak_t
+      false_next: t_whenever
+    t_whenever:
+      type: condition
+      variable: time_bound
+      operator: eq
+      value: "whenever"
+      true_next: ret_weak_t
+      false_next: t_empty
+    t_empty:
+      type: condition
+      variable: time_bound
+      operator: eq
+      value: ""
+      true_next: ret_weak_t
+      false_next: t_later
+    t_later:
+      type: condition
+      variable: time_bound
+      operator: eq
+      value: "later"
+      true_next: ret_weak_t
+      false_next: t_eventually
+    t_eventually:
+      type: condition
+      variable: time_bound
+      operator: eq
+      value: "eventually"
+      true_next: ret_weak_t
+      false_next: t_tbd
+    t_tbd:
+      type: condition
+      variable: time_bound
+      operator: eq
+      value: "tbd"
+      true_next: ret_weak_t
+      false_next: a_yes
+
+    # ─── Achievable dimension (tier: acceptable) ───
+    a_yes:
+      type: condition
+      variable: achievable
+      operator: eq
+      value: "yes"
+      true_next: ret_acc_a
+      false_next: a_true
+    a_true:
+      type: condition
+      variable: achievable
+      operator: eq
+      value: "true"
+      true_next: ret_acc_a
+      false_next: a_sure
+    a_sure:
+      type: condition
+      variable: achievable
+      operator: eq
+      value: "sure"
+      true_next: ret_acc_a
+      false_next: a_maybe
+    a_maybe:
+      type: condition
+      variable: achievable
+      operator: eq
+      value: "maybe"
+      true_next: ret_acc_a
+      false_next: a_empty
+    a_empty:
+      type: condition
+      variable: achievable
+      operator: eq
+      value: ""
+      true_next: ret_acc_a
+      false_next: r_yes
+
+    # ─── Relevant dimension (tier: acceptable) ───
+    r_yes:
+      type: condition
+      variable: relevant
+      operator: eq
+      value: "yes"
+      true_next: ret_acc_r
+      false_next: r_true
+    r_true:
+      type: condition
+      variable: relevant
+      operator: eq
+      value: "true"
+      true_next: ret_acc_r
+      false_next: r_relevant
+    r_relevant:
+      type: condition
+      variable: relevant
+      operator: eq
+      value: "relevant"
+      true_next: ret_acc_r
+      false_next: r_maybe
+    r_maybe:
+      type: condition
+      variable: relevant
+      operator: eq
+      value: "maybe"
+      true_next: ret_acc_r
+      false_next: r_empty
+    r_empty:
+      type: condition
+      variable: relevant
+      operator: eq
+      value: ""
+      true_next: ret_acc_r
+      false_next: ret_genuine
+
+    # ─── Returns (tier classifications) ───
+    ret_checkbox_m:
+      type: return
+      value:
+        tier: checkbox
+        failing_dim: measurable
+    ret_weak_s:
+      type: return
+      value:
+        tier: weak
+        failing_dim: specific
+    ret_weak_t:
+      type: return
+      value:
+        tier: weak
+        failing_dim: time_bound
+    ret_acc_a:
+      type: return
+      value:
+        tier: acceptable
+        failing_dim: achievable
+    ret_acc_r:
+      type: return
+      value:
+        tier: acceptable
+        failing_dim: relevant
+    ret_genuine:
+      type: return
+      value:
+        tier: genuine
+        failing_dim: none
+
+tests:
+- input:
+    measurable: "yes"
+    specific: "concrete scope"
+    time_bound: "2026-04-20"
+    achievable: "well-justified"
+    relevant: "user request"
+  expect:
+    tier: checkbox
+    failing_dim: measurable
+- input:
+    measurable: "done"
+    specific: "x"
+    time_bound: "x"
+    achievable: "x"
+    relevant: "x"
+  expect:
+    tier: checkbox
+    failing_dim: measurable
+- input:
+    measurable: "cargo test passes"
+    specific: "yes"
+    time_bound: "2026-04-20"
+    achievable: "well-justified"
+    relevant: "user request"
+  expect:
+    tier: weak
+    failing_dim: specific
+- input:
+    measurable: "cargo test passes"
+    specific: "concrete scope"
+    time_bound: "soon"
+    achievable: "well-justified"
+    relevant: "user request"
+  expect:
+    tier: weak
+    failing_dim: time_bound
+- input:
+    measurable: "cargo test passes"
+    specific: "concrete scope"
+    time_bound: "2026-04-20"
+    achievable: "yes"
+    relevant: "user request"
+  expect:
+    tier: acceptable
+    failing_dim: achievable
+- input:
+    measurable: "cargo test passes"
+    specific: "concrete scope"
+    time_bound: "2026-04-20"
+    achievable: "well-justified"
+    relevant: "yes"
+  expect:
+    tier: acceptable
+    failing_dim: relevant
+- input:
+    measurable: "cargo test passes with 15 pagination tests"
+    specific: "GET /api/users?page=1&limit=10 with cursor pagination"
+    time_bound: "2026-04-20 end of session"
+    achievable: "Existing users table + axum router pattern"
+    relevant: "User requested API pagination"
+  expect:
+    tier: genuine
+    failing_dim: none

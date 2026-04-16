@@ -1,0 +1,93 @@
+name: cs-publishable-gate
+description: Classifies Compendious Score (Cs = I/E x C x R) into tier — draft, acceptable, good, publishable. Used post knowledge_score to decide whether to archive or ship.
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(cs, threshold) at ∂(tier_bands) — cascading comparison across 4 density tiers'
+  primes: ['κ', '∂', 'N']
+  arguments: ['cs']
+  chain_prediction: 'κ on scalar cs. Priority-ordered thresholds: 2.0 publishable, 1.5 good, 0.5 acceptable, else draft. Sub-1ms eval.'
+interface:
+  inputs:
+    cs:
+      type: float
+      required: true
+  outputs:
+    tier:
+      type: string
+    publishable:
+      type: bool
+tree:
+  start: check_publishable
+  nodes:
+    check_publishable:
+      type: condition
+      variable: cs
+      operator: gte
+      value: 2.0
+      true_next: ret_publishable
+      false_next: check_good
+    check_good:
+      type: condition
+      variable: cs
+      operator: gte
+      value: 1.5
+      true_next: ret_good
+      false_next: check_acceptable
+    check_acceptable:
+      type: condition
+      variable: cs
+      operator: gte
+      value: 0.5
+      true_next: ret_acceptable
+      false_next: ret_draft
+    ret_publishable:
+      type: return
+      value:
+        tier: "publishable"
+        publishable: true
+    ret_good:
+      type: return
+      value:
+        tier: "good"
+        publishable: true
+    ret_acceptable:
+      type: return
+      value:
+        tier: "acceptable"
+        publishable: false
+    ret_draft:
+      type: return
+      value:
+        tier: "draft"
+        publishable: false
+tests:
+- input:
+    cs: 2.320
+  expect:
+    tier: "publishable"
+    publishable: true
+- input:
+    cs: 2.0
+  expect:
+    tier: "publishable"
+    publishable: true
+- input:
+    cs: 1.8
+  expect:
+    tier: "good"
+    publishable: true
+- input:
+    cs: 0.75
+  expect:
+    tier: "acceptable"
+    publishable: false
+- input:
+    cs: 0.3
+  expect:
+    tier: "draft"
+    publishable: false
+- input: {}
+  expect:
+    tier: "draft"
+    publishable: false

@@ -1,0 +1,88 @@
+name: batch-goal-quality-check
+description: Classifies a SMART goal batch by count — zero goals (empty session), few (focused), many (ambitious), excessive (overloaded). Pre-filter before per-goal quality scoring.
+version: 0.1.0
+primitive_signature:
+  dominant: 'κ'
+  expression: 'κ(goal_count, band_thresholds) — batch-level session health gate before per-goal analysis'
+  primes: ['κ', '∂', 'N']
+  arguments: ['goal_count']
+  chain_prediction: 'κ on count. Chains with smart-goal-quality (per-goal) — this is the batch-level pre-filter that catches empty and overloaded sessions.'
+interface:
+  inputs:
+    goal_count:
+      type: int
+      required: true
+  outputs:
+    batch_tier:
+      type: string
+    healthy:
+      type: bool
+tree:
+  start: check_excessive
+  nodes:
+    check_excessive:
+      type: condition
+      variable: goal_count
+      operator: gt
+      value: 7
+      true_next: ret_excessive
+      false_next: check_ambitious
+    check_ambitious:
+      type: condition
+      variable: goal_count
+      operator: gt
+      value: 5
+      true_next: ret_ambitious
+      false_next: check_focused
+    check_focused:
+      type: condition
+      variable: goal_count
+      operator: gte
+      value: 1
+      true_next: ret_focused
+      false_next: ret_empty
+    ret_excessive:
+      type: return
+      value:
+        batch_tier: "excessive"
+        healthy: false
+    ret_ambitious:
+      type: return
+      value:
+        batch_tier: "ambitious"
+        healthy: true
+    ret_focused:
+      type: return
+      value:
+        batch_tier: "focused"
+        healthy: true
+    ret_empty:
+      type: return
+      value:
+        batch_tier: "empty"
+        healthy: false
+tests:
+- input:
+    goal_count: 0
+  expect:
+    batch_tier: "empty"
+    healthy: false
+- input:
+    goal_count: 3
+  expect:
+    batch_tier: "focused"
+    healthy: true
+- input:
+    goal_count: 6
+  expect:
+    batch_tier: "ambitious"
+    healthy: true
+- input:
+    goal_count: 10
+  expect:
+    batch_tier: "excessive"
+    healthy: false
+- input: {}
+  expect:
+    batch_tier: "empty"
+    healthy: false

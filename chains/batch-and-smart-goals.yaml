@@ -1,0 +1,55 @@
+name: batch-and-smart-goals
+description: 'Two-step goal pipeline. Step 1 classifies the batch (empty/focused/ambitious/excessive). Step 2 runs per-goal M/S/T/A/R tier assignment. Batch-first gate catches overloaded or empty sessions before per-goal cost.'
+version: 0.1.0
+micrograms_dir: ../micrograms
+accumulate: true
+steps:
+  - batch-goal-quality-check
+  - smart-goal-quality
+tests:
+- name: empty session → batch=empty, tier=checkbox (vacuous)
+  input:
+    goal_count: 0
+    measurable: ""
+    specific: ""
+    time_bound: ""
+    achievable: ""
+    relevant: ""
+  expect:
+    batch_tier: "empty"
+    healthy: false
+- name: focused session with measurable goal → batch=focused, tier tiered
+  input:
+    goal_count: 2
+    measurable: "revenue > $10k MRR by Q2"
+    specific: "acquire 50 paying Patreon members"
+    time_bound: "2026-06-30"
+    achievable: "current funnel shows 15% conversion"
+    relevant: "primary KPI for year"
+  expect:
+    batch_tier: "focused"
+    healthy: true
+- name: ambitious batch → passes through, per-goal scores
+  input:
+    goal_count: 6
+    measurable: "yes"
+    specific: "yes"
+    time_bound: "yes"
+    achievable: "yes"
+    relevant: "yes"
+  expect:
+    batch_tier: "ambitious"
+    healthy: true
+    tier: "checkbox"
+    failing_dim: "measurable"
+- name: excessive batch — still runs per-goal but batch flags unhealthy
+  input:
+    goal_count: 10
+    measurable: "ship 1000 features"
+    specific: "vague vague vague"
+    time_bound: "someday"
+    achievable: "TBD"
+    relevant: "???"
+  expect:
+    batch_tier: "excessive"
+    healthy: false
