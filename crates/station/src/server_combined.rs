@@ -17,7 +17,7 @@ use uuid::Uuid;
 use crate::auth::{self, ApiKeyGate, AuthResult};
 use crate::config::ConfigRegistry;
 use crate::protocol::{JsonRpcRequest, StationEvent, StationEventNotification};
-use crate::server::handle_request_cached;
+use crate::server::{handle_request_with_collapse, parse_collapse_header};
 use crate::server_streamable::StreamableState;
 use crate::telemetry::StationTelemetry;
 
@@ -344,7 +344,8 @@ async fn handle_message(
         "SSE message received"
     );
 
-    let response = handle_request_cached(&state.registry, &state.telemetry, Some(&state.meter), &state.auth_gate, &request, Some(&state.event_tx), auth_header.as_deref(), &state.proxy_cache);
+    let collapse_override = parse_collapse_header(&headers);
+    let response = handle_request_with_collapse(&state.registry, &state.telemetry, Some(&state.meter), &state.auth_gate, &request, Some(&state.event_tx), auth_header.as_deref(), Some(&state.proxy_cache), collapse_override);
 
     if let Some(resp) = response {
         let json = match serde_json::to_string(&resp) {
@@ -387,7 +388,8 @@ async fn handle_rpc(
         }
     }
 
-    let response = handle_request_cached(&state.registry, &state.telemetry, Some(&state.meter), &state.auth_gate, &request, Some(&state.event_tx), auth_header.as_deref(), &state.proxy_cache);
+    let collapse_override = parse_collapse_header(&headers);
+    let response = handle_request_with_collapse(&state.registry, &state.telemetry, Some(&state.meter), &state.auth_gate, &request, Some(&state.event_tx), auth_header.as_deref(), Some(&state.proxy_cache), collapse_override);
     match response {
         Some(resp) => (StatusCode::OK, Json(resp)).into_response(),
         None => StatusCode::ACCEPTED.into_response(),
@@ -434,7 +436,8 @@ async fn handle_tool_call(
         })),
     };
 
-    let response = handle_request_cached(&state.registry, &state.telemetry, Some(&state.meter), &state.auth_gate, &request, Some(&state.event_tx), auth_header.as_deref(), &state.proxy_cache);
+    let collapse_override = parse_collapse_header(&headers);
+    let response = handle_request_with_collapse(&state.registry, &state.telemetry, Some(&state.meter), &state.auth_gate, &request, Some(&state.event_tx), auth_header.as_deref(), Some(&state.proxy_cache), collapse_override);
     match response {
         Some(resp) => {
             if let Some(result) = resp.result {

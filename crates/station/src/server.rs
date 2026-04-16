@@ -78,7 +78,7 @@ pub fn handle_request(
     event_tx: Option<&broadcast::Sender<StationEvent>>,
     auth_header: Option<&str>,
 ) -> Option<JsonRpcResponse> {
-    handle_request_core(registry, telemetry, meter, auth_gate, req, event_tx, auth_header, None)
+    handle_request_core(registry, telemetry, meter, auth_gate, req, event_tx, auth_header, None, None)
 }
 
 /// Handle request with auth header — backward compat, no proxy cache.
@@ -91,7 +91,7 @@ pub fn handle_request_with_auth(
     event_tx: Option<&broadcast::Sender<StationEvent>>,
     auth_header: Option<&str>,
 ) -> Option<JsonRpcResponse> {
-    handle_request_core(registry, telemetry, meter, auth_gate, req, event_tx, auth_header, None)
+    handle_request_core(registry, telemetry, meter, auth_gate, req, event_tx, auth_header, None, None)
 }
 
 /// Handle request with proxy cache for FAERS total count acceleration.
@@ -106,7 +106,40 @@ pub fn handle_request_cached(
     auth_header: Option<&str>,
     proxy_cache: &router::ProxyCache,
 ) -> Option<JsonRpcResponse> {
-    handle_request_core(registry, telemetry, meter, auth_gate, req, event_tx, auth_header, Some(proxy_cache))
+    handle_request_core(registry, telemetry, meter, auth_gate, req, event_tx, auth_header, Some(proxy_cache), None)
+}
+
+/// Handle request with per-request collapse override (HTTP transports).
+///
+/// `collapse_override` comes from the `X-NexVigilant-Collapse` request header:
+/// - `Some(true)` → collapsed (one `station` meta-tool)
+/// - `Some(false)` → full tool list
+/// - `None` → fall back to `registry.collapse_tools_default`
+#[allow(clippy::too_many_arguments)]
+pub fn handle_request_with_collapse(
+    registry: &ConfigRegistry,
+    telemetry: &StationTelemetry,
+    meter: Option<&crate::metering::StationMeter>,
+    auth_gate: &ApiKeyGate,
+    req: &JsonRpcRequest,
+    event_tx: Option<&broadcast::Sender<StationEvent>>,
+    auth_header: Option<&str>,
+    proxy_cache: Option<&router::ProxyCache>,
+    collapse_override: Option<bool>,
+) -> Option<JsonRpcResponse> {
+    handle_request_core(registry, telemetry, meter, auth_gate, req, event_tx, auth_header, proxy_cache, collapse_override)
+}
+
+/// Parse the `X-NexVigilant-Collapse` header into an `Option<bool>`.
+///
+/// Returns `Some(true)` for truthy values (`1`, `true`, `yes`, `on`),
+/// `Some(false)` for any other present value (explicit opt-out),
+/// and `None` when the header is absent (fall back to process default).
+pub fn parse_collapse_header(headers: &axum::http::HeaderMap) -> Option<bool> {
+    headers
+        .get("x-nexvigilant-collapse")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| matches!(s.trim(), "1" | "true" | "yes" | "on"))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -119,7 +152,10 @@ fn handle_request_core(
     event_tx: Option<&broadcast::Sender<StationEvent>>,
     auth_header: Option<&str>,
     proxy_cache: Option<&router::ProxyCache>,
+    collapse_override: Option<bool>,
 ) -> Option<JsonRpcResponse> {
+    // Effective collapse = per-request override, fallback to process default.
+    let collapsed = collapse_override.unwrap_or(registry.collapse_tools_default);
     let id = req.id.clone();
 
     // Validate JSON-RPC version (fixes Issue #10)
@@ -186,8 +222,19 @@ fn handle_request_core(
 
         "tools/list" => {
             let authenticated = auth_gate.is_authenticated(auth_header);
-            let tools = registry.tool_infos_filtered(authenticated);
-            info!(count = tools.len(), authenticated, "Tools list requested");
+            let tools = if collapsed {
+                // Collapse mode: advertise ONE synthetic meta-tool instead of ~3,000.
+                // This is the token-reclaim path — see meta_wire.rs for rationale.
+                vec![crate::meta_wire::station_tool_info()]
+            } else {
+                registry.tool_infos_filtered(authenticated)
+            };
+            info!(
+                count = tools.len(),
+                authenticated,
+                collapsed,
+                "Tools list requested"
+            );
             let result = ToolsListResult { tools };
             Some(JsonRpcResponse::success(
                 id,
@@ -216,7 +263,32 @@ fn handle_request_core(
 
             info!(tool = %tool_name, "Tool call");
             let timer = telemetry::start_timer();
-            let result = router::route_tool_call(registry, telemetry, meter, auth_gate, auth_header, tool_name, &arguments, proxy_cache);
+            let result = if collapsed {
+                // Collapse mode: route EVERYTHING through the meta-tool.
+                // The `station` tool dispatches discover/execute; any other
+                // tool name is rejected with a hint pointing to `station`.
+                if tool_name == "station" {
+                    crate::meta_wire::handle_meta_call(
+                        registry, telemetry, meter, auth_gate, auth_header, proxy_cache, &arguments,
+                    )
+                } else {
+                    crate::protocol::ToolCallResult {
+                        content: vec![crate::protocol::ContentBlock::Text {
+                            text: serde_json::json!({
+                                "status": "error",
+                                "error": format!(
+                                    "Station is in collapsed mode — call `station` with mode=discover (intent=...) or mode=execute (config/tool/params). Tool `{}` is not advertised directly.",
+                                    tool_name
+                                )
+                            })
+                            .to_string(),
+                        }],
+                        is_error: Some(true),
+                    }
+                }
+            } else {
+                router::route_tool_call(registry, telemetry, meter, auth_gate, auth_header, tool_name, &arguments, proxy_cache)
+            };
             let duration_ms = telemetry::elapsed_ms(timer);
 
             // Emit station event to broadcast channel
@@ -314,4 +386,73 @@ fn write_response(out: &mut impl Write, response: &JsonRpcResponse) -> Result<()
     writeln!(out, "{json}")?;
     out.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::HeaderMap;
+
+    fn headers_with(name: &str, value: &str) -> HeaderMap {
+        let mut m = HeaderMap::new();
+        m.insert(
+            axum::http::HeaderName::from_bytes(name.as_bytes()).unwrap(),
+            axum::http::HeaderValue::from_str(value).unwrap(),
+        );
+        m
+    }
+
+    // --- parse_collapse_header ---
+
+    #[test]
+    fn collapse_header_absent_returns_none() {
+        assert_eq!(parse_collapse_header(&HeaderMap::new()), None);
+    }
+
+    #[test]
+    fn collapse_header_truthy_values_return_some_true() {
+        for val in &["1", "true", "yes", "on"] {
+            let h = headers_with("x-nexvigilant-collapse", val);
+            assert_eq!(
+                parse_collapse_header(&h),
+                Some(true),
+                "expected Some(true) for '{val}'"
+            );
+        }
+    }
+
+    #[test]
+    fn collapse_header_falsy_values_return_some_false() {
+        for val in &["0", "false", "no", "off", ""] {
+            let h = headers_with("x-nexvigilant-collapse", val);
+            assert_eq!(
+                parse_collapse_header(&h),
+                Some(false),
+                "expected Some(false) for '{val}'"
+            );
+        }
+    }
+
+    #[test]
+    fn collapse_header_override_beats_default() {
+        // Simulate: process default = true, header says false → effective = false
+        let override_val: Option<bool> = Some(false);
+        let default_val = true;
+        let effective = override_val.unwrap_or(default_val);
+        assert!(!effective, "header override should win over process default");
+
+        // Simulate: process default = false, header says true → effective = true
+        let override_val: Option<bool> = Some(true);
+        let default_val = false;
+        let effective = override_val.unwrap_or(default_val);
+        assert!(effective, "header override should win over process default");
+    }
+
+    #[test]
+    fn collapse_header_none_falls_back_to_default() {
+        let override_val: Option<bool> = None;
+        let default_val = true;
+        let effective = override_val.unwrap_or(default_val);
+        assert!(effective, "absent header should fall back to process default");
+    }
 }

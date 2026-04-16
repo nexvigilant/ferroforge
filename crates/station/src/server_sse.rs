@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::auth::{ApiKeyGate, AuthResult};
 use crate::config::ConfigRegistry;
 use crate::protocol::{JsonRpcRequest, StationEvent, StationEventNotification};
-use crate::server::handle_request;
+use crate::server::{handle_request_with_collapse, parse_collapse_header};
 use crate::telemetry::StationTelemetry;
 
 type SseChannel = mpsc::Sender<Result<Event, axum::Error>>;
@@ -211,7 +211,8 @@ async fn handle_message(
         "SSE message received"
     );
 
-    let response = handle_request(&state.registry, &state.telemetry, None, &state.auth_gate, &request, Some(&state.event_tx), None);
+    let collapse_override = parse_collapse_header(&headers);
+    let response = handle_request_with_collapse(&state.registry, &state.telemetry, None, &state.auth_gate, &request, Some(&state.event_tx), None, None, collapse_override);
 
     if let Some(resp) = response {
         let json = match serde_json::to_string(&resp) {

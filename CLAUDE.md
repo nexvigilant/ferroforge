@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## FerroForge — NexVigilant Station
 
-Rust MCP server + 243 domain configs (2,018 tools). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio, SSE, and Streamable HTTP. Forge pipeline: `forge.py` (YAML→config), `forge_from_crates.py` (nexcore→config), `forge_nucleus.py` (config→page). Nexcore bridge proxy covers 119 rust-native gap configs via `nexcore_proxy.py`. 55 proxy scripts total. (measured 2026-03-31)
+Rust MCP server + 274 domain configs (3,095 tools — 3,082 public, 13 private). The station binary reads JSON configs from `configs/` and exposes them as MCP tools over stdio, SSE, and Streamable HTTP. Forge pipeline: `forge.py` (YAML→config), `forge_from_crates.py` (nexcore→config), `forge_nucleus.py` (config→page). Nexcore bridge proxy covers 119 rust-native gap configs via `nexcore_proxy.py`. 57 proxy scripts total. (measured 2026-04-16)
 
 ## Build & Test
 
@@ -35,14 +35,14 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 | `crates/station/src/server.rs` | Stdio MCP server loop |
 | `crates/station/src/telemetry.rs` | Per-tool-call metrics (timestamp, domain, duration_ms, status) |
 | `scripts/dispatch.py` | Unified proxy router — routes by domain prefix to per-domain proxy scripts |
-| `scripts/*_proxy.py` | Per-domain API proxy scripts (39 files — source: measured 2026-03-29) |
+| `scripts/*_proxy.py` | Per-domain API proxy scripts (57 files — source: measured 2026-04-16) |
 | `scripts/forge.py` | Config generator from YAML specs |
 | `scripts/forge_from_crates.py` | Config generator from nexcore MCP tool introspection |
 | `scripts/forge_nucleus.py` | Nucleus page scaffolder from Station configs |
 | `scripts/nexcore_proxy.py` | Bridge proxy: routes rust-native gaps to nexcore-mcp binary |
 | `scripts/config_forge.py` | Config generator + hub deployer (self-hosted or Cloud Run) |
 
-## Config Inventory (243 configs, 2,018 tools — source: measured 2026-03-31)
+## Config Inventory (274 configs, 3,095 tools — 3,082 public, 13 private — source: measured 2026-04-16)
 
 **Live API proxies (10):** openfda, clinicaltrials, pubmed, dailymed, rxnav, openvigilfrance, fda-accessdata, eudravigilance, fda-safety, science
 
@@ -52,7 +52,7 @@ configs/*.json  -->  ConfigRegistry  -->  MCP tools/list  -->  Agent discovery
 
 **Reference configs:** ich, cioms, who-umc, meddra, drugbank, vigiaccess, ema, fda-safety, wikipedia, compliance, algovigilance, chemivigilance, cccp, harm-taxonomy, tov, pvdsl, dtree, dataframe, edit-distance, energy, zeta, dna, benefit-risk, vigilance
 
-**All 243 configs have proxy scripts or Rust-native handlers** — 0 stubs remaining. 55 proxy files serve 243 configs. 119 rust-native gap configs routed through nexcore bridge proxy (`nexcore_proxy.py` → `nexcore-mcp` binary via stdio JSON-RPC).
+**All 274 configs have proxy scripts or Rust-native handlers** — 0 stubs remaining. 57 proxy files serve 274 configs. 119 rust-native gap configs routed through nexcore bridge proxy (`nexcore_proxy.py` → `nexcore-mcp` binary via stdio JSON-RPC).
 
 **Metering:** Live toll billing at 1.30x harness premium. `/billing/usage`, `/billing/rates`, `/billing/balance` endpoints. Per-key usage tracking with token estimation and cost computation.
 
@@ -117,13 +117,13 @@ Add as connector in Claude.ai Settings → Connectors:
 - **URL:** `https://mcp.nexvigilant.com/mcp`
 - **Auth:** None (authless — `NEXVIGILANT_API_KEYS` not set on Cloud Run)
 - **Protocol:** MCP 2025-03-26 Streamable HTTP
-- **Tools visible:** ~340 (public configs only — `--exclude-private` filters private configs)
+- **Tools visible:** 3,089 on Cloud Run = **3,082** from public configs + **7** runtime meta-tools injected by the station binary (`nexvigilant_chart_course`, `nexvigilant_capabilities`, `nexvigilant_directory`, `nexvigilant_station_health`, `nexvigilant_forge_diagnose`, `nexvigilant_hop`, `nexvigilant_ring_health`). `--exclude-private` filters configs marked `"private": true`. Source: `curl https://mcp.nexvigilant.com/tools` measured 2026-04-16.
 
 Source: `crates/station/src/server_streamable.rs`. Session-optional design: Claude.ai doesn't forward `Mcp-Session-Id` header, so all requests process statelessly.
 
 ### Public vs Private Configs
 
-`--exclude-private` flag in Dockerfile CMD filters configs with `"private": true`. Public configs are exposed on Cloud Run (~340 tools). Private configs are available locally via stdio but not on the public endpoint.
+`--exclude-private` flag in Dockerfile CMD filters configs with `"private": true`. Public configs are exposed on Cloud Run (3,089 tools live = 3,082 from configs + 7 runtime meta-tools added by the station binary — source: measured 2026-04-16). Private configs are available locally via stdio but not on the public endpoint.
 
 **DO NOT deploy to webmcp-hub.com.** The third-party hub has a 50-config cap and is no longer the primary deployment target. All agent traffic routes through `mcp.nexvigilant.com`.
 

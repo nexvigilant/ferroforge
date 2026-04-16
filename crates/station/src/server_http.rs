@@ -12,7 +12,7 @@ use tracing::{debug, info};
 use crate::auth::{self, ApiKeyGate, AuthResult};
 use crate::config::ConfigRegistry;
 use crate::protocol::{JsonRpcRequest, StationEvent};
-use crate::server::handle_request;
+use crate::server::{handle_request_with_collapse, parse_collapse_header};
 use crate::telemetry::StationTelemetry;
 
 struct AppState {
@@ -80,7 +80,8 @@ async fn handle_rpc(
         }
     }
 
-    let response = handle_request(&state.registry, &state.telemetry, None, &state.auth_gate, &request, Some(&state.event_tx), None);
+    let collapse_override = parse_collapse_header(&headers);
+    let response = handle_request_with_collapse(&state.registry, &state.telemetry, None, &state.auth_gate, &request, Some(&state.event_tx), None, None, collapse_override);
     match response {
         Some(resp) => (StatusCode::OK, Json(resp)).into_response(),
         None => StatusCode::ACCEPTED.into_response(),
@@ -125,7 +126,8 @@ async fn handle_tool_call(
         })),
     };
 
-    let response = handle_request(&state.registry, &state.telemetry, None, &state.auth_gate, &request, Some(&state.event_tx), None);
+    let collapse_override = parse_collapse_header(&headers);
+    let response = handle_request_with_collapse(&state.registry, &state.telemetry, None, &state.auth_gate, &request, Some(&state.event_tx), None, None, collapse_override);
     match response {
         Some(resp) => {
             // Unwrap the JSON-RPC envelope for REST clients

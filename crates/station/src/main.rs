@@ -48,6 +48,13 @@ struct Cli {
     /// Exclude configs marked as private (for public deployments)
     #[arg(long, default_value = "false")]
     exclude_private: bool,
+
+    /// Set the *default* collapse mode for this process.
+    /// When enabled, `tools/list` returns ONE synthetic `station` meta-tool instead of ~3,000.
+    /// Individual HTTP requests can override this default via the `X-NexVigilant-Collapse` header.
+    /// Default OFF — preserves existing tools/list behavior for unannotated clients.
+    #[arg(long, default_value = "false")]
+    collapse_tools: bool,
 }
 
 fn main() -> Result<()> {
@@ -80,7 +87,11 @@ fn main() -> Result<()> {
         "NexVigilant Station starting"
     );
 
-    let registry = ConfigRegistry::load_from_dir_filtered(&cli.config_dir, cli.exclude_private)?;
+    let mut registry = ConfigRegistry::load_from_dir_filtered(&cli.config_dir, cli.exclude_private)?;
+    registry.collapse_tools_default = cli.collapse_tools;
+    if cli.collapse_tools {
+        info!("Collapsed-tools default ON: tools/list returns ONE `station` meta-tool (override via X-NexVigilant-Collapse header)");
+    }
     let telemetry = if matches!(cli.transport, Transport::Stdio) {
         StationTelemetry::new_local(Some(cli.telemetry_log))
     } else {

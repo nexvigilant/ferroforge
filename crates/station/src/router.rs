@@ -578,9 +578,9 @@ fn execute_tool(
         // rust-native configs that don't have dedicated try_handle wiring.
         if proxy == "rust-native" {
             let dispatch_proxy = "scripts/dispatch.py";
-            return execute_proxy(dispatch_proxy, mcp_name, arguments, station_root, request_id, proxy_cache);
+            return execute_proxy(dispatch_proxy, mcp_name, arguments, station_root, request_id, proxy_cache, &config.domain);
         }
-        return execute_proxy(proxy, mcp_name, arguments, station_root, request_id, proxy_cache);
+        return execute_proxy(proxy, mcp_name, arguments, station_root, request_id, proxy_cache, &config.domain);
     }
 
     // Fall back to stub response if no proxy is available
@@ -628,6 +628,7 @@ fn execute_proxy(
     station_root: &str,
     request_id: &str,
     proxy_cache: Option<&ProxyCache>,
+    domain: &str,
 ) -> ToolCallResult {
     // Fast path: if this is a dispatch.py call and the daemon is alive, use it.
     // Falls through to subprocess on any failure (~13.9x speedup when daemon works).
@@ -686,6 +687,7 @@ fn execute_proxy(
             "tool": bare,
             "arguments": arguments,
             "request_id": request_id,
+            "_domain": domain,
         })
     };
 
@@ -834,8 +836,28 @@ fn inject_request_id(result: &mut ToolCallResult, request_id: &str) {
 /// `_ch_`, `_int_`) and strip everything up to and including it.
 /// Remaining underscores become hyphens (kebab-case).
 fn strip_domain_prefix(mcp_name: &str) -> String {
-    let tld_markers = ["_gov_", "_com_", "_org_", "_eu_", "_fr_", "_ch_", "_int_"];
+    let ccld_markers = [
+        "_gov_au_", "_gov_br_", "_gov_cn_", "_gov_hk_", "_gov_in_",
+        "_gov_ph_", "_gov_ru_", "_gov_sa_", "_gov_sg_", "_gov_tw_",
+        "_gov_uk_", "_gov_za_", "_gob_es_", "_gob_mx_", "_gov_it_",
+        "_go_id_", "_go_jp_", "_go_kr_", "_go_th_",
+        "_org_za_", "_org_ru_",
+        "_ac_uk_",
+        "_com_hk_",
+    ];
+    for marker in &ccld_markers {
+        if let Some(pos) = mcp_name.find(marker) {
+            let bare = &mcp_name[pos + marker.len()..];
+            return bare.replace('_', "-");
+        }
+    }
 
+    let tld_markers = [
+        "_gov_", "_com_", "_org_", "_eu_", "_fr_", "_ch_", "_int_",
+        "_es_", "_it_", "_de_", "_ru_", "_kr_", "_cn_", "_za_", "_sa_",
+        "_tw_", "_th_", "_in_", "_id_", "_ph_", "_br_", "_jp_", "_au_",
+        "_uk_", "_nz_", "_sg_", "_hk_",
+    ];
     for marker in &tld_markers {
         if let Some(pos) = mcp_name.rfind(marker) {
             let bare = &mcp_name[pos + marker.len()..];
@@ -843,7 +865,6 @@ fn strip_domain_prefix(mcp_name: &str) -> String {
         }
     }
 
-    // No TLD found — return as-is with underscore→hyphen conversion
     mcp_name.replace('_', "-")
 }
 

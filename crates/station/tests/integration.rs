@@ -17,6 +17,8 @@ fn test_telemetry() -> StationTelemetry {
 fn test_registry() -> ConfigRegistry {
     ConfigRegistry {
         station_root: "/tmp".into(),
+        configs_dir: "/tmp".into(),
+        collapse_tools_default: false,
         configs: vec![
             HubConfig {
                 domain: "api.fda.gov".into(),

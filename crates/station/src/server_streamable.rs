@@ -25,7 +25,7 @@ use uuid::Uuid;
 use crate::auth::{ApiKeyGate, AuthResult};
 use crate::config::ConfigRegistry;
 use crate::protocol::{JsonRpcRequest, JsonRpcResponse, StationEvent, StationEventNotification};
-use crate::server::{handle_request, handle_request_with_auth};
+use crate::server::{handle_request, handle_request_with_collapse, parse_collapse_header};
 use crate::telemetry::StationTelemetry;
 
 /// Maximum concurrent Streamable HTTP sessions.
@@ -171,7 +171,8 @@ pub async fn handle_mcp_post(
                     let batch_auth = headers
                         .get(axum::http::header::AUTHORIZATION)
                         .and_then(|v| v.to_str().ok());
-                    if let Some(resp) = handle_request_with_auth(
+                    let collapse_override = parse_collapse_header(&headers);
+                    if let Some(resp) = handle_request_with_collapse(
                         &state.registry,
                         &state.telemetry,
                         Some(&state.meter),
@@ -179,6 +180,8 @@ pub async fn handle_mcp_post(
                         req,
                         Some(&state.event_tx),
                         batch_auth,
+                        None,
+                        collapse_override,
                     ) {
                         responses.push(resp);
                     }
@@ -269,7 +272,8 @@ pub async fn handle_mcp_post(
     let auth_header = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
-    let response = handle_request_with_auth(
+    let collapse_override = parse_collapse_header(&headers);
+    let response = handle_request_with_collapse(
         &state.registry,
         &state.telemetry,
         Some(&state.meter),
@@ -277,6 +281,8 @@ pub async fn handle_mcp_post(
         &request,
         Some(&state.event_tx),
         auth_header,
+        None,
+        collapse_override,
     );
 
     match response {

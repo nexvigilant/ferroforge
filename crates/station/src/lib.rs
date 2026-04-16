@@ -40,6 +40,7 @@ pub mod heligram;
 pub mod helix;
 pub mod markov;
 pub mod marketing;
+pub mod meta_wire;
 pub mod metering;
 pub mod moltbook;
 pub mod molecular_weight;

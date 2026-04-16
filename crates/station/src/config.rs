@@ -91,6 +91,12 @@ pub struct ConfigRegistry {
     pub configs: Vec<HubConfig>,
     /// Root directory of the station (for resolving relative proxy paths)
     pub station_root: String,
+    /// Directory the configs were loaded from (for lazy rebuilding of the meta-tool discovery index).
+    pub configs_dir: String,
+    /// Default collapse mode for this process — set via `--collapse-tools` at startup.
+    /// When true, `tools/list` returns ONE synthetic `station` meta-tool instead of ~3,000.
+    /// Per-request `X-NexVigilant-Collapse` header overrides this default for HTTP transports.
+    pub collapse_tools_default: bool,
 }
 
 impl ConfigRegistry {
@@ -109,6 +115,8 @@ impl ConfigRegistry {
             return Ok(Self {
                 configs,
                 station_root: dir.parent().unwrap_or(dir).to_string_lossy().into(),
+                configs_dir: dir.to_string_lossy().into(),
+                collapse_tools_default: false,
             });
         }
 
@@ -170,6 +178,11 @@ impl ConfigRegistry {
                 .unwrap_or(dir)
                 .to_string_lossy()
                 .into(),
+            configs_dir: dir.canonicalize()
+                .unwrap_or_else(|_| dir.to_path_buf())
+                .to_string_lossy()
+                .into(),
+            collapse_tools_default: false,
         })
     }
 
